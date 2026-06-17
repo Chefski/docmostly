@@ -33,7 +33,7 @@ final class PageReaderViewModel {
 
         do {
             let comment = try await appState.addPageComment(pageId: pageID, text: draftComment)
-            comments.insert(comment, at: 0)
+            applyCreatedComment(comment)
             draftComment = ""
         } catch {
             commentErrorMessage = error.localizedDescription
@@ -76,15 +76,13 @@ final class PageReaderViewModel {
         if let index = comments.firstIndex(where: { $0.id == comment.id }) {
             comments[index] = comment
         } else {
-            comments.insert(comment, at: 0)
+            comments.append(comment)
         }
     }
 
     func applyUpdatedComment(_ comment: DocmostComment) {
         if let index = comments.firstIndex(where: { $0.id == comment.id }) {
             comments[index] = comment
-        } else {
-            comments.insert(comment, at: 0)
         }
     }
 

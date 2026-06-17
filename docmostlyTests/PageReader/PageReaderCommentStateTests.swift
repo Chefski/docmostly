@@ -33,7 +33,7 @@ struct PageReaderCommentStateTests {
         #expect(viewModel.comments.map(\.id) == ["comment-1"])
     }
 
-    @Test func createdCommentIsPrependedOnce() throws {
+    @Test func createdCommentIsAppendedOnce() throws {
         let viewModel = PageReaderViewModel()
         let existingComment = try comment(id: "comment-1", text: "Existing", resolvedAt: nil)
         let newComment = try comment(id: "comment-2", text: "New", resolvedAt: nil)
@@ -42,7 +42,18 @@ struct PageReaderCommentStateTests {
         viewModel.applyCreatedComment(newComment)
         viewModel.applyCreatedComment(newComment)
 
-        #expect(viewModel.comments.map(\.id) == ["comment-2", "comment-1"])
+        #expect(viewModel.comments.map(\.id) == ["comment-1", "comment-2"])
+    }
+
+    @Test func updateForMissingCommentDoesNotInsertOutOfOrderComment() throws {
+        let viewModel = PageReaderViewModel()
+        let existingComment = try comment(id: "comment-1", text: "Existing", resolvedAt: nil)
+        let missingComment = try comment(id: "comment-2", text: "Updated elsewhere", resolvedAt: nil)
+        viewModel.comments = [existingComment]
+
+        viewModel.applyUpdatedComment(missingComment)
+
+        #expect(viewModel.comments.map(\.id) == ["comment-1"])
     }
 
     private func comment(id: String, text: String, resolvedAt: String?) throws -> DocmostComment {
