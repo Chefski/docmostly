@@ -27,6 +27,7 @@ actor NativeEditorCollaborationPresenceClient {
     private let localClientID: Int
     private var localAwarenessClock = 0
     private var activeDocumentName: String?
+    private var hasSentLocalAwareness = false
     private var awarenessStore = NativeEditorAwarenessStateStore()
 
     init(
@@ -87,6 +88,7 @@ actor NativeEditorCollaborationPresenceClient {
         task = nil
         authenticatedScope = nil
         activeDocumentName = nil
+        hasSentLocalAwareness = false
         awarenessStore.reset()
     }
 
@@ -110,8 +112,6 @@ actor NativeEditorCollaborationPresenceClient {
                 )
             )
             try await send(NativeEditorHocuspocusFrame.queryAwareness(documentName: context.documentName))
-            try await sendLocalAwareness(context: context)
-            startHeartbeat(context: context)
             try await receiveMessages(
                 from: task,
                 context: context,
@@ -159,18 +159,11 @@ actor NativeEditorCollaborationPresenceClient {
                 )
             )
         case .authenticated(let scope):
-            authenticatedScope = scope
-            try await sendInitialCRDTSync(using: context.syncDriver)
-            if scope.allowsLocalDocumentUpdates {
-                startLocalUpdateSender(using: context.syncDriver)
-            } else {
-                stopLocalUpdateSender()
-            }
-            startLocalAwarenessUpdateSender(context: context)
-            continuation.yield(.authenticated(scope))
+            try await handleAuthenticatedScope(scope, context: context, continuation: continuation)
         case .authenticationFailed(let reason):
             throw NativeEditorCollabAuthFailure(reason: reason)
         case .queryAwareness:
+            guard authenticatedScope?.allowsLocalAwarenessUpdates == true else { return }
             try await sendLocalAwareness(context: context)
         case .awareness(let states):
             let currentStates = awarenessStore.apply(states)
@@ -192,9 +185,47 @@ actor NativeEditorCollaborationPresenceClient {
 }
 
 private extension NativeEditorCollaborationPresenceClient {
+    func handleAuthenticatedScope(
+        _ scope: NativeEditorCollaborationScope,
+        context: NativeEditorCollaborationSessionContext,
+        continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
+    ) async throws {
+        authenticatedScope = scope
+        try await sendInitialCRDTSync(using: context.syncDriver)
+        configureLocalDocumentUpdates(for: scope, syncDriver: context.syncDriver)
+        try await configureLocalAwarenessUpdates(for: scope, context: context)
+        continuation.yield(.authenticated(scope))
+    }
+
+    func configureLocalDocumentUpdates(
+        for scope: NativeEditorCollaborationScope,
+        syncDriver: NativeEditorCollaborationSyncDriver?
+    ) {
+        if scope.allowsLocalDocumentUpdates {
+            startLocalUpdateSender(using: syncDriver)
+        } else {
+            stopLocalUpdateSender()
+        }
+    }
+
+    func configureLocalAwarenessUpdates(
+        for scope: NativeEditorCollaborationScope,
+        context: NativeEditorCollaborationSessionContext
+    ) async throws {
+        if scope.allowsLocalAwarenessUpdates {
+            try await sendLocalAwareness(context: context)
+            startHeartbeat(context: context)
+            startLocalAwarenessUpdateSender(context: context)
+        } else {
+            try? await sendLocalAwarenessRemovalIfNeeded(documentName: context.documentName)
+            stopHeartbeat()
+            stopLocalAwarenessUpdateSender()
+        }
+    }
+
     func disconnectGracefully() async {
         if let activeDocumentName {
-            try? await sendLocalAwarenessRemoval(documentName: activeDocumentName)
+            try? await sendLocalAwarenessRemovalIfNeeded(documentName: activeDocumentName)
         }
 
         disconnect()
@@ -222,6 +253,16 @@ private extension NativeEditorCollaborationPresenceClient {
         localUpdateTask = nil
     }
 
+    func stopLocalAwarenessUpdateSender() {
+        localAwarenessUpdateTask?.cancel()
+        localAwarenessUpdateTask = nil
+    }
+
+    func stopHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+    }
+
     func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
         stopLocalUpdateSender()
 
@@ -244,8 +285,7 @@ private extension NativeEditorCollaborationPresenceClient {
     }
 
     func startLocalAwarenessUpdateSender(context: NativeEditorCollaborationSessionContext) {
-        localAwarenessUpdateTask?.cancel()
-        localAwarenessUpdateTask = nil
+        stopLocalAwarenessUpdateSender()
 
         guard let updates = context.localAwarenessUpdates else { return }
 
@@ -263,7 +303,7 @@ private extension NativeEditorCollaborationPresenceClient {
     }
 
     func startHeartbeat(context: NativeEditorCollaborationSessionContext) {
-        heartbeatTask?.cancel()
+        stopHeartbeat()
         heartbeatTask = Task { [weak self, context] in
             while Task.isCancelled == false {
                 try? await Task.sleep(for: .seconds(15))
@@ -295,9 +335,12 @@ private extension NativeEditorCollaborationPresenceClient {
             )
         ])
         try await send(NativeEditorHocuspocusFrame.awareness(documentName: documentName, update: update))
+        hasSentLocalAwareness = true
     }
 
-    func sendLocalAwarenessRemoval(documentName: String) async throws {
+    func sendLocalAwarenessRemovalIfNeeded(documentName: String) async throws {
+        guard hasSentLocalAwareness else { return }
+
         localAwarenessClock += 1
         let frame = try NativeEditorHocuspocusFrame.awarenessRemoval(
             documentName: documentName,
@@ -305,6 +348,7 @@ private extension NativeEditorCollaborationPresenceClient {
             clock: localAwarenessClock
         )
         try await send(frame)
+        hasSentLocalAwareness = false
     }
 
     func send(_ data: Data) async throws {

@@ -79,6 +79,10 @@ nonisolated enum NativeEditorCollaborationScope: String, Equatable, Sendable {
         self == .readWrite
     }
 
+    var allowsLocalAwarenessUpdates: Bool {
+        allowsLocalDocumentUpdates
+    }
+
     func allowsSyncReply(to message: NativeEditorYjsSyncMessage) -> Bool {
         switch message {
         case .stepOne:
