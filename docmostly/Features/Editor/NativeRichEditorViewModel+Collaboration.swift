@@ -123,6 +123,16 @@ extension NativeRichEditorViewModel {
         return try? await crdtDocumentEngine.encodeLocalAwarenessCursor(for: selection)
     }
 
+    func resolvedCursorsForBlock(id blockID: UUID) -> [NativeEditorResolvedRemoteCursor] {
+        guard let blockIndex = document.blocks.firstIndex(where: { $0.id == blockID }) else { return [] }
+
+        return resolvedRemoteCursors.filter { cursor in
+            let lowerBound = min(cursor.anchor.blockIndex, cursor.head.blockIndex)
+            let upperBound = max(cursor.anchor.blockIndex, cursor.head.blockIndex)
+            return (lowerBound...upperBound).contains(blockIndex)
+        }
+    }
+
     private func isRemotePageNewer(_ page: DocmostEditablePage) -> Bool {
         guard let remoteUpdatedAt = page.updatedAt else { return false }
         guard let lastRemoteUpdatedAt else { return true }

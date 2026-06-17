@@ -218,12 +218,54 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(resolvedCursor == cursor)
     }
 
+    @Test func viewModelRoutesResolvedRemoteCursorsToAffectedBlocks() {
+        let firstBlockID = UUID()
+        let secondBlockID = UUID()
+        let thirdBlockID = UUID()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(id: firstBlockID, kind: .paragraph, text: AttributedString("One"), alignment: .left),
+            NativeEditorBlock(id: secondBlockID, kind: .paragraph, text: AttributedString("Two"), alignment: .left),
+            NativeEditorBlock(id: thirdBlockID, kind: .paragraph, text: AttributedString("Three"), alignment: .left)
+        ])
+        viewModel.resolvedRemoteCursors = [
+            resolvedCursor(id: "user-2", blockIndex: 1),
+            resolvedCursor(id: "user-3", anchorBlockIndex: 0, headBlockIndex: 2),
+            resolvedCursor(id: "user-4", blockIndex: 4)
+        ]
+
+        #expect(viewModel.resolvedCursorsForBlock(id: secondBlockID).map(\.id) == ["user-2", "user-3"])
+        #expect(viewModel.resolvedCursorsForBlock(id: thirdBlockID).map(\.id) == ["user-3"])
+        #expect(viewModel.resolvedCursorsForBlock(id: UUID()) == [])
+    }
+
     private func remoteCursor(id: String, name: String) -> NativeEditorRemoteCursor {
         NativeEditorRemoteCursor(
             id: id,
             name: name,
             colorName: "#2563EB",
             cursor: NativeEditorAwarenessCursor(anchor: nil, head: nil)
+        )
+    }
+
+    private func resolvedCursor(
+        id: String,
+        blockIndex: Int
+    ) -> NativeEditorResolvedRemoteCursor {
+        resolvedCursor(id: id, anchorBlockIndex: blockIndex, headBlockIndex: blockIndex)
+    }
+
+    private func resolvedCursor(
+        id: String,
+        anchorBlockIndex: Int,
+        headBlockIndex: Int
+    ) -> NativeEditorResolvedRemoteCursor {
+        NativeEditorResolvedRemoteCursor(
+            id: id,
+            name: id,
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: anchorBlockIndex, characterOffset: 0),
+            head: NativeEditorRemoteTextPosition(blockIndex: headBlockIndex, characterOffset: 0)
         )
     }
 }

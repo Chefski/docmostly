@@ -48,6 +48,12 @@ struct NativeEditorBodyView: View {
                         NativeEditorSlashCommandMenu(viewModel: viewModel)
                             .padding(.leading, 34)
                     }
+
+                    let remoteCursors = viewModel.resolvedCursorsForBlock(id: block.id)
+                    if remoteCursors.isEmpty == false {
+                        NativeEditorRemoteCursorBadgeStack(cursors: remoteCursors)
+                            .padding(.leading, 34)
+                    }
                 }
             }
 
