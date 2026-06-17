@@ -89,6 +89,8 @@ struct NativeEditorBodyView: View {
             updateCallout: viewModel.updateCallout,
             updateDetails: viewModel.updateDetails,
             updateEmbed: viewModel.updateEmbed,
+            updateDrawio: viewModel.updateDrawio,
+            updateExcalidraw: viewModel.updateExcalidraw,
             updateMathBlock: viewModel.updateMathBlock
         )
     }

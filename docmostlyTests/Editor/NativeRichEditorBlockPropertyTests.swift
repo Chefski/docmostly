@@ -10,11 +10,25 @@ struct NativeRichEditorBlockPropertyTests {
         let detailsID = viewModel.document.blocks[1].id
         let embedID = viewModel.document.blocks[2].id
         let mathID = viewModel.document.blocks[3].id
+        let drawioID = viewModel.document.blocks[4].id
+        let excalidrawID = viewModel.document.blocks[5].id
 
         viewModel.updateCallout(blockID: calloutID, style: "warning", icon: "alert", text: "Check rollout")
         viewModel.updateDetails(blockID: detailsID, summary: "Checklist", body: "Ship native editor", isOpen: true)
         viewModel.updateEmbed(blockID: embedID, source: "https://example.com/video", provider: "Example")
         viewModel.updateMathBlock(blockID: mathID, text: "E = mc^2")
+        viewModel.updateDrawio(
+            blockID: drawioID,
+            source: "/api/files/drawio/diagram.png",
+            title: "Flow",
+            alternativeText: "Flow diagram"
+        )
+        viewModel.updateExcalidraw(
+            blockID: excalidrawID,
+            source: "/api/files/excalidraw/sketch.png",
+            title: "Sketch",
+            alternativeText: "Sketch diagram"
+        )
 
         let nodes = viewModel.document.proseMirrorDocument.content
         #expect(nodes[0].type == "callout")
@@ -35,6 +49,16 @@ struct NativeRichEditorBlockPropertyTests {
 
         #expect(nodes[3].type == "mathBlock")
         #expect(nodes[3].attrs?["text"] == .string("E = mc^2"))
+
+        #expect(nodes[4].type == "drawio")
+        #expect(nodes[4].attrs?["src"] == .string("/api/files/drawio/diagram.png"))
+        #expect(nodes[4].attrs?["title"] == .string("Flow"))
+        #expect(nodes[4].attrs?["alt"] == .string("Flow diagram"))
+
+        #expect(nodes[5].type == "excalidraw")
+        #expect(nodes[5].attrs?["src"] == .string("/api/files/excalidraw/sketch.png"))
+        #expect(nodes[5].attrs?["title"] == .string("Sketch"))
+        #expect(nodes[5].attrs?["alt"] == .string("Sketch diagram"))
         #expect(viewModel.isDirty == true)
     }
 
@@ -44,7 +68,9 @@ struct NativeRichEditorBlockPropertyTests {
             calloutBlock(),
             detailsBlock(),
             embedBlock(),
-            mathBlock()
+            mathBlock(),
+            drawioBlock(),
+            excalidrawBlock()
         ])
         return viewModel
     }
@@ -88,6 +114,44 @@ struct NativeRichEditorBlockPropertyTests {
             text: AttributedString("x"),
             alignment: .left,
             rawNode: ProseMirrorNode(type: "mathBlock")
+        )
+    }
+
+    private func drawioBlock() -> NativeEditorBlock {
+        NativeEditorBlock(
+            kind: .drawio(NativeEditorDiagramBlock(
+                source: nil,
+                title: nil,
+                alternativeText: nil,
+                attachmentID: nil,
+                sizeInBytes: nil,
+                width: nil,
+                height: nil,
+                aspectRatio: nil,
+                alignment: nil
+            )),
+            text: AttributedString(""),
+            alignment: .left,
+            rawNode: ProseMirrorNode(type: "drawio")
+        )
+    }
+
+    private func excalidrawBlock() -> NativeEditorBlock {
+        NativeEditorBlock(
+            kind: .excalidraw(NativeEditorDiagramBlock(
+                source: nil,
+                title: nil,
+                alternativeText: nil,
+                attachmentID: nil,
+                sizeInBytes: nil,
+                width: nil,
+                height: nil,
+                aspectRatio: nil,
+                alignment: nil
+            )),
+            text: AttributedString(""),
+            alignment: .left,
+            rawNode: ProseMirrorNode(type: "excalidraw")
         )
     }
 }

@@ -145,3 +145,50 @@ struct NativeEditorMathBlockEditor: View {
         }
     }
 }
+
+struct NativeEditorDiagramEditor: View {
+    let blockID: UUID
+    let diagram: NativeEditorDiagramBlock
+    let update: (UUID, String, String, String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Source", text: sourceBinding)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 8) {
+                TextField("Title", text: titleBinding)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("Alt", text: alternativeTextBinding)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+
+    private var sourceBinding: Binding<String> {
+        Binding {
+            diagram.source ?? ""
+        } set: { source in
+            update(blockID, source, diagram.title ?? "", diagram.alternativeText ?? "")
+        }
+    }
+
+    private var titleBinding: Binding<String> {
+        Binding {
+            diagram.title ?? ""
+        } set: { title in
+            update(blockID, diagram.source ?? "", title, diagram.alternativeText ?? "")
+        }
+    }
+
+    private var alternativeTextBinding: Binding<String> {
+        Binding {
+            diagram.alternativeText ?? ""
+        } set: { alternativeText in
+            update(blockID, diagram.source ?? "", diagram.title ?? "", alternativeText)
+        }
+    }
+}

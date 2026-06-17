@@ -105,13 +105,29 @@ struct NativeEditorRichBlockPreviewView: View {
                 systemImage: "flowchart",
                 title: diagram.title ?? "Draw.io diagram",
                 subtitle: diagram.alternativeText ?? diagram.source
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorDiagramEditor(
+                        blockID: block.id,
+                        diagram: diagram,
+                        update: richBlockActions.updateDrawio
+                    )
+                }
+            }
         case .excalidraw(let diagram):
             previewShell(
                 systemImage: "scribble.variable",
                 title: diagram.title ?? "Excalidraw diagram",
                 subtitle: diagram.alternativeText ?? diagram.source
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorDiagramEditor(
+                        blockID: block.id,
+                        diagram: diagram,
+                        update: richBlockActions.updateExcalidraw
+                    )
+                }
+            }
         case .mathBlock(let math):
             previewShell(systemImage: "function", title: "Math equation", subtitle: math.text) {
                 if let richBlockActions {
