@@ -3,9 +3,9 @@ import SwiftUI
 struct NativeEditorFormattingToolbarGroup: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     @Binding var isShowingStatusPrompt: Bool
-    @Binding var isShowingCommentPrompt: Bool
     @Binding var isShowingMathPrompt: Bool
     let showMentionPicker: () -> Void
+    let showInlineCommentComposer: () -> Void
 
     var body: some View {
         Button {
@@ -72,9 +72,9 @@ struct NativeEditorFormattingToolbarGroup: View {
 
         NativeEditorInlineInsertMenu(
             isShowingStatusPrompt: $isShowingStatusPrompt,
-            isShowingCommentPrompt: $isShowingCommentPrompt,
             isShowingMathPrompt: $isShowingMathPrompt,
-            showMentionPicker: showMentionPicker
+            showMentionPicker: showMentionPicker,
+            showInlineCommentComposer: showInlineCommentComposer
         )
     }
 }

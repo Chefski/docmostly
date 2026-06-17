@@ -2,9 +2,9 @@ import SwiftUI
 
 struct NativeEditorInlineInsertMenu: View {
     @Binding var isShowingStatusPrompt: Bool
-    @Binding var isShowingCommentPrompt: Bool
     @Binding var isShowingMathPrompt: Bool
     let showMentionPicker: () -> Void
+    let showInlineCommentComposer: () -> Void
 
     var body: some View {
         Menu {
@@ -15,7 +15,7 @@ struct NativeEditorInlineInsertMenu: View {
                 showMentionPicker()
             }
             Button("Comment", systemImage: "text.bubble") {
-                isShowingCommentPrompt = true
+                showInlineCommentComposer()
             }
             Button("Math", systemImage: "function") {
                 isShowingMathPrompt = true

@@ -1,6 +1,45 @@
 import SwiftUI
 
 extension NativeRichEditorViewModel {
+    var activeSelectedPlainText: String? {
+        activeInlineCommentContext?.selectedText
+    }
+
+    var activeInlineCommentContext: NativeEditorInlineCommentContext? {
+        guard let index = activeBlockIndex else { return nil }
+
+        let block = document.blocks[index]
+        guard let selectedText = selectedPlainText(in: block, selection: block.selection) else {
+            return nil
+        }
+
+        return NativeEditorInlineCommentContext(
+            blockID: block.id,
+            selectedText: selectedText,
+            selection: block.selection
+        )
+    }
+
+    private func selectedPlainText(
+        in block: NativeEditorBlock,
+        selection: AttributedTextSelection
+    ) -> String? {
+        guard selection.hasSelectedRanges(in: block.text) else { return nil }
+
+        let selectedText: String
+        switch selection.indices(in: block.text) {
+        case .ranges(let ranges):
+            selectedText = ranges.ranges
+                .map { String(block.text[$0].characters) }
+                .joined(separator: " ")
+        case .insertionPoint:
+            selectedText = ""
+        }
+
+        let trimmedText = selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedText.isEmpty ? nil : trimmedText
+    }
+
     func applyHighlight(color: String, colorName: String? = nil) {
         applyInlineAttributes { attributes in
             attributes[NativeEditorHighlightColorAttribute.self] = color
@@ -24,6 +63,30 @@ extension NativeRichEditorViewModel {
             attributes[NativeEditorCommentIDAttribute.self] = trimmedCommentID
             attributes[NativeEditorCommentResolvedAttribute.self] = isResolved
             attributes.backgroundColor = .yellow.opacity(0.28)
+        }
+    }
+
+    func applyInlineComment(
+        commentID: String,
+        to context: NativeEditorInlineCommentContext,
+        isResolved: Bool = false
+    ) {
+        let trimmedCommentID = commentID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedCommentID.isEmpty == false else { return }
+
+        performUndoableEdit {
+            guard let index = document.blocks.firstIndex(where: { $0.id == context.blockID }) else { return }
+
+            var selection = context.selection
+            guard selection.hasSelectedRanges(in: document.blocks[index].text) else { return }
+
+            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                attributes[NativeEditorCommentIDAttribute.self] = trimmedCommentID
+                attributes[NativeEditorCommentResolvedAttribute.self] = isResolved
+                attributes.backgroundColor = .yellow.opacity(0.28)
+            }
+            document.blocks[index].selection = selection
+            activeBlockID = context.blockID
         }
     }
 

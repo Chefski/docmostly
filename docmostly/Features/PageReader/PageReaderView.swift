@@ -8,8 +8,13 @@ struct PageReaderView: View {
     @State private var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State private var isShowingAttachmentImporter = false
     @State private var isShowingMentionPicker = false
+    @State private var isShowingInlineCommentComposer = false
     @State private var isUploadingAttachment = false
     @State private var attachmentUploadErrorMessage: String?
+    @State private var inlineCommentContext: NativeEditorInlineCommentContext?
+    @State private var inlineCommentErrorMessage: String?
+    @State private var pendingInlineCommentID: String?
+    @State private var pendingInlineCommentDraft: String?
     @FocusState private var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
@@ -65,7 +70,8 @@ struct PageReaderView: View {
                         viewModel: editorViewModel,
                         isUploadingAttachment: isUploadingAttachment,
                         importAttachment: beginAttachmentImport,
-                        showMentionPicker: beginMentionSearch
+                        showMentionPicker: beginMentionSearch,
+                        showInlineCommentComposer: beginInlineComment
                     ) {
                         editorFocusedField = nil
                         editorViewModel.clearFocus()
@@ -87,9 +93,24 @@ struct PageReaderView: View {
         } message: {
             Text(attachmentUploadErrorMessage ?? "")
         }
+        .alert("Inline Comment", isPresented: inlineCommentFailedBinding) {
+            Button("OK", role: .cancel) {
+                inlineCommentErrorMessage = nil
+            }
+        } message: {
+            Text(inlineCommentErrorMessage ?? "")
+        }
         .sheet(isPresented: $isShowingMentionPicker) {
             if let editorViewModel {
                 NativeEditorMentionPickerView(viewModel: editorViewModel)
+            }
+        }
+        .sheet(isPresented: $isShowingInlineCommentComposer) {
+            if let inlineCommentContext {
+                NativeEditorInlineCommentComposerView(
+                    selectedText: inlineCommentContext.selectedText,
+                    submit: createInlineComment
+                )
             }
         }
         .task(id: pageID) {
@@ -100,6 +121,13 @@ struct PageReaderView: View {
         }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
+        }
+        .onChange(of: isShowingInlineCommentComposer) { _, isShowing in
+            if isShowing == false {
+                inlineCommentContext = nil
+                pendingInlineCommentID = nil
+                pendingInlineCommentDraft = nil
+            }
         }
         .onDisappear {
             autosaveInlineEdits()
@@ -243,5 +271,62 @@ struct PageReaderView: View {
 
     private var attachmentAllowedContentTypes: [UTType] {
         attachmentImportKind?.allowedContentTypes ?? NativeEditorAttachmentImportKind.file.allowedContentTypes
+    }
+}
+
+private extension PageReaderView {
+    var inlineCommentFailedBinding: Binding<Bool> {
+        Binding {
+            inlineCommentErrorMessage != nil
+        } set: { isPresented in
+            if isPresented == false {
+                inlineCommentErrorMessage = nil
+            }
+        }
+    }
+
+    func beginInlineComment() {
+        guard let context = editorViewModel?.activeInlineCommentContext else {
+            inlineCommentErrorMessage = NativeEditorInlineCommentCreationError.noSelection.localizedDescription
+            return
+        }
+
+        inlineCommentErrorMessage = nil
+        inlineCommentContext = context
+        pendingInlineCommentID = nil
+        pendingInlineCommentDraft = nil
+        isShowingInlineCommentComposer = true
+    }
+
+    func createInlineComment(_ text: String) async throws {
+        guard let editorViewModel, let inlineCommentContext else {
+            throw NativeEditorInlineCommentCreationError.noSelection
+        }
+
+        let commentID: String
+        if let pendingInlineCommentID, pendingInlineCommentDraft == text {
+            commentID = pendingInlineCommentID
+        } else {
+            let comment = try await appState.addInlineComment(
+                pageId: editorViewModel.currentPageID,
+                text: text,
+                selectedText: inlineCommentContext.selectedText
+            )
+            commentID = comment.id
+            pendingInlineCommentID = comment.id
+            pendingInlineCommentDraft = text
+        }
+
+        editorViewModel.applyInlineComment(commentID: commentID, to: inlineCommentContext)
+
+        guard await editorViewModel.save(appState: appState) else {
+            let message = editorViewModel.saveErrorMessage ??
+                "Comment was created, but the page update did not save."
+            throw NativeEditorInlineCommentCreationError.saveFailed(message)
+        }
+
+        pendingInlineCommentID = nil
+        pendingInlineCommentDraft = nil
+        await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
     }
 }

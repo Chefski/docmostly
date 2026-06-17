@@ -5,16 +5,15 @@ struct NativeEditorToolbar: View {
     @State private var isShowingLinkPrompt = false
     @State private var isShowingSearchReplace = false
     @State private var isShowingStatusPrompt = false
-    @State private var isShowingCommentPrompt = false
     @State private var isShowingMathPrompt = false
     @State private var linkURLString = ""
     @State private var statusText = ""
-    @State private var commentID = ""
     @State private var inlineMathText = ""
 
     let isUploadingAttachment: Bool
     let importAttachment: (NativeEditorAttachmentImportKind) -> Void
     let showMentionPicker: () -> Void
+    let showInlineCommentComposer: () -> Void
     let dismissKeyboard: () -> Void
 
     init(
@@ -22,12 +21,14 @@ struct NativeEditorToolbar: View {
         isUploadingAttachment: Bool = false,
         importAttachment: @escaping (NativeEditorAttachmentImportKind) -> Void = { _ in },
         showMentionPicker: @escaping () -> Void = {},
+        showInlineCommentComposer: @escaping () -> Void = {},
         dismissKeyboard: @escaping () -> Void
     ) {
         self.viewModel = viewModel
         self.isUploadingAttachment = isUploadingAttachment
         self.importAttachment = importAttachment
         self.showMentionPicker = showMentionPicker
+        self.showInlineCommentComposer = showInlineCommentComposer
         self.dismissKeyboard = dismissKeyboard
     }
 
@@ -52,9 +53,9 @@ struct NativeEditorToolbar: View {
                     NativeEditorFormattingToolbarGroup(
                         viewModel: viewModel,
                         isShowingStatusPrompt: $isShowingStatusPrompt,
-                        isShowingCommentPrompt: $isShowingCommentPrompt,
                         isShowingMathPrompt: $isShowingMathPrompt,
-                        showMentionPicker: showMentionPicker
+                        showMentionPicker: showMentionPicker,
+                        showInlineCommentComposer: showInlineCommentComposer
                     )
 
                     Divider()
@@ -124,17 +125,6 @@ struct NativeEditorToolbar: View {
             }
             Button("Cancel", role: .cancel) {
                 statusText = ""
-            }
-        }
-        .alert("Inline Comment", isPresented: $isShowingCommentPrompt) {
-            TextField("Comment ID", text: $commentID)
-                .textInputAutocapitalization(.never)
-            Button("Apply") {
-                viewModel.applyInlineComment(commentID: commentID)
-                commentID = ""
-            }
-            Button("Cancel", role: .cancel) {
-                commentID = ""
             }
         }
         .alert("Math", isPresented: $isShowingMathPrompt) {

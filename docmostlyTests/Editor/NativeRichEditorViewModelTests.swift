@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -199,6 +200,32 @@ struct NativeRichEditorViewModelTests {
             attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
         )))
         #expect(viewModel.isDirty == true)
+    }
+
+    @Test func appliesInlineCommentFromCapturedSelectionContext() throws {
+        let text = AttributedString("Inline comment selection")
+        let commentRange = try #require(text.range(of: "comment"))
+        let block = NativeEditorBlock(
+            kind: .paragraph,
+            text: text,
+            alignment: .left,
+            selection: AttributedTextSelection(range: commentRange)
+        )
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        let context = try #require(viewModel.activeInlineCommentContext)
+        #expect(context.selectedText == "comment")
+
+        viewModel.clearFocus()
+        viewModel.applyInlineComment(commentID: "comment-1", to: context)
+
+        let marks = proseMirrorTextMarks(from: viewModel)
+        #expect(marks.contains(ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
+        )))
     }
 
     @Test func insertsStatusAndMentionInlineAtoms() {

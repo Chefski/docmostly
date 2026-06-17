@@ -207,20 +207,6 @@ final class AppState {
         }
     }
 
-    func loadComments(pageId: String) async throws -> [DocmostComment] {
-        guard let apiClient else { return [] }
-        let response: PaginatedResponse<DocmostComment> = try await apiClient.send(.comments(pageId: pageId))
-        return response.items
-    }
-
-    func addPageComment(pageId: String, text: String) async throws -> DocmostComment {
-        guard let apiClient else {
-            throw APIError.connectionFailed("Comments require a network connection.")
-        }
-        let content = CommentPayload.plainText(text).jsonString
-        return try await apiClient.send(.createPageComment(pageId: pageId, content: content))
-    }
-
     func attachmentLinks(pageId: String) -> [DocmostAttachmentLink] {
         (try? cacheRepository?.loadAttachmentLinks(pageId: pageId)) ?? []
     }

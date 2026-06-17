@@ -49,4 +49,24 @@ struct EndpointTests {
         #expect(request.httpMethod == "POST")
         #expect(request.httpBody == nil)
     }
+
+    @Test func buildsInlineCommentCreateRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.createComment(
+            pageId: "page-1",
+            content: #"{"type":"doc","content":[]}"#,
+            type: .inline,
+            selection: "Selected text"
+        )
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/comments/create")
+
+        let body = try #require(request.httpBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["pageId"] as? String == "page-1")
+        #expect(object?["content"] as? String == #"{"type":"doc","content":[]}"#)
+        #expect(object?["type"] as? String == "inline")
+        #expect(object?["selection"] as? String == "Selected text")
+    }
 }
