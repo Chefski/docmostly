@@ -81,4 +81,19 @@ enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
         }
         return nil
     }
+
+    var displayString: String? {
+        switch self {
+        case .string(let value):
+            value
+        case .int(let value):
+            value.formatted()
+        case .double(let value):
+            value.formatted(.number)
+        case .bool(let value):
+            value ? "true" : "false"
+        case .object, .array, .null:
+            nil
+        }
+    }
 }

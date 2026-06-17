@@ -7,6 +7,7 @@ struct NativeEditorBlock: Identifiable, Equatable {
     var text: AttributedString
     var alignment: NativeEditorTextAlignment
     var selection: AttributedTextSelection
+    var inlineContent: [NativeEditorInlineContent]?
     var rawNode: ProseMirrorNode?
 
     init(
@@ -15,6 +16,7 @@ struct NativeEditorBlock: Identifiable, Equatable {
         text: AttributedString,
         alignment: NativeEditorTextAlignment,
         selection: AttributedTextSelection = AttributedTextSelection(),
+        inlineContent: [NativeEditorInlineContent]? = nil,
         rawNode: ProseMirrorNode? = nil
     ) {
         self.id = id
@@ -22,18 +24,20 @@ struct NativeEditorBlock: Identifiable, Equatable {
         self.text = text
         self.alignment = alignment
         self.selection = selection
+        self.inlineContent = inlineContent
         self.rawNode = rawNode
     }
 
     var isEditable: Bool {
-        kind.isEditable
+        kind.isEditable && inlineContent == nil
     }
 
     static func == (lhs: NativeEditorBlock, rhs: NativeEditorBlock) -> Bool {
         lhs.id == rhs.id &&
-        lhs.kind == rhs.kind &&
-        lhs.text == rhs.text &&
-        lhs.alignment == rhs.alignment &&
-        lhs.rawNode == rhs.rawNode
+            lhs.kind == rhs.kind &&
+            lhs.text == rhs.text &&
+            lhs.alignment == rhs.alignment &&
+            lhs.inlineContent == rhs.inlineContent &&
+            lhs.rawNode == rhs.rawNode
     }
 }

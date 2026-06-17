@@ -35,6 +35,12 @@ struct NativeEditorToolbar: View {
                 }
 
                 Button {
+                    viewModel.toggleInlineMark(.underline)
+                } label: {
+                    Label("Underline", systemImage: "underline")
+                }
+
+                Button {
                     viewModel.toggleInlineMark(.strikethrough)
                 } label: {
                     Label("Strikethrough", systemImage: "strikethrough")
@@ -44,6 +50,18 @@ struct NativeEditorToolbar: View {
                     viewModel.toggleInlineMark(.code)
                 } label: {
                     Label("Inline Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+
+                Button {
+                    viewModel.toggleInlineMark(.subscript)
+                } label: {
+                    Label("Subscript", systemImage: "textformat.subscript")
+                }
+
+                Button {
+                    viewModel.toggleInlineMark(.superscript)
+                } label: {
+                    Label("Superscript", systemImage: "textformat.superscript")
                 }
 
                 Divider()

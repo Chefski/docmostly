@@ -8,13 +8,35 @@ enum NativeEditorBlockKind: Equatable, Sendable {
     case taskListItem(isChecked: Bool)
     case blockquote
     case codeBlock(language: String?)
+    case table(NativeEditorTable)
+    case image(NativeEditorMediaBlock)
+    case video(NativeEditorMediaBlock)
+    case audio(NativeEditorMediaBlock)
+    case pdf(NativeEditorPDFBlock)
+    case attachment(NativeEditorAttachmentBlock)
+    case callout(NativeEditorCalloutBlock)
+    case details(NativeEditorDetailsBlock)
+    case pageBreak
+    case divider
+    case columns(NativeEditorColumnsBlock)
+    case subpages
+    case transclusionSource(NativeEditorTransclusionSourceBlock)
+    case transclusionReference(NativeEditorTransclusionReferenceBlock)
+    case embed(NativeEditorEmbedBlock)
+    case drawio(NativeEditorDiagramBlock)
+    case excalidraw(NativeEditorDiagramBlock)
+    case mathBlock(NativeEditorMathBlock)
     case unsupported(type: String)
 
     var isEditable: Bool {
-        if case .unsupported = self {
+        switch self {
+        case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
+            return true
+        case .table, .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider,
+                .columns, .subpages, .transclusionSource, .transclusionReference, .embed, .drawio, .excalidraw,
+                .mathBlock, .unsupported:
             return false
         }
-        return true
     }
 
     var editorFont: Font {
@@ -23,7 +45,11 @@ enum NativeEditorBlockKind: Equatable, Sendable {
             level == 1 ? .title : .title2
         case .codeBlock:
             .body.monospaced()
-        default:
+        case .paragraph, .bulletListItem, .orderedListItem, .taskListItem, .blockquote:
+            .body
+        case .table, .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider,
+                .columns, .subpages, .transclusionSource, .transclusionReference, .embed, .drawio, .excalidraw,
+                .mathBlock, .unsupported:
             .body
         }
     }
@@ -44,6 +70,42 @@ enum NativeEditorBlockKind: Equatable, Sendable {
             "Quote"
         case .codeBlock:
             "Code block"
+        case .table:
+            "Table"
+        case .image:
+            "Image"
+        case .video:
+            "Video"
+        case .audio:
+            "Audio"
+        case .pdf:
+            "PDF"
+        case .attachment:
+            "File attachment"
+        case .callout(let callout):
+            "\(callout.style.capitalized) callout"
+        case .details:
+            "Toggle block"
+        case .pageBreak:
+            "Page break"
+        case .divider:
+            "Divider"
+        case .columns:
+            "Columns"
+        case .subpages:
+            "Subpages"
+        case .transclusionSource:
+            "Synced block"
+        case .transclusionReference:
+            "Synced block reference"
+        case .embed(let embed):
+            embed.provider.map { "\($0) embed" } ?? "Embed"
+        case .drawio:
+            "Draw.io diagram"
+        case .excalidraw:
+            "Excalidraw diagram"
+        case .mathBlock:
+            "Math equation"
         case .unsupported(let type):
             "Unsupported \(type) block"
         }

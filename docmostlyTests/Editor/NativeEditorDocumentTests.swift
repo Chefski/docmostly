@@ -5,7 +5,9 @@ import Testing
 @MainActor
 struct NativeEditorDocumentTests {
     @Test func decodesDocmostBlocksAndInlineMarks() throws {
-        let document = try NativeEditorDocument(proseMirrorJSONData: Self.docmostBlocksFixture)
+        let document = try NativeEditorDocument(
+            proseMirrorJSONData: NativeEditorBasicFixtures.docmostBlocks
+        )
 
         #expect(document.blocks.count == 4)
         #expect(document.blocks[0].kind == .heading(level: 2))
@@ -25,7 +27,11 @@ struct NativeEditorDocumentTests {
         #expect(document.blocks[2].kind == .bulletListItem)
         #expect(String(document.blocks[2].text.characters) == "First")
 
-        #expect(document.blocks[3].kind == .unsupported(type: "table"))
+        guard case .table(let table) = document.blocks[3].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(table.rows.isEmpty)
         #expect(document.blocks[3].isEditable == false)
     }
 
@@ -65,43 +71,201 @@ struct NativeEditorDocumentTests {
         #expect((content[2]["content"] as? [[String: Any]])?.count == 2)
     }
 
-    private static var docmostBlocksFixture: Data {
-        Data("""
-        {
-          "type": "doc",
-          "content": [
-            {
-              "type": "heading",
-              "attrs": { "level": 2, "textAlign": "center" },
-              "content": [
-                { "type": "text", "text": "Plan", "marks": [{ "type": "bold" }] }
-              ]
-            },
-            {
-              "type": "paragraph",
-              "content": [
-                { "type": "text", "text": "Visit ", "marks": [{ "type": "italic" }] },
-                {
-                  "type": "text",
-                  "text": "Docmost",
-                  "marks": [{ "type": "link", "attrs": { "href": "https://docmost.com" } }]
-                }
-              ]
-            },
-            {
-              "type": "bulletList",
-              "content": [
-                {
-                  "type": "listItem",
-                  "content": [
-                    { "type": "paragraph", "content": [{ "type": "text", "text": "First" }] }
-                  ]
-                }
-              ]
-            },
-            { "type": "table", "content": [] }
-          ]
+    @Test func decodesRichMediaAndFileBlocks() throws {
+        let blocks = try richBlocks()
+
+        guard case .table(let table) = blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
         }
-        """.utf8)
+        #expect(table.rows.count == 2)
+        #expect(table.rows[0].cells.map(\.plainText) == ["Feature", "Status"])
+
+        guard case .image(let image) = blocks[1].kind else {
+            Issue.record("Expected image block")
+            return
+        }
+        #expect(image.source == "/files/image.png")
+        #expect(image.alternativeText == "Architecture")
+
+        guard case .video(let video) = blocks[2].kind else {
+            Issue.record("Expected video block")
+            return
+        }
+        #expect(video.attachmentID == "video-1")
+        try expectAudioPDFAndAttachmentBlocks(blocks)
+    }
+
+    @Test func decodesRichStructuralBlocks() throws {
+        let blocks = try richBlocks()
+
+        guard case .callout(let callout) = blocks[6].kind else {
+            Issue.record("Expected callout block")
+            return
+        }
+        #expect(callout.style == "warning")
+        #expect(callout.previewText == "Check migration plan")
+
+        guard case .details(let details) = blocks[7].kind else {
+            Issue.record("Expected details block")
+            return
+        }
+        #expect(details.summary == "Release checklist")
+        #expect(details.isOpen == true)
+
+        #expect(blocks[8].kind == .pageBreak)
+        #expect(blocks[9].kind == .divider)
+        try expectColumnsAndSyncedBlocks(blocks)
+    }
+
+    @Test func decodesRichEmbedDiagramAndMathBlocks() throws {
+        let blocks = try richBlocks()
+
+        guard case .embed(let embed) = blocks[14].kind else {
+            Issue.record("Expected embed block")
+            return
+        }
+        #expect(embed.provider == "YouTube")
+
+        guard case .drawio(let drawio) = blocks[15].kind else {
+            Issue.record("Expected Draw.io block")
+            return
+        }
+        #expect(drawio.title == "Flow")
+
+        guard case .excalidraw(let excalidraw) = blocks[16].kind else {
+            Issue.record("Expected Excalidraw block")
+            return
+        }
+        #expect(excalidraw.attachmentID == "exc-1")
+        try expectMathAndMermaidBlocks(blocks)
+    }
+
+    @Test func roundTripsRichDocmostBlocksWithoutDroppingAttributes() throws {
+        let original = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: NativeEditorRichBlockFixtures.richBlocks
+        )
+        let document = NativeEditorDocument(proseMirrorDocument: original)
+
+        #expect(document.proseMirrorDocument == original)
+    }
+
+    @Test func decodesInlineDocmostFormattingAndAtomNodes() throws {
+        let document = try NativeEditorDocument(
+            proseMirrorJSONData: NativeEditorInlineFixtures.richInline
+        )
+        let block = try #require(document.blocks.first)
+
+        let inlineContent = try #require(block.inlineContent)
+        #expect(inlineContent.count == 7)
+
+        guard case .text(let styledText, let styledMarks) = inlineContent[0] else {
+            Issue.record("Expected styled text")
+            return
+        }
+        #expect(styledText == "Styled")
+        #expect(styledMarks.contains(.underline))
+        #expect(styledMarks.contains(.highlight(color: "#faf594", colorName: "yellow")))
+        #expect(styledMarks.contains(.textColor("#2563EB")))
+        #expect(styledMarks.contains(.comment(commentID: "comment-1", isResolved: false)))
+
+        try expectInlineMentionStatusAndMath(inlineContent)
+
+        let original = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: NativeEditorInlineFixtures.richInline
+        )
+        #expect(document.proseMirrorDocument == original)
+    }
+
+    private func richBlocks() throws -> [NativeEditorBlock] {
+        let document = try NativeEditorDocument(
+            proseMirrorJSONData: NativeEditorRichBlockFixtures.richBlocks
+        )
+
+        #expect(document.blocks.count == 19)
+        return document.blocks
+    }
+
+    private func expectAudioPDFAndAttachmentBlocks(_ blocks: [NativeEditorBlock]) throws {
+        guard case .audio(let audio) = blocks[3].kind else {
+            Issue.record("Expected audio block")
+            return
+        }
+        #expect(audio.sizeInBytes == 1024)
+
+        guard case .pdf(let pdf) = blocks[4].kind else {
+            Issue.record("Expected PDF block")
+            return
+        }
+        #expect(pdf.name == "Spec.pdf")
+
+        guard case .attachment(let attachment) = blocks[5].kind else {
+            Issue.record("Expected attachment block")
+            return
+        }
+        #expect(attachment.mimeType == "application/zip")
+    }
+
+    private func expectColumnsAndSyncedBlocks(_ blocks: [NativeEditorBlock]) throws {
+        guard case .columns(let columns) = blocks[10].kind else {
+            Issue.record("Expected columns block")
+            return
+        }
+        #expect(columns.layout == "two_equal")
+        #expect(columns.columnCount == 2)
+
+        #expect(blocks[11].kind == .subpages)
+
+        guard case .transclusionSource(let source) = blocks[12].kind else {
+            Issue.record("Expected transclusion source")
+            return
+        }
+        #expect(source.identifier == "sync-1")
+
+        guard case .transclusionReference(let reference) = blocks[13].kind else {
+            Issue.record("Expected transclusion reference")
+            return
+        }
+        #expect(reference.sourcePageID == "page-1")
+        #expect(reference.transclusionID == "sync-1")
+    }
+
+    private func expectMathAndMermaidBlocks(_ blocks: [NativeEditorBlock]) throws {
+        guard case .mathBlock(let math) = blocks[17].kind else {
+            Issue.record("Expected math block")
+            return
+        }
+        #expect(math.text == "E = mc^2")
+
+        guard case .codeBlock(let language) = blocks[18].kind else {
+            Issue.record("Expected Mermaid code block")
+            return
+        }
+        #expect(language == "mermaid")
+    }
+
+    private func expectInlineMentionStatusAndMath(_ inlineContent: [NativeEditorInlineContent]) throws {
+        guard case .mention(let mention) = inlineContent[2] else {
+            Issue.record("Expected page mention")
+            return
+        }
+        #expect(mention.label == "Roadmap")
+        #expect(mention.entityType == "page")
+        #expect(mention.slugID == "roadmap-abc")
+
+        guard case .status(let status) = inlineContent[4] else {
+            Issue.record("Expected status badge")
+            return
+        }
+        #expect(status.text == "Ship")
+        #expect(status.color == "green")
+
+        guard case .mathInline(let math) = inlineContent[6] else {
+            Issue.record("Expected inline math")
+            return
+        }
+        #expect(math.text == "x^2")
     }
 }

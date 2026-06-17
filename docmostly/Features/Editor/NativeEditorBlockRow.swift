@@ -44,7 +44,7 @@ struct NativeEditorBlockRow: View {
                     .focused(focusedField, equals: .block(block.id))
                     .accessibilityLabel(block.kind.accessibilityLabel)
             } else {
-                NativeEditorUnsupportedBlockView(block: block)
+                NativeEditorRichBlockPreviewView(block: block)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
