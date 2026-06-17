@@ -40,6 +40,7 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func block(from line: String) -> NativeEditorBlock? {
+        let indentLevel = listIndentLevel(from: line)
         let trimmedLine = line.trimmingCharacters(in: .whitespaces)
         guard trimmedLine.isEmpty == false else { return nil }
 
@@ -48,7 +49,12 @@ enum NativeEditorMarkdownParser {
         }
 
         if let rule = inputRule(from: trimmedLine) {
-            return NativeEditorBlock(kind: rule.kind, text: inlineText(from: rule.text), alignment: .left)
+            return NativeEditorBlock(
+                kind: rule.kind,
+                text: inlineText(from: rule.text),
+                alignment: .left,
+                indentLevel: rule.kind.isListItem ? indentLevel : 0
+            )
         }
 
         return NativeEditorBlock(kind: .paragraph, text: inlineText(from: trimmedLine), alignment: .left)
@@ -202,5 +208,33 @@ enum NativeEditorMarkdownParser {
 
     private static func isDivider(_ text: String) -> Bool {
         text == "---" || text == "***"
+    }
+
+    private static func listIndentLevel(from line: String) -> Int {
+        var columns = 0
+
+        for character in line {
+            switch character {
+            case " ":
+                columns += 1
+            case "\t":
+                columns += 2
+            default:
+                return min(columns / 2, 8)
+            }
+        }
+
+        return min(columns / 2, 8)
+    }
+}
+
+private extension NativeEditorBlockKind {
+    var isListItem: Bool {
+        switch self {
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            true
+        default:
+            false
+        }
     }
 }

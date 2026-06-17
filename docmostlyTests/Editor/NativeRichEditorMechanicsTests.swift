@@ -68,6 +68,30 @@ struct NativeRichEditorMechanicsTests {
         #expect(String(viewModel.document.blocks[0].text.characters) == "Intro")
     }
 
+    @Test func pasteMarkdownPreservesNestedListIndentation() {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("""
+        - Parent
+          - Child
+            - Grandchild
+          2. Ordered child
+          - [x] Task child
+        """)
+
+        #expect(viewModel.document.blocks.map(\.indentLevel) == [0, 0, 1, 2, 1, 1])
+        #expect(viewModel.document.blocks.map(\.kind) == [
+            .paragraph,
+            .bulletListItem,
+            .bulletListItem,
+            .bulletListItem,
+            .orderedListItem(ordinal: 2),
+            .taskListItem(isChecked: true)
+        ])
+    }
+
     @Test func indentAndOutdentActiveListBlock() {
         let block = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Nested"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [block])
