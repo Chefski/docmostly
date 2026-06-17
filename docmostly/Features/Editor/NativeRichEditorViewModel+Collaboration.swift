@@ -64,6 +64,7 @@ extension NativeRichEditorViewModel {
     func handleCRDTBackedPageUpdated(_ event: NativeEditorCollaborationStatelessEvent) -> Bool {
         guard crdtDocumentEngine != nil else { return false }
 
+        recordRecentEditor(from: event.lastUpdatedBy)
         markRemoteBaseline(updatedAt: event.updatedAt ?? lastRemoteUpdatedAt)
         return true
     }
@@ -233,5 +234,11 @@ extension NativeRichEditorViewModel {
     private func collaborators(from person: DocmostPagePerson?) -> [NativeEditorCollaborator] {
         guard let person else { return [] }
         return [NativeEditorCollaborator(person: person)]
+    }
+
+    private func recordRecentEditor(from person: DocmostPagePerson?) {
+        guard let person else { return }
+        activeCollaborators.removeAll { $0.source == .recentEditor }
+        activeCollaborators.append(NativeEditorCollaborator(person: person))
     }
 }

@@ -15,6 +15,13 @@ struct NativeCRDTStatelessEventTests {
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(kind: .paragraph, text: AttributedString("Local draft"), alignment: .left)
         ])
+        let presenceCollaborator = NativeEditorCollaborator(
+            id: "user-3",
+            name: "Bob",
+            colorName: "#059669",
+            source: .presence
+        )
+        viewModel.activeCollaborators = [presenceCollaborator]
         viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
         viewModel.handleDocumentChanged()
         let event = NativeEditorCollaborationStatelessEvent(
@@ -32,6 +39,11 @@ struct NativeCRDTStatelessEventTests {
         #expect(viewModel.pendingRemotePage == nil)
         #expect(viewModel.realtimeStatus == .connected)
         #expect(viewModel.lastRemoteUpdatedAt == event.updatedAt)
+        #expect(viewModel.activeCollaborators.count == 2)
+        #expect(viewModel.activeCollaborators.first == presenceCollaborator)
+        #expect(viewModel.activeCollaborators.last?.id == "user-2")
+        #expect(viewModel.activeCollaborators.last?.name == "Alice")
+        #expect(viewModel.activeCollaborators.last?.source == .recentEditor)
     }
 
     @Test func pageUpdatedEventNeedsSnapshotRefreshWithoutCRDTEngine() {
