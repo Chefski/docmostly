@@ -161,6 +161,13 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
         return encoder.data
     }
 
+    static func awarenessRemoval(documentName: String, clientID: Int, clock: Int) throws -> Data {
+        let update = try awarenessUpdate(states: [
+            NativeEditorAwarenessState(clientID: clientID, clock: clock, payload: nil)
+        ])
+        return awareness(documentName: documentName, update: update)
+    }
+
     static func awarenessUpdate(states: [NativeEditorAwarenessState]) throws -> Data {
         var encoder = NativeEditorLib0Encoder()
         encoder.writeVarUint(states.count)

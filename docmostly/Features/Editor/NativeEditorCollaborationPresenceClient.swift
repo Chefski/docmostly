@@ -26,6 +26,7 @@ actor NativeEditorCollaborationPresenceClient {
     private var authenticatedScope: NativeEditorCollaborationScope?
     private let localClientID: Int
     private var localAwarenessClock = 0
+    private var activeDocumentName: String?
     private var awarenessStore = NativeEditorAwarenessStateStore()
 
     init(
@@ -66,9 +67,9 @@ actor NativeEditorCollaborationPresenceClient {
         }
 
         streamPair.continuation.onTermination = { _ in
-            receiver.cancel()
             Task {
-                await self.disconnect()
+                await self.disconnectGracefully()
+                receiver.cancel()
             }
         }
 
@@ -85,6 +86,7 @@ actor NativeEditorCollaborationPresenceClient {
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         authenticatedScope = nil
+        activeDocumentName = nil
         awarenessStore.reset()
     }
 
@@ -92,10 +94,11 @@ actor NativeEditorCollaborationPresenceClient {
         context: NativeEditorCollaborationSessionContext,
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async {
-        disconnect()
+        await disconnectGracefully()
 
         let task = urlSession.webSocketTask(with: URLRequest(url: context.url))
         self.task = task
+        activeDocumentName = context.documentName
         task.resume()
 
         do {
@@ -189,6 +192,14 @@ actor NativeEditorCollaborationPresenceClient {
 }
 
 private extension NativeEditorCollaborationPresenceClient {
+    func disconnectGracefully() async {
+        if let activeDocumentName {
+            try? await sendLocalAwarenessRemoval(documentName: activeDocumentName)
+        }
+
+        disconnect()
+    }
+
     func sendInitialCRDTSync(using syncDriver: NativeEditorCollaborationSyncDriver?) async throws {
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFramesAfterAuthentication()
@@ -284,6 +295,16 @@ private extension NativeEditorCollaborationPresenceClient {
             )
         ])
         try await send(NativeEditorHocuspocusFrame.awareness(documentName: documentName, update: update))
+    }
+
+    func sendLocalAwarenessRemoval(documentName: String) async throws {
+        localAwarenessClock += 1
+        let frame = try NativeEditorHocuspocusFrame.awarenessRemoval(
+            documentName: documentName,
+            clientID: localClientID,
+            clock: localAwarenessClock
+        )
+        try await send(frame)
     }
 
     func send(_ data: Data) async throws {
