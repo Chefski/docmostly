@@ -31,6 +31,7 @@ struct NativeEditorBodyView: View {
                         insertBelow: { viewModel.insertBlock(after: block.id) },
                         delete: { viewModel.deleteBlock(block.id) },
                         tableActions: tableEditingActions,
+                        richBlockActions: richBlockEditingActions,
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
@@ -80,6 +81,15 @@ struct NativeEditorBodyView: View {
             deleteRow: viewModel.deleteTableRow,
             insertColumnAfter: viewModel.insertTableColumnAfter,
             deleteColumn: viewModel.deleteTableColumn
+        )
+    }
+
+    private var richBlockEditingActions: NativeEditorRichBlockEditingActions {
+        NativeEditorRichBlockEditingActions(
+            updateCallout: viewModel.updateCallout,
+            updateDetails: viewModel.updateDetails,
+            updateEmbed: viewModel.updateEmbed,
+            updateMathBlock: viewModel.updateMathBlock
         )
     }
 }
