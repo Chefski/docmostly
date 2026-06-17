@@ -126,6 +126,7 @@ final class NativeRichEditorViewModel {
 
         do {
             if let crdtDocumentEngine {
+                await waitForPendingCRDTLocalChange()
                 let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = try await crdtDocumentEngine.flushPendingLocalChanges(
                     title: trimmedTitle,
