@@ -14,7 +14,21 @@ struct NativeEditorToolbar: View {
     @State private var commentID = ""
     @State private var inlineMathText = ""
 
+    let isUploadingAttachment: Bool
+    let importAttachment: (NativeEditorAttachmentImportKind) -> Void
     let dismissKeyboard: () -> Void
+
+    init(
+        viewModel: NativeRichEditorViewModel,
+        isUploadingAttachment: Bool = false,
+        importAttachment: @escaping (NativeEditorAttachmentImportKind) -> Void = { _ in },
+        dismissKeyboard: @escaping () -> Void
+    ) {
+        self.viewModel = viewModel
+        self.isUploadingAttachment = isUploadingAttachment
+        self.importAttachment = importAttachment
+        self.dismissKeyboard = dismissKeyboard
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -48,6 +62,14 @@ struct NativeEditorToolbar: View {
                     NativeEditorAlignmentToolbarGroup(
                         viewModel: viewModel,
                         isShowingLinkPrompt: $isShowingLinkPrompt
+                    )
+
+                    Divider()
+                        .frame(height: 28)
+
+                    NativeEditorAttachmentToolbarGroup(
+                        isUploading: isUploadingAttachment,
+                        importAttachment: importAttachment
                     )
 
                     Divider()

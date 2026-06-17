@@ -86,6 +86,56 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.document.proseMirrorDocument.content.first?.attrs?["language"] == .string("mermaid"))
     }
 
+    @Test func insertingUploadedImageReplacesActiveBlockWithDocmostNode() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/image"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.insertUploadedAttachment(uploadedAttachment(), as: .image)
+
+        let updatedBlock = viewModel.document.blocks[0]
+        guard case .image(let image) = updatedBlock.kind else {
+            Issue.record("Expected image block")
+            return
+        }
+
+        let node = viewModel.document.proseMirrorDocument.content.first
+        #expect(updatedBlock.id == block.id)
+        #expect(updatedBlock.isEditable == false)
+        #expect(image.source == "/api/files/attachment-1/Report.pdf")
+        #expect(image.attachmentID == "attachment-1")
+        #expect(image.sizeInBytes == 4096)
+        #expect(node?.type == "image")
+        #expect(node?.attrs?["src"] == .string("/api/files/attachment-1/Report.pdf"))
+        #expect(node?.attrs?["attachmentId"] == .string("attachment-1"))
+        #expect(node?.attrs?["size"] == .int(4096))
+        #expect(viewModel.isDirty == true)
+    }
+
+    @Test func insertingUploadedFileAppendsWhenNoTextBlockIsActive() {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [])
+
+        viewModel.insertUploadedAttachment(uploadedAttachment(), as: .file)
+
+        let updatedBlock = try? #require(viewModel.document.blocks.first)
+        guard case .attachment(let attachment) = updatedBlock?.kind else {
+            Issue.record("Expected attachment block")
+            return
+        }
+
+        let node = viewModel.document.proseMirrorDocument.content.first
+        #expect(attachment.url == "/api/files/attachment-1/Report.pdf")
+        #expect(attachment.name == "Report.pdf")
+        #expect(attachment.mimeType == "application/pdf")
+        #expect(node?.type == "attachment")
+        #expect(node?.attrs?["url"] == .string("/api/files/attachment-1/Report.pdf"))
+        #expect(node?.attrs?["name"] == .string("Report.pdf"))
+        #expect(node?.attrs?["mime"] == .string("application/pdf"))
+        #expect(viewModel.selectedBlockID == updatedBlock?.id)
+    }
+
     @Test func deletesSelectedBlockAndKeepsAdjacentBlockActive() {
         let firstBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("First"), alignment: .left)
         let selectedBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("Selected"), alignment: .left)
@@ -197,5 +247,24 @@ struct NativeRichEditorViewModelTests {
 
     private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
         viewModel.document.proseMirrorDocument.content.first?.content ?? []
+    }
+
+    private func uploadedAttachment() -> DocmostAttachment {
+        DocmostAttachment(
+            id: "attachment-1",
+            fileName: "Report.pdf",
+            filePath: nil,
+            fileSize: 4096,
+            fileExt: "pdf",
+            mimeType: "application/pdf",
+            type: "file",
+            creatorId: "user-1",
+            pageId: "page-1",
+            spaceId: "space-1",
+            workspaceId: "workspace-1",
+            createdAt: nil,
+            updatedAt: nil,
+            deletedAt: nil
+        )
     }
 }
