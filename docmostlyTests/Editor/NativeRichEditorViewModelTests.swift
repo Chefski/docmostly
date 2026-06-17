@@ -54,6 +54,38 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.isDirty == true)
     }
 
+    @Test func applyingTableCommandCreatesRawTableBlock() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/table"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.applySlashCommand(.table)
+
+        guard case .table(let table) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(table.rows.count == 2)
+        #expect(viewModel.document.blocks[0].isEditable == false)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.type == "table")
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
+    }
+
+    @Test func applyingMermaidCommandCreatesEditableMermaidCodeBlock() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/mermaid"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.applySlashCommand(.mermaid)
+
+        #expect(viewModel.document.blocks[0].kind == .codeBlock(language: "mermaid"))
+        #expect(viewModel.document.blocks[0].isEditable == true)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.type == "codeBlock")
+        #expect(viewModel.document.proseMirrorDocument.content.first?.attrs?["language"] == .string("mermaid"))
+    }
+
     @Test func deletesSelectedBlockAndKeepsAdjacentBlockActive() {
         let firstBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("First"), alignment: .left)
         let selectedBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("Selected"), alignment: .left)

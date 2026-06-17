@@ -186,6 +186,11 @@ extension NativeRichEditorViewModel {
         performUndoableEdit {
             guard let index = activeBlockIndex else { return }
 
+            if let replacementBlock = command.replacementBlock(reusing: document.blocks[index].id) {
+                document.blocks[index] = replacementBlock
+                return
+            }
+
             document.blocks[index].kind = command.blockKind
             if activeSlashCommandQuery != nil {
                 document.blocks[index].text = AttributedString("")

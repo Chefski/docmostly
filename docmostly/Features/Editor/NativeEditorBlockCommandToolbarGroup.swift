@@ -4,7 +4,7 @@ struct NativeEditorBlockCommandToolbarGroup: View {
     @Bindable var viewModel: NativeRichEditorViewModel
 
     var body: some View {
-        ForEach(NativeEditorCommand.allCases) { command in
+        ForEach(NativeEditorCommand.primaryCases) { command in
             Button {
                 viewModel.applySlashCommand(command)
             } label: {
@@ -12,5 +12,18 @@ struct NativeEditorBlockCommandToolbarGroup: View {
             }
             .accessibilityLabel(command.title)
         }
+
+        Menu {
+            ForEach(NativeEditorCommand.richCases) { command in
+                Button {
+                    viewModel.applySlashCommand(command)
+                } label: {
+                    Label(command.title, systemImage: command.systemImage)
+                }
+            }
+        } label: {
+            Label("Rich Blocks", systemImage: "square.grid.2x2")
+        }
+        .accessibilityLabel("Rich Blocks")
     }
 }
