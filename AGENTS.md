@@ -2,12 +2,9 @@
 
 This repository contains an Xcode project written with Swift and SwiftUI. Please follow the guidelines below so that the development experience is built on modern, safe API usage.
 
-The backend for this project is located at `/Users/chefski/Documents/dev/Setbreak/backend` (one directory up from the iOS project).
+## Project Details
 
-## Project Snapshot
-This project acts as the backend for the Setbreak iOS app.
-
-This repository is a VERY EARLY WIP. Proposing sweeping changes that improve long-term maintainability is encouraged.
+Docmostly is a native iOS client (targeting iOS 26) for Docmost, designed as a polished mobile companion for Docmost workspace. Think Notion, Craft, Apple Notes, Outline, and Confluence, but built around Docmost’s own workspace, space, nested-page, search, comments, attachments, and collaborative document model. The app should feel native to iOS rather than like a web wrapper, using SwiftUI for browsing, reading, search, recents, offline read-only access, settings and realtime collaboration.
 
 ## Core Priorities
 
