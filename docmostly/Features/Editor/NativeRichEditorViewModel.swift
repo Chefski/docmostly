@@ -38,6 +38,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
+    @ObservationIgnored var crdtLocalChangeTask: Task<Void, Never>?
 
     init(
         pageID: String,
@@ -50,6 +51,10 @@ final class NativeRichEditorViewModel {
         lastSavedTitle = initialTitle
         lastKnownSnapshot = makeHistorySnapshot()
         self.crdtDocumentEngine = crdtDocumentEngine
+    }
+
+    deinit {
+        crdtLocalChangeTask?.cancel()
     }
 
     var isEditing: Bool {

@@ -10,10 +10,16 @@ nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
     }
 }
 
+nonisolated struct NativeEditorCRDTLocalChange: Sendable {
+    let before: NativeEditorHistorySnapshot
+    let after: NativeEditorHistorySnapshot
+}
+
 protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     func encodeStateVector() async throws -> Data
     func encodeStateAsUpdate(for stateVector: Data) async throws -> Data
     func applyRemoteUpdate(_ update: Data) async throws
+    func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor?
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
         -> NativeEditorAwarenessCursor?
@@ -25,6 +31,8 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
 }
 
 extension NativeEditorCRDTDocumentEngine {
+    func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws { }
+
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor? {
         nil
     }

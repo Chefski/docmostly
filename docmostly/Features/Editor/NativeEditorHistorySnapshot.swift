@@ -1,6 +1,6 @@
 import Foundation
 
-struct NativeEditorHistorySnapshot: Equatable {
+struct NativeEditorHistorySnapshot: Equatable, Sendable {
     var title: String
     var document: NativeEditorDocument
     var activeBlockID: UUID?

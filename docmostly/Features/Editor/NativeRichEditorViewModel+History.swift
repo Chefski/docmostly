@@ -41,6 +41,7 @@ extension NativeRichEditorViewModel {
         lastKnownSnapshot = after
         updateHistoryAvailability()
         recalculateDirty()
+        queueCRDTLocalChange(before: before, after: after)
     }
 
     func makeHistorySnapshot() -> NativeEditorHistorySnapshot {
@@ -73,11 +74,13 @@ extension NativeRichEditorViewModel {
             applySmartTypographyIfNeeded()
         }
 
+        let after = makeHistorySnapshot()
         appendUndoSnapshot(before)
         redoStack.removeAll()
-        lastKnownSnapshot = makeHistorySnapshot()
+        lastKnownSnapshot = after
         updateHistoryAvailability()
         recalculateDirty()
+        queueCRDTLocalChange(before: before, after: after)
     }
 
     private func appendUndoSnapshot(_ snapshot: NativeEditorHistorySnapshot) {
@@ -107,5 +110,31 @@ extension NativeRichEditorViewModel {
     private func updateHistoryAvailability() {
         canUndo = undoStack.isEmpty == false
         canRedo = redoStack.isEmpty == false
+    }
+
+    func waitForPendingCRDTLocalChange() async {
+        await crdtLocalChangeTask?.value
+    }
+
+    private func queueCRDTLocalChange(
+        before: NativeEditorHistorySnapshot,
+        after: NativeEditorHistorySnapshot
+    ) {
+        guard let crdtDocumentEngine else { return }
+
+        let previousTask = crdtLocalChangeTask
+        let change = NativeEditorCRDTLocalChange(before: before, after: after)
+        crdtLocalChangeTask = Task { [weak self, crdtDocumentEngine, change, previousTask] in
+            await previousTask?.value
+            guard Task.isCancelled == false else { return }
+
+            do {
+                try await crdtDocumentEngine.integrateLocalChange(change)
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.realtimeStatus = .failed(error.localizedDescription)
+            }
+        }
     }
 }
