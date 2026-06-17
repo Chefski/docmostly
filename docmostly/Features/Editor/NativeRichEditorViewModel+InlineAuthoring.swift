@@ -117,6 +117,31 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func removeInlineComment(commentID: String, tracksUndo: Bool = true) {
+        let trimmedCommentID = commentID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedCommentID.isEmpty == false else { return }
+
+        var updatedDocument = document
+        guard Self.removeInlineComment(
+            commentID: trimmedCommentID,
+            from: &updatedDocument
+        ) else { return }
+
+        if tracksUndo {
+            performUndoableEdit {
+                document = updatedDocument
+            }
+        } else {
+            document = updatedDocument
+            _ = Self.removeInlineComment(
+                commentID: trimmedCommentID,
+                from: &lastSavedDocument
+            )
+            lastKnownSnapshot = makeHistorySnapshot()
+            recalculateDirty()
+        }
+    }
+
     private static func updateInlineCommentResolved(
         commentID: String,
         isResolved: Bool,
@@ -136,6 +161,31 @@ extension NativeRichEditorViewModel {
                 document.blocks[index].text[range].backgroundColor = isResolved
                     ? .gray.opacity(0.16)
                     : .yellow.opacity(0.28)
+            }
+        }
+
+        return didUpdate
+    }
+
+    private static func removeInlineComment(
+        commentID: String,
+        from document: inout NativeEditorDocument
+    ) -> Bool {
+        var didUpdate = false
+
+        for index in document.blocks.indices {
+            let ranges = document.blocks[index].text.runs.compactMap { run in
+                run[NativeEditorCommentIDAttribute.self] == commentID ? run.range : nil
+            }
+            guard ranges.isEmpty == false else { continue }
+
+            didUpdate = true
+            for range in ranges {
+                let highlightColor = document.blocks[index].text[range][NativeEditorHighlightColorAttribute.self]
+                let restoredBackgroundColor = highlightColor.flatMap { Color(docmostlyHex: $0) }
+                document.blocks[index].text[range][NativeEditorCommentIDAttribute.self] = nil
+                document.blocks[index].text[range][NativeEditorCommentResolvedAttribute.self] = nil
+                document.blocks[index].text[range].backgroundColor = restoredBackgroundColor
             }
         }
 

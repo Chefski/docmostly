@@ -72,6 +72,7 @@ extension PageReaderView {
             )
         case .commentDeleted(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.removeComment(id: event.commentID)
+            editorViewModel.removeInlineComment(commentID: event.commentID, tracksUndo: false)
         case .pageUpdated, .commentCreated, .commentUpdated, .commentResolved, .commentDeleted, .unknown:
             break
         }
