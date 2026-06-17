@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -170,6 +171,53 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(viewModel.resolvedRemoteCursors == [])
     }
 
+    @Test func viewModelBuildsLocalTextSelectionFromActiveBlockSelection() throws {
+        let firstBlockID = UUID()
+        let secondBlockID = UUID()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(id: firstBlockID, kind: .paragraph, text: AttributedString("First"), alignment: .left),
+            NativeEditorBlock(
+                id: secondBlockID,
+                kind: .paragraph,
+                text: AttributedString("Second body"),
+                alignment: .left
+            )
+        ])
+        viewModel.focus(blockID: secondBlockID)
+        let text = viewModel.document.blocks[1].text
+        let start = try #require(text.characters.index(text.startIndex, offsetBy: 2, limitedBy: text.endIndex))
+        let end = try #require(text.characters.index(text.startIndex, offsetBy: 8, limitedBy: text.endIndex))
+        viewModel.document.blocks[1].selection = AttributedTextSelection(range: start..<end)
+
+        #expect(viewModel.currentLocalTextSelection() == NativeEditorLocalTextSelection(
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 1, characterOffset: 2),
+            head: NativeEditorRemoteTextPosition(blockIndex: 1, characterOffset: 8)
+        ))
+    }
+
+    @Test func syncDriverResolvesLocalAwarenessCursorFromNativeSelection() async throws {
+        let localSelection = NativeEditorLocalTextSelection(
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 1),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 4)
+        )
+        let cursor = NativeEditorAwarenessCursor(
+            anchor: .object(["relative": .string("anchor")]),
+            head: .object(["relative": .string("head")])
+        )
+        let engine = RecordingCRDTDocumentEngine()
+        engine.localAwarenessCursor = cursor
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.page-1",
+            coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        )
+
+        let resolvedCursor = try await driver.localAwarenessCursor(for: localSelection)
+
+        #expect(engine.localAwarenessCursorRequests == [localSelection])
+        #expect(resolvedCursor == cursor)
+    }
+
     private func remoteCursor(id: String, name: String) -> NativeEditorRemoteCursor {
         NativeEditorRemoteCursor(
             id: id,
@@ -188,6 +236,8 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
     var appliedRemoteUpdates: [Data] = []
     var resolvedRemoteCursorsByID: [String: NativeEditorResolvedRemoteCursor] = [:]
     var remoteCursorResolutionRequests: [NativeEditorRemoteCursor] = []
+    var localAwarenessCursor: NativeEditorAwarenessCursor?
+    var localAwarenessCursorRequests: [NativeEditorLocalTextSelection] = []
 
     func encodeStateVector() async throws -> Data {
         encodedStateVector
@@ -205,5 +255,12 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor? {
         remoteCursorResolutionRequests.append(cursor)
         return resolvedRemoteCursorsByID[cursor.id]
+    }
+
+    func encodeLocalAwarenessCursor(
+        for selection: NativeEditorLocalTextSelection
+    ) async throws -> NativeEditorAwarenessCursor? {
+        localAwarenessCursorRequests.append(selection)
+        return localAwarenessCursor
     }
 }

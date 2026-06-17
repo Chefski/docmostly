@@ -28,6 +28,11 @@ actor NativeEditorCRDTSyncCoordinator {
         return .update(update)
     }
 
+    func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
+        -> NativeEditorAwarenessCursor? {
+        try await documentEngine.encodeLocalAwarenessCursor(for: selection)
+    }
+
     private func consumeLocalEcho(for update: Data) -> Bool {
         guard let count = pendingLocalEchoCounts[update] else { return false }
 

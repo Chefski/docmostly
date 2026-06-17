@@ -23,6 +23,12 @@ actor NativeEditorCollaborationSyncDriver {
         return frame(for: message)
     }
 
+    func localAwarenessCursor(
+        for selection: NativeEditorLocalTextSelection
+    ) async throws -> NativeEditorAwarenessCursor? {
+        try await coordinator.encodeLocalAwarenessCursor(for: selection)
+    }
+
     private func frame(for message: NativeEditorYjsSyncMessage) -> Data {
         NativeEditorHocuspocusFrame.sync(documentName: documentName, message: message)
     }

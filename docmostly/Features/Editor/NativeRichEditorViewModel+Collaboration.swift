@@ -68,6 +68,61 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
+        crdtDocumentEngine = engine
+    }
+
+    func collaborationSession() -> NativeEditorCollaborationSession {
+        let documentName = "page.\(currentPageID)"
+        let syncDriver = crdtDocumentEngine.map { engine in
+            NativeEditorCollaborationSyncDriver(
+                documentName: documentName,
+                coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+            )
+        }
+        return NativeEditorCollaborationSession(
+            documentName: documentName,
+            syncDriver: syncDriver,
+            localAwarenessCursor: { [weak self] in
+                await self?.localAwarenessCursor()
+            }
+        )
+    }
+
+    func refreshResolvedRemoteCursors() async {
+        guard let crdtDocumentEngine else {
+            resolvedRemoteCursors = []
+            return
+        }
+
+        var resolvedCursors: [NativeEditorResolvedRemoteCursor] = []
+        resolvedCursors.reserveCapacity(remoteCursors.count)
+
+        for cursor in remoteCursors {
+            if let resolvedCursor = try? await crdtDocumentEngine.resolveRemoteCursor(cursor) {
+                resolvedCursors.append(resolvedCursor)
+            }
+        }
+
+        resolvedRemoteCursors = resolvedCursors
+    }
+
+    func currentLocalTextSelection() -> NativeEditorLocalTextSelection? {
+        guard let index = activeBlockIndex else { return nil }
+        let block = document.blocks[index]
+        return NativeEditorLocalTextSelection(
+            blockIndex: index,
+            selection: block.selection,
+            text: block.text
+        )
+    }
+
+    func localAwarenessCursor() async -> NativeEditorAwarenessCursor? {
+        guard let crdtDocumentEngine else { return nil }
+        guard let selection = currentLocalTextSelection() else { return nil }
+        return try? await crdtDocumentEngine.encodeLocalAwarenessCursor(for: selection)
+    }
+
     private func isRemotePageNewer(_ page: DocmostEditablePage) -> Bool {
         guard let remoteUpdatedAt = page.updatedAt else { return false }
         guard let lastRemoteUpdatedAt else { return true }

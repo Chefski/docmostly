@@ -13,6 +13,7 @@ private struct NativeEditorCollaborationSessionContext: Sendable {
     let documentName: String
     let user: DocmostUser?
     let syncDriver: NativeEditorCollaborationSyncDriver?
+    let localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)?
 }
 
 actor NativeEditorCollaborationPresenceClient {
@@ -36,7 +37,8 @@ actor NativeEditorCollaborationPresenceClient {
         token: String,
         documentName: String,
         user: DocmostUser?,
-        syncDriver: NativeEditorCollaborationSyncDriver? = nil
+        syncDriver: NativeEditorCollaborationSyncDriver? = nil,
+        localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)? = nil
     ) -> AsyncThrowingStream<NativeEditorCollaborationEvent, any Error> {
         let streamPair = AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.makeStream(
             bufferingPolicy: .bufferingNewest(50)
@@ -46,7 +48,8 @@ actor NativeEditorCollaborationPresenceClient {
             token: token,
             documentName: documentName,
             user: user,
-            syncDriver: syncDriver
+            syncDriver: syncDriver,
+            localAwarenessCursor: localAwarenessCursor
         )
 
         let receiver = Task {
@@ -93,8 +96,8 @@ actor NativeEditorCollaborationPresenceClient {
                 )
             )
             try await send(NativeEditorHocuspocusFrame.queryAwareness(documentName: context.documentName))
-            try await sendLocalAwareness(documentName: context.documentName, user: context.user)
-            startHeartbeat(documentName: context.documentName, user: context.user)
+            try await sendLocalAwareness(context: context)
+            startHeartbeat(context: context)
             try await receiveMessages(
                 from: task,
                 context: context,
@@ -147,7 +150,7 @@ actor NativeEditorCollaborationPresenceClient {
         case .authenticationFailed(let reason):
             throw APIError.connectionFailed(reason)
         case .queryAwareness:
-            try await sendLocalAwareness(documentName: context.documentName, user: context.user)
+            try await sendLocalAwareness(context: context)
         case .awareness(let states):
             let currentStates = awarenessStore.apply(states)
             continuation.yield(.awareness(states: currentStates, localClientID: localClientID))
@@ -177,18 +180,21 @@ actor NativeEditorCollaborationPresenceClient {
         try await send(frames)
     }
 
-    private func startHeartbeat(documentName: String, user: DocmostUser?) {
+    private func startHeartbeat(context: NativeEditorCollaborationSessionContext) {
         heartbeatTask?.cancel()
-        heartbeatTask = Task { [weak self] in
+        heartbeatTask = Task { [weak self, context] in
             while Task.isCancelled == false {
                 try? await Task.sleep(for: .seconds(15))
                 guard Task.isCancelled == false else { return }
-                try? await self?.sendLocalAwareness(documentName: documentName, user: user)
+                try? await self?.sendLocalAwareness(context: context)
             }
         }
     }
 
-    private func sendLocalAwareness(documentName: String, user: DocmostUser?) async throws {
+    private func sendLocalAwareness(context: NativeEditorCollaborationSessionContext) async throws {
+        let cursor = await context.localAwarenessCursor?()
+        let documentName = context.documentName
+        let user = context.user
         guard let user else { return }
 
         localAwarenessClock += 1
@@ -202,7 +208,7 @@ actor NativeEditorCollaborationPresenceClient {
                         name: user.name,
                         color: NativeEditorPresenceColor.color(for: user.id)
                     ),
-                    cursor: nil
+                    cursor: cursor
                 )
             )
         ])

@@ -19,7 +19,8 @@ extension PageReaderView {
                     token: token,
                     documentName: collaborationSession.documentName,
                     user: appState.currentUser?.user,
-                    syncDriver: collaborationSession.syncDriver
+                    syncDriver: collaborationSession.syncDriver,
+                    localAwarenessCursor: collaborationSession.localAwarenessCursor
                 )
 
                 for try await event in events {

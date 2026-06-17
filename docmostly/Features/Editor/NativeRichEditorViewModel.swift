@@ -37,7 +37,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var redoStack: [NativeEditorHistorySnapshot] = []
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
-    @ObservationIgnored private var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
+    @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
 
     init(
         pageID: String,
@@ -181,41 +181,6 @@ final class NativeRichEditorViewModel {
         isDirty = title != lastSavedTitle || document != lastSavedDocument
     }
 
-    func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
-        crdtDocumentEngine = engine
-    }
-
-    func collaborationSession() -> NativeEditorCollaborationSession {
-        let documentName = "page.\(currentPageID)"
-        let syncDriver = crdtDocumentEngine.map { engine in
-            NativeEditorCollaborationSyncDriver(
-                documentName: documentName,
-                coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
-            )
-        }
-        return NativeEditorCollaborationSession(
-            documentName: documentName,
-            syncDriver: syncDriver
-        )
-    }
-
-    func refreshResolvedRemoteCursors() async {
-        guard let crdtDocumentEngine else {
-            resolvedRemoteCursors = []
-            return
-        }
-
-        var resolvedCursors: [NativeEditorResolvedRemoteCursor] = []
-        resolvedCursors.reserveCapacity(remoteCursors.count)
-
-        for cursor in remoteCursors {
-            if let resolvedCursor = try? await crdtDocumentEngine.resolveRemoteCursor(cursor) {
-                resolvedCursors.append(resolvedCursor)
-            }
-        }
-
-        resolvedRemoteCursors = resolvedCursors
-    }
 }
 
 extension NativeRichEditorViewModel {
