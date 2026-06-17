@@ -15,27 +15,68 @@ struct NativeEditorRemoteUpdate: Equatable, Sendable {
     var lastUpdatedBy: DocmostPagePerson?
 }
 
+enum NativeEditorCollaboratorSource: Equatable, Sendable {
+    case presence
+    case recentEditor
+}
+
 struct NativeEditorCollaborator: Equatable, Identifiable, Sendable {
     var id: String
     var name: String
     var colorName: String
+    var source: NativeEditorCollaboratorSource
 
-    init(id: String, name: String, colorName: String) {
+    init(
+        id: String,
+        name: String,
+        colorName: String,
+        source: NativeEditorCollaboratorSource = .presence
+    ) {
         self.id = id
         self.name = name
         self.colorName = colorName
+        self.source = source
     }
 
     init(person: DocmostPagePerson) {
         id = person.id
         name = person.name
         colorName = Self.colorName(for: person.id)
+        source = .recentEditor
+    }
+
+    init(awarenessState: NativeEditorAwarenessState) {
+        let user = awarenessState.payload?.user
+        let identifier = user?.id ?? "client-\(awarenessState.clientID)"
+        id = identifier
+        name = user?.name ?? "Someone"
+        colorName = user?.color ?? Self.colorName(for: identifier)
+        source = .presence
     }
 
     private static func colorName(for identifier: String) -> String {
         let palette = ["gray", "blue", "green", "orange", "purple"]
         let index = abs(identifier.hashValue) % palette.count
         return palette[index]
+    }
+}
+
+enum NativeEditorPresenceStatusText {
+    static func editingTitle(for collaborators: [NativeEditorCollaborator]) -> String? {
+        let names = collaborators
+            .filter { $0.source == .presence }
+            .map(\.name)
+
+        guard let firstName = names.first else { return nil }
+
+        switch names.count {
+        case 1:
+            return "\(firstName) is editing"
+        case 2:
+            return "\(firstName) and \(names[1]) are editing"
+        default:
+            return "\(firstName) and \(names.count - 1) others are editing"
+        }
     }
 }
 

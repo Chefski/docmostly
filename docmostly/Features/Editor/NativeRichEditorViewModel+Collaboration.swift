@@ -44,6 +44,21 @@ extension NativeRichEditorViewModel {
         realtimeStatus = .connected
     }
 
+    func applyAwarenessStates(_ states: [NativeEditorAwarenessState], localClientID: Int) {
+        var seenIDs: Set<String> = []
+        activeCollaborators = states.compactMap { state in
+            guard state.clientID != localClientID, state.payload?.user != nil else { return nil }
+
+            let collaborator = NativeEditorCollaborator(awarenessState: state)
+            guard seenIDs.insert(collaborator.id).inserted else { return nil }
+            return collaborator
+        }
+
+        if realtimeStatus != .conflict {
+            realtimeStatus = .connected
+        }
+    }
+
     private func isRemotePageNewer(_ page: DocmostEditablePage) -> Bool {
         guard let remoteUpdatedAt = page.updatedAt else { return false }
         guard let lastRemoteUpdatedAt else { return true }

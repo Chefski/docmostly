@@ -125,6 +125,81 @@ struct NativeEditorCollaborationTests {
         #expect(NativeEditorRealtimeSocketFrame.pongMessage == "3")
     }
 
+    @Test func keepsAwarenessStateAcrossIncrementalUpdatesAndRemovals() {
+        var store = NativeEditorAwarenessStateStore()
+        let alice = NativeEditorAwarenessState(
+            clientID: 42,
+            clock: 1,
+            payload: NativeEditorAwarenessPayload(
+                user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                cursor: nil
+            )
+        )
+        let bob = NativeEditorAwarenessState(
+            clientID: 43,
+            clock: 1,
+            payload: NativeEditorAwarenessPayload(
+                user: NativeEditorAwarenessUser(id: "user-3", name: "Bob", color: "#059669"),
+                cursor: nil
+            )
+        )
+
+        #expect(store.apply([alice]).map(\.clientID) == [42])
+        #expect(store.apply([bob]).map(\.clientID) == [42, 43])
+        #expect(store.apply([
+            NativeEditorAwarenessState(clientID: 42, clock: 2, payload: nil)
+        ]).map(\.clientID) == [43])
+    }
+
+    @Test func updatesActiveCollaboratorsFromAwarenessAndIgnoresLocalClient() {
+        let viewModel = configuredViewModel()
+        let states = [
+            NativeEditorAwarenessState(
+                clientID: 10,
+                clock: 1,
+                payload: NativeEditorAwarenessPayload(
+                    user: NativeEditorAwarenessUser(id: "user-1", name: "Chefling", color: "#111827"),
+                    cursor: nil
+                )
+            ),
+            NativeEditorAwarenessState(
+                clientID: 11,
+                clock: 1,
+                payload: NativeEditorAwarenessPayload(
+                    user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                    cursor: nil
+                )
+            ),
+            NativeEditorAwarenessState(clientID: 12, clock: 1, payload: nil)
+        ]
+
+        viewModel.applyAwarenessStates(states, localClientID: 10)
+
+        #expect(viewModel.activeCollaborators == [
+            NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB")
+        ])
+        #expect(viewModel.realtimeStatus == .connected)
+    }
+
+    @Test func summarizesPresenceEditingStatusText() {
+        let alice = NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB")
+        let bob = NativeEditorCollaborator(id: "user-3", name: "Bob", colorName: "#059669")
+        let remoteEditor = NativeEditorCollaborator(
+            id: "user-4",
+            name: "Recent Editor",
+            colorName: "orange",
+            source: .recentEditor
+        )
+
+        #expect(NativeEditorPresenceStatusText.editingTitle(for: [alice]) == "Alice is editing")
+        #expect(NativeEditorPresenceStatusText.editingTitle(for: [alice, bob]) == "Alice and Bob are editing")
+        #expect(
+            NativeEditorPresenceStatusText.editingTitle(for: [alice, bob, remoteEditor]) ==
+                "Alice and Bob are editing"
+        )
+        #expect(NativeEditorPresenceStatusText.editingTitle(for: [remoteEditor]) == nil)
+    }
+
     @Test func appliesRemoteSnapshotWhenEditorIsClean() {
         let viewModel = configuredViewModel()
         let remotePage = editablePage(
@@ -206,4 +281,5 @@ struct NativeEditorCollaborationTests {
             lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Remote Editor", avatarUrl: nil)
         )
     }
+
 }

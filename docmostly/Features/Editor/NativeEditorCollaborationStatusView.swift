@@ -29,7 +29,9 @@ struct NativeEditorCollaborationStatusView: View {
 
                     Button("Apply", systemImage: "arrow.down.doc", action: viewModel.acceptPendingRemoteUpdate)
                     Button("Keep Mine", systemImage: "xmark", action: viewModel.rejectPendingRemoteUpdate)
-                } else if viewModel.activeCollaborators.isEmpty == false {
+                } else if presenceCollaborators.isEmpty == false {
+                    Spacer(minLength: 0)
+                } else if recentEditors.isEmpty == false {
                     collaboratorNames
                     Spacer(minLength: 0)
                 }
@@ -42,7 +44,7 @@ struct NativeEditorCollaborationStatusView: View {
     }
 
     private var collaboratorNames: some View {
-        Text(viewModel.activeCollaborators.map(\.name).joined(separator: ", "))
+        Text(recentEditors.map(\.name).joined(separator: ", "))
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
@@ -51,29 +53,45 @@ struct NativeEditorCollaborationStatusView: View {
     private var isVisible: Bool {
         switch viewModel.realtimeStatus {
         case .disconnected:
-            viewModel.activeCollaborators.isEmpty == false || viewModel.pendingRemoteUpdate != nil
+            hasCollaborators || viewModel.pendingRemoteUpdate != nil
         case .connected:
-            viewModel.activeCollaborators.isEmpty == false || viewModel.pendingRemoteUpdate != nil
+            hasCollaborators || viewModel.pendingRemoteUpdate != nil
         case .connecting, .conflict, .failed, .unsupported:
             true
         }
     }
 
     private var statusTitle: String {
+        if let editingTitle = NativeEditorPresenceStatusText.editingTitle(for: presenceCollaborators) {
+            return editingTitle
+        }
+
         switch viewModel.realtimeStatus {
         case .disconnected:
-            "Offline"
+            return "Offline"
         case .connecting:
-            "Connecting"
+            return "Connecting"
         case .connected:
-            "Live"
+            return "Live"
         case .conflict:
-            "Remote update"
+            return "Remote update"
         case .failed:
-            "Sync issue"
+            return "Sync issue"
         case .unsupported:
-            "Limited live sync"
+            return "Limited live sync"
         }
+    }
+
+    private var hasCollaborators: Bool {
+        viewModel.activeCollaborators.isEmpty == false
+    }
+
+    private var presenceCollaborators: [NativeEditorCollaborator] {
+        viewModel.activeCollaborators.filter { $0.source == .presence }
+    }
+
+    private var recentEditors: [NativeEditorCollaborator] {
+        viewModel.activeCollaborators.filter { $0.source == .recentEditor }
     }
 
     private var statusImage: String {

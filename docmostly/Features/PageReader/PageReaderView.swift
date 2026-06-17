@@ -6,6 +6,7 @@ struct PageReaderView: View {
     @State var viewModel = PageReaderViewModel()
     @State var editorViewModel: NativeRichEditorViewModel?
     @State var realtimeEventClient = NativeEditorRealtimeEventClient()
+    @State var collaborationPresenceClient = NativeEditorCollaborationPresenceClient()
     @State private var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State private var isShowingAttachmentImporter = false
     @State private var isShowingMentionPicker = false
@@ -127,6 +128,9 @@ struct PageReaderView: View {
         }
         .task(id: editorViewModel?.currentPageID) {
             await monitorRealtimeEvents()
+        }
+        .task(id: editorViewModel?.currentPageID) {
+            await monitorCollaborationPresence()
         }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
@@ -283,6 +287,7 @@ private extension PageReaderView {
             }
         }
     }
+
 }
 
 private extension PageReaderView {
