@@ -55,7 +55,9 @@ extension PageReaderView {
             editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
             await editorViewModel.refreshResolvedRemoteCursors()
         case .stateless(let event) where event.type == "page.updated":
-            await refreshRemotePageSnapshot(editorViewModel: editorViewModel, lastUpdatedBy: event.lastUpdatedBy)
+            if editorViewModel.handleCRDTBackedPageUpdated(event) == false {
+                await refreshRemotePageSnapshot(editorViewModel: editorViewModel, lastUpdatedBy: event.lastUpdatedBy)
+            }
         case .stateless, .syncStatus:
             break
         }

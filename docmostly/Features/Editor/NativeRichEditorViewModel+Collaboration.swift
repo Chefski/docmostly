@@ -44,6 +44,13 @@ extension NativeRichEditorViewModel {
         realtimeStatus = .connected
     }
 
+    func handleCRDTBackedPageUpdated(_ event: NativeEditorCollaborationStatelessEvent) -> Bool {
+        guard crdtDocumentEngine != nil else { return false }
+
+        markRemoteBaseline(updatedAt: event.updatedAt ?? lastRemoteUpdatedAt)
+        return true
+    }
+
     func applyAwarenessStates(_ states: [NativeEditorAwarenessState], localClientID: Int) {
         var seenIDs: Set<String> = []
         activeCollaborators = states.compactMap { state in
