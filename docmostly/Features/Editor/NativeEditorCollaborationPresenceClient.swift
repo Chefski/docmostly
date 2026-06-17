@@ -152,7 +152,7 @@ actor NativeEditorCollaborationPresenceClient {
             startLocalUpdateSender(using: context.syncDriver)
             continuation.yield(.authenticated(scope))
         case .authenticationFailed(let reason):
-            throw APIError.connectionFailed(reason)
+            throw NativeEditorCollabAuthFailure(reason: reason)
         case .queryAwareness:
             try await sendLocalAwareness(context: context)
         case .awareness(let states):

@@ -15,6 +15,7 @@ extension PageReaderView {
     func monitorCollaborationPresence() async {
         guard let editorViewModel else { return }
         var reconnectPolicy = NativeEditorRealtimeReconnectPolicy()
+        var authenticationRetry = NativeEditorCollabAuthRetry()
 
         while Task.isCancelled == false {
             do {
@@ -38,6 +39,7 @@ extension PageReaderView {
                     guard Task.isCancelled == false else { return }
                     if case .authenticated = event {
                         reconnectPolicy.reset()
+                        authenticationRetry.markAuthenticated()
                     }
                     await handleCollaborationPresenceEvent(event, editorViewModel: editorViewModel)
                 }
@@ -45,6 +47,13 @@ extension PageReaderView {
                 return
             } catch {
                 guard Task.isCancelled == false else { return }
+
+                if authenticationRetry.shouldRetryImmediately(after: error) {
+                    reconnectPolicy.reset()
+                    markCollaborationPresenceConnecting(editorViewModel)
+                    continue
+                }
+
                 markCollaborationPresenceUnsupported(editorViewModel, message: error.localizedDescription)
             }
 
