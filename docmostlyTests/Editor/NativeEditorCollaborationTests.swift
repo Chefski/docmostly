@@ -193,6 +193,56 @@ struct NativeEditorCollaborationTests {
         #expect(engine.appliedRemoteUpdates == [update])
     }
 
+    @Test func syncDriverFramesInitialCRDTSyncMessage() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.encodedStateVector = Data([1, 2, 3])
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.page-1",
+            coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        )
+
+        let frames = try await driver.outboundFramesAfterAuthentication()
+
+        let frame = try NativeEditorHocuspocusFrame.parse(try #require(frames.first))
+        #expect(frames.count == 1)
+        #expect(frame.documentName == "page.page-1")
+        #expect(frame.message == .sync(.stepOne(Data([1, 2, 3]))))
+    }
+
+    @Test func syncDriverFramesRepliesToRemoteCRDTSyncMessages() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.stateUpdatesByVector = [
+            Data([4, 5]): Data([9, 8, 7])
+        ]
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.page-1",
+            coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        )
+
+        let frames = try await driver.outboundFrames(for: .stepOne(Data([4, 5])))
+
+        let frame = try NativeEditorHocuspocusFrame.parse(try #require(frames.first))
+        #expect(frames.count == 1)
+        #expect(frame.message == .sync(.stepTwo(Data([9, 8, 7]))))
+    }
+
+    @Test func syncDriverFramesLocalUpdatesAndSkipsMatchingEcho() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.page-1",
+            coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        )
+        let update = Data([13, 14])
+
+        let localFrame = await driver.outboundFrame(forLocalUpdate: update)
+        let parsedLocalFrame = try NativeEditorHocuspocusFrame.parse(localFrame)
+        #expect(parsedLocalFrame.message == .sync(.update(update)))
+
+        let echoFrames = try await driver.outboundFrames(for: .update(update))
+        #expect(echoFrames == [])
+        #expect(engine.appliedRemoteUpdates == [])
+    }
+
     private func configuredViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
         viewModel.document = NativeEditorDocument(blocks: [

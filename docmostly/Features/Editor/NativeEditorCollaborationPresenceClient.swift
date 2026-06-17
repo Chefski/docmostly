@@ -7,6 +7,14 @@ nonisolated enum NativeEditorCollaborationEvent: Equatable, Sendable {
     case syncStatus(Bool)
 }
 
+private struct NativeEditorCollaborationSessionContext: Sendable {
+    let url: URL
+    let token: String
+    let documentName: String
+    let user: DocmostUser?
+    let syncDriver: NativeEditorCollaborationSyncDriver?
+}
+
 actor NativeEditorCollaborationPresenceClient {
     private let urlSession: URLSession
     private var task: URLSessionWebSocketTask?
@@ -27,18 +35,23 @@ actor NativeEditorCollaborationPresenceClient {
         url: URL,
         token: String,
         documentName: String,
-        user: DocmostUser?
+        user: DocmostUser?,
+        syncDriver: NativeEditorCollaborationSyncDriver? = nil
     ) -> AsyncThrowingStream<NativeEditorCollaborationEvent, any Error> {
         let streamPair = AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.makeStream(
             bufferingPolicy: .bufferingNewest(50)
         )
+        let context = NativeEditorCollaborationSessionContext(
+            url: url,
+            token: token,
+            documentName: documentName,
+            user: user,
+            syncDriver: syncDriver
+        )
 
         let receiver = Task {
             await connect(
-                url: url,
-                token: token,
-                documentName: documentName,
-                user: user,
+                context: context,
                 continuation: streamPair.continuation
             )
         }
@@ -62,29 +75,29 @@ actor NativeEditorCollaborationPresenceClient {
     }
 
     private func connect(
-        url: URL,
-        token: String,
-        documentName: String,
-        user: DocmostUser?,
+        context: NativeEditorCollaborationSessionContext,
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async {
         disconnect()
 
-        let task = urlSession.webSocketTask(with: URLRequest(url: url))
+        let task = urlSession.webSocketTask(with: URLRequest(url: context.url))
         self.task = task
         task.resume()
 
         do {
             try Task.checkCancellation()
-            try await send(NativeEditorHocuspocusFrame.authentication(documentName: documentName, token: token))
-            try await send(NativeEditorHocuspocusFrame.queryAwareness(documentName: documentName))
-            try await sendLocalAwareness(documentName: documentName, user: user)
-            startHeartbeat(documentName: documentName, user: user)
+            try await send(
+                NativeEditorHocuspocusFrame.authentication(
+                    documentName: context.documentName,
+                    token: context.token
+                )
+            )
+            try await send(NativeEditorHocuspocusFrame.queryAwareness(documentName: context.documentName))
+            try await sendLocalAwareness(documentName: context.documentName, user: context.user)
+            startHeartbeat(documentName: context.documentName, user: context.user)
             try await receiveMessages(
                 from: task,
-                token: token,
-                documentName: documentName,
-                user: user,
+                context: context,
                 continuation: continuation
             )
             continuation.finish()
@@ -99,21 +112,17 @@ actor NativeEditorCollaborationPresenceClient {
 
     private func receiveMessages(
         from task: URLSessionWebSocketTask,
-        token: String,
-        documentName: String,
-        user: DocmostUser?,
+        context: NativeEditorCollaborationSessionContext,
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         while Task.isCancelled == false {
             let message = try await task.receive()
             let frame = try NativeEditorHocuspocusFrame.parse(Self.data(from: message))
-            guard frame.documentName == documentName else { continue }
+            guard frame.documentName == context.documentName else { continue }
 
             try await handle(
                 frame.message,
-                token: token,
-                documentName: documentName,
-                user: user,
+                context: context,
                 continuation: continuation
             )
         }
@@ -121,20 +130,24 @@ actor NativeEditorCollaborationPresenceClient {
 
     private func handle(
         _ message: NativeEditorHocuspocusMessage,
-        token: String,
-        documentName: String,
-        user: DocmostUser?,
+        context: NativeEditorCollaborationSessionContext,
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         switch message {
         case .authTokenRequested:
-            try await send(NativeEditorHocuspocusFrame.authentication(documentName: documentName, token: token))
+            try await send(
+                NativeEditorHocuspocusFrame.authentication(
+                    documentName: context.documentName,
+                    token: context.token
+                )
+            )
         case .authenticated(let scope):
+            try await sendInitialCRDTSync(using: context.syncDriver)
             continuation.yield(.authenticated(scope))
         case .authenticationFailed(let reason):
             throw APIError.connectionFailed(reason)
         case .queryAwareness:
-            try await sendLocalAwareness(documentName: documentName, user: user)
+            try await sendLocalAwareness(documentName: context.documentName, user: context.user)
         case .awareness(let states):
             let currentStates = awarenessStore.apply(states)
             continuation.yield(.awareness(states: currentStates, localClientID: localClientID))
@@ -142,11 +155,26 @@ actor NativeEditorCollaborationPresenceClient {
             continuation.yield(.stateless(event))
         case .syncStatus(let isSynced):
             continuation.yield(.syncStatus(isSynced))
-        case .sync:
-            break
+        case .sync(let syncMessage):
+            try await sendCRDTSyncReply(for: syncMessage, using: context.syncDriver)
         case .close(let reason):
             throw APIError.connectionFailed(reason)
         }
+    }
+
+    private func sendInitialCRDTSync(using syncDriver: NativeEditorCollaborationSyncDriver?) async throws {
+        guard let syncDriver else { return }
+        let frames = try await syncDriver.outboundFramesAfterAuthentication()
+        try await send(frames)
+    }
+
+    private func sendCRDTSyncReply(
+        for message: NativeEditorYjsSyncMessage,
+        using syncDriver: NativeEditorCollaborationSyncDriver?
+    ) async throws {
+        guard let syncDriver else { return }
+        let frames = try await syncDriver.outboundFrames(for: message)
+        try await send(frames)
     }
 
     private func startHeartbeat(documentName: String, user: DocmostUser?) {
@@ -186,6 +214,12 @@ actor NativeEditorCollaborationPresenceClient {
             throw URLError(.notConnectedToInternet)
         }
         try await task.send(.data(data))
+    }
+
+    private func send(_ frames: [Data]) async throws {
+        for frame in frames {
+            try await send(frame)
+        }
     }
 
     private static func data(from message: URLSessionWebSocketTask.Message) -> Data {
