@@ -22,6 +22,50 @@ nonisolated enum NativeEditorHocuspocusAuthMessageType: Int, Sendable {
     case authenticated = 2
 }
 
+nonisolated enum NativeEditorYjsSyncMessageType: Int, Sendable {
+    case stepOne = 0
+    case stepTwo = 1
+    case update = 2
+}
+
+nonisolated enum NativeEditorYjsSyncMessage: Equatable, Sendable {
+    case stepOne(Data)
+    case stepTwo(Data)
+    case update(Data)
+
+    static func parse(decoder: inout NativeEditorLib0Decoder) throws -> NativeEditorYjsSyncMessage {
+        let typeValue = try decoder.readVarUint()
+        let payload = try decoder.readVarUint8Array()
+
+        guard let type = NativeEditorYjsSyncMessageType(rawValue: typeValue) else {
+            throw NativeEditorHocuspocusProtocolError.invalidMessageType(typeValue)
+        }
+
+        switch type {
+        case .stepOne:
+            return .stepOne(payload)
+        case .stepTwo:
+            return .stepTwo(payload)
+        case .update:
+            return .update(payload)
+        }
+    }
+
+    func encode(to encoder: inout NativeEditorLib0Encoder) {
+        switch self {
+        case .stepOne(let stateVector):
+            encoder.writeVarUint(NativeEditorYjsSyncMessageType.stepOne.rawValue)
+            encoder.writeVarUint8Array(stateVector)
+        case .stepTwo(let update):
+            encoder.writeVarUint(NativeEditorYjsSyncMessageType.stepTwo.rawValue)
+            encoder.writeVarUint8Array(update)
+        case .update(let update):
+            encoder.writeVarUint(NativeEditorYjsSyncMessageType.update.rawValue)
+            encoder.writeVarUint8Array(update)
+        }
+    }
+}
+
 nonisolated enum NativeEditorCollaborationScope: String, Equatable, Sendable {
     case readWrite = "read-write"
     case readonly
@@ -48,7 +92,7 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
         let message: NativeEditorHocuspocusMessage
         switch type {
         case .sync:
-            message = .sync
+            message = .sync(try NativeEditorYjsSyncMessage.parse(decoder: &decoder))
         case .awareness:
             let updateData = try decoder.readVarUint8Array()
             message = .awareness(try NativeEditorAwarenessState.decodeUpdate(updateData))
@@ -78,6 +122,14 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
         encoder.writeVarUint(NativeEditorHocuspocusMessageType.auth.rawValue)
         encoder.writeVarUint(NativeEditorHocuspocusAuthMessageType.token.rawValue)
         encoder.writeVarString(token)
+        return encoder.data
+    }
+
+    static func sync(documentName: String, message: NativeEditorYjsSyncMessage) -> Data {
+        var encoder = NativeEditorLib0Encoder()
+        encoder.writeVarString(documentName)
+        encoder.writeVarUint(NativeEditorHocuspocusMessageType.sync.rawValue)
+        message.encode(to: &encoder)
         return encoder.data
     }
 
@@ -141,7 +193,7 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
 }
 
 nonisolated enum NativeEditorHocuspocusMessage: Equatable, Sendable {
-    case sync
+    case sync(NativeEditorYjsSyncMessage)
     case awareness([NativeEditorAwarenessState])
     case authTokenRequested
     case authenticated(scope: NativeEditorCollaborationScope)

@@ -105,6 +105,56 @@ struct NativeEditorHocuspocusProtocolTests {
         #expect(event.updatedAt == expectedDate)
     }
 
+    @Test func parsesYjsSyncStepOneFrame() throws {
+        let stateVector = Data([4, 1, 2, 3, 4])
+        let frameData = makeHocuspocusFrame(
+            documentName: "page.page-1",
+            messageType: 0,
+            payload: makeYjsSyncMessage(type: 0, update: stateVector)
+        )
+
+        let frame = try NativeEditorHocuspocusFrame.parse(frameData)
+
+        guard case .sync(.stepOne(let parsedStateVector)) = frame.message else {
+            Issue.record("Expected sync step one message")
+            return
+        }
+
+        #expect(parsedStateVector == stateVector)
+    }
+
+    @Test func parsesYjsSyncStepTwoFrame() throws {
+        let update = Data([6, 10, 11, 12, 13, 14, 15])
+        let frameData = makeHocuspocusFrame(
+            documentName: "page.page-1",
+            messageType: 0,
+            payload: makeYjsSyncMessage(type: 1, update: update)
+        )
+
+        let frame = try NativeEditorHocuspocusFrame.parse(frameData)
+
+        guard case .sync(.stepTwo(let parsedUpdate)) = frame.message else {
+            Issue.record("Expected sync step two message")
+            return
+        }
+
+        #expect(parsedUpdate == update)
+    }
+
+    @Test func encodesYjsSyncUpdateFrame() {
+        let frameData = NativeEditorHocuspocusFrame.sync(
+            documentName: "page.page-1",
+            message: .update(Data([9, 8, 7]))
+        )
+
+        #expect(Array(frameData) == [
+            11, 112, 97, 103, 101, 46, 112, 97, 103, 101, 45, 49,
+            0,
+            2,
+            3, 9, 8, 7
+        ])
+    }
+
     private func makeHocuspocusFrame(documentName: String, messageType: Int, payload: Data) -> Data {
         var data = Data()
         data.append(encodeVarString(documentName))
@@ -124,6 +174,14 @@ struct NativeEditorHocuspocusProtocolTests {
         payload.append(encodeVarUint(update.count))
         payload.append(update)
         return payload
+    }
+
+    private func makeYjsSyncMessage(type: Int, update: Data) -> Data {
+        var data = Data()
+        data.append(encodeVarUint(type))
+        data.append(encodeVarUint(update.count))
+        data.append(update)
+        return data
     }
 
     private func encodeVarString(_ value: String) -> Data {
