@@ -52,11 +52,26 @@ struct EndpointTests {
 
     @Test func buildsInlineCommentCreateRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let yjsSelection = NativeEditorYjsSelection(
+            anchor: NativeEditorYjsSelectionPosition(
+                type: NativeEditorYjsID(client: 1, clock: 10),
+                targetName: nil,
+                item: NativeEditorYjsID(client: 1, clock: 11),
+                assoc: 0
+            ),
+            head: NativeEditorYjsSelectionPosition(
+                type: NativeEditorYjsID(client: 1, clock: 12),
+                targetName: nil,
+                item: nil,
+                assoc: -1
+            )
+        )
         let endpoint = Endpoint.createComment(
             pageId: "page-1",
             content: #"{"type":"doc","content":[]}"#,
             type: .inline,
-            selection: "Selected text"
+            selection: "Selected text",
+            yjsSelection: yjsSelection
         )
         let request = try endpoint.urlRequest(baseURL: baseURL)
 
@@ -68,6 +83,21 @@ struct EndpointTests {
         #expect(object?["content"] as? String == #"{"type":"doc","content":[]}"#)
         #expect(object?["type"] as? String == "inline")
         #expect(object?["selection"] as? String == "Selected text")
+        let selection = try #require(object?["yjsSelection"] as? [String: Any])
+        let anchor = try #require(selection["anchor"] as? [String: Any])
+        let anchorType = try #require(anchor["type"] as? [String: Any])
+        let anchorItem = try #require(anchor["item"] as? [String: Any])
+        let head = try #require(selection["head"] as? [String: Any])
+        let headType = try #require(head["type"] as? [String: Any])
+
+        #expect(anchorType["client"] as? Int == 1)
+        #expect(anchorType["clock"] as? Int == 10)
+        #expect(anchor["tname"] is NSNull)
+        #expect(anchorItem["clock"] as? Int == 11)
+        #expect(anchor["assoc"] as? Int == 0)
+        #expect(headType["clock"] as? Int == 12)
+        #expect(head["item"] is NSNull)
+        #expect(head["assoc"] as? Int == -1)
     }
 
     @Test func buildsResolveCommentRequest() throws {

@@ -60,3 +60,56 @@ nonisolated struct NativeEditorYjsRelativePosition: Codable, Equatable, Hashable
         case assoc
     }
 }
+
+nonisolated struct NativeEditorYjsSelection: Codable, Equatable, Sendable {
+    let anchor: NativeEditorYjsSelectionPosition
+    let head: NativeEditorYjsSelectionPosition
+}
+
+nonisolated struct NativeEditorYjsSelectionPosition: Codable, Equatable, Sendable {
+    let type: NativeEditorYjsID
+    let targetName: String?
+    let item: NativeEditorYjsID?
+    let assoc: Int
+
+    init(type: NativeEditorYjsID, targetName: String?, item: NativeEditorYjsID?, assoc: Int) {
+        self.type = type
+        self.targetName = targetName
+        self.item = item
+        self.assoc = assoc
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        type = try container.decode(NativeEditorYjsID.self, forKey: .type)
+        targetName = try container.decodeIfPresent(String.self, forKey: .targetName)
+        item = try container.decodeIfPresent(NativeEditorYjsID.self, forKey: .item)
+        assoc = try container.decode(Int.self, forKey: .assoc)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(type, forKey: .type)
+        if let targetName {
+            try container.encode(targetName, forKey: .targetName)
+        } else {
+            try container.encodeNil(forKey: .targetName)
+        }
+
+        if let item {
+            try container.encode(item, forKey: .item)
+        } else {
+            try container.encodeNil(forKey: .item)
+        }
+        try container.encode(assoc, forKey: .assoc)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case targetName = "tname"
+        case item
+        case assoc
+    }
+}

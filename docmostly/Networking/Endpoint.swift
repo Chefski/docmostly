@@ -32,7 +32,13 @@ nonisolated enum Endpoint: Sendable {
         operation: ContentOperation = .replace
     )
     case comments(pageId: String, cursor: String? = nil, limit: Int = 100)
-    case createComment(pageId: String, content: String, type: DocmostCommentType = .page, selection: String? = nil)
+    case createComment(
+        pageId: String,
+        content: String,
+        type: DocmostCommentType = .page,
+        selection: String? = nil,
+        yjsSelection: NativeEditorYjsSelection? = nil
+    )
     case resolveComment(commentId: String, pageId: String, resolved: Bool)
     case attachmentInfo(attachmentId: String)
 
@@ -124,12 +130,13 @@ nonisolated enum Endpoint: Sendable {
             ))
         case .comments(let pageId, let cursor, let limit):
             return try encode(CommentsRequest(pageId: pageId, cursor: cursor, limit: limit))
-        case .createComment(let pageId, let content, let type, let selection):
+        case .createComment(let pageId, let content, let type, let selection, let yjsSelection):
             return try encode(CreateCommentRequest(
                 pageId: pageId,
                 content: content,
                 type: type,
-                selection: selection
+                selection: selection,
+                yjsSelection: yjsSelection
             ))
         case .resolveComment(let commentId, let pageId, let resolved):
             return try encode(ResolveCommentRequest(
@@ -207,6 +214,7 @@ nonisolated private struct CreateCommentRequest: Encodable {
     let content: String
     let type: DocmostCommentType
     let selection: String?
+    let yjsSelection: NativeEditorYjsSelection?
 }
 
 nonisolated private struct ResolveCommentRequest: Encodable {

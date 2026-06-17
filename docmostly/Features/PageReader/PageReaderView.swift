@@ -323,10 +323,12 @@ private extension PageReaderView {
         if let pendingInlineCommentID, pendingInlineCommentDraft == text {
             commentID = pendingInlineCommentID
         } else {
+            let yjsSelection = await editorViewModel.inlineCommentYjsSelection(for: inlineCommentContext)
             let comment = try await appState.addInlineComment(
                 pageId: editorViewModel.currentPageID,
                 text: text,
-                selectedText: inlineCommentContext.selectedText
+                selectedText: inlineCommentContext.selectedText,
+                yjsSelection: yjsSelection
             )
             commentID = comment.id
             pendingInlineCommentID = comment.id

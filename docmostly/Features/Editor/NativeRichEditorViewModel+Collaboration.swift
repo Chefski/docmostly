@@ -123,6 +123,18 @@ extension NativeRichEditorViewModel {
         return try? await crdtDocumentEngine.encodeLocalAwarenessCursor(for: selection)
     }
 
+    func inlineCommentYjsSelection(for context: NativeEditorInlineCommentContext) async -> NativeEditorYjsSelection? {
+        guard let crdtDocumentEngine else { return nil }
+        guard let blockIndex = document.blocks.firstIndex(where: { $0.id == context.blockID }) else { return nil }
+        guard let selection = NativeEditorLocalTextSelection(
+            blockIndex: blockIndex,
+            selection: context.selection,
+            text: document.blocks[blockIndex].text
+        ) else { return nil }
+        guard selection.isCollapsed == false else { return nil }
+        return try? await crdtDocumentEngine.encodeInlineCommentSelection(for: selection)
+    }
+
     func resolvedCursorsForBlock(id blockID: UUID) -> [NativeEditorResolvedRemoteCursor] {
         guard let blockIndex = document.blocks.firstIndex(where: { $0.id == blockID }) else { return [] }
 

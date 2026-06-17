@@ -15,7 +15,12 @@ extension AppState {
         return try await apiClient.send(.createComment(pageId: pageId, content: content, type: .page))
     }
 
-    func addInlineComment(pageId: String, text: String, selectedText: String) async throws -> DocmostComment {
+    func addInlineComment(
+        pageId: String,
+        text: String,
+        selectedText: String,
+        yjsSelection: NativeEditorYjsSelection? = nil
+    ) async throws -> DocmostComment {
         guard let apiClient else {
             throw APIError.connectionFailed("Comments require a network connection.")
         }
@@ -24,7 +29,8 @@ extension AppState {
             pageId: pageId,
             content: content,
             type: .inline,
-            selection: selectedText
+            selection: selectedText,
+            yjsSelection: yjsSelection
         ))
     }
 
