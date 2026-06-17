@@ -39,6 +39,8 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, Never>?
+    @ObservationIgnored let localAwarenessUpdateStream: AsyncStream<Void>
+    @ObservationIgnored let localAwarenessUpdateContinuation: AsyncStream<Void>.Continuation
 
     init(
         pageID: String,
@@ -49,12 +51,16 @@ final class NativeRichEditorViewModel {
         title = initialTitle
         editablePageID = pageID
         lastSavedTitle = initialTitle
+        let awarenessUpdates = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        localAwarenessUpdateStream = awarenessUpdates.stream
+        localAwarenessUpdateContinuation = awarenessUpdates.continuation
         lastKnownSnapshot = makeHistorySnapshot()
         self.crdtDocumentEngine = crdtDocumentEngine
     }
 
     deinit {
         crdtLocalChangeTask?.cancel()
+        localAwarenessUpdateContinuation.finish()
     }
 
     var isEditing: Bool {
@@ -159,6 +165,7 @@ final class NativeRichEditorViewModel {
         activeBlockID = nil
         selectedBlockID = nil
         visibleBlockControlsID = nil
+        notifyLocalAwarenessChanged()
     }
 
     func focus(blockID: UUID) {
@@ -166,11 +173,13 @@ final class NativeRichEditorViewModel {
         activeBlockID = blockID
         selectedBlockID = nil
         visibleBlockControlsID = nil
+        notifyLocalAwarenessChanged()
     }
 
     func clearFocus() {
         isTitleFocused = false
         activeBlockID = nil
+        notifyLocalAwarenessChanged()
     }
 
     func selectBlock(_ blockID: UUID) {
@@ -179,6 +188,7 @@ final class NativeRichEditorViewModel {
         activeBlockID = nil
         visibleBlockControlsID = blockID
         selectedBlockID = selectedBlockID == blockID ? nil : blockID
+        notifyLocalAwarenessChanged()
     }
 
     func clearBlockSelection() {
@@ -190,6 +200,7 @@ final class NativeRichEditorViewModel {
         isTitleFocused = false
         activeBlockID = nil
         visibleBlockControlsID = blockID
+        notifyLocalAwarenessChanged()
     }
 
     func hideBlockControls() {

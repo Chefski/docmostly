@@ -111,6 +111,14 @@ extension NativeRichEditorViewModel {
         crdtDocumentEngine = engine
     }
 
+    func localAwarenessUpdates() -> AsyncStream<Void> {
+        localAwarenessUpdateStream
+    }
+
+    func notifyLocalAwarenessChanged() {
+        localAwarenessUpdateContinuation.yield(())
+    }
+
     func collaborationSession() -> NativeEditorCollaborationSession {
         let collaborationDocument = NativeEditorCollaborationDocument(pageID: currentPageID)
         let syncDriver = crdtDocumentEngine.map { engine in
@@ -124,7 +132,8 @@ extension NativeRichEditorViewModel {
             syncDriver: syncDriver,
             localAwarenessCursor: { [weak self] in
                 await self?.localAwarenessCursor()
-            }
+            },
+            localAwarenessUpdates: localAwarenessUpdates()
         )
     }
 

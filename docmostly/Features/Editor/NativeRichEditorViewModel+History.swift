@@ -10,10 +10,12 @@ extension NativeRichEditorViewModel {
 
     func handleDocumentChanged() {
         commitExternalChange(applyingInputRules: true)
+        notifyLocalAwarenessChanged()
     }
 
     func handleTitleChanged() {
         commitExternalChange(applyingInputRules: false)
+        notifyLocalAwarenessChanged()
     }
 
     func undo() {
@@ -42,6 +44,7 @@ extension NativeRichEditorViewModel {
         updateHistoryAvailability()
         recalculateDirty()
         queueCRDTLocalChange(before: before, after: after)
+        notifyLocalAwarenessChanged()
     }
 
     func makeHistorySnapshot() -> NativeEditorHistorySnapshot {
@@ -105,6 +108,7 @@ extension NativeRichEditorViewModel {
         lastKnownSnapshot = snapshot
         updateHistoryAvailability()
         recalculateDirty()
+        notifyLocalAwarenessChanged()
     }
 
     private func updateHistoryAvailability() {

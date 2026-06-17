@@ -53,6 +53,7 @@ extension NativeRichEditorViewModel {
         visibleBlockControlsID = nil
         isTitleFocused = false
         selectText(for: match)
+        notifyLocalAwarenessChanged()
     }
 
     private func replace(match: NativeEditorSearchMatch, with replacement: String) {

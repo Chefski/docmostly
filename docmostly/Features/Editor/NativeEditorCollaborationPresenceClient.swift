@@ -14,6 +14,7 @@ private struct NativeEditorCollaborationSessionContext: Sendable {
     let user: DocmostUser?
     let syncDriver: NativeEditorCollaborationSyncDriver?
     let localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)?
+    let localAwarenessUpdates: AsyncStream<Void>?
 }
 
 actor NativeEditorCollaborationPresenceClient {
@@ -21,6 +22,7 @@ actor NativeEditorCollaborationPresenceClient {
     private var task: URLSessionWebSocketTask?
     private var heartbeatTask: Task<Void, Never>?
     private var localUpdateTask: Task<Void, Never>?
+    private var localAwarenessUpdateTask: Task<Void, Never>?
     private let localClientID: Int
     private var localAwarenessClock = 0
     private var awarenessStore = NativeEditorAwarenessStateStore()
@@ -39,7 +41,8 @@ actor NativeEditorCollaborationPresenceClient {
         documentName: String,
         user: DocmostUser?,
         syncDriver: NativeEditorCollaborationSyncDriver? = nil,
-        localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)? = nil
+        localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)? = nil,
+        localAwarenessUpdates: AsyncStream<Void>? = nil
     ) -> AsyncThrowingStream<NativeEditorCollaborationEvent, any Error> {
         let streamPair = AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.makeStream(
             bufferingPolicy: .bufferingNewest(50)
@@ -50,7 +53,8 @@ actor NativeEditorCollaborationPresenceClient {
             documentName: documentName,
             user: user,
             syncDriver: syncDriver,
-            localAwarenessCursor: localAwarenessCursor
+            localAwarenessCursor: localAwarenessCursor,
+            localAwarenessUpdates: localAwarenessUpdates
         )
 
         let receiver = Task {
@@ -75,6 +79,8 @@ actor NativeEditorCollaborationPresenceClient {
         heartbeatTask = nil
         localUpdateTask?.cancel()
         localUpdateTask = nil
+        localAwarenessUpdateTask?.cancel()
+        localAwarenessUpdateTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         awarenessStore.reset()
@@ -150,6 +156,7 @@ actor NativeEditorCollaborationPresenceClient {
         case .authenticated(let scope):
             try await sendInitialCRDTSync(using: context.syncDriver)
             startLocalUpdateSender(using: context.syncDriver)
+            startLocalAwarenessUpdateSender(context: context)
             continuation.yield(.authenticated(scope))
         case .authenticationFailed(let reason):
             throw NativeEditorCollabAuthFailure(reason: reason)
@@ -199,6 +206,25 @@ actor NativeEditorCollaborationPresenceClient {
 
                 do {
                     try await self?.send(frame)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func startLocalAwarenessUpdateSender(context: NativeEditorCollaborationSessionContext) {
+        localAwarenessUpdateTask?.cancel()
+        localAwarenessUpdateTask = nil
+
+        guard let updates = context.localAwarenessUpdates else { return }
+
+        localAwarenessUpdateTask = Task { [weak self, context, updates] in
+            for await _ in updates {
+                guard Task.isCancelled == false else { return }
+
+                do {
+                    try await self?.sendLocalAwareness(context: context)
                 } catch {
                     return
                 }
