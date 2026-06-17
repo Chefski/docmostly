@@ -338,6 +338,13 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
         return localAwarenessCursor
     }
 
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        NativeEditorCRDTSaveResult()
+    }
+
     func localUpdates() async -> AsyncStream<Data> {
         if let localUpdateStream {
             return localUpdateStream

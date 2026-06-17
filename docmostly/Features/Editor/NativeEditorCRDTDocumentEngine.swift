@@ -1,5 +1,15 @@
 import Foundation
 
+nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
+    let title: String?
+    let updatedAt: Date?
+
+    init(title: String? = nil, updatedAt: Date? = nil) {
+        self.title = title
+        self.updatedAt = updatedAt
+    }
+}
+
 protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     func encodeStateVector() async throws -> Data
     func encodeStateAsUpdate(for stateVector: Data) async throws -> Data
@@ -9,6 +19,8 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
         -> NativeEditorAwarenessCursor?
     func encodeInlineCommentSelection(for selection: NativeEditorLocalTextSelection) async throws
         -> NativeEditorYjsSelection?
+    func flushPendingLocalChanges(title: String, document: NativeEditorDocument) async throws
+        -> NativeEditorCRDTSaveResult
     func localUpdates() async -> AsyncStream<Data>
 }
 

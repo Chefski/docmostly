@@ -109,6 +109,21 @@ final class NativeRichEditorViewModel {
         defer { isSaving = false }
 
         do {
+            if let crdtDocumentEngine {
+                let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                let result = try await crdtDocumentEngine.flushPendingLocalChanges(
+                    title: trimmedTitle,
+                    document: document
+                )
+                title = result.title ?? trimmedTitle
+                lastSavedTitle = title
+                lastSavedDocument = document
+                markRemoteBaseline(updatedAt: result.updatedAt ?? lastRemoteUpdatedAt)
+                lastKnownSnapshot = makeHistorySnapshot()
+                isDirty = false
+                return true
+            }
+
             let page = try await appState.updatePage(
                 pageId: editablePageID,
                 title: title.trimmingCharacters(in: .whitespacesAndNewlines),

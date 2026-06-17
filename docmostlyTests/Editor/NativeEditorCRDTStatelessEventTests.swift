@@ -64,4 +64,11 @@ private final class StatelessEventCRDTDocumentEngine: NativeEditorCRDTDocumentEn
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor? {
         nil
     }
+
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        NativeEditorCRDTSaveResult()
+    }
 }

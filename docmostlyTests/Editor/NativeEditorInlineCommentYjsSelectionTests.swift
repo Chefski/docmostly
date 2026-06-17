@@ -73,6 +73,13 @@ private final class InlineCommentSelectionCRDTDocumentEngine: NativeEditorCRDTDo
         nil
     }
 
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        NativeEditorCRDTSaveResult()
+    }
+
     func encodeInlineCommentSelection(
         for selection: NativeEditorLocalTextSelection
     ) async throws -> NativeEditorYjsSelection? {
