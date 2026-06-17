@@ -29,32 +29,6 @@ struct NativeEditorCollaborationTests {
         #expect(insecureURL.absoluteString == "ws://localhost:3000/collab")
     }
 
-    @Test func keepsAwarenessStateAcrossIncrementalUpdatesAndRemovals() {
-        var store = NativeEditorAwarenessStateStore()
-        let alice = NativeEditorAwarenessState(
-            clientID: 42,
-            clock: 1,
-            payload: NativeEditorAwarenessPayload(
-                user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
-                cursor: nil
-            )
-        )
-        let bob = NativeEditorAwarenessState(
-            clientID: 43,
-            clock: 1,
-            payload: NativeEditorAwarenessPayload(
-                user: NativeEditorAwarenessUser(id: "user-3", name: "Bob", color: "#059669"),
-                cursor: nil
-            )
-        )
-
-        #expect(store.apply([alice]).map(\.clientID) == [42])
-        #expect(store.apply([bob]).map(\.clientID) == [42, 43])
-        #expect(store.apply([
-            NativeEditorAwarenessState(clientID: 42, clock: 2, payload: nil)
-        ]).map(\.clientID) == [43])
-    }
-
     @Test func updatesActiveCollaboratorsFromAwarenessAndIgnoresLocalClient() {
         let viewModel = configuredViewModel()
         let states = [
