@@ -7,6 +7,7 @@ struct PageReaderView: View {
     @State private var editorViewModel: NativeRichEditorViewModel?
     @State private var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State private var isShowingAttachmentImporter = false
+    @State private var isShowingMentionPicker = false
     @State private var isUploadingAttachment = false
     @State private var attachmentUploadErrorMessage: String?
     @FocusState private var editorFocusedField: NativeEditorFocus?
@@ -63,7 +64,8 @@ struct PageReaderView: View {
                     NativeEditorToolbar(
                         viewModel: editorViewModel,
                         isUploadingAttachment: isUploadingAttachment,
-                        importAttachment: beginAttachmentImport
+                        importAttachment: beginAttachmentImport,
+                        showMentionPicker: beginMentionSearch
                     ) {
                         editorFocusedField = nil
                         editorViewModel.clearFocus()
@@ -84,6 +86,11 @@ struct PageReaderView: View {
             }
         } message: {
             Text(attachmentUploadErrorMessage ?? "")
+        }
+        .sheet(isPresented: $isShowingMentionPicker) {
+            if let editorViewModel {
+                NativeEditorMentionPickerView(viewModel: editorViewModel)
+            }
         }
         .task(id: pageID) {
             await loadNativePage()
@@ -130,6 +137,10 @@ struct PageReaderView: View {
         attachmentImportKind = importKind
         attachmentUploadErrorMessage = nil
         isShowingAttachmentImporter = true
+    }
+
+    private func beginMentionSearch() {
+        isShowingMentionPicker = true
     }
 
     private func handleAttachmentImport(_ result: Result<[URL], any Error>) {

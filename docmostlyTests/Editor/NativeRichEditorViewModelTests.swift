@@ -119,8 +119,9 @@ struct NativeRichEditorViewModelTests {
 
         viewModel.insertUploadedAttachment(uploadedAttachment(), as: .file)
 
-        let updatedBlock = try? #require(viewModel.document.blocks.first)
-        guard case .attachment(let attachment) = updatedBlock?.kind else {
+        #expect(viewModel.document.blocks.count == 1)
+        let updatedBlock = viewModel.document.blocks[0]
+        guard case .attachment(let attachment) = updatedBlock.kind else {
             Issue.record("Expected attachment block")
             return
         }
@@ -133,7 +134,7 @@ struct NativeRichEditorViewModelTests {
         #expect(node?.attrs?["url"] == .string("/api/files/attachment-1/Report.pdf"))
         #expect(node?.attrs?["name"] == .string("Report.pdf"))
         #expect(node?.attrs?["mime"] == .string("application/pdf"))
-        #expect(viewModel.selectedBlockID == updatedBlock?.id)
+        #expect(viewModel.selectedBlockID == updatedBlock.id)
     }
 
     @Test func deletesSelectedBlockAndKeepsAdjacentBlockActive() {

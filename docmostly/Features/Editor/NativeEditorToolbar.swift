@@ -5,28 +5,29 @@ struct NativeEditorToolbar: View {
     @State private var isShowingLinkPrompt = false
     @State private var isShowingSearchReplace = false
     @State private var isShowingStatusPrompt = false
-    @State private var isShowingMentionPrompt = false
     @State private var isShowingCommentPrompt = false
     @State private var isShowingMathPrompt = false
     @State private var linkURLString = ""
     @State private var statusText = ""
-    @State private var mentionText = ""
     @State private var commentID = ""
     @State private var inlineMathText = ""
 
     let isUploadingAttachment: Bool
     let importAttachment: (NativeEditorAttachmentImportKind) -> Void
+    let showMentionPicker: () -> Void
     let dismissKeyboard: () -> Void
 
     init(
         viewModel: NativeRichEditorViewModel,
         isUploadingAttachment: Bool = false,
         importAttachment: @escaping (NativeEditorAttachmentImportKind) -> Void = { _ in },
+        showMentionPicker: @escaping () -> Void = {},
         dismissKeyboard: @escaping () -> Void
     ) {
         self.viewModel = viewModel
         self.isUploadingAttachment = isUploadingAttachment
         self.importAttachment = importAttachment
+        self.showMentionPicker = showMentionPicker
         self.dismissKeyboard = dismissKeyboard
     }
 
@@ -51,9 +52,9 @@ struct NativeEditorToolbar: View {
                     NativeEditorFormattingToolbarGroup(
                         viewModel: viewModel,
                         isShowingStatusPrompt: $isShowingStatusPrompt,
-                        isShowingMentionPrompt: $isShowingMentionPrompt,
                         isShowingCommentPrompt: $isShowingCommentPrompt,
-                        isShowingMathPrompt: $isShowingMathPrompt
+                        isShowingMathPrompt: $isShowingMathPrompt,
+                        showMentionPicker: showMentionPicker
                     )
 
                     Divider()
@@ -123,16 +124,6 @@ struct NativeEditorToolbar: View {
             }
             Button("Cancel", role: .cancel) {
                 statusText = ""
-            }
-        }
-        .alert("Mention", isPresented: $isShowingMentionPrompt) {
-            TextField("Label", text: $mentionText)
-            Button("Insert") {
-                viewModel.insertMention(NativeEditorMention(label: mentionText, entityType: "page"))
-                mentionText = ""
-            }
-            Button("Cancel", role: .cancel) {
-                mentionText = ""
             }
         }
         .alert("Inline Comment", isPresented: $isShowingCommentPrompt) {
