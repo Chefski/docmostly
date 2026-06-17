@@ -137,6 +137,7 @@ extension NativeRichEditorViewModel {
 
     func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
         crdtDocumentEngine = engine
+        crdtSyncCoordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
     }
 
     func localAwarenessUpdates() -> AsyncStream<Void> {
@@ -149,10 +150,10 @@ extension NativeRichEditorViewModel {
 
     func collaborationSession() -> NativeEditorCollaborationSession {
         let collaborationDocument = NativeEditorCollaborationDocument(pageID: currentPageID)
-        let syncDriver = crdtDocumentEngine.map { engine in
+        let syncDriver = crdtSyncCoordinator.map { coordinator in
             NativeEditorCollaborationSyncDriver(
                 documentName: collaborationDocument.name,
-                coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+                coordinator: coordinator
             )
         }
         return NativeEditorCollaborationSession(

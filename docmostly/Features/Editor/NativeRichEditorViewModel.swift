@@ -41,6 +41,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
+    @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, Never>?
     @ObservationIgnored let localAwarenessUpdateStream: AsyncStream<Void>
     @ObservationIgnored let localAwarenessUpdateContinuation: AsyncStream<Void>.Continuation
@@ -59,6 +60,9 @@ final class NativeRichEditorViewModel {
         localAwarenessUpdateContinuation = awarenessUpdates.continuation
         lastKnownSnapshot = makeHistorySnapshot()
         self.crdtDocumentEngine = crdtDocumentEngine
+        crdtSyncCoordinator = crdtDocumentEngine.map {
+            NativeEditorCRDTSyncCoordinator(documentEngine: $0)
+        }
     }
 
     deinit {
