@@ -4,6 +4,19 @@ import Testing
 
 @MainActor
 struct NativeEditorCollaborationTests {
+    @Test func collaborationDocumentMatchesDocmostPageYjsContract() {
+        let document = NativeEditorCollaborationDocument(pageID: "page-1")
+
+        #expect(document.name == "page.page-1")
+        #expect(document.fragmentName == "default")
+        #expect(NativeEditorCollaborationDocument.yjsFragmentName == "default")
+        #expect(NativeEditorCollaborationDocument.statelessPageUpdatedType == "page.updated")
+        #expect(NativeEditorCollaborationDocument(documentName: document.name)?.pageID == "page-1")
+        #expect(NativeEditorCollaborationDocument(documentName: "space.page-1") == nil)
+        #expect(NativeEditorCollaborationDocument(documentName: "page.") == nil)
+        #expect(NativeEditorCollaborationDocument(documentName: "page.page-1.extra") == nil)
+    }
+
     @Test func buildsCollaborationWebSocketURLFromServerURL() throws {
         let secureURL = try NativeEditorCollaborationEndpoint.webSocketURL(
             serverBaseURL: #require(URL(string: "https://docs.example.com"))
@@ -228,7 +241,7 @@ struct NativeEditorCollaborationTests {
     private func awarenessCursorPosition(
         client: Int,
         clock: Int,
-        targetName: String = "default"
+        targetName: String = NativeEditorCollaborationDocument.yjsFragmentName
     ) -> NativeEditorYjsRelativePosition {
         NativeEditorYjsRelativePosition(
             type: .name("text"),

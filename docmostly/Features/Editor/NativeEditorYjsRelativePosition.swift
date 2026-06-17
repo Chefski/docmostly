@@ -42,7 +42,7 @@ nonisolated enum NativeEditorYjsRelativePositionType: Codable, Equatable, Hashab
 }
 
 nonisolated struct NativeEditorYjsRelativePosition: Codable, Equatable, Hashable, Sendable {
-    static let docmostFragmentName = "default"
+    static let docmostFragmentName = NativeEditorCollaborationDocument.yjsFragmentName
 
     let type: NativeEditorYjsRelativePositionType?
     let targetName: String?

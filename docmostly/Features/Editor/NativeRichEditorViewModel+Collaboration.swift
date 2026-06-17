@@ -112,15 +112,15 @@ extension NativeRichEditorViewModel {
     }
 
     func collaborationSession() -> NativeEditorCollaborationSession {
-        let documentName = "page.\(currentPageID)"
+        let collaborationDocument = NativeEditorCollaborationDocument(pageID: currentPageID)
         let syncDriver = crdtDocumentEngine.map { engine in
             NativeEditorCollaborationSyncDriver(
-                documentName: documentName,
+                documentName: collaborationDocument.name,
                 coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
             )
         }
         return NativeEditorCollaborationSession(
-            documentName: documentName,
+            document: collaborationDocument,
             syncDriver: syncDriver,
             localAwarenessCursor: { [weak self] in
                 await self?.localAwarenessCursor()

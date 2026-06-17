@@ -130,6 +130,7 @@ struct NativeEditorCRDTCollaborationTests {
         let collaborationSession = viewModel.collaborationSession()
 
         #expect(collaborationSession.documentName == "page.page-1")
+        #expect(collaborationSession.document.fragmentName == NativeEditorCollaborationDocument.yjsFragmentName)
         #expect(collaborationSession.syncDriver == nil)
     }
 
@@ -148,6 +149,7 @@ struct NativeEditorCRDTCollaborationTests {
         let frames = try await driver.outboundFramesAfterAuthentication()
         let frame = try NativeEditorHocuspocusFrame.parse(try #require(frames.first))
         #expect(frame.documentName == "page.page-1")
+        #expect(collaborationSession.document.fragmentName == NativeEditorCollaborationDocument.yjsFragmentName)
         #expect(frame.message == .sync(.stepOne(Data([21, 22]))))
     }
 
