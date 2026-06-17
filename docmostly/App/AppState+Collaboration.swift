@@ -13,4 +13,9 @@ extension AppState {
         let serverURL = try ServerURLValidator.normalizedURL(from: serverURLString)
         return try NativeEditorCollaborationEndpoint.webSocketURL(serverBaseURL: serverURL)
     }
+
+    func realtimeEventWebSocketURL() throws -> URL {
+        let serverURL = try ServerURLValidator.normalizedURL(from: serverURLString)
+        return try NativeEditorRealtimeEventEndpoint.webSocketURL(serverBaseURL: serverURL)
+    }
 }

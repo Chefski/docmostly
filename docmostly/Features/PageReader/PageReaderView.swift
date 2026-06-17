@@ -5,6 +5,7 @@ struct PageReaderView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = PageReaderViewModel()
     @State private var editorViewModel: NativeRichEditorViewModel?
+    @State private var realtimeEventClient = NativeEditorRealtimeEventClient()
     @State private var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State private var isShowingAttachmentImporter = false
     @State private var isShowingMentionPicker = false
@@ -118,6 +119,9 @@ struct PageReaderView: View {
         }
         .task(id: editorViewModel?.currentPageID) {
             await monitorRemotePageChanges()
+        }
+        .task(id: editorViewModel?.currentPageID) {
+            await monitorRealtimeEvents()
         }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
@@ -328,5 +332,54 @@ private extension PageReaderView {
         pendingInlineCommentID = nil
         pendingInlineCommentDraft = nil
         await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+    }
+}
+
+private extension PageReaderView {
+    func monitorRealtimeEvents() async {
+        guard let editorViewModel else { return }
+
+        do {
+            let url = try appState.realtimeEventWebSocketURL()
+            let cookies = await appState.storedSessionCookies()
+            let events = await realtimeEventClient.events(url: url, cookies: cookies)
+
+            for try await event in events {
+                guard Task.isCancelled == false else { return }
+                await handleRealtimeEvent(event, editorViewModel: editorViewModel)
+            }
+        } catch {
+            guard Task.isCancelled == false else { return }
+            editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
+        }
+    }
+
+    func handleRealtimeEvent(
+        _ event: NativeEditorRealtimeEvent,
+        editorViewModel: NativeRichEditorViewModel
+    ) async {
+        switch event {
+        case .pageUpdated(let event) where event.pageID == editorViewModel.currentPageID:
+            await refreshRemotePageSnapshot(editorViewModel: editorViewModel)
+        case .commentCreated(let event) where event.pageID == editorViewModel.currentPageID:
+            await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+        case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:
+            await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+        case .commentResolved(let event) where event.pageID == editorViewModel.currentPageID:
+            await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+        case .commentDeleted(let event) where event.pageID == editorViewModel.currentPageID:
+            await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+        case .pageUpdated, .commentCreated, .commentUpdated, .commentResolved, .commentDeleted, .unknown:
+            break
+        }
+    }
+
+    func refreshRemotePageSnapshot(editorViewModel: NativeRichEditorViewModel) async {
+        do {
+            let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
+            editorViewModel.handleRemotePageSnapshot(page)
+        } catch {
+            editorViewModel.realtimeStatus = .failed(error.localizedDescription)
+        }
     }
 }

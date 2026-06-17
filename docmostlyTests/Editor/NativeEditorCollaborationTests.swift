@@ -16,6 +16,109 @@ struct NativeEditorCollaborationTests {
         #expect(insecureURL.absoluteString == "ws://localhost:3000/collab")
     }
 
+    @Test func buildsRealtimeEventSocketURLFromServerURL() throws {
+        let secureURL = try NativeEditorRealtimeEventEndpoint.webSocketURL(
+            serverBaseURL: #require(URL(string: "https://docs.example.com/api"))
+        )
+
+        #expect(
+            secureURL.absoluteString == "wss://docs.example.com/socket.io/?EIO=4&transport=websocket"
+        )
+    }
+
+    @Test func parsesSocketIOPageUpdateMessageEvent() throws {
+        let frame = """
+        42[
+          "message",
+          {
+            "operation": "updateOne",
+            "spaceId": "space-1",
+            "entity": ["pages"],
+            "id": "page-1",
+            "payload": {
+              "title": "Remote",
+              "updatedAt": "2026-06-17T10:05:00.000Z"
+            }
+          }
+        ]
+        """
+
+        let parsedFrame = try NativeEditorRealtimeSocketFrame.parse(frame)
+        guard case .event(.pageUpdated(let event)) = parsedFrame else {
+            Issue.record("Expected a page update event")
+            return
+        }
+
+        #expect(event.pageID == "page-1")
+        #expect(event.spaceID == "space-1")
+        #expect(event.title == "Remote")
+        let expectedDate = try Date(
+            "2026-06-17T10:05:00.000Z",
+            strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        )
+        #expect(event.updatedAt == expectedDate)
+    }
+
+    @Test func parsesSocketIOCommentCreatedMessageEvent() throws {
+        let frame = """
+        42[
+          "message",
+          {
+            "operation": "commentCreated",
+            "pageId": "page-1",
+            "comment": {
+              "id": "comment-1",
+              "content": {
+                "type": "doc",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      { "type": "text", "text": "Looks good" }
+                    ]
+                  }
+                ]
+              },
+              "selection": "Selected",
+              "type": "inline",
+              "creatorId": "user-1",
+              "pageId": "page-1",
+              "parentCommentId": null,
+              "resolvedById": null,
+              "resolvedAt": null,
+              "workspaceId": "workspace-1",
+              "createdAt": "2026-06-17T10:05:00.000Z",
+              "editedAt": null,
+              "deletedAt": null,
+              "creator": {
+                "id": "user-1",
+                "name": "Chefling",
+                "email": "chef@example.com"
+              }
+            }
+          }
+        ]
+        """
+
+        let parsedFrame = try NativeEditorRealtimeSocketFrame.parse(frame)
+        guard case .event(.commentCreated(let event)) = parsedFrame else {
+            Issue.record("Expected a comment created event")
+            return
+        }
+
+        #expect(event.pageID == "page-1")
+        #expect(event.comment.id == "comment-1")
+        #expect(event.comment.content == "Looks good")
+        #expect(event.comment.type == "inline")
+    }
+
+    @Test func parsesEngineIOControlFrames() throws {
+        #expect(try NativeEditorRealtimeSocketFrame.parse("2") == .ping)
+        #expect(try NativeEditorRealtimeSocketFrame.parse("40") == .connected)
+        #expect(NativeEditorRealtimeSocketFrame.connectMessage == "40")
+        #expect(NativeEditorRealtimeSocketFrame.pongMessage == "3")
+    }
+
     @Test func appliesRemoteSnapshotWhenEditorIsClean() {
         let viewModel = configuredViewModel()
         let remotePage = editablePage(
