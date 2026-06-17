@@ -145,6 +145,54 @@ struct NativeEditorCollaborationTests {
         #expect(viewModel.isDirty == false)
     }
 
+    @Test func startsCRDTSyncWithCurrentStateVector() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.encodedStateVector = Data([1, 2, 3])
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+
+        let message = try await coordinator.makeInitialSyncMessage()
+
+        #expect(message == .stepOne(Data([1, 2, 3])))
+    }
+
+    @Test func repliesToRemoteCRDTSyncStepOneWithStateUpdate() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.stateUpdatesByVector = [
+            Data([4, 5]): Data([9, 8, 7])
+        ]
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+
+        let outgoing = try await coordinator.receive(.stepOne(Data([4, 5])))
+
+        #expect(engine.requestedStateVectors == [Data([4, 5])])
+        #expect(outgoing == [.stepTwo(Data([9, 8, 7]))])
+    }
+
+    @Test func appliesRemoteCRDTSyncUpdatesToDocumentEngine() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+
+        #expect(try await coordinator.receive(.stepTwo(Data([6, 7]))) == [])
+        #expect(try await coordinator.receive(.update(Data([8, 9]))) == [])
+
+        #expect(engine.appliedRemoteUpdates == [Data([6, 7]), Data([8, 9])])
+    }
+
+    @Test func skipsOneMatchingCRDTUpdateEchoAfterLocalBroadcast() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        let update = Data([10, 11, 12])
+
+        let outgoing = await coordinator.broadcastLocalUpdate(update)
+        #expect(outgoing == .update(update))
+
+        #expect(try await coordinator.receive(.update(update)) == [])
+        #expect(engine.appliedRemoteUpdates == [])
+
+        #expect(try await coordinator.receive(.update(update)) == [])
+        #expect(engine.appliedRemoteUpdates == [update])
+    }
+
     private func configuredViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
         viewModel.document = NativeEditorDocument(blocks: [
@@ -173,4 +221,25 @@ struct NativeEditorCollaborationTests {
         )
     }
 
+}
+
+@MainActor
+private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+    var encodedStateVector = Data()
+    var stateUpdatesByVector: [Data: Data] = [:]
+    var requestedStateVectors: [Data] = []
+    var appliedRemoteUpdates: [Data] = []
+
+    func encodeStateVector() async throws -> Data {
+        encodedStateVector
+    }
+
+    func encodeStateAsUpdate(for stateVector: Data) async throws -> Data {
+        requestedStateVectors.append(stateVector)
+        return stateUpdatesByVector[stateVector] ?? Data()
+    }
+
+    func applyRemoteUpdate(_ update: Data) async throws {
+        appliedRemoteUpdates.append(update)
+    }
 }
