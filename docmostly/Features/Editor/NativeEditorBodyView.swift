@@ -11,6 +11,7 @@ struct NativeEditorBodyView: View {
                 .bold()
                 .textFieldStyle(.plain)
                 .focused(focusedField, equals: .title)
+                .disabled(viewModel.canEdit == false)
                 .accessibilityLabel("Page title")
 
             if let saveErrorMessage = viewModel.saveErrorMessage {
@@ -26,12 +27,13 @@ struct NativeEditorBodyView: View {
                         focusedField: focusedField,
                         isSelected: viewModel.selectedBlockID == block.id,
                         isShowingControls: viewModel.visibleBlockControlsID == block.id,
+                        isReadOnly: viewModel.canEdit == false,
                         select: { viewModel.selectBlock(block.id) },
                         showControls: { viewModel.showBlockControls(for: block.id) },
                         insertBelow: { viewModel.insertBlock(after: block.id) },
                         delete: { viewModel.deleteBlock(block.id) },
-                        tableActions: tableEditingActions,
-                        richBlockActions: richBlockEditingActions,
+                        tableActions: viewModel.canEdit ? tableEditingActions : nil,
+                        richBlockActions: viewModel.canEdit ? richBlockEditingActions : nil,
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
@@ -57,9 +59,11 @@ struct NativeEditorBodyView: View {
                 }
             }
 
-            Button("Add Block", systemImage: "plus", action: viewModel.appendBlock)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+            if viewModel.canEdit {
+                Button("Add Block", systemImage: "plus", action: viewModel.appendBlock)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            }
         }
         .onChange(of: viewModel.document) {
             viewModel.handleDocumentChanged()

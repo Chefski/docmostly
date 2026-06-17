@@ -70,7 +70,8 @@ extension PageReaderView {
         editorViewModel: NativeRichEditorViewModel
     ) async {
         switch event {
-        case .authenticated:
+        case .authenticated(let scope):
+            editorViewModel.applyCollaborationAuthenticationScope(scope)
             markCollaborationPresenceConnected(editorViewModel)
         case .awareness(let states, let localClientID):
             editorViewModel.applyAwarenessStates(states, localClientID: localClientID)

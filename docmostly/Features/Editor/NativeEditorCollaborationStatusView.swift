@@ -53,9 +53,9 @@ struct NativeEditorCollaborationStatusView: View {
     private var isVisible: Bool {
         switch viewModel.realtimeStatus {
         case .disconnected:
-            hasCollaborators || viewModel.pendingRemoteUpdate != nil
+            hasCollaborators || viewModel.pendingRemoteUpdate != nil || viewModel.canEdit == false
         case .connected:
-            hasCollaborators || viewModel.pendingRemoteUpdate != nil
+            hasCollaborators || viewModel.pendingRemoteUpdate != nil || viewModel.canEdit == false
         case .connecting, .conflict, .failed, .unsupported:
             true
         }
@@ -64,6 +64,10 @@ struct NativeEditorCollaborationStatusView: View {
     private var statusTitle: String {
         if let editingTitle = NativeEditorPresenceStatusText.editingTitle(for: presenceCollaborators) {
             return editingTitle
+        }
+
+        if viewModel.canEdit == false {
+            return "Read-only"
         }
 
         switch viewModel.realtimeStatus {
@@ -95,6 +99,14 @@ struct NativeEditorCollaborationStatusView: View {
     }
 
     private var statusImage: String {
+        if viewModel.canEdit == false {
+            "lock"
+        } else {
+            statusImageForRealtimeStatus
+        }
+    }
+
+    private var statusImageForRealtimeStatus: String {
         switch viewModel.realtimeStatus {
         case .connected:
             "checkmark.circle"
@@ -112,7 +124,9 @@ struct NativeEditorCollaborationStatusView: View {
     }
 
     private var statusStyle: Color {
-        switch viewModel.realtimeStatus {
+        guard viewModel.canEdit else { return .secondary }
+
+        return switch viewModel.realtimeStatus {
         case .connected:
             .green
         case .conflict:

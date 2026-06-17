@@ -74,6 +74,19 @@ nonisolated enum NativeEditorCollaborationScope: String, Equatable, Sendable {
     init(rawScope: String) {
         self = Self(rawValue: rawScope) ?? .unknown
     }
+
+    var allowsLocalDocumentUpdates: Bool {
+        self == .readWrite
+    }
+
+    func allowsSyncReply(to message: NativeEditorYjsSyncMessage) -> Bool {
+        switch message {
+        case .stepOne:
+            allowsLocalDocumentUpdates
+        case .stepTwo, .update:
+            true
+        }
+    }
 }
 
 nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {

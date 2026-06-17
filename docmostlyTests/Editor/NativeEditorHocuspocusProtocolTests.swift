@@ -149,6 +149,29 @@ struct NativeEditorHocuspocusProtocolTests {
         #expect(parsedUpdate == update)
     }
 
+    @Test func parsesAuthenticatedCollaborationScope() throws {
+        let frameData = makeHocuspocusFrame(
+            documentName: "page.page-1",
+            messageType: 2,
+            payload: authPayload(type: 2, scope: "readonly")
+        )
+
+        let frame = try NativeEditorHocuspocusFrame.parse(frameData)
+
+        #expect(frame.message == .authenticated(scope: .readonly))
+    }
+
+    @Test func readOnlyCollaborationScopeDoesNotAllowOutboundLocalDocumentState() {
+        #expect(NativeEditorCollaborationScope.readWrite.allowsLocalDocumentUpdates == true)
+        #expect(NativeEditorCollaborationScope.readonly.allowsLocalDocumentUpdates == false)
+        #expect(NativeEditorCollaborationScope.unknown.allowsLocalDocumentUpdates == false)
+        #expect(NativeEditorCollaborationScope.readWrite.allowsSyncReply(to: .stepOne(Data([1]))) == true)
+        #expect(NativeEditorCollaborationScope.readonly.allowsSyncReply(to: .stepOne(Data([1]))) == false)
+        #expect(NativeEditorCollaborationScope.unknown.allowsSyncReply(to: .stepOne(Data([1]))) == false)
+        #expect(NativeEditorCollaborationScope.readonly.allowsSyncReply(to: .stepTwo(Data([2]))) == true)
+        #expect(NativeEditorCollaborationScope.readonly.allowsSyncReply(to: .update(Data([3]))) == true)
+    }
+
     @Test func encodesYjsSyncUpdateFrame() {
         let frameData = NativeEditorHocuspocusFrame.sync(
             documentName: "page.page-1",
@@ -182,6 +205,12 @@ struct NativeEditorHocuspocusProtocolTests {
         payload.append(encodeVarUint(update.count))
         payload.append(update)
         return payload
+    }
+
+    private func authPayload(type: Int, scope: String) -> Data {
+        var data = encodeVarUint(type)
+        data.append(encodeVarString(scope))
+        return data
     }
 
     private func makeYjsSyncMessage(type: Int, update: Data) -> Data {

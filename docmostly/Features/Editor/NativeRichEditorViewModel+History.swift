@@ -9,16 +9,27 @@ extension NativeRichEditorViewModel {
     }
 
     func handleDocumentChanged() {
+        guard canEdit else {
+            restoreReadOnlyBaseline()
+            return
+        }
+
         commitExternalChange(applyingInputRules: true)
         notifyLocalAwarenessChanged()
     }
 
     func handleTitleChanged() {
+        guard canEdit else {
+            restoreReadOnlyBaseline()
+            return
+        }
+
         commitExternalChange(applyingInputRules: false)
         notifyLocalAwarenessChanged()
     }
 
     func undo() {
+        guard canEdit else { return }
         guard let previousSnapshot = undoStack.popLast() else { return }
         let currentSnapshot = makeHistorySnapshot()
         redoStack.append(currentSnapshot)
@@ -26,6 +37,7 @@ extension NativeRichEditorViewModel {
     }
 
     func redo() {
+        guard canEdit else { return }
         guard let nextSnapshot = redoStack.popLast() else { return }
         let currentSnapshot = makeHistorySnapshot()
         undoStack.append(currentSnapshot)
@@ -33,6 +45,8 @@ extension NativeRichEditorViewModel {
     }
 
     func performUndoableEdit(_ edit: () -> Void) {
+        guard canEdit else { return }
+
         let before = makeHistorySnapshot()
         edit()
         let after = makeHistorySnapshot()
@@ -114,6 +128,16 @@ extension NativeRichEditorViewModel {
     private func updateHistoryAvailability() {
         canUndo = undoStack.isEmpty == false
         canRedo = redoStack.isEmpty == false
+    }
+
+    private func restoreReadOnlyBaseline() {
+        guard isApplyingHistory == false else { return }
+
+        title = lastSavedTitle
+        document = lastSavedDocument
+        lastKnownSnapshot = makeHistorySnapshot()
+        isDirty = false
+        updateHistoryAvailability()
     }
 
     func waitForPendingCRDTLocalChange() async {

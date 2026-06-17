@@ -23,6 +23,7 @@ actor NativeEditorCollaborationPresenceClient {
     private var heartbeatTask: Task<Void, Never>?
     private var localUpdateTask: Task<Void, Never>?
     private var localAwarenessUpdateTask: Task<Void, Never>?
+    private var authenticatedScope: NativeEditorCollaborationScope?
     private let localClientID: Int
     private var localAwarenessClock = 0
     private var awarenessStore = NativeEditorAwarenessStateStore()
@@ -83,6 +84,7 @@ actor NativeEditorCollaborationPresenceClient {
         localAwarenessUpdateTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+        authenticatedScope = nil
         awarenessStore.reset()
     }
 
@@ -154,8 +156,13 @@ actor NativeEditorCollaborationPresenceClient {
                 )
             )
         case .authenticated(let scope):
+            authenticatedScope = scope
             try await sendInitialCRDTSync(using: context.syncDriver)
-            startLocalUpdateSender(using: context.syncDriver)
+            if scope.allowsLocalDocumentUpdates {
+                startLocalUpdateSender(using: context.syncDriver)
+            } else {
+                stopLocalUpdateSender()
+            }
             startLocalAwarenessUpdateSender(context: context)
             continuation.yield(.authenticated(scope))
         case .authenticationFailed(let reason):
@@ -170,30 +177,42 @@ actor NativeEditorCollaborationPresenceClient {
         case .syncStatus(let isSynced):
             continuation.yield(.syncStatus(isSynced))
         case .sync(let syncMessage):
-            try await sendCRDTSyncReply(for: syncMessage, using: context.syncDriver)
+            try await sendCRDTSyncReply(
+                for: syncMessage,
+                authenticatedScope: authenticatedScope,
+                using: context.syncDriver
+            )
         case .close(let reason):
             throw APIError.connectionFailed(reason)
         }
     }
+}
 
-    private func sendInitialCRDTSync(using syncDriver: NativeEditorCollaborationSyncDriver?) async throws {
+private extension NativeEditorCollaborationPresenceClient {
+    func sendInitialCRDTSync(using syncDriver: NativeEditorCollaborationSyncDriver?) async throws {
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFramesAfterAuthentication()
         try await send(frames)
     }
 
-    private func sendCRDTSyncReply(
+    func sendCRDTSyncReply(
         for message: NativeEditorYjsSyncMessage,
+        authenticatedScope: NativeEditorCollaborationScope?,
         using syncDriver: NativeEditorCollaborationSyncDriver?
     ) async throws {
         guard let syncDriver else { return }
+        guard authenticatedScope?.allowsSyncReply(to: message) ?? false else { return }
         let frames = try await syncDriver.outboundFrames(for: message)
         try await send(frames)
     }
 
-    private func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
+    func stopLocalUpdateSender() {
         localUpdateTask?.cancel()
         localUpdateTask = nil
+    }
+
+    func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
+        stopLocalUpdateSender()
 
         guard let syncDriver else { return }
 
@@ -213,7 +232,7 @@ actor NativeEditorCollaborationPresenceClient {
         }
     }
 
-    private func startLocalAwarenessUpdateSender(context: NativeEditorCollaborationSessionContext) {
+    func startLocalAwarenessUpdateSender(context: NativeEditorCollaborationSessionContext) {
         localAwarenessUpdateTask?.cancel()
         localAwarenessUpdateTask = nil
 
@@ -232,7 +251,7 @@ actor NativeEditorCollaborationPresenceClient {
         }
     }
 
-    private func startHeartbeat(context: NativeEditorCollaborationSessionContext) {
+    func startHeartbeat(context: NativeEditorCollaborationSessionContext) {
         heartbeatTask?.cancel()
         heartbeatTask = Task { [weak self, context] in
             while Task.isCancelled == false {
@@ -243,7 +262,7 @@ actor NativeEditorCollaborationPresenceClient {
         }
     }
 
-    private func sendLocalAwareness(context: NativeEditorCollaborationSessionContext) async throws {
+    func sendLocalAwareness(context: NativeEditorCollaborationSessionContext) async throws {
         let cursor = await context.localAwarenessCursor?()
         let documentName = context.documentName
         let user = context.user
@@ -267,20 +286,20 @@ actor NativeEditorCollaborationPresenceClient {
         try await send(NativeEditorHocuspocusFrame.awareness(documentName: documentName, update: update))
     }
 
-    private func send(_ data: Data) async throws {
+    func send(_ data: Data) async throws {
         guard let task else {
             throw URLError(.notConnectedToInternet)
         }
         try await task.send(.data(data))
     }
 
-    private func send(_ frames: [Data]) async throws {
+    func send(_ frames: [Data]) async throws {
         for frame in frames {
             try await send(frame)
         }
     }
 
-    private static func data(from message: URLSessionWebSocketTask.Message) -> Data {
+    static func data(from message: URLSessionWebSocketTask.Message) -> Data {
         switch message {
         case .data(let data):
             data

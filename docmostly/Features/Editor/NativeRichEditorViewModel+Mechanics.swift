@@ -16,6 +16,7 @@ extension NativeRichEditorViewModel {
     }
 
     func dropMarkdown(_ markdown: String, before targetBlockID: UUID) -> Bool {
+        guard canEdit else { return false }
         let droppedBlocks = NativeEditorMarkdownParser.blocks(from: markdown)
         guard
             droppedBlocks.isEmpty == false,

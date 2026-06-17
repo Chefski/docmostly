@@ -12,6 +12,8 @@ extension NativeRichEditorViewModel {
         _ page: DocmostEditablePage,
         lastUpdatedBy fallbackLastUpdatedBy: DocmostPagePerson? = nil
     ) {
+        applyPagePermissions(page.permissions)
+
         guard isRemotePageNewer(page) else {
             realtimeStatus = .connected
             return
@@ -219,6 +221,7 @@ extension NativeRichEditorViewModel {
         document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
         lastSavedTitle = title
         lastSavedDocument = document
+        applyPagePermissions(page.permissions)
         activeCollaborators = collaborators(from: lastUpdatedBy)
         remoteCursors = []
         resolvedRemoteCursors = []

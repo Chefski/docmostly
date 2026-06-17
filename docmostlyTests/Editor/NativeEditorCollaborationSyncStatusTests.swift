@@ -4,6 +4,55 @@ import Testing
 
 @MainActor
 struct NativeEditorCollaborationSyncStatusTests {
+    @Test func pagePermissionsDisableNativeEditingAndSaving() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Saved title")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+
+        viewModel.applyPagePermissions(DocmostPagePermissions(canEdit: false, hasRestriction: true))
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.canSave == false)
+        viewModel.focus(blockID: block.id)
+        #expect(viewModel.activeBlockID == nil)
+
+        viewModel.toggleInlineMark(.bold)
+        #expect(viewModel.document == viewModel.lastSavedDocument)
+        #expect(viewModel.isDirty == false)
+    }
+
+    @Test func readOnlyCollaborationScopeDiscardsPendingNativeEdits() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Saved title")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Local draft")
+        viewModel.handleDocumentChanged()
+        #expect(viewModel.isDirty == true)
+
+        viewModel.applyCollaborationAuthenticationScope(.readonly)
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.canSave == false)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
+        #expect(viewModel.isDirty == false)
+        #expect(viewModel.activeBlockID == nil)
+    }
+
+    @Test func readWriteCollaborationScopeDoesNotOverrideRestrictedPagePermissions() {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        viewModel.applyPagePermissions(DocmostPagePermissions(canEdit: false, hasRestriction: true))
+        viewModel.applyCollaborationAuthenticationScope(.readWrite)
+
+        #expect(viewModel.canEdit == false)
+    }
+
     @Test func unsyncedCollaborationStatusClearsTransientPresenceAndCursors() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         let recentEditor = NativeEditorCollaborator(
@@ -72,5 +121,21 @@ struct NativeEditorCollaborationSyncStatusTests {
 
         #expect(viewModel.realtimeStatus == .connecting)
         #expect(viewModel.activeCollaborators == [])
+    }
+
+    @Test func pageReaderRoutesCollaborationAuthenticationScope() async {
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        await view.handleCollaborationPresenceEvent(.authenticated(.readonly), editorViewModel: viewModel)
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.realtimeStatus == .connected)
+
+        viewModel.applyPagePermissions(DocmostPagePermissions(canEdit: true, hasRestriction: false))
+        await view.handleCollaborationPresenceEvent(.authenticated(.readWrite), editorViewModel: viewModel)
+
+        #expect(viewModel.canEdit == true)
+        #expect(viewModel.realtimeStatus == .connected)
     }
 }

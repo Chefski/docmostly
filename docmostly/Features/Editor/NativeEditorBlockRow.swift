@@ -5,6 +5,7 @@ struct NativeEditorBlockRow: View {
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     let isSelected: Bool
     let isShowingControls: Bool
+    let isReadOnly: Bool
     let select: () -> Void
     let showControls: () -> Void
     let insertBelow: () -> Void
@@ -39,7 +40,7 @@ struct NativeEditorBlockRow: View {
                     .frame(width: 24, alignment: .center)
             }
 
-            if block.isEditable {
+            if block.isEditable && isReadOnly == false {
                 TextEditor(text: $block.text, selection: $block.selection)
                     .font(block.kind.editorFont)
                     .scrollContentBackground(.hidden)
@@ -73,9 +74,13 @@ struct NativeEditorBlockRow: View {
             (isSelected ? DocmostlyTheme.primaryTint : Color.clear)
                 .clipShape(.rect(cornerRadius: 8))
                 .contentShape(.rect)
-                .onLongPressGesture(perform: showControls)
+                .onLongPressGesture {
+                    guard isReadOnly == false else { return }
+                    showControls()
+                }
         }
         .dropDestination(for: String.self) { blockIDs, _ in
+            guard isReadOnly == false else { return false }
             guard let rawBlockID = blockIDs.first else { return false }
             let movedBlockID = UUID(uuidString: rawBlockID)
 
@@ -100,7 +105,7 @@ struct NativeEditorBlockRow: View {
     }
 
     private var showsControls: Bool {
-        isShowingControls || isSelected
+        isReadOnly == false && (isShowingControls || isSelected)
     }
 
     private var hasVisiblePrefix: Bool {

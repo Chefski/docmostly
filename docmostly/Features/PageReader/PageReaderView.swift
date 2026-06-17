@@ -63,7 +63,7 @@ struct PageReaderView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if let editorViewModel, editorViewModel.isEditing {
+            if let editorViewModel, editorViewModel.isEditing, editorViewModel.canEdit {
                 VStack(spacing: 6) {
                     if isUploadingAttachment {
                         ProgressView("Uploading attachment")
