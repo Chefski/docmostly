@@ -9,12 +9,14 @@ extension PageReaderView {
             guard let token = try await appState.loadCollaborationToken().token else {
                 throw APIError.connectionFailed("Realtime collaboration token is missing.")
             }
+            let collaborationSession = editorViewModel.collaborationSession()
 
             let events = await collaborationPresenceClient.events(
                 url: url,
                 token: token,
-                documentName: "page.\(editorViewModel.currentPageID)",
-                user: appState.currentUser?.user
+                documentName: collaborationSession.documentName,
+                user: appState.currentUser?.user,
+                syncDriver: collaborationSession.syncDriver
             )
 
             for try await event in events {

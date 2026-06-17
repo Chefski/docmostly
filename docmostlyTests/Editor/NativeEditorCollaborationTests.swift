@@ -243,6 +243,33 @@ struct NativeEditorCollaborationTests {
         #expect(engine.appliedRemoteUpdates == [])
     }
 
+    @Test func viewModelBuildsCollaborationSessionWithoutCRDTDriverWhenEngineIsMissing() {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        let collaborationSession = viewModel.collaborationSession()
+
+        #expect(collaborationSession.documentName == "page.page-1")
+        #expect(collaborationSession.syncDriver == nil)
+    }
+
+    @Test func viewModelBuildsCollaborationSessionWithCRDTDriverWhenEngineIsConfigured() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.encodedStateVector = Data([21, 22])
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+
+        let collaborationSession = viewModel.collaborationSession()
+        let driver = try #require(collaborationSession.syncDriver)
+
+        let frames = try await driver.outboundFramesAfterAuthentication()
+        let frame = try NativeEditorHocuspocusFrame.parse(try #require(frames.first))
+        #expect(frame.documentName == "page.page-1")
+        #expect(frame.message == .sync(.stepOne(Data([21, 22]))))
+    }
+
     private func configuredViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
         viewModel.document = NativeEditorDocument(blocks: [

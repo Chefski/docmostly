@@ -35,13 +35,19 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var redoStack: [NativeEditorHistorySnapshot] = []
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
+    @ObservationIgnored private var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
 
-    init(pageID: String, initialTitle: String = "") {
+    init(
+        pageID: String,
+        initialTitle: String = "",
+        crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)? = nil
+    ) {
         self.pageID = pageID
         title = initialTitle
         editablePageID = pageID
         lastSavedTitle = initialTitle
         lastKnownSnapshot = makeHistorySnapshot()
+        self.crdtDocumentEngine = crdtDocumentEngine
     }
 
     var isEditing: Bool {
@@ -171,6 +177,24 @@ final class NativeRichEditorViewModel {
 
     func recalculateDirty() {
         isDirty = title != lastSavedTitle || document != lastSavedDocument
+    }
+
+    func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
+        crdtDocumentEngine = engine
+    }
+
+    func collaborationSession() -> NativeEditorCollaborationSession {
+        let documentName = "page.\(currentPageID)"
+        let syncDriver = crdtDocumentEngine.map { engine in
+            NativeEditorCollaborationSyncDriver(
+                documentName: documentName,
+                coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+            )
+        }
+        return NativeEditorCollaborationSession(
+            documentName: documentName,
+            syncDriver: syncDriver
+        )
     }
 }
 
