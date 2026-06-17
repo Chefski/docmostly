@@ -210,7 +210,8 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
                 layout: "two_equal",
                 widthMode: "wide",
                 columnCount: 2,
-                previewText: "Left Right"
+                previewText: "Left Right",
+                columnTexts: ["Left", "Right"]
             ))
         case .subpages:
             .subpages

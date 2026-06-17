@@ -225,17 +225,14 @@ extension NativeEditorDocument {
             ProseMirrorNode(type: "pageBreak")
         case .divider:
             ProseMirrorNode(type: "horizontalRule")
-        case .columns:
-            ProseMirrorNode(type: "columns")
+        case .columns(let columns):
+            NativeEditorRichBlockNodeFactory.columnsNode(from: columns)
         case .subpages:
             ProseMirrorNode(type: "subpages")
-        case .transclusionSource:
-            ProseMirrorNode(
-                type: "transclusionSource",
-                content: [textContainerNode(type: "paragraph", block: block)]
-            )
-        case .transclusionReference:
-            ProseMirrorNode(type: "transclusionReference")
+        case .transclusionSource(let source):
+            NativeEditorRichBlockNodeFactory.transclusionSourceNode(from: source)
+        case .transclusionReference(let reference):
+            NativeEditorRichBlockNodeFactory.transclusionReferenceNode(from: reference)
         default:
             nil
         }

@@ -24,6 +24,49 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func updateColumns(blockID: UUID, layout: String, widthMode: String, columnTexts: [String]) {
+        updateRichBlock(blockID: blockID) { block in
+            let normalizedColumnTexts = Self.normalizedColumnTexts(columnTexts)
+            let columns = NativeEditorColumnsBlock(
+                layout: layout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "two_equal" : layout,
+                widthMode: widthMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "normal" : widthMode,
+                columnCount: normalizedColumnTexts.count,
+                previewText: normalizedColumnTexts.joined(separator: " "),
+                columnTexts: normalizedColumnTexts
+            )
+            block.kind = .columns(columns)
+            block.text = AttributedString(columns.previewText)
+            block.rawNode = NativeEditorRichBlockNodeFactory.columnsNode(from: columns)
+        }
+    }
+
+    func updateTransclusionSource(blockID: UUID, identifier: String, text: String) {
+        updateRichBlock(blockID: blockID) { block in
+            let trimmedIdentifier = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+            let source = NativeEditorTransclusionSourceBlock(
+                identifier: trimmedIdentifier.isEmpty ? nil : trimmedIdentifier,
+                previewText: text
+            )
+            block.kind = .transclusionSource(source)
+            block.text = AttributedString(text)
+            block.rawNode = NativeEditorRichBlockNodeFactory.transclusionSourceNode(from: source)
+        }
+    }
+
+    func updateTransclusionReference(blockID: UUID, sourcePageID: String, transclusionID: String) {
+        updateRichBlock(blockID: blockID) { block in
+            let trimmedSourcePageID = sourcePageID.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedTransclusionID = transclusionID.trimmingCharacters(in: .whitespacesAndNewlines)
+            let reference = NativeEditorTransclusionReferenceBlock(
+                sourcePageID: trimmedSourcePageID.isEmpty ? nil : trimmedSourcePageID,
+                transclusionID: trimmedTransclusionID.isEmpty ? nil : trimmedTransclusionID
+            )
+            block.kind = .transclusionReference(reference)
+            block.text = AttributedString(reference.transclusionID ?? reference.sourcePageID ?? "")
+            block.rawNode = NativeEditorRichBlockNodeFactory.transclusionReferenceNode(from: reference)
+        }
+    }
+
     func updateEmbed(blockID: UUID, source: String, provider: String) {
         updateRichBlock(blockID: blockID) { block in
             guard case .embed(let currentEmbed) = block.kind else { return }
@@ -101,6 +144,11 @@ extension NativeRichEditorViewModel {
             edit(&document.blocks[index])
         }
     }
+
+    private static func normalizedColumnTexts(_ columnTexts: [String]) -> [String] {
+        let limitedTexts = Array(columnTexts.prefix(4))
+        return limitedTexts.isEmpty ? [""] : limitedTexts
+    }
 }
 
 private extension NativeEditorBlockKind {
@@ -125,7 +173,7 @@ private extension NativeEditorBlockKind {
     }
 }
 
-private enum NativeEditorRichBlockNodeFactory {
+enum NativeEditorRichBlockNodeFactory {
     static func calloutNode(from callout: NativeEditorCalloutBlock) -> ProseMirrorNode {
         var attrs: [String: ProseMirrorJSONValue] = ["type": .string(callout.style)]
         if let icon = callout.icon {
@@ -153,6 +201,46 @@ private enum NativeEditorRichBlockNodeFactory {
                     content: [paragraphNode(details.previewText)]
                 )
             ]
+        )
+    }
+
+    static func columnsNode(from columns: NativeEditorColumnsBlock) -> ProseMirrorNode {
+        let columnTexts = normalizedColumnTexts(from: columns)
+        return ProseMirrorNode(
+            type: "columns",
+            attrs: [
+                "layout": .string(columns.layout),
+                "widthMode": .string(columns.widthMode)
+            ],
+            content: columnTexts.map(columnNode(text:))
+        )
+    }
+
+    static func transclusionSourceNode(from source: NativeEditorTransclusionSourceBlock) -> ProseMirrorNode {
+        var attrs = [String: ProseMirrorJSONValue]()
+        if let identifier = source.identifier, identifier.isEmpty == false {
+            attrs["id"] = .string(identifier)
+        }
+
+        return ProseMirrorNode(
+            type: "transclusionSource",
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: [paragraphNode(source.previewText)]
+        )
+    }
+
+    static func transclusionReferenceNode(from reference: NativeEditorTransclusionReferenceBlock) -> ProseMirrorNode {
+        var attrs = [String: ProseMirrorJSONValue]()
+        if let sourcePageID = reference.sourcePageID, sourcePageID.isEmpty == false {
+            attrs["sourcePageId"] = .string(sourcePageID)
+        }
+        if let transclusionID = reference.transclusionID, transclusionID.isEmpty == false {
+            attrs["transclusionId"] = .string(transclusionID)
+        }
+
+        return ProseMirrorNode(
+            type: "transclusionReference",
+            attrs: attrs.isEmpty ? nil : attrs
         )
     }
 
@@ -216,5 +304,23 @@ private enum NativeEditorRichBlockNodeFactory {
             type: "paragraph",
             content: NativeEditorDocument.inlineNodes(from: AttributedString(text))
         )
+    }
+
+    private static func columnNode(text: String) -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "column",
+            attrs: ["width": .int(1)],
+            content: [paragraphNode(text)]
+        )
+    }
+
+    private static func normalizedColumnTexts(from columns: NativeEditorColumnsBlock) -> [String] {
+        if columns.columnTexts.isEmpty == false {
+            return Array(columns.columnTexts.prefix(max(columns.columnCount, 1)))
+        }
+
+        let columnCount = max(columns.columnCount, 1)
+        let firstColumnText = columns.previewText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (0..<columnCount).map { index in index == 0 ? firstColumnText : "" }
     }
 }

@@ -91,6 +91,149 @@ struct NativeEditorDetailsEditor: View {
     }
 }
 
+struct NativeEditorColumnsEditor: View {
+    let blockID: UUID
+    let columns: NativeEditorColumnsBlock
+    let actions: NativeEditorRichBlockEditingActions
+
+    private let layouts = ["two_equal", "two_left_sidebar", "two_right_sidebar", "three_equal"]
+    private let widthModes = ["normal", "wide", "full"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Menu(layoutTitle, systemImage: "rectangle.split.2x1") {
+                    ForEach(layouts, id: \.self) { layout in
+                        Button(layout.replacing("_", with: " ").capitalized) {
+                            actions.updateColumns(blockID, layout, columns.widthMode, columnTexts)
+                        }
+                    }
+                }
+
+                Menu(columns.widthMode.capitalized, systemImage: "arrow.left.and.right") {
+                    ForEach(widthModes, id: \.self) { widthMode in
+                        Button(widthMode.capitalized) {
+                            actions.updateColumns(blockID, columns.layout, widthMode, columnTexts)
+                        }
+                    }
+                }
+            }
+
+            Stepper("Columns: \(columnTexts.count)", value: columnCountBinding, in: 1...4)
+
+            ForEach(columnTexts.indices, id: \.self) { index in
+                TextField("Column \(index + 1)", text: columnTextBinding(index: index), axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...3)
+            }
+        }
+    }
+
+    private var layoutTitle: String {
+        columns.layout.replacing("_", with: " ").capitalized
+    }
+
+    private var columnTexts: [String] {
+        if columns.columnTexts.isEmpty == false {
+            return columns.columnTexts
+        }
+        return [columns.previewText]
+    }
+
+    private var columnCountBinding: Binding<Int> {
+        Binding {
+            columnTexts.count
+        } set: { count in
+            var updatedTexts = columnTexts
+            if count > updatedTexts.count {
+                updatedTexts.append(contentsOf: repeatElement("", count: count - updatedTexts.count))
+            } else if count < updatedTexts.count {
+                updatedTexts.removeLast(updatedTexts.count - count)
+            }
+            actions.updateColumns(blockID, columns.layout, columns.widthMode, updatedTexts)
+        }
+    }
+
+    private func columnTextBinding(index: Int) -> Binding<String> {
+        Binding {
+            columnTexts[index]
+        } set: { text in
+            var updatedTexts = columnTexts
+            guard updatedTexts.indices.contains(index) else { return }
+            updatedTexts[index] = text
+            actions.updateColumns(blockID, columns.layout, columns.widthMode, updatedTexts)
+        }
+    }
+}
+
+struct NativeEditorTransclusionSourceEditor: View {
+    let blockID: UUID
+    let source: NativeEditorTransclusionSourceBlock
+    let actions: NativeEditorRichBlockEditingActions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Synced block ID", text: identifierBinding)
+                .textInputAutocapitalization(.never)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Content", text: textBinding, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...4)
+        }
+    }
+
+    private var identifierBinding: Binding<String> {
+        Binding {
+            source.identifier ?? ""
+        } set: { identifier in
+            actions.updateTransclusionSource(blockID, identifier, source.previewText)
+        }
+    }
+
+    private var textBinding: Binding<String> {
+        Binding {
+            source.previewText
+        } set: { text in
+            actions.updateTransclusionSource(blockID, source.identifier ?? "", text)
+        }
+    }
+}
+
+struct NativeEditorTransclusionReferenceEditor: View {
+    let blockID: UUID
+    let reference: NativeEditorTransclusionReferenceBlock
+    let actions: NativeEditorRichBlockEditingActions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Source page ID", text: sourcePageBinding)
+                .textInputAutocapitalization(.never)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Synced block ID", text: transclusionBinding)
+                .textInputAutocapitalization(.never)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private var sourcePageBinding: Binding<String> {
+        Binding {
+            reference.sourcePageID ?? ""
+        } set: { sourcePageID in
+            actions.updateTransclusionReference(blockID, sourcePageID, reference.transclusionID ?? "")
+        }
+    }
+
+    private var transclusionBinding: Binding<String> {
+        Binding {
+            reference.transclusionID ?? ""
+        } set: { transclusionID in
+            actions.updateTransclusionReference(blockID, reference.sourcePageID ?? "", transclusionID)
+        }
+    }
+}
+
 struct NativeEditorEmbedEditor: View {
     let blockID: UUID
     let embed: NativeEditorEmbedBlock

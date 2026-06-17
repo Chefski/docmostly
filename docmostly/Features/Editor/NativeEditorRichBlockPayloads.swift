@@ -63,6 +63,7 @@ struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
     var widthMode: String
     var columnCount: Int
     var previewText: String
+    var columnTexts: [String] = []
 }
 
 struct NativeEditorTransclusionSourceBlock: Equatable, Hashable, Sendable {

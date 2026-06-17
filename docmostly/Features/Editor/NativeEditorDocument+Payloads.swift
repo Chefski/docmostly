@@ -65,12 +65,14 @@ extension NativeEditorDocument {
 
     static func columnsBlock(from node: ProseMirrorNode) -> NativeEditorColumnsBlock {
         let columns = (node.content ?? []).filter { $0.type == "column" }
+        let columnTexts = columns.map { plainText(in: $0.content ?? []) }
 
         return NativeEditorColumnsBlock(
             layout: node.attrs?["layout"]?.stringValue ?? "two_equal",
             widthMode: node.attrs?["widthMode"]?.stringValue ?? "normal",
             columnCount: columns.count,
-            previewText: plainText(in: columns.flatMap { $0.content ?? [] })
+            previewText: columnTexts.joined(separator: " "),
+            columnTexts: columnTexts
         )
     }
 

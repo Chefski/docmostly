@@ -88,6 +88,9 @@ struct NativeEditorBodyView: View {
         NativeEditorRichBlockEditingActions(
             updateCallout: viewModel.updateCallout,
             updateDetails: viewModel.updateDetails,
+            updateColumns: viewModel.updateColumns,
+            updateTransclusionSource: viewModel.updateTransclusionSource,
+            updateTransclusionReference: viewModel.updateTransclusionReference,
             updateEmbed: viewModel.updateEmbed,
             updateDrawio: viewModel.updateDrawio,
             updateExcalidraw: viewModel.updateExcalidraw,

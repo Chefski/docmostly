@@ -75,7 +75,11 @@ struct NativeEditorRichBlockPreviewView: View {
                 systemImage: columnsSystemImage(for: columns.columnCount),
                 title: "Columns",
                 subtitle: columns.previewText
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorColumnsEditor(blockID: block.id, columns: columns, actions: richBlockActions)
+                }
+            }
         case .subpages:
             previewShell(systemImage: "doc.on.doc", title: "Subpages", subtitle: "Child pages are shown by Docmost.")
         case .transclusionSource(let source):
@@ -83,13 +87,25 @@ struct NativeEditorRichBlockPreviewView: View {
                 systemImage: "arrow.trianglehead.2.clockwise",
                 title: "Synced block",
                 subtitle: source.previewText
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorTransclusionSourceEditor(blockID: block.id, source: source, actions: richBlockActions)
+                }
+            }
         case .transclusionReference(let reference):
             previewShell(
                 systemImage: "arrow.trianglehead.2.clockwise.rotate.90",
                 title: "Synced block reference",
                 subtitle: reference.transclusionID ?? reference.sourcePageID
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorTransclusionReferenceEditor(
+                        blockID: block.id,
+                        reference: reference,
+                        actions: richBlockActions
+                    )
+                }
+            }
         case .embed(let embed):
             previewShell(
                 systemImage: "rectangle.connected.to.line.below",
