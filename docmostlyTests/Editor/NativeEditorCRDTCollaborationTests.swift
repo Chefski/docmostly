@@ -223,8 +223,18 @@ struct NativeEditorCRDTCollaborationTests {
             head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 4)
         )
         let cursor = NativeEditorAwarenessCursor(
-            anchor: .object(["relative": .string("anchor")]),
-            head: .object(["relative": .string("head")])
+            anchor: NativeEditorYjsRelativePosition(
+                type: .name("text"),
+                targetName: "default",
+                item: NativeEditorYjsID(client: 1, clock: 2),
+                assoc: 0
+            ),
+            head: NativeEditorYjsRelativePosition(
+                type: .name("text"),
+                targetName: "default",
+                item: NativeEditorYjsID(client: 1, clock: 4),
+                assoc: 0
+            )
         )
         let engine = RecordingCRDTDocumentEngine()
         engine.localAwarenessCursor = cursor

@@ -284,8 +284,14 @@ nonisolated struct NativeEditorAwarenessUser: Codable, Equatable, Sendable {
 }
 
 nonisolated struct NativeEditorAwarenessCursor: Codable, Equatable, Sendable {
-    let anchor: ProseMirrorJSONValue?
-    let head: ProseMirrorJSONValue?
+    let anchor: NativeEditorYjsRelativePosition?
+    let head: NativeEditorYjsRelativePosition?
+
+    var targetsDocmostDefaultFragment: Bool {
+        let positions = [anchor, head].compactMap { $0 }
+        guard positions.isEmpty == false else { return false }
+        return positions.allSatisfy(\.targetsDocmostDefaultFragment)
+    }
 }
 
 nonisolated struct NativeEditorLib0Encoder: Sendable {

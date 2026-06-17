@@ -68,7 +68,15 @@ struct NativeEditorHocuspocusProtocolTests {
         #expect(state.user?.id == "user-2")
         #expect(state.user?.name == "Alice")
         #expect(state.user?.color == "#2563EB")
-        #expect(state.cursor != nil)
+        let cursor = try #require(state.cursor)
+        #expect(cursor.anchor?.type == .name("text"))
+        #expect(cursor.anchor?.targetName == "default")
+        #expect(cursor.anchor?.item == NativeEditorYjsID(client: 1, clock: 2))
+        #expect(cursor.anchor?.assoc == 0)
+        #expect(cursor.head?.type == .name("text"))
+        #expect(cursor.head?.targetName == "default")
+        #expect(cursor.head?.item == NativeEditorYjsID(client: 1, clock: 4))
+        #expect(cursor.head?.assoc == 0)
     }
 
     @Test func parsesStatelessPageUpdatedFrame() throws {

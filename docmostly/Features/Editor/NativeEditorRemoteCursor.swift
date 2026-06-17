@@ -15,6 +15,7 @@ struct NativeEditorRemoteCursor: Equatable, Identifiable, Sendable {
 
     init?(awarenessState: NativeEditorAwarenessState) {
         guard let cursor = awarenessState.cursor else { return nil }
+        guard cursor.targetsDocmostDefaultFragment else { return nil }
 
         let collaborator = NativeEditorCollaborator(awarenessState: awarenessState)
         id = collaborator.id

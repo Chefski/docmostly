@@ -115,6 +115,22 @@ struct NativeEditorCollaborationTests {
         ])
     }
 
+    @Test func ignoresAwarenessCursorsOutsideDocmostDefaultFragment() {
+        let state = NativeEditorAwarenessState(
+            clientID: 11,
+            clock: 1,
+            payload: NativeEditorAwarenessPayload(
+                user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                cursor: NativeEditorAwarenessCursor(
+                    anchor: awarenessCursorPosition(client: 2, clock: 3, targetName: "other"),
+                    head: awarenessCursorPosition(client: 2, clock: 5, targetName: "other")
+                )
+            )
+        )
+
+        #expect(NativeEditorRemoteCursor(awarenessState: state) == nil)
+    }
+
     @Test func summarizesPresenceEditingStatusText() {
         let alice = NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB")
         let bob = NativeEditorCollaborator(id: "user-3", name: "Bob", colorName: "#059669")
@@ -209,16 +225,17 @@ struct NativeEditorCollaborationTests {
         )
     }
 
-    private func awarenessCursorPosition(client: Int, clock: Int) -> ProseMirrorJSONValue {
-        .object([
-            "type": .string("text"),
-            "tname": .string("default"),
-            "item": .object([
-                "client": .int(client),
-                "clock": .int(clock)
-            ]),
-            "assoc": .int(0)
-        ])
+    private func awarenessCursorPosition(
+        client: Int,
+        clock: Int,
+        targetName: String = "default"
+    ) -> NativeEditorYjsRelativePosition {
+        NativeEditorYjsRelativePosition(
+            type: .name("text"),
+            targetName: targetName,
+            item: NativeEditorYjsID(client: client, clock: clock),
+            assoc: 0
+        )
     }
 
     private func editablePage(title: String, text: String, updatedAt: Date) -> DocmostEditablePage {
