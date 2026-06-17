@@ -40,6 +40,7 @@ extension PageReaderView {
             markCollaborationPresenceConnected(editorViewModel)
         case .awareness(let states, let localClientID):
             editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
+            await editorViewModel.refreshResolvedRemoteCursors()
         case .stateless(let event) where event.type == "page.updated":
             await refreshRemotePageSnapshot(editorViewModel: editorViewModel, lastUpdatedBy: event.lastUpdatedBy)
         case .stateless, .syncStatus:

@@ -26,6 +26,7 @@ final class NativeRichEditorViewModel {
     var pendingRemoteUpdate: NativeEditorRemoteUpdate?
     var activeCollaborators: [NativeEditorCollaborator] = []
     var remoteCursors: [NativeEditorRemoteCursor] = []
+    var resolvedRemoteCursors: [NativeEditorResolvedRemoteCursor] = []
 
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored var lastSavedTitle: String
@@ -196,6 +197,24 @@ final class NativeRichEditorViewModel {
             documentName: documentName,
             syncDriver: syncDriver
         )
+    }
+
+    func refreshResolvedRemoteCursors() async {
+        guard let crdtDocumentEngine else {
+            resolvedRemoteCursors = []
+            return
+        }
+
+        var resolvedCursors: [NativeEditorResolvedRemoteCursor] = []
+        resolvedCursors.reserveCapacity(remoteCursors.count)
+
+        for cursor in remoteCursors {
+            if let resolvedCursor = try? await crdtDocumentEngine.resolveRemoteCursor(cursor) {
+                resolvedCursors.append(resolvedCursor)
+            }
+        }
+
+        resolvedRemoteCursors = resolvedCursors
     }
 }
 

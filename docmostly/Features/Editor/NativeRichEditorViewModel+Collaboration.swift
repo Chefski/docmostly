@@ -61,6 +61,7 @@ extension NativeRichEditorViewModel {
             guard seenCursorIDs.insert(remoteCursor.id).inserted else { return nil }
             return remoteCursor
         }
+        resolvedRemoteCursors = []
 
         if realtimeStatus != .conflict {
             realtimeStatus = .connected
@@ -80,6 +81,7 @@ extension NativeRichEditorViewModel {
         lastSavedDocument = document
         activeCollaborators = collaborators(from: lastUpdatedBy)
         remoteCursors = []
+        resolvedRemoteCursors = []
         markRemoteBaseline(updatedAt: page.updatedAt)
         resetEditingHistory()
         isDirty = false

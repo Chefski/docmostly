@@ -128,6 +128,56 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(frame.documentName == "page.page-1")
         #expect(frame.message == .sync(.stepOne(Data([21, 22]))))
     }
+
+    @Test func viewModelResolvesRemoteCursorsThroughCRDTEngine() async throws {
+        let remoteCursor = remoteCursor(id: "user-2", name: "Alice")
+        let resolvedCursor = NativeEditorResolvedRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 1),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 5)
+        )
+        let engine = RecordingCRDTDocumentEngine()
+        engine.resolvedRemoteCursorsByID = ["user-2": resolvedCursor]
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+        viewModel.remoteCursors = [remoteCursor]
+
+        await viewModel.refreshResolvedRemoteCursors()
+
+        #expect(engine.remoteCursorResolutionRequests == [remoteCursor])
+        #expect(viewModel.resolvedRemoteCursors == [resolvedCursor])
+    }
+
+    @Test func viewModelClearsResolvedRemoteCursorsWithoutCRDTEngine() async {
+        let resolvedCursor = NativeEditorResolvedRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 1),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 5)
+        )
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.resolvedRemoteCursors = [resolvedCursor]
+        viewModel.remoteCursors = [remoteCursor(id: "user-2", name: "Alice")]
+
+        await viewModel.refreshResolvedRemoteCursors()
+
+        #expect(viewModel.resolvedRemoteCursors == [])
+    }
+
+    private func remoteCursor(id: String, name: String) -> NativeEditorRemoteCursor {
+        NativeEditorRemoteCursor(
+            id: id,
+            name: name,
+            colorName: "#2563EB",
+            cursor: NativeEditorAwarenessCursor(anchor: nil, head: nil)
+        )
+    }
 }
 
 @MainActor
@@ -136,6 +186,8 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
     var stateUpdatesByVector: [Data: Data] = [:]
     var requestedStateVectors: [Data] = []
     var appliedRemoteUpdates: [Data] = []
+    var resolvedRemoteCursorsByID: [String: NativeEditorResolvedRemoteCursor] = [:]
+    var remoteCursorResolutionRequests: [NativeEditorRemoteCursor] = []
 
     func encodeStateVector() async throws -> Data {
         encodedStateVector
@@ -148,5 +200,10 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
 
     func applyRemoteUpdate(_ update: Data) async throws {
         appliedRemoteUpdates.append(update)
+    }
+
+    func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor? {
+        remoteCursorResolutionRequests.append(cursor)
+        return resolvedRemoteCursorsByID[cursor.id]
     }
 }
