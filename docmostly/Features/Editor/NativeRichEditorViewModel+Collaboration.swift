@@ -44,6 +44,21 @@ extension NativeRichEditorViewModel {
         realtimeStatus = .connected
     }
 
+    func clearCollaborationPresence() {
+        activeCollaborators.removeAll { $0.source == .presence }
+        remoteCursors = []
+        resolvedRemoteCursors = []
+    }
+
+    func applyCollaborationSyncStatus(isSynced: Bool) {
+        if isSynced == false {
+            clearCollaborationPresence()
+        }
+
+        guard realtimeStatus != .conflict else { return }
+        realtimeStatus = isSynced ? .connected : .connecting
+    }
+
     func handleCRDTBackedPageUpdated(_ event: NativeEditorCollaborationStatelessEvent) -> Bool {
         guard crdtDocumentEngine != nil else { return false }
 

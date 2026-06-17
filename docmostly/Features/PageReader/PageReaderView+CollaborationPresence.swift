@@ -79,7 +79,9 @@ extension PageReaderView {
             if editorViewModel.handleCRDTBackedPageUpdated(event) == false {
                 await refreshRemotePageSnapshot(editorViewModel: editorViewModel, lastUpdatedBy: event.lastUpdatedBy)
             }
-        case .stateless, .syncStatus:
+        case .syncStatus(let isSynced):
+            editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
+        case .stateless:
             break
         }
     }
@@ -91,6 +93,7 @@ extension PageReaderView {
     }
 
     private func markCollaborationPresenceConnecting(_ editorViewModel: NativeRichEditorViewModel) {
+        editorViewModel.clearCollaborationPresence()
         if editorViewModel.realtimeStatus != .conflict {
             editorViewModel.realtimeStatus = .connecting
         }
@@ -100,6 +103,7 @@ extension PageReaderView {
         _ editorViewModel: NativeRichEditorViewModel,
         message: String
     ) {
+        editorViewModel.clearCollaborationPresence()
         if editorViewModel.realtimeStatus != .conflict {
             editorViewModel.realtimeStatus = .unsupported(message)
         }
