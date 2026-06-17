@@ -132,6 +132,9 @@ struct PageReaderView: View {
         .task(id: editorViewModel?.currentPageID) {
             await monitorCollaborationPresence()
         }
+        .task(id: editorViewModel?.currentPageID) {
+            await monitorCRDTDocumentSnapshots()
+        }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
         }

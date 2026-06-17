@@ -1,6 +1,17 @@
 import Foundation
 
 extension PageReaderView {
+    func monitorCRDTDocumentSnapshots() async {
+        guard let editorViewModel else { return }
+        let snapshots = await editorViewModel.crdtDocumentSnapshots()
+
+        for await snapshot in snapshots {
+            guard Task.isCancelled == false else { return }
+            editorViewModel.applyCRDTDocumentSnapshot(snapshot)
+            await editorViewModel.refreshResolvedRemoteCursors()
+        }
+    }
+
     func monitorCollaborationPresence() async {
         guard let editorViewModel else { return }
         var reconnectPolicy = NativeEditorRealtimeReconnectPolicy()

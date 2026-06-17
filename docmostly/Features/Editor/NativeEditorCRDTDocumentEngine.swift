@@ -10,6 +10,18 @@ nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
     }
 }
 
+nonisolated struct NativeEditorCRDTDocumentSnapshot: Sendable {
+    let title: String?
+    let document: NativeEditorDocument
+    let updatedAt: Date?
+
+    init(title: String? = nil, document: NativeEditorDocument, updatedAt: Date? = nil) {
+        self.title = title
+        self.document = document
+        self.updatedAt = updatedAt
+    }
+}
+
 nonisolated struct NativeEditorCRDTLocalChange: Sendable {
     let before: NativeEditorHistorySnapshot
     let after: NativeEditorHistorySnapshot
@@ -28,6 +40,7 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     func flushPendingLocalChanges(title: String, document: NativeEditorDocument) async throws
         -> NativeEditorCRDTSaveResult
     func localUpdates() async -> AsyncStream<Data>
+    func documentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot>
 }
 
 extension NativeEditorCRDTDocumentEngine {
@@ -49,6 +62,12 @@ extension NativeEditorCRDTDocumentEngine {
 
     func localUpdates() async -> AsyncStream<Data> {
         let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
+        continuation.finish()
+        return stream
+    }
+
+    func documentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot> {
+        let (stream, continuation) = AsyncStream.makeStream(of: NativeEditorCRDTDocumentSnapshot.self)
         continuation.finish()
         return stream
     }

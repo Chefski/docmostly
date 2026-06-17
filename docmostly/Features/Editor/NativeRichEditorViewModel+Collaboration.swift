@@ -51,6 +51,38 @@ extension NativeRichEditorViewModel {
         return true
     }
 
+    func crdtDocumentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot> {
+        guard let crdtDocumentEngine else {
+            let (stream, continuation) = AsyncStream.makeStream(of: NativeEditorCRDTDocumentSnapshot.self)
+            continuation.finish()
+            return stream
+        }
+
+        return await crdtDocumentEngine.documentSnapshots()
+    }
+
+    func applyCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        let wasDirty = isDirty
+
+        if let title = snapshot.title {
+            self.title = title
+        }
+        document = snapshot.document
+        pendingRemotePage = nil
+        pendingRemoteUpdate = nil
+        resolvedRemoteCursors = []
+        markRemoteBaseline(updatedAt: snapshot.updatedAt ?? lastRemoteUpdatedAt)
+        resetEditingHistory()
+
+        if wasDirty {
+            isDirty = true
+        } else {
+            lastSavedTitle = self.title
+            lastSavedDocument = document
+            isDirty = false
+        }
+    }
+
     func applyAwarenessStates(_ states: [NativeEditorAwarenessState], localClientID: Int) {
         var seenIDs: Set<String> = []
         activeCollaborators = states.compactMap { state in
