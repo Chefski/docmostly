@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension NativeRichEditorViewModel {
     var searchMatches: [NativeEditorSearchMatch] {
@@ -46,10 +47,12 @@ extension NativeRichEditorViewModel {
         guard matches.isEmpty == false else { return }
 
         currentSearchMatchIndex = (currentSearchMatchIndex + offset + matches.count) % matches.count
-        activeBlockID = matches[currentSearchMatchIndex].blockID
+        let match = matches[currentSearchMatchIndex]
+        activeBlockID = match.blockID
         selectedBlockID = nil
         visibleBlockControlsID = nil
         isTitleFocused = false
+        selectText(for: match)
     }
 
     private func replace(match: NativeEditorSearchMatch, with replacement: String) {
@@ -60,6 +63,25 @@ extension NativeRichEditorViewModel {
         let end = text.index(text.startIndex, offsetBy: match.upperBound)
         let updatedText = text.replacingCharacters(in: start..<end, with: replacement)
         document.blocks[match.blockIndex].text = AttributedString(updatedText)
+    }
+
+    private func selectText(for match: NativeEditorSearchMatch) {
+        for index in document.blocks.indices where index != match.blockIndex {
+            document.blocks[index].selection = AttributedTextSelection()
+        }
+
+        guard document.blocks.indices.contains(match.blockIndex) else { return }
+
+        let text = document.blocks[match.blockIndex].text
+        guard
+            let start = text.characters.index(text.startIndex, offsetBy: match.lowerBound, limitedBy: text.endIndex),
+            let end = text.characters.index(text.startIndex, offsetBy: match.upperBound, limitedBy: text.endIndex)
+        else {
+            document.blocks[match.blockIndex].selection = AttributedTextSelection()
+            return
+        }
+
+        document.blocks[match.blockIndex].selection = AttributedTextSelection(range: start..<end)
     }
 }
 

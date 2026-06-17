@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -111,6 +112,20 @@ struct NativeRichEditorMechanicsTests {
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Alpha beta", "beta gamma"])
     }
 
+    @Test func searchNavigationSelectsExactMatchInFocusedBlock() throws {
+        let first = NativeEditorBlock(kind: .paragraph, text: AttributedString("Alpha beta"), alignment: .left)
+        let second = NativeEditorBlock(kind: .paragraph, text: AttributedString("Gamma beta"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [first, second])
+
+        viewModel.searchQuery = "beta"
+        viewModel.selectNextSearchMatch()
+
+        #expect(viewModel.activeBlockID == second.id)
+
+        let selectedText = try selectedPlainText(in: viewModel.document.blocks[1])
+        #expect(selectedText == "beta")
+    }
+
     @Test func documentMarkdownConversionIncludesBlockStructure() {
         let heading = NativeEditorBlock(kind: .heading(level: 1), text: AttributedString("Roadmap"), alignment: .left)
         let item = NativeEditorBlock(
@@ -128,5 +143,15 @@ struct NativeRichEditorMechanicsTests {
         viewModel.document = NativeEditorDocument(blocks: blocks)
         viewModel.resetEditingHistory()
         return viewModel
+    }
+
+    private func selectedPlainText(in block: NativeEditorBlock) throws -> String {
+        switch block.selection.indices(in: block.text) {
+        case .ranges(let ranges):
+            let range = try #require(ranges.ranges.first)
+            return String(block.text[range].characters)
+        case .insertionPoint:
+            return ""
+        }
     }
 }
