@@ -9,6 +9,7 @@ struct NativeEditorBlockRow: View {
     let showControls: () -> Void
     let insertBelow: () -> Void
     let delete: () -> Void
+    let tableActions: NativeEditorTableEditingActions?
     let moveBefore: (UUID) -> Void
     let dropText: (String) -> Bool
 
@@ -45,7 +46,7 @@ struct NativeEditorBlockRow: View {
                     .focused(focusedField, equals: .block(block.id))
                     .accessibilityLabel(block.kind.accessibilityLabel)
             } else {
-                NativeEditorRichBlockPreviewView(block: block)
+                NativeEditorRichBlockPreviewView(block: block, tableActions: tableActions)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 

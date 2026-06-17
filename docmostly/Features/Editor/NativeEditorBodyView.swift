@@ -30,6 +30,7 @@ struct NativeEditorBodyView: View {
                         showControls: { viewModel.showBlockControls(for: block.id) },
                         insertBelow: { viewModel.insertBlock(after: block.id) },
                         delete: { viewModel.deleteBlock(block.id) },
+                        tableActions: tableEditingActions,
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
@@ -63,5 +64,22 @@ struct NativeEditorBodyView: View {
             guard let blockID else { return }
             focusedField.wrappedValue = .block(blockID)
         }
+    }
+
+    private var tableEditingActions: NativeEditorTableEditingActions {
+        NativeEditorTableEditingActions(
+            updateCell: { blockID, rowIndex, columnIndex, text in
+                viewModel.updateTableCell(
+                    blockID: blockID,
+                    rowIndex: rowIndex,
+                    columnIndex: columnIndex,
+                    text: text
+                )
+            },
+            insertRowBelow: viewModel.insertTableRowBelow,
+            deleteRow: viewModel.deleteTableRow,
+            insertColumnAfter: viewModel.insertTableColumnAfter,
+            deleteColumn: viewModel.deleteTableColumn
+        )
     }
 }

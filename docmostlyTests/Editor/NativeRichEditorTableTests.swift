@@ -1,0 +1,66 @@
+import Foundation
+import Testing
+@testable import docmostly
+
+@MainActor
+struct NativeRichEditorTableTests {
+    @Test func updatesTableCellAndReencodesRawTableNode() {
+        let viewModel = tableViewModel()
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.updateTableCell(blockID: blockID, rowIndex: 1, columnIndex: 0, text: "Native iOS")
+
+        guard case .table(let table) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+
+        let node = viewModel.document.proseMirrorDocument.content.first
+        let secondRow = node?.content?[1]
+        let firstCell = secondRow?.content?.first
+        let paragraph = firstCell?.content?.first
+        let text = paragraph?.content?.first
+        #expect(table.rows[1].cells[0].plainText == "Native iOS")
+        #expect(node?.type == "table")
+        #expect(firstCell?.type == "tableCell")
+        #expect(text?.text == "Native iOS")
+        #expect(viewModel.isDirty == true)
+    }
+
+    @Test func insertsAndDeletesTableRowsAndColumns() {
+        let viewModel = tableViewModel()
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.insertTableRowBelow(blockID: blockID, rowIndex: 0)
+        viewModel.insertTableColumnAfter(blockID: blockID, columnIndex: 0)
+
+        guard case .table(let expandedTable) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(expandedTable.rows.count == 3)
+        #expect(expandedTable.columnCount == 3)
+        #expect(expandedTable.rows[0].cells[1].isHeader == true)
+        #expect(expandedTable.rows[1].cells.allSatisfy { $0.isHeader == false })
+
+        viewModel.deleteTableRow(blockID: blockID, rowIndex: 1)
+        viewModel.deleteTableColumn(blockID: blockID, columnIndex: 1)
+
+        guard case .table(let reducedTable) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(reducedTable.rows.count == 2)
+        #expect(reducedTable.columnCount == 2)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
+    }
+
+    private func tableViewModel() -> NativeRichEditorViewModel {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/table"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+        viewModel.applySlashCommand(.table)
+        return viewModel
+    }
+}
