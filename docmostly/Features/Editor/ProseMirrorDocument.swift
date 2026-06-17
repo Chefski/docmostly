@@ -1,6 +1,6 @@
 import Foundation
 
-struct ProseMirrorDocument: Codable, Hashable, Sendable {
+nonisolated struct ProseMirrorDocument: Codable, Hashable, Sendable {
     var type: String
     var content: [ProseMirrorNode]
 

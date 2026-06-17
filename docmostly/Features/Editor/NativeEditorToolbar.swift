@@ -4,7 +4,15 @@ struct NativeEditorToolbar: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     @State private var isShowingLinkPrompt = false
     @State private var isShowingSearchReplace = false
+    @State private var isShowingStatusPrompt = false
+    @State private var isShowingMentionPrompt = false
+    @State private var isShowingCommentPrompt = false
+    @State private var isShowingMathPrompt = false
     @State private var linkURLString = ""
+    @State private var statusText = ""
+    @State private var mentionText = ""
+    @State private var commentID = ""
+    @State private var inlineMathText = ""
 
     let dismissKeyboard: () -> Void
 
@@ -16,156 +24,47 @@ struct NativeEditorToolbar: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: 6) {
-                    Button {
-                        viewModel.undo()
-                    } label: {
-                        Label("Undo", systemImage: "arrow.uturn.backward")
-                    }
-                    .disabled(viewModel.canUndo == false)
-                    .keyboardShortcut("z", modifiers: .command)
-
-                    Button {
-                        viewModel.redo()
-                    } label: {
-                        Label("Redo", systemImage: "arrow.uturn.forward")
-                    }
-                    .disabled(viewModel.canRedo == false)
-                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    NativeEditorHistoryToolbarGroup(viewModel: viewModel)
 
                     Divider()
                         .frame(height: 28)
 
-                    ForEach(NativeEditorCommand.allCases) { command in
-                        Button {
-                            viewModel.applySlashCommand(command)
-                        } label: {
-                            Label(command.title, systemImage: command.systemImage)
-                        }
-                        .accessibilityLabel(command.title)
-                    }
+                    NativeEditorBlockCommandToolbarGroup(viewModel: viewModel)
 
                     Divider()
                         .frame(height: 28)
 
-                    Button {
-                        viewModel.toggleInlineMark(.bold)
-                    } label: {
-                        Label("Bold", systemImage: "bold")
-                    }
-                    .keyboardShortcut("b", modifiers: .command)
-
-                    Button {
-                        viewModel.toggleInlineMark(.italic)
-                    } label: {
-                        Label("Italic", systemImage: "italic")
-                    }
-                    .keyboardShortcut("i", modifiers: .command)
-
-                    Button {
-                        viewModel.toggleInlineMark(.underline)
-                    } label: {
-                        Label("Underline", systemImage: "underline")
-                    }
-                    .keyboardShortcut("u", modifiers: .command)
-
-                    Button {
-                        viewModel.toggleInlineMark(.strikethrough)
-                    } label: {
-                        Label("Strikethrough", systemImage: "strikethrough")
-                    }
-
-                    Button {
-                        viewModel.toggleInlineMark(.code)
-                    } label: {
-                        Label("Inline Code", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                    .keyboardShortcut("e", modifiers: .command)
-
-                    Button {
-                        viewModel.toggleInlineMark(.subscript)
-                    } label: {
-                        Label("Subscript", systemImage: "textformat.subscript")
-                    }
-
-                    Button {
-                        viewModel.toggleInlineMark(.superscript)
-                    } label: {
-                        Label("Superscript", systemImage: "textformat.superscript")
-                    }
+                    NativeEditorFormattingToolbarGroup(
+                        viewModel: viewModel,
+                        isShowingStatusPrompt: $isShowingStatusPrompt,
+                        isShowingMentionPrompt: $isShowingMentionPrompt,
+                        isShowingCommentPrompt: $isShowingCommentPrompt,
+                        isShowingMathPrompt: $isShowingMathPrompt
+                    )
 
                     Divider()
                         .frame(height: 28)
 
-                    Menu {
-                        Button("Left", systemImage: "text.alignleft") {
-                            viewModel.setActiveAlignment(.left)
-                        }
-                        Button("Center", systemImage: "text.aligncenter") {
-                            viewModel.setActiveAlignment(.center)
-                        }
-                        Button("Right", systemImage: "text.alignright") {
-                            viewModel.setActiveAlignment(.right)
-                        }
-                    } label: {
-                        Label("Alignment", systemImage: "text.alignleft")
-                    }
-                    .accessibilityLabel("Alignment")
-
-                    Button {
-                        isShowingLinkPrompt = true
-                    } label: {
-                        Label("Link", systemImage: "link")
-                    }
-                    .keyboardShortcut("k", modifiers: .command)
+                    NativeEditorAlignmentToolbarGroup(
+                        viewModel: viewModel,
+                        isShowingLinkPrompt: $isShowingLinkPrompt
+                    )
 
                     Divider()
                         .frame(height: 28)
 
-                    Button {
-                        isShowingSearchReplace.toggle()
-                    } label: {
-                        Label("Find", systemImage: "magnifyingglass")
-                    }
-                    .keyboardShortcut("f", modifiers: .command)
-
-                    Button {
-                        viewModel.copyActiveBlockMarkdownToClipboard()
-                    } label: {
-                        Label("Copy Markdown", systemImage: "doc.on.clipboard")
-                    }
-                    .keyboardShortcut("c", modifiers: [.command, .shift])
-
-                    PasteButton(payloadType: String.self) { values in
-                        viewModel.pasteMarkdown(values.joined(separator: "\n"))
-                    }
-                    .labelStyle(.iconOnly)
-                    .keyboardShortcut("v", modifiers: [.command, .shift])
+                    NativeEditorClipboardToolbarGroup(
+                        viewModel: viewModel,
+                        isShowingSearchReplace: $isShowingSearchReplace
+                    )
 
                     Divider()
                         .frame(height: 28)
 
-                    Button {
-                        viewModel.outdentActiveBlock()
-                    } label: {
-                        Label("Outdent", systemImage: "decrease.indent")
-                    }
-                    .keyboardShortcut("[", modifiers: .command)
-
-                    Button {
-                        viewModel.indentActiveBlock()
-                    } label: {
-                        Label("Indent", systemImage: "increase.indent")
-                    }
-                    .keyboardShortcut("]", modifiers: .command)
-
-                    Button(action: viewModel.appendBlock) {
-                        Label("Add Block", systemImage: "plus")
-                    }
-                    .keyboardShortcut(.return, modifiers: .command)
-
-                    Button(action: dismissKeyboard) {
-                        Label("Dismiss Keyboard", systemImage: "keyboard.chevron.compact.down")
-                    }
+                    NativeEditorBlockActionsToolbarGroup(
+                        viewModel: viewModel,
+                        dismissKeyboard: dismissKeyboard
+                    )
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -192,6 +91,47 @@ struct NativeEditorToolbar: View {
             }
             Button("Cancel", role: .cancel) {
                 linkURLString = ""
+            }
+        }
+        .alert("Status", isPresented: $isShowingStatusPrompt) {
+            TextField("Text", text: $statusText)
+            Button("Insert") {
+                viewModel.insertStatusBadge(text: statusText, color: "green")
+                statusText = ""
+            }
+            Button("Cancel", role: .cancel) {
+                statusText = ""
+            }
+        }
+        .alert("Mention", isPresented: $isShowingMentionPrompt) {
+            TextField("Label", text: $mentionText)
+            Button("Insert") {
+                viewModel.insertMention(NativeEditorMention(label: mentionText, entityType: "page"))
+                mentionText = ""
+            }
+            Button("Cancel", role: .cancel) {
+                mentionText = ""
+            }
+        }
+        .alert("Inline Comment", isPresented: $isShowingCommentPrompt) {
+            TextField("Comment ID", text: $commentID)
+                .textInputAutocapitalization(.never)
+            Button("Apply") {
+                viewModel.applyInlineComment(commentID: commentID)
+                commentID = ""
+            }
+            Button("Cancel", role: .cancel) {
+                commentID = ""
+            }
+        }
+        .alert("Math", isPresented: $isShowingMathPrompt) {
+            TextField("Expression", text: $inlineMathText)
+            Button("Insert") {
+                viewModel.insertInlineMath(inlineMathText)
+                inlineMathText = ""
+            }
+            Button("Cancel", role: .cancel) {
+                inlineMathText = ""
             }
         }
     }

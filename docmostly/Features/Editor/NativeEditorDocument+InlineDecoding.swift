@@ -36,12 +36,16 @@ extension NativeEditorDocument {
             return AttributedString("\n")
         case .mention(let mention):
             var segment = AttributedString(mention.displayText)
+            segment[NativeEditorMentionAttribute.self] = mention
             segment.foregroundColor = DocmostlyTheme.primary
             return segment
         case .status(let status):
-            return AttributedString(status.text)
+            var segment = AttributedString(status.text)
+            segment[NativeEditorStatusAttribute.self] = status
+            return segment
         case .mathInline(let math):
             var segment = AttributedString(math.text)
+            segment[NativeEditorMathInlineAttribute.self] = math
             segment.inlinePresentationIntent = .code
             return segment
         case .unsupported(let node):
@@ -146,15 +150,24 @@ extension NativeEditorDocument {
             text.underlineStyle = .single
         case .link(let href):
             text.link = URL(string: href)
-        case .highlight(let color, _):
+        case .highlight(let color, let colorName):
+            if let color {
+                text[NativeEditorHighlightColorAttribute.self] = color
+            }
+            if let colorName {
+                text[NativeEditorHighlightColorNameAttribute.self] = colorName
+            }
             applyBackgroundColor(color, to: &text)
         case .textColor(let color):
+            text[NativeEditorTextColorAttribute.self] = color
             applyForegroundColor(color, to: &text)
         case .subscript:
             text.baselineOffset = -4
         case .superscript:
             text.baselineOffset = 4
-        case .comment:
+        case .comment(let commentID, let isResolved):
+            text[NativeEditorCommentIDAttribute.self] = commentID
+            text[NativeEditorCommentResolvedAttribute.self] = isResolved
             text.backgroundColor = .yellow.opacity(0.28)
         case .bold, .italic, .strikethrough, .code, .unknown:
             return

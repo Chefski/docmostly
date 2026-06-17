@@ -1,6 +1,6 @@
 import Foundation
 
-enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
+nonisolated enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
     case string(String)
     case int(Int)
     case double(Double)

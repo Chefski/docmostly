@@ -1,6 +1,6 @@
 import Foundation
 
-struct ProseMirrorMark: Codable, Hashable, Sendable {
+nonisolated struct ProseMirrorMark: Codable, Hashable, Sendable {
     var type: String
     var attrs: [String: ProseMirrorJSONValue]?
 

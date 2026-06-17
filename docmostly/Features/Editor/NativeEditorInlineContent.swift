@@ -1,6 +1,6 @@
 import Foundation
 
-enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codable {
+nonisolated enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codable {
     case text(String, marks: [NativeEditorTextMark])
     case hardBreak
     case mention(NativeEditorMention)
@@ -32,19 +32,23 @@ enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codable {
                 switch mark {
                 case .bold, .italic, .strikethrough, .code, .link:
                     false
-                case .underline, .highlight, .textColor, .subscript, .superscript, .comment, .unknown:
+                case .unknown:
                     true
+                case .underline, .highlight, .textColor, .subscript, .superscript, .comment:
+                    false
                 }
             }
         case .hardBreak:
             false
-        case .mention, .status, .mathInline, .unsupported:
+        case .mention, .status, .mathInline:
+            false
+        case .unsupported:
             true
         }
     }
 }
 
-enum NativeEditorTextMark: Equatable, Hashable, Sendable, Codable {
+nonisolated enum NativeEditorTextMark: Equatable, Hashable, Sendable, Codable {
     case bold
     case italic
     case underline
@@ -59,7 +63,7 @@ enum NativeEditorTextMark: Equatable, Hashable, Sendable, Codable {
     case unknown(ProseMirrorMark)
 }
 
-struct NativeEditorMention: Equatable, Hashable, Sendable, Codable {
+nonisolated struct NativeEditorMention: Equatable, Hashable, Sendable, Codable {
     var identifier: String?
     var label: String?
     var entityType: String?
@@ -67,6 +71,24 @@ struct NativeEditorMention: Equatable, Hashable, Sendable, Codable {
     var slugID: String?
     var creatorID: String?
     var anchorID: String?
+
+    init(
+        identifier: String? = nil,
+        label: String? = nil,
+        entityType: String? = nil,
+        entityID: String? = nil,
+        slugID: String? = nil,
+        creatorID: String? = nil,
+        anchorID: String? = nil
+    ) {
+        self.identifier = identifier
+        self.label = label
+        self.entityType = entityType
+        self.entityID = entityID
+        self.slugID = slugID
+        self.creatorID = creatorID
+        self.anchorID = anchorID
+    }
 
     var displayText: String {
         if entityType == "user" {
@@ -77,11 +99,11 @@ struct NativeEditorMention: Equatable, Hashable, Sendable, Codable {
     }
 }
 
-struct NativeEditorStatusBadge: Equatable, Hashable, Sendable, Codable {
+nonisolated struct NativeEditorStatusBadge: Equatable, Hashable, Sendable, Codable {
     var text: String
     var color: String
 }
 
-struct NativeEditorMathInline: Equatable, Hashable, Sendable, Codable {
+nonisolated struct NativeEditorMathInline: Equatable, Hashable, Sendable, Codable {
     var text: String
 }

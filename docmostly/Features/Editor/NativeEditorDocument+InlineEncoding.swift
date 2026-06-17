@@ -8,6 +8,9 @@ extension NativeEditorDocument {
         appendUnderlineMark(from: run, to: &marks)
         appendBaselineMark(from: run, to: &marks)
         appendLinkMark(from: run, to: &marks)
+        appendHighlightMark(from: run, to: &marks)
+        appendTextColorMark(from: run, to: &marks)
+        appendCommentMark(from: run, to: &marks)
         return marks.isEmpty ? nil : marks
     }
 
@@ -74,6 +77,50 @@ extension NativeEditorDocument {
         if let href = run.link?.absoluteString {
             appendMarkIfMissing(ProseMirrorMark(type: "link", attrs: ["href": .string(href)]), to: &marks)
         }
+    }
+
+    private static func appendHighlightMark(
+        from run: AttributedString.Runs.Run,
+        to marks: inout [ProseMirrorMark]
+    ) {
+        let color = run[NativeEditorHighlightColorAttribute.self]
+        let colorName = run[NativeEditorHighlightColorNameAttribute.self]
+
+        guard color != nil || colorName != nil else { return }
+
+        appendMarkIfMissing(
+            ProseMirrorMark(type: "highlight", attrs: optionalAttrs(markAttrs(color, colorName))),
+            to: &marks
+        )
+    }
+
+    private static func appendTextColorMark(
+        from run: AttributedString.Runs.Run,
+        to marks: inout [ProseMirrorMark]
+    ) {
+        guard let color = run[NativeEditorTextColorAttribute.self] else { return }
+
+        appendMarkIfMissing(
+            ProseMirrorMark(type: "textStyle", attrs: ["color": .string(color)]),
+            to: &marks
+        )
+    }
+
+    private static func appendCommentMark(
+        from run: AttributedString.Runs.Run,
+        to marks: inout [ProseMirrorMark]
+    ) {
+        guard let commentID = run[NativeEditorCommentIDAttribute.self], commentID.isEmpty == false else {
+            return
+        }
+
+        appendMarkIfMissing(
+            ProseMirrorMark(
+                type: "comment",
+                attrs: commentAttrs(commentID, run[NativeEditorCommentResolvedAttribute.self] ?? false)
+            ),
+            to: &marks
+        )
     }
 
     private static func simpleProseMirrorMark(from mark: NativeEditorTextMark) -> ProseMirrorMark? {

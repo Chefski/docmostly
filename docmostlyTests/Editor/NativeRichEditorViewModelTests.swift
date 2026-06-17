@@ -94,4 +94,76 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Third", "First", "Second"])
         #expect(viewModel.isDirty == true)
     }
+
+    @Test func appliesHighlightTextColorAndInlineCommentMarks() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Marked text"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.applyHighlight(color: "#FEF3C7", colorName: "yellow")
+        viewModel.applyTextColor("#111827")
+        viewModel.applyInlineComment(commentID: "comment-1")
+
+        let marks = proseMirrorTextMarks(from: viewModel)
+        #expect(marks.contains(ProseMirrorMark(
+            type: "highlight",
+            attrs: ["color": .string("#FEF3C7"), "colorName": .string("yellow")]
+        )))
+        #expect(marks.contains(ProseMirrorMark(type: "textStyle", attrs: ["color": .string("#111827")])))
+        #expect(marks.contains(ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
+        )))
+        #expect(viewModel.isDirty == true)
+    }
+
+    @Test func insertsStatusAndMentionInlineAtoms() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("State "), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.insertStatusBadge(text: "Ship", color: "green")
+        viewModel.insertMention(NativeEditorMention(
+            identifier: "mention-1",
+            label: "Roadmap",
+            entityType: "page",
+            entityID: "page-2",
+            slugID: "roadmap-abc"
+        ))
+
+        let inlineNodes = proseMirrorInlineNodes(from: viewModel)
+        #expect(inlineNodes.map(\.type) == ["text", "status", "mention"])
+        #expect(inlineNodes[1].attrs?["text"] == .string("Ship"))
+        #expect(inlineNodes[1].attrs?["color"] == .string("green"))
+        #expect(inlineNodes[2].attrs?["label"] == .string("Roadmap"))
+        #expect(inlineNodes[2].attrs?["entityType"] == .string("page"))
+        #expect(inlineNodes[2].attrs?["slugId"] == .string("roadmap-abc"))
+    }
+
+    @Test func decodesRichInlineAtomsAsEditableAttributedText() throws {
+        let proseMirrorDocument = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: NativeEditorInlineFixtures.richInline
+        )
+        let document = NativeEditorDocument(
+            proseMirrorDocument: proseMirrorDocument
+        )
+
+        let block = try #require(document.blocks.first)
+
+        #expect(block.isEditable == true)
+        #expect(block.inlineContent == nil)
+        #expect(String(block.text.characters).contains("Roadmap"))
+        #expect(String(block.text.characters).contains("Ship"))
+    }
+
+    private func proseMirrorTextMarks(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorMark] {
+        proseMirrorInlineNodes(from: viewModel).first?.marks ?? []
+    }
+
+    private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
+        viewModel.document.proseMirrorDocument.content.first?.content ?? []
+    }
 }

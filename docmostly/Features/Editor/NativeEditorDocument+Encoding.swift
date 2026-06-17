@@ -282,6 +282,10 @@ extension NativeEditorDocument {
         from run: AttributedString.Runs.Run,
         in attributedText: AttributedString
     ) -> [ProseMirrorNode] {
+        if let atomNode = inlineAtomNode(from: run) {
+            return [atomNode]
+        }
+
         let runText = String(attributedText.characters[run.range])
         let components = runText.split(separator: "\n", omittingEmptySubsequences: false)
         var nodes: [ProseMirrorNode] = []
@@ -297,6 +301,22 @@ extension NativeEditorDocument {
         }
 
         return nodes
+    }
+
+    private static func inlineAtomNode(from run: AttributedString.Runs.Run) -> ProseMirrorNode? {
+        if let mention = run[NativeEditorMentionAttribute.self] {
+            return ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+        }
+
+        if let status = run[NativeEditorStatusAttribute.self] {
+            return ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
+        }
+
+        if let math = run[NativeEditorMathInlineAttribute.self] {
+            return ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+        }
+
+        return nil
     }
 
     private static func inlineNode(from item: NativeEditorInlineContent) -> ProseMirrorNode {
