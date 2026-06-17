@@ -103,6 +103,27 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(engine.appliedRemoteUpdates == [])
     }
 
+    @Test func syncDriverExposesLocalCRDTUpdateStream() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let streamPair = AsyncStream.makeStream(of: Data.self)
+        engine.localUpdateStream = streamPair.stream
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.page-1",
+            coordinator: NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        )
+        let updates = await driver.localUpdates()
+        var iterator = updates.makeAsyncIterator()
+        let update = Data([31, 32])
+
+        streamPair.continuation.yield(update)
+        streamPair.continuation.finish()
+
+        #expect(await iterator.next() == update)
+        let frame = await driver.outboundFrame(forLocalUpdate: update)
+        let parsedFrame = try NativeEditorHocuspocusFrame.parse(frame)
+        #expect(parsedFrame.message == .sync(.update(update)))
+    }
+
     @Test func viewModelBuildsCollaborationSessionWithoutCRDTDriverWhenEngineIsMissing() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
@@ -280,6 +301,7 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
     var remoteCursorResolutionRequests: [NativeEditorRemoteCursor] = []
     var localAwarenessCursor: NativeEditorAwarenessCursor?
     var localAwarenessCursorRequests: [NativeEditorLocalTextSelection] = []
+    var localUpdateStream: AsyncStream<Data>?
 
     func encodeStateVector() async throws -> Data {
         encodedStateVector
@@ -304,5 +326,14 @@ private final class RecordingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine 
     ) async throws -> NativeEditorAwarenessCursor? {
         localAwarenessCursorRequests.append(selection)
         return localAwarenessCursor
+    }
+
+    func localUpdates() async -> AsyncStream<Data> {
+        if let localUpdateStream {
+            return localUpdateStream
+        }
+        let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
+        continuation.finish()
+        return stream
     }
 }

@@ -23,6 +23,10 @@ actor NativeEditorCollaborationSyncDriver {
         return frame(for: message)
     }
 
+    func localUpdates() async -> AsyncStream<Data> {
+        await coordinator.localUpdates()
+    }
+
     func localAwarenessCursor(
         for selection: NativeEditorLocalTextSelection
     ) async throws -> NativeEditorAwarenessCursor? {

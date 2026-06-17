@@ -20,6 +20,7 @@ actor NativeEditorCollaborationPresenceClient {
     private let urlSession: URLSession
     private var task: URLSessionWebSocketTask?
     private var heartbeatTask: Task<Void, Never>?
+    private var localUpdateTask: Task<Void, Never>?
     private let localClientID: Int
     private var localAwarenessClock = 0
     private var awarenessStore = NativeEditorAwarenessStateStore()
@@ -72,6 +73,8 @@ actor NativeEditorCollaborationPresenceClient {
     func disconnect() {
         heartbeatTask?.cancel()
         heartbeatTask = nil
+        localUpdateTask?.cancel()
+        localUpdateTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         awarenessStore.reset()
@@ -146,6 +149,7 @@ actor NativeEditorCollaborationPresenceClient {
             )
         case .authenticated(let scope):
             try await sendInitialCRDTSync(using: context.syncDriver)
+            startLocalUpdateSender(using: context.syncDriver)
             continuation.yield(.authenticated(scope))
         case .authenticationFailed(let reason):
             throw APIError.connectionFailed(reason)
@@ -178,6 +182,28 @@ actor NativeEditorCollaborationPresenceClient {
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFrames(for: message)
         try await send(frames)
+    }
+
+    private func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
+        localUpdateTask?.cancel()
+        localUpdateTask = nil
+
+        guard let syncDriver else { return }
+
+        localUpdateTask = Task { [weak self, syncDriver] in
+            let updates = await syncDriver.localUpdates()
+
+            for await update in updates {
+                guard Task.isCancelled == false else { return }
+                let frame = await syncDriver.outboundFrame(forLocalUpdate: update)
+
+                do {
+                    try await self?.send(frame)
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     private func startHeartbeat(context: NativeEditorCollaborationSessionContext) {

@@ -7,6 +7,7 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor?
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
         -> NativeEditorAwarenessCursor?
+    func localUpdates() async -> AsyncStream<Data>
 }
 
 extension NativeEditorCRDTDocumentEngine {
@@ -17,5 +18,11 @@ extension NativeEditorCRDTDocumentEngine {
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
         -> NativeEditorAwarenessCursor? {
         nil
+    }
+
+    func localUpdates() async -> AsyncStream<Data> {
+        let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
+        continuation.finish()
+        return stream
     }
 }
