@@ -26,6 +26,7 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
     case ping
     case connected
     case disconnected
+    case unauthorized
     case event(NativeEditorRealtimeEvent)
     case ignored(String)
 
@@ -57,7 +58,16 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
         let payload = String(frame.dropFirst(2))
         let data = Data(payload.utf8)
         let envelope = try DocmostJSONDecoder.make().decode(SocketIOEventEnvelope.self, from: data)
-        return envelope.name == "message" ? .event(envelope.event) : .ignored(envelope.name)
+
+        switch envelope.name {
+        case "message":
+            guard let event = envelope.event else { return .ignored(envelope.name) }
+            return .event(event)
+        case "Unauthorized":
+            return .unauthorized
+        default:
+            return .ignored(envelope.name)
+        }
     }
 }
 
@@ -91,12 +101,12 @@ nonisolated struct NativeEditorRealtimeCommentDeletedEvent: Equatable, Sendable 
 
 nonisolated private struct SocketIOEventEnvelope: Decodable {
     let name: String
-    let event: NativeEditorRealtimeEvent
+    let event: NativeEditorRealtimeEvent?
 
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
         name = try container.decode(String.self)
-        event = try container.decode(NativeEditorRealtimeEvent.self)
+        event = container.isAtEnd ? nil : try container.decode(NativeEditorRealtimeEvent.self)
     }
 }
 

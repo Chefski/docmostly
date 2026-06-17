@@ -1,5 +1,25 @@
 import Foundation
 
+nonisolated enum NativeEditorRealtimeClientEvent: Equatable, Sendable {
+    case connected
+    case disconnected
+    case event(NativeEditorRealtimeEvent)
+}
+
+nonisolated struct NativeEditorRealtimeReconnectPolicy: Equatable, Sendable {
+    private var attempt = 0
+    private let delaysSeconds = [1, 2, 5, 10, 20, 30]
+
+    mutating func nextDelaySeconds() -> Int {
+        defer { attempt += 1 }
+        return delaysSeconds[min(attempt, delaysSeconds.count - 1)]
+    }
+
+    mutating func reset() {
+        attempt = 0
+    }
+}
+
 actor NativeEditorRealtimeEventClient {
     private let urlSession: URLSession
     private var task: URLSessionWebSocketTask?
@@ -11,19 +31,23 @@ actor NativeEditorRealtimeEventClient {
     func events(
         url: URL,
         cookies: [StoredHTTPCookie]
-    ) -> AsyncThrowingStream<NativeEditorRealtimeEvent, any Error> {
-        AsyncThrowingStream { continuation in
-            let receiver = Task {
-                await connect(url: url, cookies: cookies, continuation: continuation)
-            }
+    ) -> AsyncThrowingStream<NativeEditorRealtimeClientEvent, any Error> {
+        let streamPair = AsyncThrowingStream<NativeEditorRealtimeClientEvent, any Error>.makeStream(
+            bufferingPolicy: .bufferingNewest(50)
+        )
 
-            continuation.onTermination = { _ in
-                receiver.cancel()
-                Task {
-                    await self.disconnect()
-                }
+        let receiver = Task {
+            await connect(url: url, cookies: cookies, continuation: streamPair.continuation)
+        }
+
+        streamPair.continuation.onTermination = { _ in
+            receiver.cancel()
+            Task {
+                await self.disconnect()
             }
         }
+
+        return streamPair.stream
     }
 
     func disconnect() {
@@ -34,8 +58,10 @@ actor NativeEditorRealtimeEventClient {
     private func connect(
         url: URL,
         cookies: [StoredHTTPCookie],
-        continuation: AsyncThrowingStream<NativeEditorRealtimeEvent, any Error>.Continuation
+        continuation: AsyncThrowingStream<NativeEditorRealtimeClientEvent, any Error>.Continuation
     ) async {
+        disconnect()
+
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = true
         if cookies.isEmpty == false {
@@ -49,14 +75,18 @@ actor NativeEditorRealtimeEventClient {
         do {
             try await receiveMessages(from: task, continuation: continuation)
             continuation.finish()
+        } catch is CancellationError {
+            continuation.finish()
         } catch {
             continuation.finish(throwing: error)
         }
+
+        disconnect()
     }
 
     private func receiveMessages(
         from task: URLSessionWebSocketTask,
-        continuation: AsyncThrowingStream<NativeEditorRealtimeEvent, any Error>.Continuation
+        continuation: AsyncThrowingStream<NativeEditorRealtimeClientEvent, any Error>.Continuation
     ) async throws {
         while Task.isCancelled == false {
             let message = try await task.receive()
@@ -67,16 +97,26 @@ actor NativeEditorRealtimeEventClient {
                 try await send(NativeEditorRealtimeSocketFrame.connectMessage)
             case .ping:
                 try await send(NativeEditorRealtimeSocketFrame.pongMessage)
+            case .connected:
+                continuation.yield(.connected)
+            case .disconnected:
+                continuation.yield(.disconnected)
+                return
+            case .unauthorized:
+                throw APIError.connectionFailed("Realtime socket unauthorized.")
             case .event(let event):
-                continuation.yield(event)
-            case .connected, .disconnected, .ignored:
+                continuation.yield(.event(event))
+            case .ignored:
                 break
             }
         }
     }
 
     private func send(_ text: String) async throws {
-        try await task?.send(.string(text))
+        guard let task else {
+            throw URLError(.notConnectedToInternet)
+        }
+        try await task.send(.string(text))
     }
 
     private static func string(from message: URLSessionWebSocketTask.Message) -> String {

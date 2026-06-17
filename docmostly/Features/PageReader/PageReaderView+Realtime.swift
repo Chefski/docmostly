@@ -3,19 +3,49 @@ import Foundation
 extension PageReaderView {
     func monitorRealtimeEvents() async {
         guard let editorViewModel else { return }
+        var reconnectPolicy = NativeEditorRealtimeReconnectPolicy()
 
-        do {
-            let url = try appState.realtimeEventWebSocketURL()
-            let cookies = await appState.storedSessionCookies()
-            let events = await realtimeEventClient.events(url: url, cookies: cookies)
+        while Task.isCancelled == false {
+            do {
+                let url = try appState.realtimeEventWebSocketURL()
+                let cookies = await appState.storedSessionCookies()
+                let events = await realtimeEventClient.events(url: url, cookies: cookies)
 
-            for try await event in events {
+                for try await event in events {
+                    guard Task.isCancelled == false else { return }
+                    await handleRealtimeClientEvent(
+                        event,
+                        editorViewModel: editorViewModel,
+                        reconnectPolicy: &reconnectPolicy
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
                 guard Task.isCancelled == false else { return }
-                await handleRealtimeEvent(event, editorViewModel: editorViewModel)
+                editorViewModel.realtimeStatus = .failed(error.localizedDescription)
             }
-        } catch {
-            guard Task.isCancelled == false else { return }
-            editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
+
+            await waitBeforeRealtimeReconnect(
+                editorViewModel: editorViewModel,
+                reconnectPolicy: &reconnectPolicy
+            )
+        }
+    }
+
+    func handleRealtimeClientEvent(
+        _ event: NativeEditorRealtimeClientEvent,
+        editorViewModel: NativeRichEditorViewModel,
+        reconnectPolicy: inout NativeEditorRealtimeReconnectPolicy
+    ) async {
+        switch event {
+        case .connected:
+            reconnectPolicy.reset()
+            markRealtimeConnected(editorViewModel)
+        case .disconnected:
+            markRealtimeConnecting(editorViewModel)
+        case .event(let event):
+            await handleRealtimeEvent(event, editorViewModel: editorViewModel)
         }
     }
 
@@ -44,6 +74,27 @@ extension PageReaderView {
             viewModel.removeComment(id: event.commentID)
         case .pageUpdated, .commentCreated, .commentUpdated, .commentResolved, .commentDeleted, .unknown:
             break
+        }
+    }
+
+    func waitBeforeRealtimeReconnect(
+        editorViewModel: NativeRichEditorViewModel,
+        reconnectPolicy: inout NativeEditorRealtimeReconnectPolicy
+    ) async {
+        markRealtimeConnecting(editorViewModel)
+        let delaySeconds = reconnectPolicy.nextDelaySeconds()
+        try? await Task.sleep(for: .seconds(delaySeconds))
+    }
+
+    private func markRealtimeConnected(_ editorViewModel: NativeRichEditorViewModel) {
+        if editorViewModel.realtimeStatus != .conflict {
+            editorViewModel.realtimeStatus = .connected
+        }
+    }
+
+    private func markRealtimeConnecting(_ editorViewModel: NativeRichEditorViewModel) {
+        if editorViewModel.realtimeStatus != .conflict {
+            editorViewModel.realtimeStatus = .connecting
         }
     }
 
