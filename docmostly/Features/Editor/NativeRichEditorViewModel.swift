@@ -17,16 +17,26 @@ final class NativeRichEditorViewModel {
     var selectedBlockID: UUID?
     var visibleBlockControlsID: UUID?
     var isTitleFocused = false
+    var canUndo = false
+    var canRedo = false
+    var searchQuery = ""
+    var replacementText = ""
+    var currentSearchMatchIndex = 0
 
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored private var lastSavedTitle: String
     @ObservationIgnored private var lastSavedDocument = NativeEditorDocument()
+    @ObservationIgnored var undoStack: [NativeEditorHistorySnapshot] = []
+    @ObservationIgnored var redoStack: [NativeEditorHistorySnapshot] = []
+    @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
+    @ObservationIgnored var isApplyingHistory = false
 
     init(pageID: String, initialTitle: String = "") {
         self.pageID = pageID
         title = initialTitle
         editablePageID = pageID
         lastSavedTitle = initialTitle
+        lastKnownSnapshot = makeHistorySnapshot()
     }
 
     var isEditing: Bool {
@@ -70,6 +80,7 @@ final class NativeRichEditorViewModel {
             document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
             lastSavedTitle = title
             lastSavedDocument = document
+            resetEditingHistory()
             isDirty = false
         } catch {
             errorMessage = error.localizedDescription
@@ -93,6 +104,7 @@ final class NativeRichEditorViewModel {
             title = page.title
             lastSavedTitle = title
             lastSavedDocument = document
+            lastKnownSnapshot = makeHistorySnapshot()
             isDirty = false
             return true
         } catch {
@@ -157,127 +169,135 @@ final class NativeRichEditorViewModel {
 
 extension NativeRichEditorViewModel {
     func setActiveBlockKind(_ kind: NativeEditorBlockKind) {
-        guard let index = activeBlockIndex else { return }
-        document.blocks[index].kind = kind
-        recalculateDirty()
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
+            document.blocks[index].kind = kind
+        }
     }
 
     func applySlashCommand(_ command: NativeEditorCommand) {
-        guard let index = activeBlockIndex else { return }
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
 
-        document.blocks[index].kind = command.blockKind
-        if activeSlashCommandQuery != nil {
-            document.blocks[index].text = AttributedString("")
-            document.blocks[index].selection = AttributedTextSelection()
+            document.blocks[index].kind = command.blockKind
+            if activeSlashCommandQuery != nil {
+                document.blocks[index].text = AttributedString("")
+                document.blocks[index].selection = AttributedTextSelection()
+            }
         }
-
-        recalculateDirty()
     }
 
     func setActiveAlignment(_ alignment: NativeEditorTextAlignment) {
-        guard let index = activeBlockIndex else { return }
-        document.blocks[index].alignment = alignment
-        recalculateDirty()
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
+            document.blocks[index].alignment = alignment
+        }
     }
 
     func toggleInlineMark(_ mark: NativeEditorInlineMark) {
-        guard let index = activeBlockIndex else { return }
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
 
-        if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
-            var selection = document.blocks[index].selection
-            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
-                mark.toggle(in: &attributes)
+            if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
+                var selection = document.blocks[index].selection
+                document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                    mark.toggle(in: &attributes)
+                }
+                document.blocks[index].selection = selection
+            } else {
+                mark.toggle(in: &document.blocks[index].text)
             }
-            document.blocks[index].selection = selection
-        } else {
-            mark.toggle(in: &document.blocks[index].text)
         }
-
-        recalculateDirty()
     }
 
     func applyLink(_ urlString: String) {
-        guard
-            let index = activeBlockIndex,
-            let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines))
-        else {
-            return
-        }
-
-        if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
-            var selection = document.blocks[index].selection
-            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
-                attributes.link = url
+        performUndoableEdit {
+            guard
+                let index = activeBlockIndex,
+                let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines))
+            else {
+                return
             }
-            document.blocks[index].selection = selection
-        } else {
-            document.blocks[index].text.link = url
-        }
 
-        recalculateDirty()
+            if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
+                var selection = document.blocks[index].selection
+                document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                    attributes.link = url
+                }
+                document.blocks[index].selection = selection
+            } else {
+                document.blocks[index].text.link = url
+            }
+        }
     }
 
     func removeLink() {
-        guard let index = activeBlockIndex else { return }
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
 
-        if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
-            var selection = document.blocks[index].selection
-            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
-                attributes.link = nil
+            if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
+                var selection = document.blocks[index].selection
+                document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                    attributes.link = nil
+                }
+                document.blocks[index].selection = selection
+            } else {
+                document.blocks[index].text.link = nil
             }
-            document.blocks[index].selection = selection
-        } else {
-            document.blocks[index].text.link = nil
         }
-
-        recalculateDirty()
     }
 
     func appendBlock() {
-        document.blocks.append(NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left))
-        activeBlockID = document.blocks.last?.id
-        recalculateDirty()
+        performUndoableEdit {
+            document.blocks.append(NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left))
+            activeBlockID = document.blocks.last?.id
+        }
     }
 
     func insertBlock(after blockID: UUID) {
-        guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else {
-            appendBlock()
-            return
-        }
+        performUndoableEdit {
+            guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else {
+                document.blocks.append(
+                    NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+                )
+                activeBlockID = document.blocks.last?.id
+                return
+            }
 
-        let nextIndex = document.blocks.index(after: index)
-        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
-        document.blocks.insert(block, at: nextIndex)
-        activeBlockID = block.id
-        recalculateDirty()
+            let nextIndex = document.blocks.index(after: index)
+            let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+            document.blocks.insert(block, at: nextIndex)
+            activeBlockID = block.id
+        }
     }
 
     func deleteBlock(_ blockID: UUID) {
-        guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else { return }
+        performUndoableEdit {
+            guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else { return }
 
-        if document.blocks.count == 1 {
-            document.blocks[0].text = AttributedString("")
-            document.blocks[0].kind = .paragraph
-            document.blocks[0].alignment = .left
-        } else {
-            document.blocks.remove(at: index)
+            if document.blocks.count == 1 {
+                document.blocks[0].text = AttributedString("")
+                document.blocks[0].kind = .paragraph
+                document.blocks[0].alignment = .left
+                document.blocks[0].indentLevel = 0
+            } else {
+                document.blocks.remove(at: index)
+            }
+
+            if activeBlockID == blockID {
+                activeBlockID = document.blocks.indices.contains(index) ?
+                    document.blocks[index].id :
+                    document.blocks.last?.id
+            }
+
+            if selectedBlockID == blockID {
+                selectedBlockID = nil
+                visibleBlockControlsID = nil
+                activeBlockID = document.blocks.indices.contains(index) ?
+                    document.blocks[index].id :
+                    document.blocks.last?.id
+            }
         }
-
-        if activeBlockID == blockID {
-            activeBlockID = document.blocks.indices.contains(index) ?
-                document.blocks[index].id :
-                document.blocks.last?.id
-        }
-
-        if selectedBlockID == blockID {
-            selectedBlockID = nil
-            visibleBlockControlsID = nil
-            activeBlockID = document.blocks.indices.contains(index) ?
-                document.blocks[index].id :
-                document.blocks.last?.id
-        }
-
-        recalculateDirty()
     }
 
     func deleteSelectedBlock() {
@@ -286,25 +306,26 @@ extension NativeRichEditorViewModel {
     }
 
     func moveBlock(_ blockID: UUID, before targetBlockID: UUID) {
-        guard
-            blockID != targetBlockID,
-            let sourceIndex = document.blocks.firstIndex(where: { $0.id == blockID }),
-            document.blocks.contains(where: { $0.id == targetBlockID })
-        else {
-            return
-        }
+        performUndoableEdit {
+            guard
+                blockID != targetBlockID,
+                let sourceIndex = document.blocks.firstIndex(where: { $0.id == blockID }),
+                document.blocks.contains(where: { $0.id == targetBlockID })
+            else {
+                return
+            }
 
-        let block = document.blocks.remove(at: sourceIndex)
-        guard let targetIndex = document.blocks.firstIndex(where: { $0.id == targetBlockID }) else {
-            document.blocks.insert(block, at: sourceIndex)
-            return
-        }
+            let block = document.blocks.remove(at: sourceIndex)
+            guard let targetIndex = document.blocks.firstIndex(where: { $0.id == targetBlockID }) else {
+                document.blocks.insert(block, at: sourceIndex)
+                return
+            }
 
-        document.blocks.insert(block, at: targetIndex)
-        recalculateDirty()
+            document.blocks.insert(block, at: targetIndex)
+        }
     }
 
-    private var activeBlockIndex: Array<NativeEditorBlock>.Index? {
+    var activeBlockIndex: Array<NativeEditorBlock>.Index? {
         guard let activeBlockID else { return nil }
         return document.blocks.firstIndex { $0.id == activeBlockID && $0.isEditable }
     }

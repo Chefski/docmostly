@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension NativeEditorDocument {
     static func marks(from run: AttributedString.Runs.Run) -> [ProseMirrorMark]? {

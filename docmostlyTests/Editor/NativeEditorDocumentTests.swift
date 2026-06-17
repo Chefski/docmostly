@@ -141,6 +141,23 @@ struct NativeEditorDocumentTests {
         try expectMathAndMermaidBlocks(blocks)
     }
 
+    @Test func decodesNestedListIndentationAndReencodesNestedLists() throws {
+        let original = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: NativeEditorNestedListFixtures.nestedBulletList
+        )
+        let document = NativeEditorDocument(proseMirrorDocument: original)
+
+        #expect(document.blocks.count == 2)
+        #expect(document.blocks[0].kind == .bulletListItem)
+        #expect(document.blocks[0].indentLevel == 0)
+        #expect(String(document.blocks[0].text.characters) == "Parent")
+        #expect(document.blocks[1].kind == .bulletListItem)
+        #expect(document.blocks[1].indentLevel == 1)
+        #expect(String(document.blocks[1].text.characters) == "Child")
+        #expect(document.proseMirrorDocument == original)
+    }
+
     @Test func roundTripsRichDocmostBlocksWithoutDroppingAttributes() throws {
         let original = try JSONDecoder().decode(
             ProseMirrorDocument.self,

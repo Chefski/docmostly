@@ -30,6 +30,9 @@ struct NativeEditorBodyView: View {
                         delete: { viewModel.deleteBlock(block.id) },
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
+                        },
+                        dropText: { text in
+                            viewModel.dropMarkdown(text, before: block.id)
                         }
                     )
 
@@ -49,10 +52,14 @@ struct NativeEditorBodyView: View {
                 .foregroundStyle(.secondary)
         }
         .onChange(of: viewModel.document) {
-            viewModel.recalculateDirty()
+            viewModel.handleDocumentChanged()
         }
         .onChange(of: viewModel.title) {
-            viewModel.recalculateDirty()
+            viewModel.handleTitleChanged()
+        }
+        .onChange(of: viewModel.activeBlockID) { _, blockID in
+            guard let blockID else { return }
+            focusedField.wrappedValue = .block(blockID)
         }
     }
 }

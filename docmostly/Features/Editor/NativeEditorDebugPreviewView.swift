@@ -28,10 +28,10 @@ struct NativeEditorDebugPreviewView: View {
             updateFocus(newValue)
         }
         .onChange(of: viewModel.document) {
-            viewModel.recalculateDirty()
+            viewModel.handleDocumentChanged()
         }
         .onChange(of: viewModel.title) {
-            viewModel.recalculateDirty()
+            viewModel.handleTitleChanged()
         }
     }
 
@@ -75,7 +75,7 @@ struct NativeEditorDebugPreviewView: View {
             viewModel.focus(blockID: commandBlockID)
             focusedField = .block(commandBlockID)
         }
-        viewModel.recalculateDirty()
+        viewModel.resetEditingHistory()
     }
 
     private func updateFocus(_ focus: NativeEditorFocus?) {

@@ -90,72 +90,73 @@ extension NativeEditorDocument {
         startingAt index: Array<NativeEditorBlock>.Index,
         block: NativeEditorBlock
     ) -> (node: ProseMirrorNode, endIndex: Array<NativeEditorBlock>.Index)? {
-        switch block.kind {
-        case .bulletListItem:
-            return bulletListGroup(from: blocks, startingAt: index)
-        case .orderedListItem(let ordinal):
-            return orderedListGroup(from: blocks, startingAt: index, ordinal: ordinal)
-        case .taskListItem:
-            return taskListGroup(from: blocks, startingAt: index)
-        default:
-            return nil
-        }
+        guard listKind(for: block.kind) != nil else { return nil }
+        return encodedList(from: blocks, startingAt: index)
     }
 
-    private static func bulletListGroup(
+    private static func encodedList(
         from blocks: [NativeEditorBlock],
         startingAt index: Array<NativeEditorBlock>.Index
     ) -> (node: ProseMirrorNode, endIndex: Array<NativeEditorBlock>.Index) {
-        let grouped = groupedListItems(from: blocks, startingAt: index) { kind in
-            if case .bulletListItem = kind { return true }
-            return false
-        }
-        return (ProseMirrorNode(type: "bulletList", content: grouped.items.map(listItemNode)), grouped.endIndex)
-    }
-
-    private static func orderedListGroup(
-        from blocks: [NativeEditorBlock],
-        startingAt index: Array<NativeEditorBlock>.Index,
-        ordinal: Int
-    ) -> (node: ProseMirrorNode, endIndex: Array<NativeEditorBlock>.Index) {
-        let grouped = groupedListItems(from: blocks, startingAt: index) { kind in
-            if case .orderedListItem = kind { return true }
-            return false
-        }
-        let node = ProseMirrorNode(
-            type: "orderedList",
-            attrs: ordinal == 1 ? nil : ["start": .int(ordinal)],
-            content: grouped.items.map(listItemNode)
-        )
-
-        return (node, grouped.endIndex)
-    }
-
-    private static func taskListGroup(
-        from blocks: [NativeEditorBlock],
-        startingAt index: Array<NativeEditorBlock>.Index
-    ) -> (node: ProseMirrorNode, endIndex: Array<NativeEditorBlock>.Index) {
-        let grouped = groupedListItems(from: blocks, startingAt: index) { kind in
-            if case .taskListItem = kind { return true }
-            return false
-        }
-        return (ProseMirrorNode(type: "taskList", content: grouped.items.map(taskItemNode)), grouped.endIndex)
-    }
-
-    private static func groupedListItems(
-        from blocks: [NativeEditorBlock],
-        startingAt index: Array<NativeEditorBlock>.Index,
-        matches: (NativeEditorBlockKind) -> Bool
-    ) -> (items: [NativeEditorBlock], endIndex: Array<NativeEditorBlock>.Index) {
-        var items: [NativeEditorBlock] = []
+        let baseBlock = blocks[index]
+        let baseIndentLevel = baseBlock.indentLevel
+        let baseKind = listKind(for: baseBlock.kind) ?? .bullet
+        var itemNodes: [ProseMirrorNode] = []
         var currentIndex = index
 
-        while currentIndex < blocks.endIndex, matches(blocks[currentIndex].kind) {
-            items.append(blocks[currentIndex])
+        while currentIndex < blocks.endIndex {
+            let block = blocks[currentIndex]
+            guard let currentKind = listKind(for: block.kind), block.indentLevel >= baseIndentLevel else {
+                break
+            }
+
+            if block.indentLevel > baseIndentLevel {
+                let nested = encodedList(from: blocks, startingAt: currentIndex)
+                append(nested.node, toLastItemIn: &itemNodes)
+                currentIndex = nested.endIndex
+                continue
+            }
+
+            guard currentKind == baseKind else { break }
+            itemNodes.append(listItemNode(for: block))
             currentIndex = blocks.index(after: currentIndex)
         }
 
-        return (items, currentIndex)
+        let node = ProseMirrorNode(
+            type: baseKind.nodeType,
+            attrs: baseKind.attrs(from: baseBlock),
+            content: itemNodes
+        )
+        return (node, currentIndex)
+    }
+
+    private static func append(_ nestedList: ProseMirrorNode, toLastItemIn itemNodes: inout [ProseMirrorNode]) {
+        guard var lastItem = itemNodes.popLast() else { return }
+        var content = lastItem.content ?? []
+        content.append(nestedList)
+        lastItem.content = content
+        itemNodes.append(lastItem)
+    }
+
+    private static func listItemNode(for block: NativeEditorBlock) -> ProseMirrorNode {
+        if case .taskListItem = block.kind {
+            return taskItemNode(from: block)
+        }
+
+        return listItemNode(from: block)
+    }
+
+    private static func listKind(for kind: NativeEditorBlockKind) -> NativeEditorListKind? {
+        switch kind {
+        case .bulletListItem:
+            .bullet
+        case .orderedListItem:
+            .ordered
+        case .taskListItem:
+            .task
+        default:
+            nil
+        }
     }
 
     private static func editableNode(from block: NativeEditorBlock) -> ProseMirrorNode? {

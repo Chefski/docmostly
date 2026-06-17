@@ -65,26 +65,70 @@ extension NativeEditorDocument {
             return [singleBlock]
         }
 
-        if node.type == "bulletList" {
-            return (node.content ?? []).map { listItem in
-                textBlock(kind: .bulletListItem, node: firstTextContainer(in: listItem) ?? listItem)
-            }
-        }
-
-        if node.type == "orderedList" {
-            return orderedListBlocks(from: node)
-        }
-
-        if node.type == "taskList" {
-            return (node.content ?? []).map { taskItem in
-                textBlock(
-                    kind: .taskListItem(isChecked: taskItem.attrs?["checked"]?.boolValue ?? false),
-                    node: firstTextContainer(in: taskItem) ?? taskItem
-                )
-            }
+        if node.isListContainer {
+            return listBlocks(from: node, indentLevel: 0)
         }
 
         return nil
+    }
+
+    private static func listBlocks(from node: ProseMirrorNode, indentLevel: Int) -> [NativeEditorBlock] {
+        switch node.type {
+        case "bulletList":
+            return bulletListBlocks(from: node, indentLevel: indentLevel)
+        case "orderedList":
+            return orderedListBlocks(from: node, indentLevel: indentLevel)
+        case "taskList":
+            return taskListBlocks(from: node, indentLevel: indentLevel)
+        default:
+            return []
+        }
+    }
+
+    private static func bulletListBlocks(from node: ProseMirrorNode, indentLevel: Int) -> [NativeEditorBlock] {
+        (node.content ?? []).flatMap { listItem in
+            listItemBlocks(kind: .bulletListItem, item: listItem, indentLevel: indentLevel)
+        }
+    }
+
+    private static func orderedListBlocks(from node: ProseMirrorNode, indentLevel: Int) -> [NativeEditorBlock] {
+        let start = node.attrs?["start"]?.intValue ?? 1
+        return (node.content ?? []).enumerated().flatMap { offset, listItem in
+            listItemBlocks(
+                kind: .orderedListItem(ordinal: start + offset),
+                item: listItem,
+                indentLevel: indentLevel
+            )
+        }
+    }
+
+    private static func taskListBlocks(from node: ProseMirrorNode, indentLevel: Int) -> [NativeEditorBlock] {
+        (node.content ?? []).flatMap { taskItem in
+            listItemBlocks(
+                kind: .taskListItem(isChecked: taskItem.attrs?["checked"]?.boolValue ?? false),
+                item: taskItem,
+                indentLevel: indentLevel
+            )
+        }
+    }
+
+    private static func listItemBlocks(
+        kind: NativeEditorBlockKind,
+        item: ProseMirrorNode,
+        indentLevel: Int
+    ) -> [NativeEditorBlock] {
+        var block = textBlock(kind: kind, node: firstTextContainer(in: item) ?? item)
+        block.indentLevel = indentLevel
+
+        let nestedBlocks: [NativeEditorBlock] = (item.content ?? []).flatMap { child in
+            if child.isListContainer {
+                listBlocks(from: child, indentLevel: indentLevel + 1)
+            } else {
+                [NativeEditorBlock]()
+            }
+        }
+
+        return [block] + nestedBlocks
     }
 
     private static func singleEditableBlock(from node: ProseMirrorNode) -> NativeEditorBlock? {
@@ -103,16 +147,6 @@ extension NativeEditorDocument {
             )
         default:
             nil
-        }
-    }
-
-    private static func orderedListBlocks(from node: ProseMirrorNode) -> [NativeEditorBlock] {
-        let start = node.attrs?["start"]?.intValue ?? 1
-        return (node.content ?? []).enumerated().map { offset, listItem in
-            textBlock(
-                kind: .orderedListItem(ordinal: start + offset),
-                node: firstTextContainer(in: listItem) ?? listItem
-            )
         }
     }
 
@@ -201,186 +235,5 @@ extension NativeEditorDocument {
             alignment: .left,
             rawNode: node
         )
-    }
-}
-
-private extension NativeEditorDocument {
-    static func inlineContent(from node: ProseMirrorNode) -> [NativeEditorInlineContent] {
-        switch node.type {
-        case "text":
-            [.text(node.text ?? "", marks: textMarks(from: node.marks ?? []))]
-        case "hardBreak":
-            [.hardBreak]
-        case "mention":
-            [.mention(mention(from: node))]
-        case "status":
-            [.status(statusBadge(from: node))]
-        case "mathInline":
-            [.mathInline(NativeEditorMathInline(text: node.attrs?["text"]?.stringValue ?? ""))]
-        default:
-            nestedInlineContent(from: node)
-        }
-    }
-
-    static func nestedInlineContent(from node: ProseMirrorNode) -> [NativeEditorInlineContent] {
-        guard let children = node.content, children.isEmpty == false else {
-            return [.unsupported(node)]
-        }
-
-        return inlineContent(from: children)
-    }
-
-    static func attributedText(from item: NativeEditorInlineContent) -> AttributedString {
-        switch item {
-        case .text(let value, let marks):
-            var segment = AttributedString(value)
-            apply(marks, to: &segment)
-            return segment
-        case .hardBreak:
-            return AttributedString("\n")
-        case .mention(let mention):
-            var segment = AttributedString(mention.displayText)
-            segment.foregroundColor = DocmostlyTheme.primary
-            return segment
-        case .status(let status):
-            return AttributedString(status.text)
-        case .mathInline(let math):
-            var segment = AttributedString(math.text)
-            segment.inlinePresentationIntent = .code
-            return segment
-        case .unsupported(let node):
-            return AttributedString(node.text ?? "")
-        }
-    }
-
-    static func textMarks(from marks: [ProseMirrorMark]) -> [NativeEditorTextMark] {
-        marks.map(textMark(from:))
-    }
-
-    static func textMark(from mark: ProseMirrorMark) -> NativeEditorTextMark {
-        if let simpleMark = simpleTextMark(from: mark) {
-            return simpleMark
-        }
-
-        return richTextMark(from: mark)
-    }
-
-    static func simpleTextMark(from mark: ProseMirrorMark) -> NativeEditorTextMark? {
-        switch mark.type {
-        case "bold":
-            .bold
-        case "italic":
-            .italic
-        case "underline":
-            .underline
-        case "strike":
-            .strikethrough
-        case "code":
-            .code
-        case "subscript":
-            .subscript
-        case "superscript":
-            .superscript
-        default:
-            nil
-        }
-    }
-
-    static func richTextMark(from mark: ProseMirrorMark) -> NativeEditorTextMark {
-        switch mark.type {
-        case "link":
-            .link(href: mark.attrs?["href"]?.stringValue ?? "")
-        case "highlight":
-            .highlight(
-                color: mark.attrs?["color"]?.stringValue,
-                colorName: mark.attrs?["colorName"]?.stringValue
-            )
-        case "textStyle":
-            colorTextMark(from: mark)
-        case "comment":
-            .comment(
-                commentID: mark.attrs?["commentId"]?.stringValue ?? "",
-                isResolved: mark.attrs?["resolved"]?.boolValue ?? false
-            )
-        default:
-            .unknown(mark)
-        }
-    }
-
-    static func colorTextMark(from mark: ProseMirrorMark) -> NativeEditorTextMark {
-        if let color = mark.attrs?["color"]?.stringValue {
-            .textColor(color)
-        } else {
-            .unknown(mark)
-        }
-    }
-
-    static func apply(_ marks: [NativeEditorTextMark], to text: inout AttributedString) {
-        for mark in marks {
-            if applyPresentationMark(mark, to: &text) {
-                continue
-            }
-
-            applyVisualMark(mark, to: &text)
-        }
-    }
-
-    static func applyPresentationMark(_ mark: NativeEditorTextMark, to text: inout AttributedString) -> Bool {
-        switch mark {
-        case .bold:
-            insertPresentationIntent(.stronglyEmphasized, into: &text)
-        case .italic:
-            insertPresentationIntent(.emphasized, into: &text)
-        case .strikethrough:
-            insertPresentationIntent(.strikethrough, into: &text)
-        case .code:
-            insertPresentationIntent(.code, into: &text)
-        default:
-            return false
-        }
-
-        return true
-    }
-
-    static func applyVisualMark(_ mark: NativeEditorTextMark, to text: inout AttributedString) {
-        switch mark {
-        case .underline:
-            text.underlineStyle = .single
-        case .link(let href):
-            text.link = URL(string: href)
-        case .highlight(let color, _):
-            applyBackgroundColor(color, to: &text)
-        case .textColor(let color):
-            applyForegroundColor(color, to: &text)
-        case .subscript:
-            text.baselineOffset = -4
-        case .superscript:
-            text.baselineOffset = 4
-        case .comment:
-            text.backgroundColor = .yellow.opacity(0.28)
-        case .bold, .italic, .strikethrough, .code, .unknown:
-            return
-        }
-    }
-
-    static func insertPresentationIntent(
-        _ presentationIntent: InlinePresentationIntent,
-        into text: inout AttributedString
-    ) {
-        var intent = text.inlinePresentationIntent ?? []
-        intent.insert(presentationIntent)
-        text.inlinePresentationIntent = intent
-    }
-
-    static func applyBackgroundColor(_ color: String?, to text: inout AttributedString) {
-        if let color, let swiftUIColor = Color(docmostlyHex: color) {
-            text.backgroundColor = swiftUIColor
-        }
-    }
-
-    static func applyForegroundColor(_ color: String, to text: inout AttributedString) {
-        if let swiftUIColor = Color(docmostlyHex: color) {
-            text.foregroundColor = swiftUIColor
-        }
     }
 }

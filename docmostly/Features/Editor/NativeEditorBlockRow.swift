@@ -10,6 +10,7 @@ struct NativeEditorBlockRow: View {
     let insertBelow: () -> Void
     let delete: () -> Void
     let moveBefore: (UUID) -> Void
+    let dropText: (String) -> Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -61,6 +62,7 @@ struct NativeEditorBlockRow: View {
             }
         }
         .padding(.vertical, 2)
+        .padding(.leading, blockIndentPadding)
         .background {
             (isSelected ? DocmostlyTheme.primaryTint : Color.clear)
                 .clipShape(.rect(cornerRadius: 8))
@@ -68,15 +70,15 @@ struct NativeEditorBlockRow: View {
                 .onLongPressGesture(perform: showControls)
         }
         .dropDestination(for: String.self) { blockIDs, _ in
-            guard
-                let rawBlockID = blockIDs.first,
-                let movedBlockID = UUID(uuidString: rawBlockID)
-            else {
-                return false
+            guard let rawBlockID = blockIDs.first else { return false }
+            let movedBlockID = UUID(uuidString: rawBlockID)
+
+            if let movedBlockID {
+                moveBefore(movedBlockID)
+                return true
             }
 
-            moveBefore(movedBlockID)
-            return true
+            return dropText(rawBlockID)
         }
     }
 
@@ -102,5 +104,9 @@ struct NativeEditorBlockRow: View {
         default:
             false
         }
+    }
+
+    private var blockIndentPadding: CGFloat {
+        CGFloat(block.indentLevel) * 22
     }
 }

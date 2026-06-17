@@ -324,3 +324,43 @@ enum NativeEditorInlineFixtures {
         """.utf8)
     }
 }
+
+enum NativeEditorNestedListFixtures {
+    static var nestedBulletList: Data {
+        Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [{ "type": "text", "text": "Parent" }]
+                    },
+                    {
+                      "type": "bulletList",
+                      "content": [
+                        {
+                          "type": "listItem",
+                          "content": [
+                            {
+                              "type": "paragraph",
+                              "content": [{ "type": "text", "text": "Child" }]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+    }
+}
