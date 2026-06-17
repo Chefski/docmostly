@@ -7,9 +7,9 @@
 
 import XCTest
 
-final class docmostlyUITestsLaunchTests: XCTestCase {
+final class DocmostlyUITestsLaunchTests: XCTestCase {
 
-    override class var runsForEachTargetApplicationUIConfiguration: Bool {
+    override static var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }
 

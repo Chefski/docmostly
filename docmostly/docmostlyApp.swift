@@ -1,31 +1,30 @@
-//
-//  docmostlyApp.swift
-//  docmostly
-//
-//  Created by Patryk on 17/06/2026.
-//
-
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
-struct docmostlyApp: App {
-    var sharedModelContainer: ModelContainer = {
+struct DocmostlyApp: App {
+    @State private var appState = AppState()
+
+    private let sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            CachedSpace.self,
+            CachedPageTreeItem.self,
+            CachedPage.self,
+            CachedAttachment.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("Could not create Docmostly model container: \(error)")
         }
     }()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(appState)
         }
         .modelContainer(sharedModelContainer)
     }

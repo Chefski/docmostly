@@ -1,0 +1,43 @@
+import Foundation
+import SwiftData
+
+@Model
+final class CachedSpace {
+    var id: String = ""
+    var name: String = ""
+    var spaceDescription: String?
+    var logo: String?
+    var slug: String = ""
+    var hostname: String?
+    var memberCount: Int?
+    var updatedAt: Date?
+    var cachedAt: Date = Date.now
+
+    init(space: DocmostSpace, cachedAt: Date = Date.now) {
+        id = space.id
+        name = space.name
+        spaceDescription = space.description
+        logo = space.logo
+        slug = space.slug
+        hostname = space.hostname
+        memberCount = space.memberCount
+        updatedAt = space.updatedAt
+        self.cachedAt = cachedAt
+    }
+
+    func asSpace() -> DocmostSpace {
+        DocmostSpace(
+            id: id,
+            name: name,
+            description: spaceDescription,
+            logo: logo,
+            slug: slug,
+            hostname: hostname,
+            creatorId: nil,
+            createdAt: nil,
+            updatedAt: updatedAt,
+            memberCount: memberCount,
+            membership: nil
+        )
+    }
+}
