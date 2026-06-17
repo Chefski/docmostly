@@ -8,25 +8,34 @@ extension NativeRichEditorViewModel {
         realtimeStatus = .connected
     }
 
-    func handleRemotePageSnapshot(_ page: DocmostEditablePage) {
+    func handleRemotePageSnapshot(
+        _ page: DocmostEditablePage,
+        lastUpdatedBy fallbackLastUpdatedBy: DocmostPagePerson? = nil
+    ) {
         guard isRemotePageNewer(page) else {
             realtimeStatus = .connected
             return
         }
 
+        let lastUpdatedBy = page.lastUpdatedBy ?? fallbackLastUpdatedBy
+
         if isDirty {
             pendingRemotePage = page
-            pendingRemoteUpdate = NativeEditorRemoteUpdate(updatedAt: page.updatedAt, title: page.title)
+            pendingRemoteUpdate = NativeEditorRemoteUpdate(
+                updatedAt: page.updatedAt,
+                title: page.title,
+                lastUpdatedBy: lastUpdatedBy
+            )
             realtimeStatus = .conflict
             return
         }
 
-        applyRemotePageSnapshot(page)
+        applyRemotePageSnapshot(page, lastUpdatedBy: lastUpdatedBy)
     }
 
     func acceptPendingRemoteUpdate() {
         guard let pendingRemotePage else { return }
-        applyRemotePageSnapshot(pendingRemotePage)
+        applyRemotePageSnapshot(pendingRemotePage, lastUpdatedBy: pendingRemoteUpdate?.lastUpdatedBy)
     }
 
     func rejectPendingRemoteUpdate() {
@@ -41,13 +50,19 @@ extension NativeRichEditorViewModel {
         return remoteUpdatedAt > lastRemoteUpdatedAt
     }
 
-    private func applyRemotePageSnapshot(_ page: DocmostEditablePage) {
+    private func applyRemotePageSnapshot(_ page: DocmostEditablePage, lastUpdatedBy: DocmostPagePerson?) {
         title = page.title
         document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
         lastSavedTitle = title
         lastSavedDocument = document
+        activeCollaborators = collaborators(from: lastUpdatedBy)
         markRemoteBaseline(updatedAt: page.updatedAt)
         resetEditingHistory()
         isDirty = false
+    }
+
+    private func collaborators(from person: DocmostPagePerson?) -> [NativeEditorCollaborator] {
+        guard let person else { return [] }
+        return [NativeEditorCollaborator(person: person)]
     }
 }

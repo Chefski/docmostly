@@ -11,10 +11,19 @@ struct NativeEditorCollaborationStatusView: View {
                     .foregroundStyle(statusStyle)
 
                 if let pendingRemoteUpdate = viewModel.pendingRemoteUpdate {
-                    Text(pendingRemoteUpdate.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(pendingRemoteUpdate.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+
+                        if let lastUpdatedBy = pendingRemoteUpdate.lastUpdatedBy {
+                            Text("Edited by \(lastUpdatedBy.name)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
 
                     Spacer(minLength: 0)
 

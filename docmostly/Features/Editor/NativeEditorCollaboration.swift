@@ -12,12 +12,31 @@ enum NativeEditorRealtimeStatus: Equatable, Sendable {
 struct NativeEditorRemoteUpdate: Equatable, Sendable {
     var updatedAt: Date?
     var title: String
+    var lastUpdatedBy: DocmostPagePerson?
 }
 
 struct NativeEditorCollaborator: Equatable, Identifiable, Sendable {
     var id: String
     var name: String
     var colorName: String
+
+    init(id: String, name: String, colorName: String) {
+        self.id = id
+        self.name = name
+        self.colorName = colorName
+    }
+
+    init(person: DocmostPagePerson) {
+        id = person.id
+        name = person.name
+        colorName = Self.colorName(for: person.id)
+    }
+
+    private static func colorName(for identifier: String) -> String {
+        let palette = ["gray", "blue", "green", "orange", "purple"]
+        let index = abs(identifier.hashValue) % palette.count
+        return palette[index]
+    }
 }
 
 enum NativeEditorCollaborationEndpoint {

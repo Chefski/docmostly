@@ -37,7 +37,12 @@ struct NativeEditorCollaborationTests {
             "id": "page-1",
             "payload": {
               "title": "Remote",
-              "updatedAt": "2026-06-17T10:05:00.000Z"
+              "updatedAt": "2026-06-17T10:05:00.000Z",
+              "lastUpdatedBy": {
+                "id": "user-2",
+                "name": "Remote Editor",
+                "avatarUrl": null
+              }
             }
           }
         ]
@@ -57,6 +62,7 @@ struct NativeEditorCollaborationTests {
             strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)
         )
         #expect(event.updatedAt == expectedDate)
+        #expect(event.lastUpdatedBy?.name == "Remote Editor")
     }
 
     @Test func parsesSocketIOCommentCreatedMessageEvent() throws {
@@ -133,6 +139,7 @@ struct NativeEditorCollaborationTests {
         #expect(String(viewModel.document.blocks[0].text.characters) == "Remote body")
         #expect(viewModel.pendingRemoteUpdate == nil)
         #expect(viewModel.realtimeStatus == .connected)
+        #expect(viewModel.activeCollaborators.map(\.name) == ["Remote Editor"])
     }
 
     @Test func defersRemoteSnapshotWhenLocalEditorIsDirty() {
@@ -150,6 +157,7 @@ struct NativeEditorCollaborationTests {
         #expect(viewModel.title == "Local")
         #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
         #expect(viewModel.pendingRemoteUpdate?.updatedAt == remotePage.updatedAt)
+        #expect(viewModel.pendingRemoteUpdate?.lastUpdatedBy?.name == "Remote Editor")
         #expect(viewModel.realtimeStatus == .conflict)
     }
 
@@ -194,7 +202,8 @@ struct NativeEditorCollaborationTests {
             icon: nil,
             spaceId: "space-1",
             updatedAt: updatedAt,
-            permissions: nil
+            permissions: nil,
+            lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Remote Editor", avatarUrl: nil)
         )
     }
 }

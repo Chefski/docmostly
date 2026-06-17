@@ -9,4 +9,5 @@ nonisolated struct DocmostEditablePage: Decodable, Identifiable, Sendable {
     let spaceId: String
     let updatedAt: Date?
     let permissions: DocmostPagePermissions?
+    let lastUpdatedBy: DocmostPagePerson?
 }

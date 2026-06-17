@@ -76,6 +76,7 @@ nonisolated struct NativeEditorRealtimePageUpdatedEvent: Equatable, Sendable {
     let title: String?
     let slugID: String?
     let updatedAt: Date?
+    let lastUpdatedBy: DocmostPagePerson?
 }
 
 nonisolated struct NativeEditorRealtimeCommentEvent: Equatable, Sendable {
@@ -146,7 +147,8 @@ nonisolated private struct PageUpdateEventEnvelope: Decodable {
             spaceID: spaceId,
             title: payload.title,
             slugID: payload.slugId,
-            updatedAt: payload.updatedAt
+            updatedAt: payload.updatedAt,
+            lastUpdatedBy: payload.lastUpdatedBy
         )
     }
 
@@ -154,6 +156,7 @@ nonisolated private struct PageUpdateEventEnvelope: Decodable {
         let title: String?
         let slugId: String?
         let updatedAt: Date?
+        let lastUpdatedBy: DocmostPagePerson?
     }
 }
 

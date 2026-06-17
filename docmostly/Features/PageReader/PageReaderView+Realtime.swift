@@ -25,7 +25,10 @@ extension PageReaderView {
     ) async {
         switch event {
         case .pageUpdated(let event) where event.pageID == editorViewModel.currentPageID:
-            await refreshRemotePageSnapshot(editorViewModel: editorViewModel)
+            await refreshRemotePageSnapshot(
+                editorViewModel: editorViewModel,
+                lastUpdatedBy: event.lastUpdatedBy
+            )
         case .commentCreated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyCreatedComment(event.comment)
         case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:
@@ -44,10 +47,13 @@ extension PageReaderView {
         }
     }
 
-    func refreshRemotePageSnapshot(editorViewModel: NativeRichEditorViewModel) async {
+    func refreshRemotePageSnapshot(
+        editorViewModel: NativeRichEditorViewModel,
+        lastUpdatedBy: DocmostPagePerson? = nil
+    ) async {
         do {
             let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
-            editorViewModel.handleRemotePageSnapshot(page)
+            editorViewModel.handleRemotePageSnapshot(page, lastUpdatedBy: lastUpdatedBy)
         } catch {
             editorViewModel.realtimeStatus = .failed(error.localizedDescription)
         }
