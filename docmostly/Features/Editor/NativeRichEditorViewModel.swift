@@ -25,6 +25,7 @@ final class NativeRichEditorViewModel {
     var realtimeStatus: NativeEditorRealtimeStatus = .disconnected
     var pendingRemoteUpdate: NativeEditorRemoteUpdate?
     var activeCollaborators: [NativeEditorCollaborator] = []
+    var remoteCursors: [NativeEditorRemoteCursor] = []
 
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored var lastSavedTitle: String

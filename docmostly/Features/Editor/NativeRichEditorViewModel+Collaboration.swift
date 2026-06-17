@@ -54,6 +54,14 @@ extension NativeRichEditorViewModel {
             return collaborator
         }
 
+        var seenCursorIDs: Set<String> = []
+        remoteCursors = states.compactMap { state in
+            guard state.clientID != localClientID else { return nil }
+            guard let remoteCursor = NativeEditorRemoteCursor(awarenessState: state) else { return nil }
+            guard seenCursorIDs.insert(remoteCursor.id).inserted else { return nil }
+            return remoteCursor
+        }
+
         if realtimeStatus != .conflict {
             realtimeStatus = .connected
         }
@@ -71,6 +79,7 @@ extension NativeRichEditorViewModel {
         lastSavedTitle = title
         lastSavedDocument = document
         activeCollaborators = collaborators(from: lastUpdatedBy)
+        remoteCursors = []
         markRemoteBaseline(updatedAt: page.updatedAt)
         resetEditingHistory()
         isDirty = false
