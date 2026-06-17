@@ -200,16 +200,16 @@ extension NativeEditorDocument {
         switch block.kind {
         case .table:
             ProseMirrorNode(type: "table")
-        case .image:
-            ProseMirrorNode(type: "image")
-        case .video:
-            ProseMirrorNode(type: "video")
-        case .audio:
-            ProseMirrorNode(type: "audio")
-        case .pdf:
-            ProseMirrorNode(type: "pdf")
-        case .attachment:
-            ProseMirrorNode(type: "attachment")
+        case .image(let media):
+            NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: "image")
+        case .video(let media):
+            NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: "video")
+        case .audio(let media):
+            NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: "audio")
+        case .pdf(let pdf):
+            NativeEditorRichBlockNodeFactory.pdfNode(from: pdf)
+        case .attachment(let attachment):
+            NativeEditorRichBlockNodeFactory.attachmentNode(from: attachment)
         default:
             nil
         }

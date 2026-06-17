@@ -33,23 +33,51 @@ struct NativeEditorRichBlockPreviewView: View {
                 }
             }
         case .image(let media):
-            previewShell(systemImage: "photo", title: "Image", subtitle: media.alternativeText ?? media.source)
+            previewShell(systemImage: "photo", title: "Image", subtitle: media.alternativeText ?? media.source) {
+                if let richBlockActions {
+                    NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
+                }
+            }
         case .video(let media):
-            previewShell(systemImage: "play.rectangle", title: "Video", subtitle: media.alternativeText ?? media.source)
+            previewShell(
+                systemImage: "play.rectangle",
+                title: "Video",
+                subtitle: media.alternativeText ?? media.source
+            ) {
+                if let richBlockActions {
+                    NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
+                }
+            }
         case .audio(let media):
-            previewShell(systemImage: "waveform", title: "Audio", subtitle: media.source)
+            previewShell(systemImage: "waveform", title: "Audio", subtitle: media.source) {
+                if let richBlockActions {
+                    NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
+                }
+            }
         case .pdf(let pdf):
             previewShell(
                 systemImage: "doc.richtext",
                 title: pdf.name ?? "PDF",
                 subtitle: fileDetail(size: pdf.sizeInBytes, fallback: pdf.source)
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorPDFBlockEditor(blockID: block.id, pdf: pdf, actions: richBlockActions)
+                }
+            }
         case .attachment(let attachment):
             previewShell(
                 systemImage: "paperclip",
                 title: attachment.name ?? "File attachment",
                 subtitle: fileDetail(size: attachment.sizeInBytes, fallback: attachment.mimeType ?? attachment.url)
-            )
+            ) {
+                if let richBlockActions {
+                    NativeEditorAttachmentBlockEditor(
+                        blockID: block.id,
+                        attachment: attachment,
+                        actions: richBlockActions
+                    )
+                }
+            }
         case .callout(let callout):
             previewShell(
                 systemImage: calloutSystemImage(for: callout.style),

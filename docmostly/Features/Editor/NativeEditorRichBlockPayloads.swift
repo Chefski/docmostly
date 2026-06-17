@@ -29,6 +29,14 @@ struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {
     var alignment: String?
 }
 
+struct NativeEditorMediaBlockUpdate: Equatable, Hashable, Sendable {
+    var source: String
+    var alternativeText: String
+    var width: String
+    var height: String
+    var alignment: String
+}
+
 struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
     var source: String?
     var name: String?
