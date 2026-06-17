@@ -92,6 +92,48 @@ struct NativeRichEditorMechanicsTests {
         ])
     }
 
+    @Test func pasteMarkdownTableCreatesNativeTableBlock() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("""
+        | Feature | Status |
+        | --- | --- |
+        | Tables | Native |
+        | Paste | Done |
+        """)
+
+        #expect(viewModel.document.blocks.count == 2)
+
+        guard case .table(let table) = viewModel.document.blocks[1].kind else {
+            Issue.record("Expected pasted Markdown table to become a native table block.")
+            return
+        }
+
+        #expect(table.rows.map { $0.cells.map(\.plainText) } == [
+            ["Feature", "Status"],
+            ["Tables", "Native"],
+            ["Paste", "Done"]
+        ])
+        let headerFlags = table.rows[0].cells.map(\.isHeader)
+        let bodyHeaderFlags = table.rows.dropFirst().flatMap { $0.cells.map(\.isHeader) }
+        #expect(headerFlags == Array(repeating: true, count: headerFlags.count))
+        #expect(bodyHeaderFlags == Array(repeating: false, count: bodyHeaderFlags.count))
+
+        let tableNode = viewModel.document.proseMirrorDocument.content.last
+        #expect(tableNode?.type == "table")
+        #expect(tableNode?.content?.first?.content?.first?.type == "tableHeader")
+        #expect(tableNode?.content?.dropFirst().first?.content?.first?.type == "tableCell")
+        #expect(viewModel.markdownForDocument() == """
+        Intro
+        | Feature | Status |
+        | --- | --- |
+        | Tables | Native |
+        | Paste | Done |
+        """)
+    }
+
     @Test func indentAndOutdentActiveListBlock() {
         let block = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Nested"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [block])

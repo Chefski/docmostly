@@ -18,6 +18,12 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if let table = tableBlock(in: lines, startingAt: index) {
+                blocks.append(table.block)
+                index = table.endIndex
+                continue
+            }
+
             if let block = block(from: lines[index]) {
                 blocks.append(block)
             }
@@ -193,6 +199,8 @@ enum NativeEditorMarkdownParser {
             return codeMarkdown(language: language, text: text)
         case .divider:
             return "---"
+        case .table(let table):
+            return tableMarkdown(from: table)
         default:
             return text
         }

@@ -198,8 +198,8 @@ extension NativeEditorDocument {
 
     private static func mediaFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode? {
         switch block.kind {
-        case .table:
-            ProseMirrorNode(type: "table")
+        case .table(let table):
+            NativeEditorTableNodeFactory.node(from: table)
         case .image(let media):
             NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: "image")
         case .video(let media):
