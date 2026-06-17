@@ -161,6 +161,32 @@ final class AppState {
         }
     }
 
+    func loadEditablePage(idOrSlugId: String) async throws -> DocmostEditablePage {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Editing requires a network connection.")
+        }
+
+        let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
+        isOffline = false
+        return page
+    }
+
+    func updatePage(pageId: String, title: String, document: ProseMirrorDocument) async throws -> DocmostEditablePage {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Editing requires a network connection.")
+        }
+
+        let page: DocmostEditablePage = try await apiClient.send(.updatePage(
+            pageId: pageId,
+            title: title,
+            content: document,
+            format: .json,
+            operation: .replace
+        ))
+        isOffline = false
+        return page
+    }
+
     func search(query: String, spaceId: String?) async throws -> [DocmostSearchResult] {
         guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return []
@@ -208,18 +234,6 @@ final class AppState {
         spaces = []
         selectedSpaceID = nil
         selectedPageID = nil
-    }
-
-    func webURL(for page: DocmostPage) -> URL? {
-        guard let baseURL = apiClient?.baseURL else { return nil }
-        let spaceSlug = page.space?.slug ?? spaces.first { $0.id == page.spaceId }?.slug
-        guard let spaceSlug else { return nil }
-        let pageSlug = PageSlugBuilder.slug(slugId: page.slugId, title: page.title)
-        return baseURL
-            .appending(path: "s")
-            .appending(path: spaceSlug)
-            .appending(path: "p")
-            .appending(path: pageSlug)
     }
 
     func storedSessionCookies() async -> [StoredHTTPCookie] {

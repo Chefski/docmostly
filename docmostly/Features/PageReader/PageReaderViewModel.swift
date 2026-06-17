@@ -4,36 +4,25 @@ import Observation
 @MainActor
 @Observable
 final class PageReaderViewModel {
-    var page: DocmostPage?
-    var html = ""
     var comments: [DocmostComment] = []
     var attachmentLinks: [DocmostAttachmentLink] = []
     var isLoading = false
-    var isFromCache = false
     var errorMessage: String?
     var commentErrorMessage: String?
     var draftComment = ""
     var isPostingComment = false
 
-    func load(pageID: String, appState: AppState) async {
+    func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        do {
-            let result = try await appState.loadPage(idOrSlugId: pageID)
-            page = result.page
-            html = result.html
-            isFromCache = result.isFromCache
-            attachmentLinks = appState.attachmentLinks(pageId: result.page.id)
-            comments = (try? await appState.loadComments(pageId: result.page.id)) ?? []
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        attachmentLinks = appState.attachmentLinks(pageId: pageID)
+        comments = (try? await appState.loadComments(pageId: pageID)) ?? []
     }
 
-    func postComment(appState: AppState) async {
-        guard let page, draftComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+    func postComment(pageID: String, appState: AppState) async {
+        guard draftComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return
         }
 
@@ -42,7 +31,7 @@ final class PageReaderViewModel {
         defer { isPostingComment = false }
 
         do {
-            let comment = try await appState.addPageComment(pageId: page.id, text: draftComment)
+            let comment = try await appState.addPageComment(pageId: pageID, text: draftComment)
             comments.insert(comment, at: 0)
             draftComment = ""
         } catch {

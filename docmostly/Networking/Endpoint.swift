@@ -6,6 +6,12 @@ nonisolated enum ContentFormat: String, Sendable {
     case html
 }
 
+nonisolated enum ContentOperation: String, Sendable {
+    case append
+    case prepend
+    case replace
+}
+
 nonisolated enum Endpoint: Sendable {
     case workspacePublic
     case login(email: String, password: String)
@@ -17,6 +23,13 @@ nonisolated enum Endpoint: Sendable {
     case pageInfo(pageId: String, format: ContentFormat = .html)
     case recentPages(spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
     case search(query: String, spaceId: String? = nil, limit: Int = 20)
+    case updatePage(
+        pageId: String,
+        title: String? = nil,
+        content: ProseMirrorDocument? = nil,
+        format: ContentFormat = .json,
+        operation: ContentOperation = .replace
+    )
     case comments(pageId: String, cursor: String? = nil, limit: Int = 100)
     case createPageComment(pageId: String, content: String)
     case attachmentInfo(attachmentId: String)
@@ -59,6 +72,8 @@ nonisolated enum Endpoint: Sendable {
             "pages/recent"
         case .search:
             "search"
+        case .updatePage:
+            "pages/update"
         case .comments:
             "comments"
         case .createPageComment:
@@ -72,27 +87,41 @@ nonisolated enum Endpoint: Sendable {
     private func bodyData() throws -> Data? {
         switch self {
         case .workspacePublic, .logout, .currentUser:
-            nil
+            return nil
         case .login(let email, let password):
-            try encode(LoginRequest(email: email, password: password))
+            return try encode(LoginRequest(email: email, password: password))
         case .spaces(let query, let cursor, let limit):
-            try encode(PaginationRequest(query: query, cursor: cursor, limit: limit))
+            return try encode(PaginationRequest(query: query, cursor: cursor, limit: limit))
         case .spaceInfo(let spaceId):
-            try encode(SpaceInfoRequest(spaceId: spaceId))
+            return try encode(SpaceInfoRequest(spaceId: spaceId))
         case .sidebarPages(let spaceId, let pageId, let cursor, let limit):
-            try encode(SidebarPagesRequest(spaceId: spaceId, pageId: pageId, cursor: cursor, limit: limit))
+            return try encode(SidebarPagesRequest(spaceId: spaceId, pageId: pageId, cursor: cursor, limit: limit))
         case .pageInfo(let pageId, let format):
-            try encode(PageInfoRequest(pageId: pageId, format: format.rawValue))
+            return try encode(PageInfoRequest(pageId: pageId, format: format.rawValue))
         case .recentPages(let spaceId, let cursor, let limit):
-            try encode(RecentPagesRequest(spaceId: spaceId, cursor: cursor, limit: limit))
+            return try encode(RecentPagesRequest(spaceId: spaceId, cursor: cursor, limit: limit))
         case .search(let query, let spaceId, let limit):
-            try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
+            return try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
+        case .updatePage(let pageId, let title, let content, let format, let operation):
+            let hasContent: Bool
+            if case .some = content {
+                hasContent = true
+            } else {
+                hasContent = false
+            }
+            return try encode(UpdatePageRequest(
+                pageId: pageId,
+                title: title,
+                content: content,
+                operation: hasContent ? operation.rawValue : nil,
+                format: hasContent ? format.rawValue : nil
+            ))
         case .comments(let pageId, let cursor, let limit):
-            try encode(CommentsRequest(pageId: pageId, cursor: cursor, limit: limit))
+            return try encode(CommentsRequest(pageId: pageId, cursor: cursor, limit: limit))
         case .createPageComment(let pageId, let content):
-            try encode(CreateCommentRequest(pageId: pageId, content: content, type: "page"))
+            return try encode(CreateCommentRequest(pageId: pageId, content: content, type: "page"))
         case .attachmentInfo(let attachmentId):
-            try encode(AttachmentInfoRequest(attachmentId: attachmentId))
+            return try encode(AttachmentInfoRequest(attachmentId: attachmentId))
         }
     }
     // swiftlint:enable cyclomatic_complexity
@@ -140,6 +169,14 @@ nonisolated private struct SearchRequest: Encodable {
     let query: String
     let spaceId: String?
     let limit: Int
+}
+
+nonisolated private struct UpdatePageRequest: Encodable {
+    let pageId: String
+    let title: String?
+    let content: ProseMirrorDocument?
+    let operation: String?
+    let format: String?
 }
 
 nonisolated private struct CommentsRequest: Encodable {

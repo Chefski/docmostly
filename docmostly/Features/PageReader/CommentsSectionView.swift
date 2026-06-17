@@ -3,6 +3,7 @@ import SwiftUI
 struct CommentsSectionView: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: PageReaderViewModel
+    let pageID: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,7 +38,7 @@ struct CommentsSectionView: View {
 
     private func postComment() {
         Task {
-            await viewModel.postComment(appState: appState)
+            await viewModel.postComment(pageID: pageID, appState: appState)
         }
     }
 

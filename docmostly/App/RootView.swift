@@ -7,6 +7,27 @@ struct RootView: View {
 
     var body: some View {
         Group {
+            #if DEBUG
+            if CommandLine.arguments.contains("-NativeEditorPreview") {
+                NativeEditorDebugPreviewView()
+            } else {
+                appContent
+            }
+            #else
+            appContent
+            #endif
+        }
+        .task {
+            #if DEBUG
+            guard CommandLine.arguments.contains("-NativeEditorPreview") == false else { return }
+            #endif
+            appState.configure(modelContext: modelContext)
+            await appState.restore()
+        }
+    }
+
+    private var appContent: some View {
+        Group {
             switch appState.phase {
             case .restoring:
                 LoadingStateView(title: "Restoring session")
@@ -17,10 +38,6 @@ struct RootView: View {
             case .authenticated:
                 MainShellView()
             }
-        }
-        .task {
-            appState.configure(modelContext: modelContext)
-            await appState.restore()
         }
     }
 }
