@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import docmostly
 
@@ -52,6 +53,60 @@ struct NativeEditorAwarenessStateStoreTests {
             NativeEditorAwarenessState(clientID: 42, clock: 4, payload: nil)
         ]).isEmpty)
         #expect(store.apply([latestAlice]).isEmpty)
+    }
+
+    @Test func keepsFreshAwarenessStatesWhenPruning() {
+        var store = NativeEditorAwarenessStateStore()
+        let receivedAt = Date(timeIntervalSince1970: 1_000)
+        let alice = awarenessState(
+            clientID: 42,
+            clock: 1,
+            userID: "user-2",
+            name: "Alice",
+            color: "#2563EB"
+        )
+
+        #expect(store.apply([alice], receivedAt: receivedAt).map(\.clientID) == [42])
+
+        let beforeTimeout = receivedAt.addingTimeInterval(
+            NativeEditorAwarenessTiming.staleStateInterval - 1
+        )
+        #expect(store.pruneStaleStates(now: beforeTimeout) == nil)
+    }
+
+    @Test func prunesStaleAwarenessStatesWithoutClearingClientClock() {
+        var store = NativeEditorAwarenessStateStore()
+        let receivedAt = Date(timeIntervalSince1970: 1_000)
+        let latestAlice = awarenessState(
+            clientID: 42,
+            clock: 3,
+            userID: "user-2",
+            name: "Alice",
+            color: "#2563EB"
+        )
+        let staleAlice = awarenessState(
+            clientID: 42,
+            clock: 2,
+            userID: "user-2",
+            name: "Old Alice",
+            color: "#EA580C"
+        )
+        let refreshedAlice = awarenessState(
+            clientID: 42,
+            clock: 4,
+            userID: "user-2",
+            name: "Alice",
+            color: "#2563EB"
+        )
+
+        #expect(store.apply([latestAlice], receivedAt: receivedAt).map(\.clientID) == [42])
+
+        let afterTimeout = receivedAt.addingTimeInterval(
+            NativeEditorAwarenessTiming.staleStateInterval
+        )
+        #expect(store.pruneStaleStates(now: afterTimeout)?.isEmpty == true)
+        #expect(store.apply([staleAlice], receivedAt: afterTimeout).isEmpty)
+        #expect(store.apply([refreshedAlice], receivedAt: afterTimeout).first?.clock == 4)
     }
 
     private func awarenessState(

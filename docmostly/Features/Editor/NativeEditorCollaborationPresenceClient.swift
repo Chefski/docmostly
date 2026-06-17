@@ -1,28 +1,12 @@
 import Foundation
 
-nonisolated enum NativeEditorCollaborationEvent: Equatable, Sendable {
-    case authenticated(NativeEditorCollaborationScope)
-    case awareness(states: [NativeEditorAwarenessState], localClientID: Int)
-    case stateless(NativeEditorCollaborationStatelessEvent)
-    case syncStatus(Bool)
-}
-
-private struct NativeEditorCollaborationSessionContext: Sendable {
-    let url: URL
-    let token: String
-    let documentName: String
-    let user: DocmostUser?
-    let syncDriver: NativeEditorCollaborationSyncDriver?
-    let localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)?
-    let localAwarenessUpdates: AsyncStream<Void>?
-}
-
 actor NativeEditorCollaborationPresenceClient {
     private let urlSession: URLSession
     private var task: URLSessionWebSocketTask?
     private var heartbeatTask: Task<Void, Never>?
     private var localUpdateTask: Task<Void, Never>?
     private var localAwarenessUpdateTask: Task<Void, Never>?
+    private var awarenessPruneTask: Task<Void, Never>?
     private var authenticatedScope: NativeEditorCollaborationScope?
     private let localClientID: Int
     private var localAwarenessClock = 0
@@ -84,6 +68,8 @@ actor NativeEditorCollaborationPresenceClient {
         localUpdateTask = nil
         localAwarenessUpdateTask?.cancel()
         localAwarenessUpdateTask = nil
+        awarenessPruneTask?.cancel()
+        awarenessPruneTask = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         authenticatedScope = nil
@@ -102,6 +88,7 @@ actor NativeEditorCollaborationPresenceClient {
         self.task = task
         activeDocumentName = context.documentName
         task.resume()
+        startAwarenessPruner(continuation: continuation)
 
         do {
             try Task.checkCancellation()
@@ -263,6 +250,11 @@ private extension NativeEditorCollaborationPresenceClient {
         heartbeatTask = nil
     }
 
+    func stopAwarenessPruner() {
+        awarenessPruneTask?.cancel()
+        awarenessPruneTask = nil
+    }
+
     func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
         stopLocalUpdateSender()
 
@@ -306,11 +298,31 @@ private extension NativeEditorCollaborationPresenceClient {
         stopHeartbeat()
         heartbeatTask = Task { [weak self, context] in
             while Task.isCancelled == false {
-                try? await Task.sleep(for: .seconds(15))
+                try? await Task.sleep(for: NativeEditorAwarenessTiming.localStateRefreshDelay)
                 guard Task.isCancelled == false else { return }
                 try? await self?.sendLocalAwareness(context: context)
             }
         }
+    }
+
+    func startAwarenessPruner(
+        continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
+    ) {
+        stopAwarenessPruner()
+        awarenessPruneTask = Task { [weak self] in
+            while Task.isCancelled == false {
+                try? await Task.sleep(for: NativeEditorAwarenessTiming.staleStateCheckDelay)
+                guard Task.isCancelled == false else { return }
+                await self?.pruneStaleAwarenessStates(continuation: continuation)
+            }
+        }
+    }
+
+    func pruneStaleAwarenessStates(
+        continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
+    ) {
+        guard let states = awarenessStore.pruneStaleStates() else { return }
+        continuation.yield(.awareness(states: states, localClientID: localClientID))
     }
 
     func sendLocalAwareness(context: NativeEditorCollaborationSessionContext) async throws {
@@ -372,20 +384,6 @@ private extension NativeEditorCollaborationPresenceClient {
             Data(string.utf8)
         @unknown default:
             Data()
-        }
-    }
-}
-
-nonisolated enum NativeEditorPresenceColor {
-    static func color(for identifier: String) -> String {
-        let palette = ["#6B7280", "#2563EB", "#059669", "#EA580C", "#7C3AED"]
-        let index = stableHash(for: identifier) % palette.count
-        return palette[index]
-    }
-
-    private static func stableHash(for value: String) -> Int {
-        value.unicodeScalars.reduce(0) { result, scalar in
-            ((result &* 31) &+ Int(scalar.value)) & Int.max
         }
     }
 }

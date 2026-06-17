@@ -276,34 +276,6 @@ nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
     }
 }
 
-nonisolated struct NativeEditorAwarenessStateStore: Sendable {
-    private var statesByClientID: [Int: NativeEditorAwarenessState] = [:]
-    private var latestClockByClientID: [Int: Int] = [:]
-
-    mutating func apply(_ updates: [NativeEditorAwarenessState]) -> [NativeEditorAwarenessState] {
-        for state in updates {
-            if let latestClock = latestClockByClientID[state.clientID], state.clock <= latestClock {
-                continue
-            }
-
-            latestClockByClientID[state.clientID] = state.clock
-
-            if state.payload == nil {
-                statesByClientID.removeValue(forKey: state.clientID)
-            } else {
-                statesByClientID[state.clientID] = state
-            }
-        }
-
-        return statesByClientID.values.sorted { $0.clientID < $1.clientID }
-    }
-
-    mutating func reset() {
-        statesByClientID.removeAll()
-        latestClockByClientID.removeAll()
-    }
-}
-
 nonisolated struct NativeEditorAwarenessPayload: Codable, Equatable, Sendable {
     let user: NativeEditorAwarenessUser?
     let cursor: NativeEditorAwarenessCursor?
