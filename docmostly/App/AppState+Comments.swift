@@ -27,4 +27,16 @@ extension AppState {
             selection: selectedText
         ))
     }
+
+    func resolveComment(commentId: String, pageId: String, resolved: Bool) async throws -> DocmostComment {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Resolving comments requires a network connection.")
+        }
+
+        return try await apiClient.send(.resolveComment(
+            commentId: commentId,
+            pageId: pageId,
+            resolved: resolved
+        ))
+    }
 }

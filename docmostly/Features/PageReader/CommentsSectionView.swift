@@ -4,6 +4,7 @@ struct CommentsSectionView: View {
     @Environment(AppState.self) private var appState
     @Bindable var viewModel: PageReaderViewModel
     let pageID: String
+    let markInlineCommentResolved: (String, Bool) async -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -31,7 +32,14 @@ struct CommentsSectionView: View {
             }
 
             ForEach(viewModel.comments) { comment in
-                CommentRowView(comment: comment)
+                CommentRowView(
+                    comment: comment,
+                    isResolving: viewModel.isResolvingComment(id: comment.id),
+                    canToggleResolved: appState.isOffline == false,
+                    toggleResolved: {
+                        toggleResolved(comment)
+                    }
+                )
             }
         }
     }
@@ -45,5 +53,16 @@ struct CommentsSectionView: View {
     private var canPostComment: Bool {
         viewModel.draftComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             && viewModel.isPostingComment == false
+    }
+
+    private func toggleResolved(_ comment: DocmostComment) {
+        Task {
+            await viewModel.toggleResolved(
+                comment,
+                pageID: pageID,
+                appState: appState,
+                markInlineCommentResolved: markInlineCommentResolved
+            )
+        }
     }
 }

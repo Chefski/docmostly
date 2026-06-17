@@ -69,4 +69,18 @@ struct EndpointTests {
         #expect(object?["type"] as? String == "inline")
         #expect(object?["selection"] as? String == "Selected text")
     }
+
+    @Test func buildsResolveCommentRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.resolveComment(commentId: "comment-1", pageId: "page-1", resolved: true)
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/comments/resolve")
+
+        let body = try #require(request.httpBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["commentId"] as? String == "comment-1")
+        #expect(object?["pageId"] as? String == "page-1")
+        #expect(object?["resolved"] as? Bool == true)
+    }
 }

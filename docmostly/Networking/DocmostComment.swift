@@ -15,6 +15,11 @@ nonisolated struct DocmostComment: Decodable, Identifiable, Hashable, Sendable {
     let editedAt: Date?
     let deletedAt: Date?
     let creator: DocmostUser?
+    let resolvedBy: DocmostUser?
+
+    var isResolved: Bool {
+        resolvedAt != nil
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -31,6 +36,7 @@ nonisolated struct DocmostComment: Decodable, Identifiable, Hashable, Sendable {
         case editedAt
         case deletedAt
         case creator
+        case resolvedBy
     }
 
     init(from decoder: Decoder) throws {
@@ -50,6 +56,7 @@ nonisolated struct DocmostComment: Decodable, Identifiable, Hashable, Sendable {
         editedAt = try container.decodeIfPresent(Date.self, forKey: .editedAt)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
         creator = try container.decodeIfPresent(DocmostUser.self, forKey: .creator)
+        resolvedBy = try container.decodeIfPresent(DocmostUser.self, forKey: .resolvedBy)
     }
 
     private static func decodeContent(from container: KeyedDecodingContainer<CodingKeys>) -> String? {

@@ -90,6 +90,58 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func setInlineCommentResolved(commentID: String, isResolved: Bool, tracksUndo: Bool = true) {
+        let trimmedCommentID = commentID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedCommentID.isEmpty == false else { return }
+
+        var updatedDocument = document
+        guard Self.updateInlineCommentResolved(
+            commentID: trimmedCommentID,
+            isResolved: isResolved,
+            in: &updatedDocument
+        ) else { return }
+
+        if tracksUndo {
+            performUndoableEdit {
+                document = updatedDocument
+            }
+        } else {
+            document = updatedDocument
+            _ = Self.updateInlineCommentResolved(
+                commentID: trimmedCommentID,
+                isResolved: isResolved,
+                in: &lastSavedDocument
+            )
+            lastKnownSnapshot = makeHistorySnapshot()
+            recalculateDirty()
+        }
+    }
+
+    private static func updateInlineCommentResolved(
+        commentID: String,
+        isResolved: Bool,
+        in document: inout NativeEditorDocument
+    ) -> Bool {
+        var didUpdate = false
+
+        for index in document.blocks.indices {
+            let ranges = document.blocks[index].text.runs.compactMap { run in
+                run[NativeEditorCommentIDAttribute.self] == commentID ? run.range : nil
+            }
+            guard ranges.isEmpty == false else { continue }
+
+            didUpdate = true
+            for range in ranges {
+                document.blocks[index].text[range][NativeEditorCommentResolvedAttribute.self] = isResolved
+                document.blocks[index].text[range].backgroundColor = isResolved
+                    ? .gray.opacity(0.16)
+                    : .yellow.opacity(0.28)
+            }
+        }
+
+        return didUpdate
+    }
+
     func insertStatusBadge(text: String, color: String) {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedText.isEmpty == false else { return }

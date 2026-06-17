@@ -33,6 +33,7 @@ nonisolated enum Endpoint: Sendable {
     )
     case comments(pageId: String, cursor: String? = nil, limit: Int = 100)
     case createComment(pageId: String, content: String, type: DocmostCommentType = .page, selection: String? = nil)
+    case resolveComment(commentId: String, pageId: String, resolved: Bool)
     case attachmentInfo(attachmentId: String)
 
     func urlRequest(baseURL: URL) throws -> URLRequest {
@@ -81,6 +82,8 @@ nonisolated enum Endpoint: Sendable {
             "comments"
         case .createComment:
             "comments/create"
+        case .resolveComment:
+            "comments/resolve"
         case .attachmentInfo:
             "files/info"
         }
@@ -127,6 +130,12 @@ nonisolated enum Endpoint: Sendable {
                 content: content,
                 type: type,
                 selection: selection
+            ))
+        case .resolveComment(let commentId, let pageId, let resolved):
+            return try encode(ResolveCommentRequest(
+                commentId: commentId,
+                pageId: pageId,
+                resolved: resolved
             ))
         case .attachmentInfo(let attachmentId):
             return try encode(AttachmentInfoRequest(attachmentId: attachmentId))
@@ -198,6 +207,12 @@ nonisolated private struct CreateCommentRequest: Encodable {
     let content: String
     let type: DocmostCommentType
     let selection: String?
+}
+
+nonisolated private struct ResolveCommentRequest: Encodable {
+    let commentId: String
+    let pageId: String
+    let resolved: Bool
 }
 
 nonisolated private struct AttachmentInfoRequest: Encodable {
