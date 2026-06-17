@@ -55,10 +55,15 @@ extension PageReaderView {
     ) async {
         switch event {
         case .pageUpdated(let event) where event.pageID == editorViewModel.currentPageID:
-            await refreshRemotePageSnapshot(
-                editorViewModel: editorViewModel,
+            if editorViewModel.handleCRDTBackedPageUpdated(
+                updatedAt: event.updatedAt,
                 lastUpdatedBy: event.lastUpdatedBy
-            )
+            ) == false {
+                await refreshRemotePageSnapshot(
+                    editorViewModel: editorViewModel,
+                    lastUpdatedBy: event.lastUpdatedBy
+                )
+            }
         case .commentCreated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyCreatedComment(event.comment)
         case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:

@@ -62,10 +62,20 @@ extension NativeRichEditorViewModel {
     }
 
     func handleCRDTBackedPageUpdated(_ event: NativeEditorCollaborationStatelessEvent) -> Bool {
+        handleCRDTBackedPageUpdated(
+            updatedAt: event.updatedAt,
+            lastUpdatedBy: event.lastUpdatedBy
+        )
+    }
+
+    func handleCRDTBackedPageUpdated(
+        updatedAt: Date?,
+        lastUpdatedBy: DocmostPagePerson?
+    ) -> Bool {
         guard crdtDocumentEngine != nil else { return false }
 
-        recordRecentEditor(from: event.lastUpdatedBy)
-        markRemoteBaseline(updatedAt: event.updatedAt ?? lastRemoteUpdatedAt)
+        recordRecentEditor(from: lastUpdatedBy)
+        markRemoteBaseline(updatedAt: updatedAt ?? lastRemoteUpdatedAt)
         return true
     }
 

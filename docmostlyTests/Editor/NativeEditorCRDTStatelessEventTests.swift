@@ -59,6 +59,42 @@ struct NativeCRDTStatelessEventTests {
 
         #expect(handled == false)
     }
+
+    @Test func crdtBackedRealtimePageUpdatedEventDoesNotReloadSnapshot() async {
+        let engine = StatelessEventCRDTDocumentEngine()
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Local",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Local draft"), alignment: .left)
+        ])
+        viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
+        let updatedAt = Date(timeIntervalSince1970: 30)
+
+        await view.handleRealtimeEvent(
+            .pageUpdated(NativeEditorRealtimePageUpdatedEvent(
+                pageID: "page-1",
+                spaceID: "space-1",
+                title: "Remote",
+                slugID: "remote",
+                updatedAt: updatedAt,
+                lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Alice", avatarUrl: nil)
+            )),
+            editorViewModel: viewModel
+        )
+
+        #expect(viewModel.title == "Local")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.pendingRemotePage == nil)
+        #expect(viewModel.realtimeStatus == .connected)
+        #expect(viewModel.lastRemoteUpdatedAt == updatedAt)
+        #expect(viewModel.activeCollaborators.last?.id == "user-2")
+        #expect(viewModel.activeCollaborators.last?.source == .recentEditor)
+    }
 }
 
 @MainActor
