@@ -16,6 +16,7 @@ nonisolated enum Endpoint: Sendable {
     case workspacePublic
     case login(email: String, password: String)
     case logout
+    case collabToken
     case currentUser
     case spaces(query: String? = nil, cursor: String? = nil, limit: Int = 100)
     case spaceInfo(spaceId: String)
@@ -58,6 +59,8 @@ nonisolated enum Endpoint: Sendable {
             "auth/login"
         case .logout:
             "auth/logout"
+        case .collabToken:
+            "auth/collab-token"
         case .currentUser:
             "users/me"
         case .spaces:
@@ -86,7 +89,7 @@ nonisolated enum Endpoint: Sendable {
     // swiftlint:disable cyclomatic_complexity
     private func bodyData() throws -> Data? {
         switch self {
-        case .workspacePublic, .logout, .currentUser:
+        case .workspacePublic, .logout, .collabToken, .currentUser:
             return nil
         case .login(let email, let password):
             return try encode(LoginRequest(email: email, password: password))

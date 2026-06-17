@@ -6,7 +6,6 @@ extension NativeRichEditorViewModel {
         redoStack.removeAll()
         lastKnownSnapshot = makeHistorySnapshot()
         updateHistoryAvailability()
-        recalculateDirty()
     }
 
     func handleDocumentChanged() {

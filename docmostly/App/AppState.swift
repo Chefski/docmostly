@@ -17,7 +17,7 @@ final class AppState {
     @ObservationIgnored private let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private var cacheRepository: CacheRepository?
-    @ObservationIgnored private var apiClient: DocmostAPIClient?
+    @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
 
     init(
         settingsStore: LocalSettingsStore = LocalSettingsStore(),

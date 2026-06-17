@@ -22,10 +22,15 @@ final class NativeRichEditorViewModel {
     var searchQuery = ""
     var replacementText = ""
     var currentSearchMatchIndex = 0
+    var realtimeStatus: NativeEditorRealtimeStatus = .disconnected
+    var pendingRemoteUpdate: NativeEditorRemoteUpdate?
+    var activeCollaborators: [NativeEditorCollaborator] = []
 
     @ObservationIgnored private var editablePageID: String
-    @ObservationIgnored private var lastSavedTitle: String
-    @ObservationIgnored private var lastSavedDocument = NativeEditorDocument()
+    @ObservationIgnored var lastSavedTitle: String
+    @ObservationIgnored var lastSavedDocument = NativeEditorDocument()
+    @ObservationIgnored var lastRemoteUpdatedAt: Date?
+    @ObservationIgnored var pendingRemotePage: DocmostEditablePage?
     @ObservationIgnored var undoStack: [NativeEditorHistorySnapshot] = []
     @ObservationIgnored var redoStack: [NativeEditorHistorySnapshot] = []
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
@@ -81,6 +86,7 @@ final class NativeRichEditorViewModel {
             lastSavedTitle = title
             lastSavedDocument = document
             resetEditingHistory()
+            markRemoteBaseline(updatedAt: page.updatedAt)
             isDirty = false
         } catch {
             errorMessage = error.localizedDescription
@@ -104,6 +110,7 @@ final class NativeRichEditorViewModel {
             title = page.title
             lastSavedTitle = title
             lastSavedDocument = document
+            markRemoteBaseline(updatedAt: page.updatedAt)
             lastKnownSnapshot = makeHistorySnapshot()
             isDirty = false
             return true

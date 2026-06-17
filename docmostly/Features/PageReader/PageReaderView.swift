@@ -56,6 +56,9 @@ struct PageReaderView: View {
         .task(id: pageID) {
             await loadNativePage()
         }
+        .task(id: editorViewModel?.currentPageID) {
+            await monitorRemotePageChanges()
+        }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
         }
@@ -87,6 +90,29 @@ struct PageReaderView: View {
         Task {
             if await editorViewModel.save(appState: appState) {
                 await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+            }
+        }
+    }
+
+    private func monitorRemotePageChanges() async {
+        guard let editorViewModel else { return }
+        editorViewModel.realtimeStatus = .connecting
+
+        do {
+            _ = try appState.collaborationWebSocketURL()
+            _ = try await appState.loadCollaborationToken()
+        } catch {
+            editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
+        }
+
+        while Task.isCancelled == false {
+            do {
+                let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
+                editorViewModel.handleRemotePageSnapshot(page)
+                try await Task.sleep(for: .seconds(4))
+            } catch {
+                editorViewModel.realtimeStatus = .failed(error.localizedDescription)
+                try? await Task.sleep(for: .seconds(8))
             }
         }
     }

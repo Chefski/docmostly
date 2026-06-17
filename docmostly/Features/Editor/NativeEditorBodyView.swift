@@ -17,6 +17,8 @@ struct NativeEditorBodyView: View {
                 NativeEditorSaveErrorView(message: saveErrorMessage)
             }
 
+            NativeEditorCollaborationStatusView(viewModel: viewModel)
+
             ForEach($viewModel.document.blocks) { $block in
                 VStack(alignment: .leading, spacing: 6) {
                     NativeEditorBlockRow(

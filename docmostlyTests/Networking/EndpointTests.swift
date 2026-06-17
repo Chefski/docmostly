@@ -40,4 +40,13 @@ struct EndpointTests {
         #expect(request.value(forHTTPHeaderField: "Content-Type") == nil)
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     }
+
+    @Test func buildsCollaborationTokenRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let request = try Endpoint.collabToken.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/auth/collab-token")
+        #expect(request.httpMethod == "POST")
+        #expect(request.httpBody == nil)
+    }
 }
