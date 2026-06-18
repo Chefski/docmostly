@@ -84,6 +84,35 @@ struct NativeCRDTStatelessEventTests {
         #expect(viewModel.realtimeStatus == .connected)
     }
 
+    @Test func crdtBackedEditorIgnoresRemotePageSnapshots() {
+        let engine = StatelessEventCRDTDocumentEngine()
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Local",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Local body"), alignment: .left)
+        ])
+        viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
+        let remotePage = editablePage(
+            title: "Remote",
+            text: "Remote body",
+            updatedAt: Date(timeIntervalSince1970: 20)
+        )
+
+        viewModel.handleRemotePageSnapshot(remotePage)
+
+        #expect(viewModel.usesCRDTDocumentEngine == true)
+        #expect(viewModel.title == "Local")
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local body"])
+        #expect(viewModel.lastRemoteUpdatedAt == Date(timeIntervalSince1970: 10))
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.pendingRemotePage == nil)
+        #expect(viewModel.activeCollaborators.isEmpty)
+        #expect(viewModel.realtimeStatus == .connected)
+    }
+
     @Test func crdtBackedRealtimePageUpdatedEventDoesNotReloadSnapshot() async {
         let engine = StatelessEventCRDTDocumentEngine()
         let view = PageReaderView(pageID: "page-1")
@@ -118,6 +147,24 @@ struct NativeCRDTStatelessEventTests {
         #expect(viewModel.lastRemoteUpdatedAt == updatedAt)
         #expect(viewModel.activeCollaborators.last?.id == "user-2")
         #expect(viewModel.activeCollaborators.last?.source == .recentEditor)
+    }
+
+    private func editablePage(title: String, text: String, updatedAt: Date) -> DocmostEditablePage {
+        DocmostEditablePage(
+            id: "page-1",
+            slugId: "slug-1",
+            title: title,
+            content: ProseMirrorDocument(content: [
+                ProseMirrorNode(type: "paragraph", content: [
+                    ProseMirrorNode(type: "text", text: text)
+                ])
+            ]),
+            icon: nil,
+            spaceId: "space-1",
+            updatedAt: updatedAt,
+            permissions: nil,
+            lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Remote Editor", avatarUrl: nil)
+        )
     }
 }
 

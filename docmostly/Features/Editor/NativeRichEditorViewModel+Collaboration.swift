@@ -14,6 +14,13 @@ extension NativeRichEditorViewModel {
     ) {
         applyPagePermissions(page.permissions)
 
+        guard usesCRDTDocumentEngine == false else {
+            if realtimeStatus != .conflict {
+                realtimeStatus = .connected
+            }
+            return
+        }
+
         guard isRemotePageNewer(page) else {
             realtimeStatus = .connected
             return
@@ -144,6 +151,10 @@ extension NativeRichEditorViewModel {
     func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
         crdtDocumentEngine = engine
         crdtSyncCoordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+    }
+
+    var usesCRDTDocumentEngine: Bool {
+        crdtDocumentEngine != nil
     }
 
     func localAwarenessUpdates() -> AsyncStream<Void> {

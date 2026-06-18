@@ -270,6 +270,7 @@ struct PageReaderView: View {
 private extension PageReaderView {
     func monitorRemotePageChanges() async {
         guard let editorViewModel else { return }
+        guard editorViewModel.usesCRDTDocumentEngine == false else { return }
         editorViewModel.realtimeStatus = .connecting
 
         do {
@@ -280,6 +281,8 @@ private extension PageReaderView {
         }
 
         while Task.isCancelled == false {
+            guard editorViewModel.usesCRDTDocumentEngine == false else { return }
+
             do {
                 let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
                 editorViewModel.handleRemotePageSnapshot(page)
