@@ -73,6 +73,12 @@ extension NativeRichEditorViewModel {
         lastUpdatedBy: DocmostPagePerson?
     ) -> Bool {
         guard crdtDocumentEngine != nil else { return false }
+        guard isCRDTPageUpdateNewer(updatedAt) else {
+            if realtimeStatus != .conflict {
+                realtimeStatus = .connected
+            }
+            return true
+        }
 
         recordRecentEditor(from: lastUpdatedBy)
         markRemoteBaseline(updatedAt: updatedAt ?? lastRemoteUpdatedAt)
@@ -226,6 +232,12 @@ extension NativeRichEditorViewModel {
         guard let remoteUpdatedAt = page.updatedAt else { return false }
         guard let lastRemoteUpdatedAt else { return true }
         return remoteUpdatedAt > lastRemoteUpdatedAt
+    }
+
+    private func isCRDTPageUpdateNewer(_ updatedAt: Date?) -> Bool {
+        guard let updatedAt else { return true }
+        guard let lastRemoteUpdatedAt else { return true }
+        return updatedAt > lastRemoteUpdatedAt
     }
 
     private func applyRemotePageSnapshot(_ page: DocmostEditablePage, lastUpdatedBy: DocmostPagePerson?) {

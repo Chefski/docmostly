@@ -60,6 +60,30 @@ struct NativeCRDTStatelessEventTests {
         #expect(handled == false)
     }
 
+    @Test func crdtBackedPageUpdatedEventIgnoresStaleMetadata() {
+        let engine = StatelessEventCRDTDocumentEngine()
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Local",
+            crdtDocumentEngine: engine
+        )
+        let currentUpdatedAt = Date(timeIntervalSince1970: 30)
+        viewModel.markRemoteBaseline(updatedAt: currentUpdatedAt)
+        let event = NativeEditorCollaborationStatelessEvent(
+            type: "page.updated",
+            updatedAt: Date(timeIntervalSince1970: 20),
+            lastUpdatedById: "user-2",
+            lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Alice", avatarUrl: nil)
+        )
+
+        let handled = viewModel.handleCRDTBackedPageUpdated(event)
+
+        #expect(handled == true)
+        #expect(viewModel.lastRemoteUpdatedAt == currentUpdatedAt)
+        #expect(viewModel.activeCollaborators.isEmpty)
+        #expect(viewModel.realtimeStatus == .connected)
+    }
+
     @Test func crdtBackedRealtimePageUpdatedEventDoesNotReloadSnapshot() async {
         let engine = StatelessEventCRDTDocumentEngine()
         let view = PageReaderView(pageID: "page-1")
