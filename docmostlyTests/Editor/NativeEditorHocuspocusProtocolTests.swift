@@ -149,6 +149,24 @@ struct NativeEditorHocuspocusProtocolTests {
         #expect(parsedUpdate == update)
     }
 
+    @Test func parsesServerSyncReplyFrameAsYjsSyncMessage() throws {
+        let update = Data([6, 10, 11, 12, 13, 14, 15])
+        let frameData = makeHocuspocusFrame(
+            documentName: "page.page-1",
+            messageType: 4,
+            payload: makeYjsSyncMessage(type: 1, update: update)
+        )
+
+        let frame = try NativeEditorHocuspocusFrame.parse(frameData)
+
+        guard case .sync(.stepTwo(let parsedUpdate)) = frame.message else {
+            Issue.record("Expected sync step two message")
+            return
+        }
+
+        #expect(parsedUpdate == update)
+    }
+
     @Test func parsesAuthenticatedCollaborationScope() throws {
         let frameData = makeHocuspocusFrame(
             documentName: "page.page-1",

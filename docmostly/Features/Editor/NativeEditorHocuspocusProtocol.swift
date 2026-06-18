@@ -11,6 +11,7 @@ nonisolated enum NativeEditorHocuspocusMessageType: Int, Sendable {
     case awareness = 1
     case auth = 2
     case queryAwareness = 3
+    case syncReply = 4
     case stateless = 5
     case close = 7
     case syncStatus = 8
@@ -113,7 +114,7 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
 
         let message: NativeEditorHocuspocusMessage
         switch type {
-        case .sync:
+        case .sync, .syncReply:
             message = .sync(try NativeEditorYjsSyncMessage.parse(decoder: &decoder))
         case .awareness:
             let updateData = try decoder.readVarUint8Array()
