@@ -149,6 +149,83 @@ struct NativeCRDTStatelessEventTests {
         #expect(viewModel.activeCollaborators.last?.source == .recentEditor)
     }
 
+    @Test func crdtBackedRealtimeTitleUpdatePreservesLocalDocumentDraft() async {
+        let engine = StatelessEventCRDTDocumentEngine()
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Saved",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved body"), alignment: .left)
+        ])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
+        viewModel.document.blocks[0].text = AttributedString("Local draft")
+        viewModel.handleDocumentChanged()
+
+        await view.handleRealtimeEvent(
+            .pageUpdated(NativeEditorRealtimePageUpdatedEvent(
+                pageID: "page-1",
+                spaceID: "space-1",
+                title: "Remote title",
+                slugID: "remote-title",
+                updatedAt: nil,
+                lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Alice", avatarUrl: nil)
+            )),
+            editorViewModel: viewModel
+        )
+
+        #expect(viewModel.title == "Remote title")
+        #expect(viewModel.lastSavedTitle == "Remote title")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.isDirty == true)
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.pendingRemotePage == nil)
+        #expect(viewModel.realtimeStatus == .connected)
+    }
+
+    @Test func crdtBackedRealtimeTitleUpdateDefersWhenLocalTitleIsDirty() async {
+        let engine = StatelessEventCRDTDocumentEngine()
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Saved",
+            crdtDocumentEngine: engine
+        )
+        viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
+        viewModel.title = "Local title"
+        viewModel.handleTitleChanged()
+
+        await view.handleRealtimeEvent(
+            .pageUpdated(NativeEditorRealtimePageUpdatedEvent(
+                pageID: "page-1",
+                spaceID: "space-1",
+                title: "Remote title",
+                slugID: "remote-title",
+                updatedAt: nil,
+                lastUpdatedBy: DocmostPagePerson(id: "user-2", name: "Alice", avatarUrl: nil)
+            )),
+            editorViewModel: viewModel
+        )
+
+        #expect(viewModel.title == "Local title")
+        #expect(viewModel.lastSavedTitle == "Saved")
+        #expect(viewModel.pendingRemoteUpdate?.title == "Remote title")
+        #expect(viewModel.pendingRemotePage == nil)
+        #expect(viewModel.realtimeStatus == .conflict)
+
+        viewModel.acceptPendingRemoteUpdate()
+
+        #expect(viewModel.title == "Remote title")
+        #expect(viewModel.lastSavedTitle == "Remote title")
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.isDirty == false)
+        #expect(viewModel.realtimeStatus == .connected)
+    }
+
     private func editablePage(title: String, text: String, updatedAt: Date) -> DocmostEditablePage {
         DocmostEditablePage(
             id: "page-1",

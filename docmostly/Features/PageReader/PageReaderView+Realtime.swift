@@ -55,10 +55,7 @@ extension PageReaderView {
     ) async {
         switch event {
         case .pageUpdated(let event) where event.pageID == editorViewModel.currentPageID:
-            if editorViewModel.handleCRDTBackedPageUpdated(
-                updatedAt: event.updatedAt,
-                lastUpdatedBy: event.lastUpdatedBy
-            ) == false {
+            if editorViewModel.handleCRDTBackedPageUpdated(event) == false {
                 await refreshRemotePageSnapshot(
                     editorViewModel: editorViewModel,
                     lastUpdatedBy: event.lastUpdatedBy

@@ -48,8 +48,13 @@ extension NativeRichEditorViewModel {
     }
 
     func acceptPendingRemoteUpdate() {
-        guard let pendingRemotePage else { return }
-        applyRemotePageSnapshot(pendingRemotePage, lastUpdatedBy: pendingRemoteUpdate?.lastUpdatedBy)
+        if let pendingRemotePage {
+            applyRemotePageSnapshot(pendingRemotePage, lastUpdatedBy: pendingRemoteUpdate?.lastUpdatedBy)
+            return
+        }
+
+        guard let pendingRemoteUpdate else { return }
+        applyPendingRemoteTitleUpdate(pendingRemoteUpdate)
     }
 
     func rejectPendingRemoteUpdate() {
@@ -80,8 +85,28 @@ extension NativeRichEditorViewModel {
         )
     }
 
+    func handleCRDTBackedPageUpdated(_ event: NativeEditorRealtimePageUpdatedEvent) -> Bool {
+        handleCRDTBackedPageUpdated(
+            updatedAt: event.updatedAt,
+            title: event.title,
+            lastUpdatedBy: event.lastUpdatedBy
+        )
+    }
+
     func handleCRDTBackedPageUpdated(
         updatedAt: Date?,
+        lastUpdatedBy: DocmostPagePerson?
+    ) -> Bool {
+        handleCRDTBackedPageUpdated(
+            updatedAt: updatedAt,
+            title: nil,
+            lastUpdatedBy: lastUpdatedBy
+        )
+    }
+
+    private func handleCRDTBackedPageUpdated(
+        updatedAt: Date?,
+        title remoteTitle: String?,
         lastUpdatedBy: DocmostPagePerson?
     ) -> Bool {
         guard crdtDocumentEngine != nil else { return false }
@@ -93,6 +118,16 @@ extension NativeRichEditorViewModel {
         }
 
         recordRecentEditor(from: lastUpdatedBy)
+
+        if let remoteTitle {
+            applyCRDTBackedRemoteTitle(
+                remoteTitle,
+                updatedAt: updatedAt,
+                lastUpdatedBy: lastUpdatedBy
+            )
+            return true
+        }
+
         markRemoteBaseline(updatedAt: updatedAt ?? lastRemoteUpdatedAt)
         return true
     }
@@ -289,5 +324,65 @@ extension NativeRichEditorViewModel {
         guard let person else { return }
         activeCollaborators.removeAll { $0.source == .recentEditor }
         activeCollaborators.append(NativeEditorCollaborator(person: person))
+    }
+
+    private func applyCRDTBackedRemoteTitle(
+        _ remoteTitle: String,
+        updatedAt: Date?,
+        lastUpdatedBy: DocmostPagePerson?
+    ) {
+        let hasLocalTitleEdits = title != lastSavedTitle
+
+        if hasLocalTitleEdits {
+            if remoteTitle == title {
+                lastSavedTitle = remoteTitle
+                rebaseEditingHistoryTitle(to: remoteTitle)
+            } else if remoteTitle != lastSavedTitle {
+                pendingRemotePage = nil
+                pendingRemoteUpdate = NativeEditorRemoteUpdate(
+                    updatedAt: updatedAt,
+                    title: remoteTitle,
+                    lastUpdatedBy: lastUpdatedBy
+                )
+                realtimeStatus = .conflict
+                return
+            }
+        } else {
+            applyRemoteTitle(remoteTitle)
+            lastSavedTitle = remoteTitle
+            rebaseEditingHistoryTitle(to: remoteTitle)
+        }
+
+        markRemoteBaseline(updatedAt: updatedAt ?? lastRemoteUpdatedAt)
+        recalculateDirty()
+    }
+
+    private func applyPendingRemoteTitleUpdate(_ update: NativeEditorRemoteUpdate) {
+        applyRemoteTitle(update.title)
+        lastSavedTitle = update.title
+        rebaseEditingHistoryTitle(to: update.title)
+        pendingRemoteUpdate = nil
+        markRemoteBaseline(updatedAt: update.updatedAt ?? lastRemoteUpdatedAt)
+        recalculateDirty()
+    }
+
+    private func applyRemoteTitle(_ remoteTitle: String) {
+        guard title != remoteTitle else { return }
+
+        isApplyingHistory = true
+        title = remoteTitle
+        isApplyingHistory = false
+    }
+
+    private func rebaseEditingHistoryTitle(to title: String) {
+        lastKnownSnapshot?.title = title
+
+        for index in undoStack.indices {
+            undoStack[index].title = title
+        }
+
+        for index in redoStack.indices {
+            redoStack[index].title = title
+        }
     }
 }
