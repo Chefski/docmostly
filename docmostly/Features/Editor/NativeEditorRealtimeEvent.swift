@@ -39,8 +39,6 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
         switch frame {
         case "2":
             return .ping
-        case "40":
-            return .connected
         case "41":
             return .disconnected
         default:
@@ -49,6 +47,10 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
 
         if frame.first == "0" {
             return .open
+        }
+
+        if frame.hasPrefix("40") {
+            return .connected
         }
 
         guard frame.hasPrefix("42") else {

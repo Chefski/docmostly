@@ -109,6 +109,7 @@ struct NativeEditorRealtimeEventTests {
     @Test func parsesEngineIOControlFrames() throws {
         #expect(try NativeEditorRealtimeSocketFrame.parse("2") == .ping)
         #expect(try NativeEditorRealtimeSocketFrame.parse("40") == .connected)
+        #expect(try NativeEditorRealtimeSocketFrame.parse("40{\"sid\":\"socket-1\"}") == .connected)
         #expect(try NativeEditorRealtimeSocketFrame.parse("41") == .disconnected)
         #expect(NativeEditorRealtimeSocketFrame.connectMessage == "40")
         #expect(NativeEditorRealtimeSocketFrame.pongMessage == "3")
