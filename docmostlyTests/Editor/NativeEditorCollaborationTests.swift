@@ -244,3 +244,74 @@ struct NativeEditorCollaborationTests {
     }
 
 }
+
+@MainActor
+struct NativeEditorWebAwarenessTests {
+    @Test func acceptsDocmostWebAwarenessUserWithoutID() throws {
+        var updateEncoder = NativeEditorLib0Encoder()
+        updateEncoder.writeVarUint(1)
+        updateEncoder.writeVarUint(11)
+        updateEncoder.writeVarUint(3)
+        updateEncoder.writeVarString("""
+        {
+          "user": {
+            "name": "Alice",
+            "color": "#958DF1"
+          },
+          "cursor": {
+            "anchor": {
+              "type": "text",
+              "tname": "default",
+              "item": { "client": 2, "clock": 3 },
+              "assoc": 0
+            },
+            "head": {
+              "type": "text",
+              "tname": "default",
+              "item": { "client": 2, "clock": 5 },
+              "assoc": 0
+            }
+          }
+        }
+        """)
+        let states = try NativeEditorAwarenessState.decodeUpdate(updateEncoder.data)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
+
+        viewModel.applyAwarenessStates(states, localClientID: 10)
+
+        #expect(viewModel.activeCollaborators == [
+            NativeEditorCollaborator(id: "client-11", name: "Alice", colorName: "#958DF1")
+        ])
+        #expect(viewModel.remoteCursors == [
+            NativeEditorRemoteCursor(
+                id: "client-11",
+                name: "Alice",
+                colorName: "#958DF1",
+                cursor: awarenessCursor(client: 2, anchorClock: 3, headClock: 5)
+            )
+        ])
+    }
+
+    private func awarenessCursor(
+        client: Int,
+        anchorClock: Int,
+        headClock: Int
+    ) -> NativeEditorAwarenessCursor {
+        NativeEditorAwarenessCursor(
+            anchor: awarenessCursorPosition(client: client, clock: anchorClock),
+            head: awarenessCursorPosition(client: client, clock: headClock)
+        )
+    }
+
+    private func awarenessCursorPosition(
+        client: Int,
+        clock: Int
+    ) -> NativeEditorYjsRelativePosition {
+        NativeEditorYjsRelativePosition(
+            type: .name("text"),
+            targetName: NativeEditorCollaborationDocument.yjsFragmentName,
+            item: NativeEditorYjsID(client: client, clock: clock),
+            assoc: 0
+        )
+    }
+}
