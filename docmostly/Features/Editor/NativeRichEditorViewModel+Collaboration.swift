@@ -42,6 +42,11 @@ extension NativeRichEditorViewModel {
         applyRemotePageSnapshot(page, lastUpdatedBy: lastUpdatedBy)
     }
 
+    func needsRemoteSnapshotRefresh(forCreatedComment comment: DocmostComment) -> Bool {
+        guard usesCRDTDocumentEngine == false else { return false }
+        return comment.type == DocmostCommentType.inline.rawValue
+    }
+
     func acceptPendingRemoteUpdate() {
         guard let pendingRemotePage else { return }
         applyRemotePageSnapshot(pendingRemotePage, lastUpdatedBy: pendingRemoteUpdate?.lastUpdatedBy)

@@ -88,6 +88,26 @@ struct PageReaderCommentStateTests {
         #expect(editorViewModel.isDirty == false)
     }
 
+    @Test func inlineCommentCreatedNeedsSnapshotRefreshWithoutCRDTEngine() throws {
+        let editorViewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        let inlineComment = try comment(id: "comment-1", text: "Inline", resolvedAt: nil, type: "inline")
+        let pageComment = try comment(id: "comment-2", text: "Page", resolvedAt: nil, type: "page")
+
+        #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: inlineComment) == true)
+        #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: pageComment) == false)
+    }
+
+    @Test func inlineCommentCreatedUsesCRDTEngineWithoutSnapshotRefresh() throws {
+        let editorViewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: CommentCreationRefreshCRDTDocumentEngine()
+        )
+        let inlineComment = try comment(id: "comment-1", text: "Inline", resolvedAt: nil, type: "inline")
+
+        #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: inlineComment) == false)
+    }
+
     private func comment(id: String, text: String, resolvedAt: String?) throws -> DocmostComment {
         try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page")
     }
@@ -130,5 +150,25 @@ struct PageReaderCommentStateTests {
 
     private func resolvedDate(_ value: String) throws -> Date {
         try Date(value, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    }
+}
+
+@MainActor
+private final class CommentCreationRefreshCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+    func encodeStateVector() async throws -> Data {
+        Data()
+    }
+
+    func encodeStateAsUpdate(for stateVector: Data) async throws -> Data {
+        Data()
+    }
+
+    func applyRemoteUpdate(_ update: Data) async throws { }
+
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        NativeEditorCRDTSaveResult()
     }
 }

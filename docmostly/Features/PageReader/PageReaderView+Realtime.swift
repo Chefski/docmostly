@@ -66,6 +66,12 @@ extension PageReaderView {
             }
         case .commentCreated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyCreatedComment(event.comment)
+            if editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: event.comment) {
+                await refreshRemotePageSnapshot(
+                    editorViewModel: editorViewModel,
+                    lastUpdatedBy: pagePerson(from: event.comment.creator)
+                )
+            }
         case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyUpdatedComment(event.comment)
             editorViewModel.setInlineCommentResolved(
@@ -119,5 +125,10 @@ extension PageReaderView {
         } catch {
             editorViewModel.realtimeStatus = .failed(error.localizedDescription)
         }
+    }
+
+    private func pagePerson(from user: DocmostUser?) -> DocmostPagePerson? {
+        guard let user else { return nil }
+        return DocmostPagePerson(id: user.id, name: user.name, avatarUrl: user.avatarUrl)
     }
 }
