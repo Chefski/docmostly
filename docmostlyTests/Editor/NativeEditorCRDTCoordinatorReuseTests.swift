@@ -82,6 +82,29 @@ struct CRDTEngineAttachmentTests {
         #expect(viewModel.collaborationSession().syncDriver == nil)
         #expect(viewModel.realtimeStatus == .unsupported("Factory failed."))
     }
+
+    @Test func crdtAttachmentDoesNotConfigureEngineAfterCancellation() async {
+        let engine = CoordinatorReuseCRDTDocumentEngine()
+        let factory = SuspendingCRDTAttachmentEngineFactory(engine: engine)
+        let appState = AppState(crdtDocumentEngineFactory: factory)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        let attachTask = Task {
+            await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
+                to: viewModel,
+                appState: appState
+            )
+        }
+        await factory.waitUntilSuspended()
+
+        attachTask.cancel()
+        factory.resume()
+        await attachTask.value
+
+        #expect(viewModel.usesCRDTDocumentEngine == false)
+        #expect(viewModel.collaborationSession().syncDriver == nil)
+        #expect(viewModel.realtimeStatus == .disconnected)
+    }
 }
 
 @MainActor
@@ -142,5 +165,46 @@ private final class ThrowingCRDTDocumentEngineFactory: NativeEditorCRDTDocumentE
         document: NativeEditorDocument
     ) async throws -> any NativeEditorCRDTDocumentEngine {
         throw APIError.connectionFailed("Factory failed.")
+    }
+}
+
+@MainActor
+private final class SuspendingCRDTAttachmentEngineFactory: NativeEditorCRDTDocumentEngineFactory {
+    let engine: CoordinatorReuseCRDTDocumentEngine
+    private var makeContinuation: CheckedContinuation<Void, Never>?
+    private var suspensionContinuation: CheckedContinuation<Void, Never>?
+    private var didSuspend = false
+
+    init(engine: CoordinatorReuseCRDTDocumentEngine) {
+        self.engine = engine
+    }
+
+    func makeDocumentEngine(
+        pageID: String,
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> any NativeEditorCRDTDocumentEngine {
+        await withCheckedContinuation { continuation in
+            self.makeContinuation = continuation
+            didSuspend = true
+            suspensionContinuation?.resume()
+            suspensionContinuation = nil
+        }
+        return engine
+    }
+
+    func waitUntilSuspended() async {
+        if didSuspend {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            self.suspensionContinuation = continuation
+        }
+    }
+
+    func resume() {
+        makeContinuation?.resume()
+        makeContinuation = nil
     }
 }

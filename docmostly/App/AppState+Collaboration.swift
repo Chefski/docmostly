@@ -45,6 +45,7 @@ enum NativeEditorCRDTDocumentEngineAttachment {
         let document = editorViewModel.document
 
         do {
+            try Task.checkCancellation()
             guard let engine = try await appState.makeCRDTDocumentEngine(
                 pageID: pageID,
                 title: title,
@@ -53,7 +54,10 @@ enum NativeEditorCRDTDocumentEngineAttachment {
                 return
             }
 
+            try Task.checkCancellation()
             editorViewModel.configureCRDTDocumentEngine(engine)
+        } catch is CancellationError {
+            return
         } catch {
             editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
         }
