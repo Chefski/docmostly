@@ -31,6 +31,12 @@ final class AppState {
         serverURLString = settingsStore.loadServerURLString()
     }
 
+    static func production(crdtRuntimeBundle: Bundle = .main) -> AppState {
+        AppState(
+            crdtDocumentEngineFactory: NativeEditorJSCRDTEngineFactory.bundledIfAvailable(in: crdtRuntimeBundle)
+        )
+    }
+
     func configure(modelContext: ModelContext) {
         if cacheRepository == nil {
             cacheRepository = CacheRepository(context: modelContext)

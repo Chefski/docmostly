@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct DocmostlyApp: App {
-    @State private var appState = AppState()
+    @State private var appState = AppState.production()
 
     private let sharedModelContainer: ModelContainer = {
         let schema = Schema([
