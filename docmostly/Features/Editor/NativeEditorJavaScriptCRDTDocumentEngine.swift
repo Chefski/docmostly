@@ -223,6 +223,29 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         return try JSONDecoder().decode(type, from: data)
     }
 
+    func optionalRuntimeResult<Payload: Encodable, Result: Decodable>(
+        function: String,
+        payload: Payload,
+        as resultType: Result.Type
+    ) throws -> Result? {
+        guard let value = try callOptional(
+            function,
+            arguments: [Self.javaScriptValue(from: payload, in: context)]
+        ) else { return nil }
+
+        return try optionalDecoded(resultType, from: value, function: function)
+    }
+
+    private func optionalDecoded<Value: Decodable>(
+        _ type: Value.Type,
+        from value: JSValue,
+        function: String
+    ) throws -> Value? {
+        guard value.isUndefined == false, value.isNull == false else { return nil }
+
+        return try decode(type, from: value, function: function)
+    }
+
     private func jsonData(from value: JSValue, function: String) throws -> Data {
         if value.isString, let string = value.toString() {
             return Data(string.utf8)

@@ -88,6 +88,69 @@ struct NativeEditorJSCRDTEngineTests {
         ))
     }
 
+    @Test func resolvesRemoteCursorThroughRuntime() async throws {
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: Self.runtimeSource
+        )
+        let cursor = NativeEditorRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            cursor: NativeEditorAwarenessCursor(anchor: nil, head: nil)
+        )
+
+        let resolvedCursor = try await engine.resolveRemoteCursor(cursor)
+
+        #expect(resolvedCursor == NativeEditorResolvedRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 1, characterOffset: 2),
+            head: NativeEditorRemoteTextPosition(blockIndex: 1, characterOffset: 6)
+        ))
+    }
+
+    @Test func encodesLocalAwarenessCursorThroughRuntime() async throws {
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: Self.runtimeSource
+        )
+
+        let cursor = try await engine.encodeLocalAwarenessCursor(for: NativeEditorLocalTextSelection(
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 1),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 3)
+        ))
+
+        #expect(cursor == NativeEditorAwarenessCursor(
+            anchor: yjsRelativePosition(clock: 10),
+            head: yjsRelativePosition(clock: 12)
+        ))
+    }
+
+    @Test func encodesInlineCommentSelectionThroughRuntime() async throws {
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: Self.runtimeSource
+        )
+
+        let selection = try await engine.encodeInlineCommentSelection(for: NativeEditorLocalTextSelection(
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 2),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 5)
+        ))
+
+        #expect(selection == NativeEditorYjsSelection(
+            anchor: yjsSelectionPosition(clock: 20),
+            head: yjsSelectionPosition(clock: 25)
+        ))
+    }
+
     @Test func reportsMissingRuntimeFactory() throws {
         #expect(throws: NativeEditorJSCRDTEngineError.missingRuntimeFactory) {
             _ = try NativeEditorJSCRDTDocumentEngine(
@@ -148,6 +211,36 @@ struct NativeEditorJSCRDTEngineTests {
               updatedAt: "1970-01-01T00:00:30Z"
             };
           },
+          resolveRemoteCursor(cursor) {
+            if (cursor.id === "user-2" && cursor.cursor.anchor === null) {
+              return {
+                id: cursor.id,
+                name: cursor.name,
+                colorName: cursor.colorName,
+                anchor: { blockIndex: 1, characterOffset: 2 },
+                head: { blockIndex: 1, characterOffset: 6 }
+              };
+            }
+            return null;
+          },
+          encodeLocalAwarenessCursor(selection) {
+            if (selection.anchor.characterOffset === 1 && selection.head.characterOffset === 3) {
+              return {
+                anchor: { type: "text", tname: "default", item: { client: 1, clock: 10 }, assoc: 0 },
+                head: { type: "text", tname: "default", item: { client: 1, clock: 12 }, assoc: 0 }
+              };
+            }
+            return null;
+          },
+          encodeInlineCommentSelection(selection) {
+            if (selection.anchor.characterOffset === 2 && selection.head.characterOffset === 5) {
+              return {
+                anchor: { type: { client: 1, clock: 20 }, tname: "default", item: null, assoc: 0 },
+                head: { type: { client: 1, clock: 25 }, tname: "default", item: null, assoc: 0 }
+              };
+            }
+            return null;
+          },
           drainLocalUpdates() {
             const updates = this.localUpdates;
             this.localUpdates = [];
@@ -181,4 +274,22 @@ struct NativeEditorJSCRDTEngineTests {
             isTitleFocused: false
         )
     }
+}
+
+private func yjsRelativePosition(clock: Int) -> NativeEditorYjsRelativePosition {
+    NativeEditorYjsRelativePosition(
+        type: .name("text"),
+        targetName: "default",
+        item: NativeEditorYjsID(client: 1, clock: clock),
+        assoc: 0
+    )
+}
+
+private func yjsSelectionPosition(clock: Int) -> NativeEditorYjsSelectionPosition {
+    NativeEditorYjsSelectionPosition(
+        type: NativeEditorYjsID(client: 1, clock: clock),
+        targetName: "default",
+        item: nil,
+        assoc: 0
+    )
 }
