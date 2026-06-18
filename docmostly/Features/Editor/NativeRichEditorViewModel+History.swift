@@ -34,6 +34,7 @@ extension NativeRichEditorViewModel {
         let currentSnapshot = makeHistorySnapshot()
         redoStack.append(currentSnapshot)
         applyHistorySnapshot(previousSnapshot)
+        queueCRDTLocalChange(before: currentSnapshot, after: previousSnapshot)
     }
 
     func redo() {
@@ -42,6 +43,7 @@ extension NativeRichEditorViewModel {
         let currentSnapshot = makeHistorySnapshot()
         undoStack.append(currentSnapshot)
         applyHistorySnapshot(nextSnapshot)
+        queueCRDTLocalChange(before: currentSnapshot, after: nextSnapshot)
     }
 
     func performUndoableEdit(_ edit: () -> Void) {

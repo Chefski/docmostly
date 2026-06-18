@@ -28,7 +28,7 @@ struct NativeEditorCRDTLocalChangeTests {
         #expect(change.after.document.blocks.map { String($0.text.characters) } == ["Draft updated"])
     }
 
-    @Test func undoDoesNotNotifyCRDTEngineAsANewLocalEdit() async {
+    @Test func undoNotifiesCRDTEngineWithRestoredSnapshot() async throws {
         let engine = LocalChangeCRDTDocumentEngine()
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Draft"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(
@@ -45,8 +45,37 @@ struct NativeEditorCRDTLocalChangeTests {
         viewModel.undo()
         await viewModel.waitForPendingCRDTLocalChange()
 
-        #expect(engine.localChanges.count == 1)
+        let undoChange = try #require(engine.localChanges.last)
+        #expect(engine.localChanges.count == 2)
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Draft"])
+        #expect(undoChange.before.document.blocks.map { String($0.text.characters) } == ["Draft updated"])
+        #expect(undoChange.after.document.blocks.map { String($0.text.characters) } == ["Draft"])
+    }
+
+    @Test func redoNotifiesCRDTEngineWithReappliedSnapshot() async throws {
+        let engine = LocalChangeCRDTDocumentEngine()
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Draft"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.resetEditingHistory()
+
+        viewModel.document.blocks[0].text = AttributedString("Draft updated")
+        viewModel.handleDocumentChanged()
+        await viewModel.waitForPendingCRDTLocalChange()
+        viewModel.undo()
+        await viewModel.waitForPendingCRDTLocalChange()
+        viewModel.redo()
+        await viewModel.waitForPendingCRDTLocalChange()
+
+        let redoChange = try #require(engine.localChanges.last)
+        #expect(engine.localChanges.count == 3)
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Draft updated"])
+        #expect(redoChange.before.document.blocks.map { String($0.text.characters) } == ["Draft"])
+        #expect(redoChange.after.document.blocks.map { String($0.text.characters) } == ["Draft updated"])
     }
 
     @Test func successiveDocumentEditsNotifyCRDTEngineInOrder() async {
