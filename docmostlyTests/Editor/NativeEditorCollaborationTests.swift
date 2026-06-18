@@ -59,6 +59,46 @@ struct NativeEditorCollaborationTests {
         #expect(viewModel.realtimeStatus == .connected)
     }
 
+    @Test func awarenessPreservesRecentEditorsAndReplacesDuplicatePresence() {
+        let viewModel = configuredViewModel()
+        viewModel.activeCollaborators = [
+            NativeEditorCollaborator(
+                id: "user-2",
+                name: "Alice",
+                colorName: "blue",
+                source: .recentEditor
+            ),
+            NativeEditorCollaborator(
+                id: "user-3",
+                name: "Bob",
+                colorName: "green",
+                source: .recentEditor
+            )
+        ]
+        let states = [
+            NativeEditorAwarenessState(
+                clientID: 11,
+                clock: 1,
+                payload: NativeEditorAwarenessPayload(
+                    user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                    cursor: nil
+                )
+            )
+        ]
+
+        viewModel.applyAwarenessStates(states, localClientID: 10)
+
+        #expect(viewModel.activeCollaborators == [
+            NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB"),
+            NativeEditorCollaborator(
+                id: "user-3",
+                name: "Bob",
+                colorName: "green",
+                source: .recentEditor
+            )
+        ])
+    }
+
     @Test func updatesRemoteCursorsFromAwarenessAndIgnoresLocalClient() {
         let viewModel = configuredViewModel()
         let localCursor = awarenessCursor(client: 1, anchorClock: 1, headClock: 1)

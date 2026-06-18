@@ -131,13 +131,18 @@ extension NativeRichEditorViewModel {
 
     func applyAwarenessStates(_ states: [NativeEditorAwarenessState], localClientID: Int) {
         var seenIDs: Set<String> = []
-        activeCollaborators = states.compactMap { state in
+        let presenceCollaborators: [NativeEditorCollaborator] = states.compactMap { state in
             guard state.clientID != localClientID, state.payload?.user != nil else { return nil }
 
             let collaborator = NativeEditorCollaborator(awarenessState: state)
             guard seenIDs.insert(collaborator.id).inserted else { return nil }
             return collaborator
         }
+        let presenceIDs = Set(presenceCollaborators.map { $0.id })
+        let recentEditors = activeCollaborators.filter { collaborator in
+            collaborator.source == .recentEditor && presenceIDs.contains(collaborator.id) == false
+        }
+        activeCollaborators = presenceCollaborators + recentEditors
 
         var seenCursorIDs: Set<String> = []
         remoteCursors = states.compactMap { state in
