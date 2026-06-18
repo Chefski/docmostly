@@ -142,8 +142,8 @@ extension NativeRichEditorViewModel {
         updateHistoryAvailability()
     }
 
-    func waitForPendingCRDTLocalChange() async {
-        await crdtLocalChangeTask?.value
+    func waitForPendingCRDTLocalChange() async throws {
+        try await crdtLocalChangeTask?.value
     }
 
     private func queueCRDTLocalChange(
@@ -155,15 +155,16 @@ extension NativeRichEditorViewModel {
         let previousTask = crdtLocalChangeTask
         let change = NativeEditorCRDTLocalChange(before: before, after: after)
         crdtLocalChangeTask = Task { [weak self, crdtDocumentEngine, change, previousTask] in
-            await previousTask?.value
-            guard Task.isCancelled == false else { return }
+            try await previousTask?.value
+            try Task.checkCancellation()
 
             do {
                 try await crdtDocumentEngine.integrateLocalChange(change)
             } catch is CancellationError {
-                return
+                throw CancellationError()
             } catch {
                 self?.realtimeStatus = .failed(error.localizedDescription)
+                throw error
             }
         }
     }

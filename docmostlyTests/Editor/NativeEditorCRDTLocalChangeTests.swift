@@ -18,7 +18,7 @@ struct NativeEditorCRDTLocalChangeTests {
 
         viewModel.document.blocks[0].text = AttributedString("Draft updated")
         viewModel.handleDocumentChanged()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
 
         let change = try #require(engine.localChanges.first)
         #expect(engine.localChanges.count == 1)
@@ -41,9 +41,9 @@ struct NativeEditorCRDTLocalChangeTests {
 
         viewModel.document.blocks[0].text = AttributedString("Draft updated")
         viewModel.handleDocumentChanged()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
         viewModel.undo()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
 
         let undoChange = try #require(engine.localChanges.last)
         #expect(engine.localChanges.count == 2)
@@ -65,11 +65,11 @@ struct NativeEditorCRDTLocalChangeTests {
 
         viewModel.document.blocks[0].text = AttributedString("Draft updated")
         viewModel.handleDocumentChanged()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
         viewModel.undo()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
         viewModel.redo()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
 
         let redoChange = try #require(engine.localChanges.last)
         #expect(engine.localChanges.count == 3)
@@ -78,7 +78,7 @@ struct NativeEditorCRDTLocalChangeTests {
         #expect(redoChange.after.document.blocks.map { String($0.text.characters) } == ["Draft updated"])
     }
 
-    @Test func successiveDocumentEditsNotifyCRDTEngineInOrder() async {
+    @Test func successiveDocumentEditsNotifyCRDTEngineInOrder() async throws {
         let engine = LocalChangeCRDTDocumentEngine()
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("One"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(
@@ -93,7 +93,7 @@ struct NativeEditorCRDTLocalChangeTests {
         viewModel.handleDocumentChanged()
         viewModel.document.blocks[0].text = AttributedString("Three")
         viewModel.handleDocumentChanged()
-        await viewModel.waitForPendingCRDTLocalChange()
+        try await viewModel.waitForPendingCRDTLocalChange()
 
         #expect(engine.localChanges.map { $0.after.document.blocks.map { String($0.text.characters) } } == [
             ["Two"],

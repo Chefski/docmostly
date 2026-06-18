@@ -42,7 +42,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
     @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
-    @ObservationIgnored var crdtLocalChangeTask: Task<Void, Never>?
+    @ObservationIgnored var crdtLocalChangeTask: Task<Void, any Error>?
     @ObservationIgnored let localAwarenessUpdateStream: AsyncStream<Void>
     @ObservationIgnored let localAwarenessUpdateContinuation: AsyncStream<Void>.Continuation
 
@@ -130,7 +130,7 @@ final class NativeRichEditorViewModel {
 
         do {
             if let crdtDocumentEngine {
-                await waitForPendingCRDTLocalChange()
+                try await waitForPendingCRDTLocalChange()
                 let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = try await crdtDocumentEngine.flushPendingLocalChanges(
                     title: trimmedTitle,

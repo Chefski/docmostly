@@ -83,6 +83,37 @@ struct NativeEditorCRDTSavesTests {
         #expect(didSave == true)
         #expect(engine.events == [.integrateLocalChange, .flushPendingLocalChanges])
     }
+
+    @Test func crdtBackedSaveFailsWhenPendingLocalChangeIntegrationFails() async {
+        let engine = SavingCRDTDocumentEngine()
+        engine.integrationError = APIError.connectionFailed("CRDT local merge failed.")
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Draft"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.resetEditingHistory()
+
+        viewModel.document.blocks[0].text = AttributedString("Draft updated")
+        viewModel.handleDocumentChanged()
+
+        let didSave = await viewModel.save(appState: AppState())
+
+        #expect(didSave == false)
+        #expect(engine.events == [.integrateLocalChange])
+        #expect(engine.flushRequests.isEmpty)
+        #expect(viewModel.isDirty == true)
+        #expect(
+            viewModel.saveErrorMessage ==
+                APIError.connectionFailed("CRDT local merge failed.").localizedDescription
+        )
+        #expect(
+            viewModel.realtimeStatus ==
+                .failed(APIError.connectionFailed("CRDT local merge failed.").localizedDescription)
+        )
+    }
 }
 
 @MainActor
@@ -101,6 +132,7 @@ private final class SavingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     var events: [Event] = []
     var saveResult = NativeEditorCRDTSaveResult()
     var error: (any Error)?
+    var integrationError: (any Error)?
     var shouldSuspendIntegration = false
     private var integrationContinuation: CheckedContinuation<Void, Never>?
 
@@ -116,6 +148,9 @@ private final class SavingCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
         events.append(.integrateLocalChange)
+        if let integrationError {
+            throw integrationError
+        }
         guard shouldSuspendIntegration else { return }
 
         await withCheckedContinuation { continuation in
