@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -56,14 +57,49 @@ struct PageReaderCommentStateTests {
         #expect(viewModel.comments.map(\.id) == ["comment-1"])
     }
 
+    @Test func realtimeCommentUpdatedResolutionUpdatesInlineMark() async throws {
+        let view = PageReaderView(pageID: "page-1")
+        let block = NativeEditorBlock(
+            kind: .paragraph,
+            text: markedText("Marked text", commentID: "comment-1"),
+            alignment: .left
+        )
+        let editorViewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        editorViewModel.document = NativeEditorDocument(blocks: [block])
+        editorViewModel.lastSavedDocument = editorViewModel.document
+        editorViewModel.resetEditingHistory()
+        let resolvedComment = try comment(
+            id: "comment-1",
+            text: "Resolved",
+            resolvedAt: "2026-06-17T10:05:00.000Z",
+            type: "inline"
+        )
+
+        await view.handleRealtimeEvent(
+            .commentUpdated(NativeEditorRealtimeCommentEvent(pageID: "page-1", comment: resolvedComment)),
+            editorViewModel: editorViewModel
+        )
+
+        let marks = editorViewModel.document.proseMirrorDocument.content.first?.content?.first?.marks ?? []
+        #expect(marks.contains(ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(true)]
+        )))
+        #expect(editorViewModel.isDirty == false)
+    }
+
     private func comment(id: String, text: String, resolvedAt: String?) throws -> DocmostComment {
+        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page")
+    }
+
+    private func comment(id: String, text: String, resolvedAt: String?, type: String) throws -> DocmostComment {
         let resolvedAtJSON = resolvedAt.map { "\"\($0)\"" } ?? "null"
         let data = Data("""
         {
           "id": "\(id)",
           "content": "\(text)",
           "selection": null,
-          "type": "page",
+          "type": "\(type)",
           "creatorId": "user-1",
           "pageId": "page-1",
           "parentCommentId": null,
@@ -82,6 +118,14 @@ struct PageReaderCommentStateTests {
         """.utf8)
 
         return try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
+    }
+
+    private func markedText(_ text: String, commentID: String) -> AttributedString {
+        var attributedText = AttributedString(text)
+        attributedText[NativeEditorCommentIDAttribute.self] = commentID
+        attributedText[NativeEditorCommentResolvedAttribute.self] = false
+        attributedText.backgroundColor = .yellow.opacity(0.28)
+        return attributedText
     }
 
     private func resolvedDate(_ value: String) throws -> Date {

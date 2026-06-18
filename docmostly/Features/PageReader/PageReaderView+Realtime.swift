@@ -68,6 +68,11 @@ extension PageReaderView {
             viewModel.applyCreatedComment(event.comment)
         case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyUpdatedComment(event.comment)
+            editorViewModel.setInlineCommentResolved(
+                commentID: event.comment.id,
+                isResolved: event.comment.isResolved,
+                tracksUndo: false
+            )
         case .commentResolved(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyUpdatedComment(event.comment)
             editorViewModel.setInlineCommentResolved(
