@@ -158,12 +158,19 @@ struct PageReaderView: View {
 
     private func loadNativePage() async {
         editorFocusedField = nil
+        editorViewModel = nil
         let editorViewModel = NativeRichEditorViewModel(pageID: pageID)
-        self.editorViewModel = editorViewModel
 
         await editorViewModel.load(appState: appState)
         if editorViewModel.errorMessage == nil {
+            await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
+                to: editorViewModel,
+                appState: appState
+            )
+            self.editorViewModel = editorViewModel
             await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+        } else {
+            self.editorViewModel = editorViewModel
         }
     }
 

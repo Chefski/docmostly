@@ -16,15 +16,18 @@ final class AppState {
 
     @ObservationIgnored private let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
+    @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
     @ObservationIgnored private var cacheRepository: CacheRepository?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
 
     init(
         settingsStore: LocalSettingsStore = LocalSettingsStore(),
-        authService: AuthService = AuthService()
+        authService: AuthService = AuthService(),
+        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil
     ) {
         self.settingsStore = settingsStore
         self.authService = authService
+        self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
         serverURLString = settingsStore.loadServerURLString()
     }
 

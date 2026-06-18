@@ -43,6 +43,15 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     func documentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot>
 }
 
+@MainActor
+protocol NativeEditorCRDTDocumentEngineFactory: AnyObject {
+    func makeDocumentEngine(
+        pageID: String,
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> any NativeEditorCRDTDocumentEngine
+}
+
 extension NativeEditorCRDTDocumentEngine {
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws { }
 
