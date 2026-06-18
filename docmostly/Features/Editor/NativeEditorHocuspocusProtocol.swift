@@ -284,6 +284,22 @@ nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
 nonisolated struct NativeEditorAwarenessPayload: Codable, Equatable, Sendable {
     let user: NativeEditorAwarenessUser?
     let cursor: NativeEditorAwarenessCursor?
+
+    private enum CodingKeys: String, CodingKey {
+        case user
+        case cursor
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(user, forKey: .user)
+
+        if let cursor {
+            try container.encode(cursor, forKey: .cursor)
+        } else {
+            try container.encodeNil(forKey: .cursor)
+        }
+    }
 }
 
 nonisolated struct NativeEditorAwarenessUser: Codable, Equatable, Sendable {
