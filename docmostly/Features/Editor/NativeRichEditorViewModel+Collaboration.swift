@@ -165,6 +165,11 @@ extension NativeRichEditorViewModel {
         localAwarenessUpdateContinuation.yield(())
     }
 
+    func handleLocalSelectionChanged() {
+        guard canEdit else { return }
+        notifyLocalAwarenessChanged()
+    }
+
     func collaborationSession() -> NativeEditorCollaborationSession {
         let collaborationDocument = NativeEditorCollaborationDocument(pageID: currentPageID)
         let syncDriver = crdtSyncCoordinator.map { coordinator in

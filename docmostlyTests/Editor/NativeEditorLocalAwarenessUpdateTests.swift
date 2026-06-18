@@ -37,4 +37,15 @@ struct NativeEditorLocalAwarenessUpdateTests {
 
         #expect(await iterator?.next() != nil)
     }
+
+    @Test func selectionChangesPublishLocalAwarenessWithoutDirtyingDocument() async {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        var iterator = viewModel.localAwarenessUpdates().makeAsyncIterator()
+
+        viewModel.handleLocalSelectionChanged()
+
+        #expect(await iterator.next() != nil)
+        #expect(viewModel.isDirty == false)
+        #expect(viewModel.canUndo == false)
+    }
 }

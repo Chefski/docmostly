@@ -37,6 +37,9 @@ struct NativeEditorBodyView: View {
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
+                        selectionChanged: {
+                            viewModel.handleLocalSelectionChanged()
+                        },
                         dropText: { text in
                             viewModel.dropMarkdown(text, before: block.id)
                         }
