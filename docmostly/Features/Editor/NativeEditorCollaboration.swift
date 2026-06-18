@@ -128,6 +128,11 @@ nonisolated struct NativeEditorAwarenessStateStore: Sendable {
     ) -> [NativeEditorAwarenessState] {
         for state in updates {
             if let latestClock = latestClockByClientID[state.clientID], state.clock <= latestClock {
+                if state.clock == latestClock,
+                   state.payload != nil,
+                   statesByClientID[state.clientID] != nil {
+                    lastSeenByClientID[state.clientID] = receivedAt
+                }
                 continue
             }
 

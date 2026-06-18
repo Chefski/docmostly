@@ -74,6 +74,41 @@ struct NativeEditorAwarenessStateStoreTests {
         #expect(store.pruneStaleStates(now: beforeTimeout) == nil)
     }
 
+    @Test func equalClockAwarenessHeartbeatRefreshesLivenessWithoutOverwritingState() {
+        var store = NativeEditorAwarenessStateStore()
+        let receivedAt = Date(timeIntervalSince1970: 1_000)
+        let alice = awarenessState(
+            clientID: 42,
+            clock: 3,
+            userID: "user-2",
+            name: "Alice",
+            color: "#2563EB"
+        )
+        let equalClockStalePayload = awarenessState(
+            clientID: 42,
+            clock: 3,
+            userID: "user-2",
+            name: "Old Alice",
+            color: "#EA580C"
+        )
+        let heartbeatReceivedAt = receivedAt.addingTimeInterval(
+            NativeEditorAwarenessTiming.staleStateInterval - 1
+        )
+
+        #expect(store.apply([alice], receivedAt: receivedAt).first?.user?.name == "Alice")
+        #expect(
+            store.apply(
+                [equalClockStalePayload],
+                receivedAt: heartbeatReceivedAt
+            ).first?.user?.name == "Alice"
+        )
+
+        let afterInitialTimeout = receivedAt.addingTimeInterval(
+            NativeEditorAwarenessTiming.staleStateInterval + 1
+        )
+        #expect(store.pruneStaleStates(now: afterInitialTimeout) == nil)
+    }
+
     @Test func prunesStaleAwarenessStatesWithoutClearingClientClock() {
         var store = NativeEditorAwarenessStateStore()
         let receivedAt = Date(timeIntervalSince1970: 1_000)
