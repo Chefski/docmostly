@@ -99,10 +99,11 @@ struct NativeEditorHocuspocusProtocolTests {
 
         let frame = try NativeEditorHocuspocusFrame.parse(frameData)
 
-        guard case .stateless(let event) = frame.message else {
+        guard case .stateless(let optionalEvent) = frame.message else {
             Issue.record("Expected stateless message")
             return
         }
+        let event = try #require(optionalEvent)
 
         #expect(event.type == "page.updated")
         #expect(event.lastUpdatedBy?.name == "Alice")
@@ -111,6 +112,19 @@ struct NativeEditorHocuspocusProtocolTests {
             strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)
         )
         #expect(event.updatedAt == expectedDate)
+    }
+
+    @Test func ignoresUnrecognizedStatelessPayloads() throws {
+        let frameData = makeHocuspocusFrame(
+            documentName: "page.page-1",
+            messageType: 5,
+            payload: encodeVarString("not-docmost-json")
+        )
+
+        let frame = try NativeEditorHocuspocusFrame.parse(frameData)
+
+        #expect(frame.documentName == "page.page-1")
+        #expect(frame.message == .stateless(nil))
     }
 
     @Test func parsesYjsSyncStepOneFrame() throws {

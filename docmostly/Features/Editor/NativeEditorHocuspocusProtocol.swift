@@ -125,7 +125,7 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
             message = .queryAwareness
         case .stateless:
             let payload = try decoder.readVarString()
-            let event = try DocmostJSONDecoder.make().decode(
+            let event = try? DocmostJSONDecoder.make().decode(
                 NativeEditorCollaborationStatelessEvent.self,
                 from: Data(payload.utf8)
             )
@@ -229,7 +229,7 @@ nonisolated enum NativeEditorHocuspocusMessage: Equatable, Sendable {
     case authenticated(scope: NativeEditorCollaborationScope)
     case authenticationFailed(reason: String)
     case queryAwareness
-    case stateless(NativeEditorCollaborationStatelessEvent)
+    case stateless(NativeEditorCollaborationStatelessEvent?)
     case close(reason: String)
     case syncStatus(Bool)
 }

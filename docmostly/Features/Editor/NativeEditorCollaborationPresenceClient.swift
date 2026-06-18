@@ -156,7 +156,7 @@ actor NativeEditorCollaborationPresenceClient {
             let currentStates = awarenessStore.apply(states)
             continuation.yield(.awareness(states: currentStates, localClientID: localClientID))
         case .stateless(let event):
-            continuation.yield(.stateless(event))
+            yieldStatelessEvent(event, continuation: continuation)
         case .syncStatus(let isSynced):
             continuation.yield(.syncStatus(isSynced))
         case .sync(let syncMessage):
@@ -172,6 +172,14 @@ actor NativeEditorCollaborationPresenceClient {
 }
 
 private extension NativeEditorCollaborationPresenceClient {
+    func yieldStatelessEvent(
+        _ event: NativeEditorCollaborationStatelessEvent?,
+        continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
+    ) {
+        guard let event else { return }
+        continuation.yield(.stateless(event))
+    }
+
     func handleAuthenticatedScope(
         _ scope: NativeEditorCollaborationScope,
         context: NativeEditorCollaborationSessionContext,
