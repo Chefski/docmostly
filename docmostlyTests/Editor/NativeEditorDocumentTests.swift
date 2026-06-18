@@ -169,30 +169,37 @@ struct NativeEditorDocumentTests {
     }
 
     @Test func decodesInlineDocmostFormattingAndAtomNodes() throws {
+        let original = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: NativeEditorInlineFixtures.richInline
+        )
         let document = try NativeEditorDocument(
             proseMirrorJSONData: NativeEditorInlineFixtures.richInline
         )
         let block = try #require(document.blocks.first)
 
-        let inlineContent = try #require(block.inlineContent)
-        #expect(inlineContent.count == 7)
+        #expect(block.isEditable == true)
+        #expect(block.inlineContent == nil)
 
-        guard case .text(let styledText, let styledMarks) = inlineContent[0] else {
-            Issue.record("Expected styled text")
-            return
-        }
-        #expect(styledText == "Styled")
-        #expect(styledMarks.contains(.underline))
-        #expect(styledMarks.contains(.highlight(color: "#faf594", colorName: "yellow")))
-        #expect(styledMarks.contains(.textColor("#2563EB")))
-        #expect(styledMarks.contains(.comment(commentID: "comment-1", isResolved: false)))
+        let styledRun = try run(containing: "Styled", in: block.text)
+        #expect(styledRun.underlineStyle != nil)
+        #expect(styledRun[NativeEditorHighlightColorAttribute.self] == "#faf594")
+        #expect(styledRun[NativeEditorHighlightColorNameAttribute.self] == "yellow")
+        #expect(styledRun[NativeEditorTextColorAttribute.self] == "#2563EB")
+        #expect(styledRun[NativeEditorCommentIDAttribute.self] == "comment-1")
+        #expect(styledRun[NativeEditorCommentResolvedAttribute.self] == false)
 
-        try expectInlineMentionStatusAndMath(inlineContent)
+        let mentionRun = try run(containing: "Roadmap", in: block.text)
+        #expect(mentionRun[NativeEditorMentionAttribute.self]?.label == "Roadmap")
+        #expect(mentionRun[NativeEditorMentionAttribute.self]?.entityType == "page")
+        #expect(mentionRun[NativeEditorMentionAttribute.self]?.slugID == "roadmap-abc")
 
-        let original = try JSONDecoder().decode(
-            ProseMirrorDocument.self,
-            from: NativeEditorInlineFixtures.richInline
-        )
+        let statusRun = try run(containing: "Ship", in: block.text)
+        #expect(statusRun[NativeEditorStatusAttribute.self]?.text == "Ship")
+        #expect(statusRun[NativeEditorStatusAttribute.self]?.color == "green")
+
+        let mathRun = try run(containing: "x^2", in: block.text)
+        #expect(mathRun[NativeEditorMathInlineAttribute.self]?.text == "x^2")
         #expect(document.proseMirrorDocument == original)
     }
 
@@ -263,26 +270,12 @@ struct NativeEditorDocumentTests {
         #expect(language == "mermaid")
     }
 
-    private func expectInlineMentionStatusAndMath(_ inlineContent: [NativeEditorInlineContent]) throws {
-        guard case .mention(let mention) = inlineContent[2] else {
-            Issue.record("Expected page mention")
-            return
-        }
-        #expect(mention.label == "Roadmap")
-        #expect(mention.entityType == "page")
-        #expect(mention.slugID == "roadmap-abc")
-
-        guard case .status(let status) = inlineContent[4] else {
-            Issue.record("Expected status badge")
-            return
-        }
-        #expect(status.text == "Ship")
-        #expect(status.color == "green")
-
-        guard case .mathInline(let math) = inlineContent[6] else {
-            Issue.record("Expected inline math")
-            return
-        }
-        #expect(math.text == "x^2")
+    private func run(
+        containing text: String,
+        in attributedText: AttributedString
+    ) throws -> AttributedString.Runs.Run {
+        try #require(attributedText.runs.first { run in
+            String(attributedText[run.range].characters).contains(text)
+        })
     }
 }

@@ -270,7 +270,7 @@ struct NativeRichEditorViewModelTests {
     }
 
     private func proseMirrorTextMarks(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorMark] {
-        proseMirrorInlineNodes(from: viewModel).first?.marks ?? []
+        proseMirrorInlineNodes(from: viewModel).flatMap { $0.marks ?? [] }
     }
 
     private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
