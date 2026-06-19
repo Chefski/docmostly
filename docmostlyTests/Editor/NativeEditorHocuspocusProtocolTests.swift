@@ -204,6 +204,12 @@ struct NativeEditorHocuspocusProtocolTests {
         #expect(NativeEditorCollaborationScope.readonly.allowsSyncReply(to: .update(Data([3]))) == true)
     }
 
+    @Test func unknownCollaborationScopeDoesNotAllowInitialDocumentSync() {
+        #expect(NativeEditorCollaborationScope.readWrite.allowsInitialDocumentSync == true)
+        #expect(NativeEditorCollaborationScope.readonly.allowsInitialDocumentSync == true)
+        #expect(NativeEditorCollaborationScope.unknown.allowsInitialDocumentSync == false)
+    }
+
     @Test func encodesYjsSyncUpdateFrame() {
         let frameData = NativeEditorHocuspocusFrame.sync(
             documentName: "page.page-1",

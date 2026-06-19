@@ -186,7 +186,7 @@ private extension NativeEditorCollaborationPresenceClient {
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         authenticatedScope = scope
-        try await sendInitialCRDTSync(using: context.syncDriver)
+        try await sendInitialCRDTSync(for: scope, using: context.syncDriver)
         configureLocalDocumentUpdates(for: scope, syncDriver: context.syncDriver)
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
@@ -226,7 +226,11 @@ private extension NativeEditorCollaborationPresenceClient {
         disconnect()
     }
 
-    func sendInitialCRDTSync(using syncDriver: NativeEditorCollaborationSyncDriver?) async throws {
+    func sendInitialCRDTSync(
+        for scope: NativeEditorCollaborationScope,
+        using syncDriver: NativeEditorCollaborationSyncDriver?
+    ) async throws {
+        guard scope.allowsInitialDocumentSync else { return }
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFramesAfterAuthentication()
         try await send(frames)
@@ -381,17 +385,6 @@ private extension NativeEditorCollaborationPresenceClient {
     func send(_ frames: [Data]) async throws {
         for frame in frames {
             try await send(frame)
-        }
-    }
-
-    static func data(from message: URLSessionWebSocketTask.Message) -> Data {
-        switch message {
-        case .data(let data):
-            data
-        case .string(let string):
-            Data(string.utf8)
-        @unknown default:
-            Data()
         }
     }
 }
