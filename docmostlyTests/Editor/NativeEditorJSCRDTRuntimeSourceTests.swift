@@ -53,6 +53,140 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         #expect(try await engine.encodeStateVector() == Data([1]))
     }
 
+    @Test func mainBundleRuntimeIntegratesLocalTextChange() async throws {
+        let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let updates = await engine.localUpdates()
+        var iterator = updates.makeAsyncIterator()
+
+        try await engine.integrateLocalChange(NativeEditorCRDTLocalChange(
+            before: historySnapshot(title: "Page", text: "Seed"),
+            after: historySnapshot(title: "Page", text: "Edited")
+        ))
+
+        #expect(await iterator.next()?.isEmpty == false)
+        #expect(try await engine.flushPendingLocalChanges(
+            title: "Page",
+            document: document(text: "Edited")
+        ).title == "Page")
+    }
+
+    @Test func mainBundleRuntimeAppliesRemoteYjsUpdateAsSnapshot() async throws {
+        let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
+        let firstEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let secondEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let updates = await firstEngine.localUpdates()
+        var updateIterator = updates.makeAsyncIterator()
+        let snapshots = await secondEngine.documentSnapshots()
+        var snapshotIterator = snapshots.makeAsyncIterator()
+
+        try await firstEngine.integrateLocalChange(NativeEditorCRDTLocalChange(
+            before: historySnapshot(title: "Page", text: "Seed"),
+            after: historySnapshot(title: "Page", text: "Shared edit")
+        ))
+        let update = try #require(await updateIterator.next())
+
+        try await secondEngine.applyRemoteUpdate(update)
+
+        let snapshot = try #require(await snapshotIterator.next())
+        #expect(snapshot.title == "Page")
+        #expect(snapshot.document.blocks.map { String($0.text.characters) } == ["Shared edit"])
+    }
+
+    @Test func mainBundleRuntimeRoundTripsAwarenessCursorAfterSync() async throws {
+        let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
+        let sourceEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let syncedEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let updates = await sourceEngine.localUpdates()
+        var updateIterator = updates.makeAsyncIterator()
+        try await sourceEngine.integrateLocalChange(NativeEditorCRDTLocalChange(
+            before: historySnapshot(title: "Page", text: "Seed"),
+            after: historySnapshot(title: "Page", text: "Shared edit")
+        ))
+        try await syncedEngine.applyRemoteUpdate(try #require(await updateIterator.next()))
+
+        let cursor = try #require(try await syncedEngine.encodeLocalAwarenessCursor(
+            for: NativeEditorLocalTextSelection(
+                anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 0),
+                head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 6)
+            )
+        ))
+        let resolvedCursor = try await syncedEngine.resolveRemoteCursor(NativeEditorRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            cursor: cursor
+        ))
+
+        #expect(resolvedCursor == NativeEditorResolvedRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 0),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 6)
+        ))
+    }
+
+    @Test func mainBundleRuntimeEncodesInlineCommentSelectionAfterSync() async throws {
+        let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
+        let sourceEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let syncedEngine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let updates = await sourceEngine.localUpdates()
+        var updateIterator = updates.makeAsyncIterator()
+        try await sourceEngine.integrateLocalChange(NativeEditorCRDTLocalChange(
+            before: historySnapshot(title: "Page", text: "Seed"),
+            after: historySnapshot(title: "Page", text: "Shared edit")
+        ))
+        try await syncedEngine.applyRemoteUpdate(try #require(await updateIterator.next()))
+
+        let selection = try #require(try await syncedEngine.encodeInlineCommentSelection(
+            for: NativeEditorLocalTextSelection(
+                anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 0),
+                head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 6)
+            )
+        ))
+
+        #expect(selection.anchor.targetName == NativeEditorCollaborationDocument.yjsFragmentName)
+        #expect(selection.head.targetName == NativeEditorCollaborationDocument.yjsFragmentName)
+        #expect(selection.anchor.type.client != 0)
+        #expect(selection.head.type.client != 0)
+    }
+
     private static let runtimeSource = """
     globalThis.docmostlyCRDT = {
       createDocument(seed) {
@@ -102,6 +236,17 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         NativeEditorDocument(blocks: [
             NativeEditorBlock(kind: .paragraph, text: AttributedString(text), alignment: .left)
         ])
+    }
+
+    private func historySnapshot(title: String, text: String) -> NativeEditorHistorySnapshot {
+        NativeEditorHistorySnapshot(
+            title: title,
+            document: document(text: text),
+            activeBlockID: nil,
+            selectedBlockID: nil,
+            visibleBlockControlsID: nil,
+            isTitleFocused: false
+        )
     }
 
     private static let infoPlist = """
