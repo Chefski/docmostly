@@ -90,6 +90,17 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    @discardableResult
+    func applyInlineCommentFallback(
+        commentID: String,
+        to context: NativeEditorInlineCommentContext,
+        yjsSelection: NativeEditorYjsSelection?
+    ) -> Bool {
+        guard yjsSelection == nil else { return false }
+        applyInlineComment(commentID: commentID, to: context)
+        return true
+    }
+
     func setInlineCommentResolved(commentID: String, isResolved: Bool, tracksUndo: Bool = true) {
         let trimmedCommentID = commentID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedCommentID.isEmpty == false else { return }

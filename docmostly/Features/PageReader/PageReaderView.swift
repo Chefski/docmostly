@@ -17,6 +17,7 @@ struct PageReaderView: View {
     @State private var inlineCommentErrorMessage: String?
     @State private var pendingInlineCommentID: String?
     @State private var pendingInlineCommentDraft: String?
+    @State private var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
     @FocusState private var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
@@ -324,6 +325,7 @@ private extension PageReaderView {
         inlineCommentContext = context
         pendingInlineCommentID = nil
         pendingInlineCommentDraft = nil
+        pendingInlineCommentYjsSelection = nil
         isShowingInlineCommentComposer = true
     }
 
@@ -333,31 +335,42 @@ private extension PageReaderView {
         }
 
         let commentID: String
+        let yjsSelection: NativeEditorYjsSelection?
         if let pendingInlineCommentID, pendingInlineCommentDraft == text {
             commentID = pendingInlineCommentID
+            yjsSelection = pendingInlineCommentYjsSelection
         } else {
-            let yjsSelection = await editorViewModel.inlineCommentYjsSelection(for: inlineCommentContext)
+            yjsSelection = await editorViewModel.inlineCommentYjsSelection(for: inlineCommentContext)
             let comment = try await appState.addInlineComment(
                 pageId: editorViewModel.currentPageID,
                 text: text,
                 selectedText: inlineCommentContext.selectedText,
                 yjsSelection: yjsSelection
             )
+            viewModel.applyCreatedComment(comment)
             commentID = comment.id
             pendingInlineCommentID = comment.id
             pendingInlineCommentDraft = text
+            pendingInlineCommentYjsSelection = yjsSelection
         }
 
-        editorViewModel.applyInlineComment(commentID: commentID, to: inlineCommentContext)
+        let didApplyLocalMark = editorViewModel.applyInlineCommentFallback(
+            commentID: commentID,
+            to: inlineCommentContext,
+            yjsSelection: yjsSelection
+        )
 
-        guard await editorViewModel.save(appState: appState) else {
-            let message = editorViewModel.saveErrorMessage ??
-                "Comment was created, but the page update did not save."
-            throw NativeEditorInlineCommentCreationError.saveFailed(message)
+        if didApplyLocalMark {
+            guard await editorViewModel.save(appState: appState) else {
+                let message = editorViewModel.saveErrorMessage ??
+                    "Comment was created, but the page update did not save."
+                throw NativeEditorInlineCommentCreationError.saveFailed(message)
+            }
         }
 
         pendingInlineCommentID = nil
         pendingInlineCommentDraft = nil
+        pendingInlineCommentYjsSelection = nil
         await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
     }
 
