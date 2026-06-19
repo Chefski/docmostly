@@ -139,6 +139,16 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.realtimeStatus == .connected)
     }
 
+    @Test func pageReaderTreatsUnknownCollaborationScopeAsUnsupported() async {
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        await view.handleCollaborationPresenceEvent(.authenticated(.unknown), editorViewModel: viewModel)
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.realtimeStatus == .unsupported("Unsupported collaboration permission scope."))
+    }
+
     @Test func pageReaderRoutesActivePageDeletionAsUnavailableReadOnlyState() async {
         let view = PageReaderView(pageID: "page-1")
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)

@@ -72,7 +72,14 @@ extension PageReaderView {
         switch event {
         case .authenticated(let scope):
             editorViewModel.applyCollaborationAuthenticationScope(scope)
-            markCollaborationPresenceConnected(editorViewModel)
+            if scope == .unknown {
+                markCollaborationPresenceUnsupported(
+                    editorViewModel,
+                    message: "Unsupported collaboration permission scope."
+                )
+            } else {
+                markCollaborationPresenceConnected(editorViewModel)
+            }
         case .awareness(let states, let localClientID):
             editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
             await editorViewModel.refreshResolvedRemoteCursors()
