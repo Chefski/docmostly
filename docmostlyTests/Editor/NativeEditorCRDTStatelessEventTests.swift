@@ -139,7 +139,8 @@ struct NativeCRDTStatelessEventTests {
             editorViewModel: viewModel
         )
 
-        #expect(viewModel.title == "Local")
+        #expect(viewModel.title == "Remote")
+        #expect(viewModel.lastSavedTitle == "Remote")
         #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
         #expect(viewModel.pendingRemoteUpdate == nil)
         #expect(viewModel.pendingRemotePage == nil)
@@ -195,6 +196,8 @@ struct NativeCRDTStatelessEventTests {
             initialTitle: "Saved",
             crdtDocumentEngine: engine
         )
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
         viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
         viewModel.title = "Local title"
         viewModel.handleTitleChanged()

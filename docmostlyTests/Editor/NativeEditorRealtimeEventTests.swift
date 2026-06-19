@@ -53,6 +53,39 @@ struct NativeEditorRealtimeEventTests {
         #expect(event.lastUpdatedBy?.name == "Remote Editor")
     }
 
+    @Test func parsesSocketIOTitleEditorUpdateWithoutUpdatedAt() throws {
+        let frame = """
+        42[
+          "message",
+          {
+            "operation": "updateOne",
+            "spaceId": "space-1",
+            "entity": ["pages"],
+            "id": "page-1",
+            "payload": {
+              "title": "Renamed",
+              "slugId": "renamed-abc",
+              "parentPageId": null,
+              "icon": null
+            }
+          }
+        ]
+        """
+
+        let parsedFrame = try NativeEditorRealtimeSocketFrame.parse(frame)
+        guard case .event(.pageUpdated(let event)) = parsedFrame else {
+            Issue.record("Expected a page update event")
+            return
+        }
+
+        #expect(event.pageID == "page-1")
+        #expect(event.spaceID == "space-1")
+        #expect(event.title == "Renamed")
+        #expect(event.slugID == "renamed-abc")
+        #expect(event.updatedAt == nil)
+        #expect(event.lastUpdatedBy == nil)
+    }
+
     @Test func parsesSocketIOCommentCreatedMessageEvent() throws {
         let frame = """
         42[
