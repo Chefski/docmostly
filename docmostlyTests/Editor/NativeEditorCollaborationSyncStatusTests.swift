@@ -138,4 +138,28 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.canEdit == true)
         #expect(viewModel.realtimeStatus == .connected)
     }
+
+    @Test func pageReaderRoutesActivePageDeletionAsUnavailableReadOnlyState() async {
+        let view = PageReaderView(pageID: "page-1")
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Saved title")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.focus(blockID: block.id)
+        viewModel.document.blocks[0].text = AttributedString("Local draft")
+        viewModel.handleDocumentChanged()
+
+        await view.handleRealtimeEvent(
+            .pageDeleted(NativeEditorRealtimePageDeletedEvent(pageID: "page-1", spaceID: "space-1")),
+            editorViewModel: viewModel
+        )
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.canSave == false)
+        #expect(viewModel.activeBlockID == nil)
+        #expect(viewModel.isDirty == false)
+        #expect(viewModel.errorMessage == "This page was deleted in Docmost.")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
+    }
 }

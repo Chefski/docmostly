@@ -242,6 +242,21 @@ final class NativeRichEditorViewModel {
         updateEditAccess()
     }
 
+    func handleRemotePageDeleted() {
+        let message = "This page was deleted in Docmost."
+        pageAllowsEditing = false
+        canEdit = false
+        errorMessage = message
+        saveErrorMessage = nil
+        pendingRemotePage = nil
+        pendingRemoteUpdate = nil
+        realtimeStatus = .failed(message)
+        activeCollaborators = []
+        remoteCursors = []
+        resolvedRemoteCursors = []
+        discardUnsavedEditsForReadOnlyAccess()
+    }
+
     func clearAuthoringState() {
         isTitleFocused = false
         activeBlockID = nil

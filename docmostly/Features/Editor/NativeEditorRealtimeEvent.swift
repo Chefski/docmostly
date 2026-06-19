@@ -79,6 +79,7 @@ nonisolated enum NativeEditorRealtimeEvent: Equatable, Sendable {
     case commentUpdated(NativeEditorRealtimeCommentEvent)
     case commentDeleted(NativeEditorRealtimeCommentDeletedEvent)
     case commentResolved(NativeEditorRealtimeCommentEvent)
+    case pageDeleted(NativeEditorRealtimePageDeletedEvent)
     case unknown(String)
 }
 
@@ -99,6 +100,11 @@ nonisolated struct NativeEditorRealtimeCommentEvent: Equatable, Sendable {
 nonisolated struct NativeEditorRealtimeCommentDeletedEvent: Equatable, Sendable {
     let pageID: String
     let commentID: String
+}
+
+nonisolated struct NativeEditorRealtimePageDeletedEvent: Equatable, Sendable {
+    let pageID: String
+    let spaceID: String?
 }
 
 nonisolated private struct SocketIOEventEnvelope: Decodable {
@@ -137,6 +143,9 @@ nonisolated extension NativeEditorRealtimeEvent: Decodable {
         case "commentDeleted":
             let event = try CommentDeletedEventEnvelope(from: decoder)
             self = .commentDeleted(event.realtimeEvent)
+        case "deleteTreeNode":
+            let event = try DeleteTreeNodeEventEnvelope(from: decoder)
+            self = .pageDeleted(event.realtimeEvent)
         default:
             self = .unknown(operation)
         }
@@ -187,5 +196,22 @@ nonisolated private struct CommentDeletedEventEnvelope: Decodable {
 
     var realtimeEvent: NativeEditorRealtimeCommentDeletedEvent {
         NativeEditorRealtimeCommentDeletedEvent(pageID: pageId, commentID: commentId)
+    }
+}
+
+nonisolated private struct DeleteTreeNodeEventEnvelope: Decodable {
+    let spaceId: String?
+    let payload: Payload
+
+    var realtimeEvent: NativeEditorRealtimePageDeletedEvent {
+        NativeEditorRealtimePageDeletedEvent(pageID: payload.node.id, spaceID: spaceId)
+    }
+
+    struct Payload: Decodable {
+        let node: Node
+    }
+
+    struct Node: Decodable {
+        let id: String
     }
 }

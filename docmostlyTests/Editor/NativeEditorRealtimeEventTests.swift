@@ -139,6 +139,34 @@ struct NativeEditorRealtimeEventTests {
         #expect(event.comment.type == "inline")
     }
 
+    @Test func parsesSocketIOPageDeletedTreeMessageEvent() throws {
+        let frame = """
+        42[
+          "message",
+          {
+            "operation": "deleteTreeNode",
+            "spaceId": "space-1",
+            "payload": {
+              "node": {
+                "id": "page-1",
+                "slugId": "deleted-page-abc",
+                "title": "Deleted page"
+              }
+            }
+          }
+        ]
+        """
+
+        let parsedFrame = try NativeEditorRealtimeSocketFrame.parse(frame)
+        guard case .event(.pageDeleted(let event)) = parsedFrame else {
+            Issue.record("Expected a page deleted event")
+            return
+        }
+
+        #expect(event.pageID == "page-1")
+        #expect(event.spaceID == "space-1")
+    }
+
     @Test func parsesEngineIOControlFrames() throws {
         #expect(try NativeEditorRealtimeSocketFrame.parse("2") == .ping)
         #expect(try NativeEditorRealtimeSocketFrame.parse("40") == .connected)
