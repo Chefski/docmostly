@@ -69,7 +69,11 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
           },
           encodeStateAsUpdate() { return ""; },
           applyRemoteUpdate() {},
+          integrateLocalChange() {},
           flushPendingLocalChanges(title) { return { title, updatedAt: null }; },
+          resolveRemoteCursor() { return null; },
+          encodeLocalAwarenessCursor() { return null; },
+          encodeInlineCommentSelection() { return null; },
           drainLocalUpdates() { return []; },
           drainDocumentSnapshots() { return []; }
         };

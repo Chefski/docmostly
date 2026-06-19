@@ -90,8 +90,7 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         }
 
         self.runtimeDocument = runtimeDocument
-        try validateRequiredRuntimeFunction("drainLocalUpdates")
-        try validateRequiredRuntimeFunction("drainDocumentSnapshots")
+        try validateRequiredRuntimeFunctions()
     }
 
     isolated deinit {
@@ -129,7 +128,7 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         document: NativeEditorDocument
     ) async throws -> NativeEditorCRDTSaveResult {
         let result = try decode(
-            RuntimeSaveResult.self,
+            NativeEditorJSCRDTRuntimeSaveResult.self,
             from: callRequired(
                 "flushPendingLocalChanges",
                 arguments: [title, Self.javaScriptValue(from: document.proseMirrorDocument, in: context)]
@@ -172,7 +171,7 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     private func drainDocumentSnapshots() throws {
         guard let value = try callOptional("drainDocumentSnapshots") else { return }
         let snapshots = try decode(
-            [RuntimeDocumentSnapshot].self,
+            [NativeEditorJSCRDTRuntimeSnapshot].self,
             from: value,
             function: "drainDocumentSnapshots"
         )
@@ -187,27 +186,6 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
             throw NativeEditorJSCRDTEngineError.missingFunction(name)
         }
         return result
-    }
-
-    private func validateRequiredRuntimeFunction(_ name: String) throws {
-        guard
-            let function = runtimeDocument.objectForKeyedSubscript(name),
-            function.isUndefined == false,
-            function.isNull == false
-        else {
-            throw NativeEditorJSCRDTEngineError.missingFunction(name)
-        }
-
-        context.exception = nil
-        guard
-            let validator = context.evaluateScript("(function(document, name) { return typeof document[name] === 'function'; })"),
-            let isCallable = validator.call(withArguments: [runtimeDocument, name])?.toBool(),
-            isCallable
-        else {
-            try Self.throwIfException(in: context)
-            throw NativeEditorJSCRDTEngineError.missingFunction(name)
-        }
-        try Self.throwIfException(in: context)
     }
 
     private func callOptional(_ name: String, arguments: [Any] = []) throws -> JSValue? {
@@ -329,6 +307,51 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     }
 }
 
+private extension NativeEditorJSCRDTDocumentEngine {
+    func validateRequiredRuntimeFunctions() throws {
+        for name in Self.requiredRuntimeFunctions {
+            try validateRequiredRuntimeFunction(name)
+        }
+    }
+
+    func validateRequiredRuntimeFunction(_ name: String) throws {
+        guard
+            let function = runtimeDocument.objectForKeyedSubscript(name),
+            function.isUndefined == false,
+            function.isNull == false
+        else {
+            throw NativeEditorJSCRDTEngineError.missingFunction(name)
+        }
+
+        context.exception = nil
+        let validatorScript = "(function(document, name) { return typeof document[name] === 'function'; })"
+        guard
+            let validator = context.evaluateScript(validatorScript),
+            let isCallable = validator.call(withArguments: [runtimeDocument, name])?.toBool(),
+            isCallable
+        else {
+            try Self.throwIfException(in: context)
+            throw NativeEditorJSCRDTEngineError.missingFunction(name)
+        }
+        try Self.throwIfException(in: context)
+    }
+
+    static var requiredRuntimeFunctions: [String] {
+        [
+            "encodeStateVector",
+            "encodeStateAsUpdate",
+            "applyRemoteUpdate",
+            "integrateLocalChange",
+            "flushPendingLocalChanges",
+            "resolveRemoteCursor",
+            "encodeLocalAwarenessCursor",
+            "encodeInlineCommentSelection",
+            "drainLocalUpdates",
+            "drainDocumentSnapshots"
+        ]
+    }
+}
+
 @MainActor
 final class NativeEditorJSCRDTEngineFactory: NativeEditorCRDTDocumentEngineFactory {
     private let runtimeSource: String
@@ -369,36 +392,5 @@ private struct RuntimeHistorySnapshot: Encodable {
     init(snapshot: NativeEditorHistorySnapshot) {
         title = snapshot.title
         document = snapshot.document.proseMirrorDocument
-    }
-}
-
-private struct RuntimeSaveResult: Decodable {
-    let title: String?
-    let updatedAt: String?
-}
-
-private struct RuntimeDocumentSnapshot: Decodable {
-    let title: String?
-    let document: ProseMirrorDocument
-    let updatedAt: String?
-
-    func crdtSnapshot() throws -> NativeEditorCRDTDocumentSnapshot {
-        NativeEditorCRDTDocumentSnapshot(
-            title: title,
-            document: NativeEditorDocument(proseMirrorDocument: document),
-            updatedAt: try NativeEditorJSCRDTDateParser.date(from: updatedAt)
-        )
-    }
-}
-
-private enum NativeEditorJSCRDTDateParser {
-    static func date(from value: String?) throws -> Date? {
-        guard let value else { return nil }
-
-        do {
-            return try Date(value, strategy: .iso8601)
-        } catch {
-            throw NativeEditorJSCRDTEngineError.invalidDate(value)
-        }
     }
 }
