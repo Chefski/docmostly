@@ -188,7 +188,7 @@ extension NativeRichEditorViewModel {
         }
         resolvedRemoteCursors = []
 
-        if realtimeStatus != .conflict {
+        if realtimeStatus != .conflict, realtimeStatus.isUnsupported == false {
             realtimeStatus = .connected
         }
     }

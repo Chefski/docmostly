@@ -77,6 +77,8 @@ extension PageReaderView {
                     editorViewModel,
                     message: "Unsupported collaboration permission scope."
                 )
+            } else if editorViewModel.usesCRDTDocumentEngine == false {
+                markCollaborationPresenceLimited(editorViewModel)
             } else {
                 markCollaborationPresenceConnected(editorViewModel)
             }
@@ -89,6 +91,9 @@ extension PageReaderView {
             }
         case .syncStatus(let isSynced):
             editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
+            if isSynced, editorViewModel.usesCRDTDocumentEngine == false {
+                markCollaborationPresenceLimited(editorViewModel)
+            }
         case .stateless:
             break
         }
@@ -114,6 +119,12 @@ extension PageReaderView {
         editorViewModel.clearCollaborationPresence()
         if editorViewModel.realtimeStatus != .conflict {
             editorViewModel.realtimeStatus = .unsupported(message)
+        }
+    }
+
+    private func markCollaborationPresenceLimited(_ editorViewModel: NativeRichEditorViewModel) {
+        if editorViewModel.realtimeStatus != .conflict {
+            editorViewModel.realtimeStatus = .unsupported("Native CRDT runtime is unavailable.")
         }
     }
 

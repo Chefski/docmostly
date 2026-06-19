@@ -108,7 +108,11 @@ struct NativeEditorCollaborationSyncStatusTests {
 
     @Test func pageReaderRoutesCollaborationSyncStatusEvents() async {
         let view = PageReaderView(pageID: "page-1")
-        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: SyncStatusCRDTDocumentEngine()
+        )
         viewModel.realtimeStatus = .connecting
 
         await view.handleCollaborationPresenceEvent(.syncStatus(true), editorViewModel: viewModel)
@@ -125,7 +129,11 @@ struct NativeEditorCollaborationSyncStatusTests {
 
     @Test func pageReaderRoutesCollaborationAuthenticationScope() async {
         let view = PageReaderView(pageID: "page-1")
-        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: SyncStatusCRDTDocumentEngine()
+        )
 
         await view.handleCollaborationPresenceEvent(.authenticated(.readonly), editorViewModel: viewModel)
 
@@ -147,6 +155,33 @@ struct NativeEditorCollaborationSyncStatusTests {
 
         #expect(viewModel.canEdit == false)
         #expect(viewModel.realtimeStatus == .unsupported("Unsupported collaboration permission scope."))
+    }
+
+    @Test func pageReaderReportsLimitedSyncWhenCRDTEngineIsMissing() async {
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        let awarenessState = NativeEditorAwarenessState(
+            clientID: 2,
+            clock: 1,
+            payload: NativeEditorAwarenessPayload(
+                user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                cursor: nil
+            )
+        )
+
+        await view.handleCollaborationPresenceEvent(.authenticated(.readWrite), editorViewModel: viewModel)
+
+        #expect(viewModel.canEdit == true)
+        #expect(viewModel.realtimeStatus == .unsupported("Native CRDT runtime is unavailable."))
+
+        await view.handleCollaborationPresenceEvent(
+            .awareness(states: [awarenessState], localClientID: 1),
+            editorViewModel: viewModel
+        )
+        await view.handleCollaborationPresenceEvent(.syncStatus(true), editorViewModel: viewModel)
+
+        #expect(viewModel.activeCollaborators.map(\.name) == ["Alice"])
+        #expect(viewModel.realtimeStatus == .unsupported("Native CRDT runtime is unavailable."))
     }
 
     @Test func pageReaderRoutesActivePageDeletionAsUnavailableReadOnlyState() async {
@@ -171,5 +206,25 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.isDirty == false)
         #expect(viewModel.errorMessage == "This page was deleted in Docmost.")
         #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
+    }
+}
+
+@MainActor
+private final class SyncStatusCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+    func encodeStateVector() async throws -> Data {
+        Data()
+    }
+
+    func encodeStateAsUpdate(for stateVector: Data) async throws -> Data {
+        Data()
+    }
+
+    func applyRemoteUpdate(_ update: Data) async throws { }
+
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        NativeEditorCRDTSaveResult()
     }
 }

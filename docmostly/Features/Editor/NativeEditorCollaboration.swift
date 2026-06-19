@@ -9,6 +9,16 @@ enum NativeEditorRealtimeStatus: Equatable, Sendable {
     case unsupported(String)
 }
 
+extension NativeEditorRealtimeStatus {
+    var isUnsupported: Bool {
+        if case .unsupported = self {
+            return true
+        }
+
+        return false
+    }
+}
+
 struct NativeEditorRemoteUpdate: Equatable, Sendable {
     var updatedAt: Date?
     var title: String
