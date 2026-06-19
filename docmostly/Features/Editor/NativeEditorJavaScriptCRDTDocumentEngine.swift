@@ -90,6 +90,8 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         }
 
         self.runtimeDocument = runtimeDocument
+        try validateRequiredRuntimeFunction("drainLocalUpdates")
+        try validateRequiredRuntimeFunction("drainDocumentSnapshots")
     }
 
     isolated deinit {
@@ -185,6 +187,27 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
             throw NativeEditorJSCRDTEngineError.missingFunction(name)
         }
         return result
+    }
+
+    private func validateRequiredRuntimeFunction(_ name: String) throws {
+        guard
+            let function = runtimeDocument.objectForKeyedSubscript(name),
+            function.isUndefined == false,
+            function.isNull == false
+        else {
+            throw NativeEditorJSCRDTEngineError.missingFunction(name)
+        }
+
+        context.exception = nil
+        guard
+            let validator = context.evaluateScript("(function(document, name) { return typeof document[name] === 'function'; })"),
+            let isCallable = validator.call(withArguments: [runtimeDocument, name])?.toBool(),
+            isCallable
+        else {
+            try Self.throwIfException(in: context)
+            throw NativeEditorJSCRDTEngineError.missingFunction(name)
+        }
+        try Self.throwIfException(in: context)
     }
 
     private func callOptional(_ name: String, arguments: [Any] = []) throws -> JSValue? {

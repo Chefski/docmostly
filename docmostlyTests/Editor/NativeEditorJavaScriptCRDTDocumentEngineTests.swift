@@ -162,6 +162,79 @@ struct NativeEditorJSCRDTEngineTests {
         }
     }
 
+    @Test func rejectsRuntimeWithoutLocalUpdateDrain() throws {
+        #expect(throws: NativeEditorJSCRDTEngineError.missingFunction("drainLocalUpdates")) {
+            _ = try NativeEditorJSCRDTDocumentEngine(
+                pageID: "page-1",
+                title: "Page",
+                document: document(text: "Seed"),
+                runtimeSource: """
+                globalThis.docmostlyCRDT = {
+                  createDocument() {
+                    return {
+                      encodeStateVector() { return ""; },
+                      encodeStateAsUpdate() { return ""; },
+                      applyRemoteUpdate() {},
+                      integrateLocalChange() {},
+                      flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
+                      drainDocumentSnapshots() { return []; }
+                    };
+                  }
+                };
+                """
+            )
+        }
+    }
+
+    @Test func rejectsRuntimeWithoutDocumentSnapshotDrain() throws {
+        #expect(throws: NativeEditorJSCRDTEngineError.missingFunction("drainDocumentSnapshots")) {
+            _ = try NativeEditorJSCRDTDocumentEngine(
+                pageID: "page-1",
+                title: "Page",
+                document: document(text: "Seed"),
+                runtimeSource: """
+                globalThis.docmostlyCRDT = {
+                  createDocument() {
+                    return {
+                      encodeStateVector() { return ""; },
+                      encodeStateAsUpdate() { return ""; },
+                      applyRemoteUpdate() {},
+                      integrateLocalChange() {},
+                      flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
+                      drainLocalUpdates() { return []; }
+                    };
+                  }
+                };
+                """
+            )
+        }
+    }
+
+    @Test func rejectsRuntimeWithNonCallableRequiredFunction() throws {
+        #expect(throws: NativeEditorJSCRDTEngineError.missingFunction("drainLocalUpdates")) {
+            _ = try NativeEditorJSCRDTDocumentEngine(
+                pageID: "page-1",
+                title: "Page",
+                document: document(text: "Seed"),
+                runtimeSource: """
+                globalThis.docmostlyCRDT = {
+                  createDocument() {
+                    return {
+                      encodeStateVector() { return ""; },
+                      encodeStateAsUpdate() { return ""; },
+                      applyRemoteUpdate() {},
+                      integrateLocalChange() {},
+                      flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
+                      drainLocalUpdates: [],
+                      drainDocumentSnapshots() { return []; }
+                    };
+                  }
+                };
+                """
+            )
+        }
+    }
+
     private static let runtimeSource = """
     globalThis.docmostlyCRDT = {
       createDocument(seed) {
