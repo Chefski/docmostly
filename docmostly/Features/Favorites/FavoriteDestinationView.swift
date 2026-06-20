@@ -11,8 +11,10 @@ struct FavoriteDestinationView: View {
             if let targetID = favorite.targetID {
                 PageReaderView(pageID: targetID)
                     .task(id: favorite.id) {
-                        appState.selectedSpaceID = favorite.page?.spaceId ?? favorite.spaceId ?? appState.selectedSpaceID
-                        appState.selectedPageID = targetID
+                        appState.selectPage(
+                            id: targetID,
+                            spaceID: favorite.page?.spaceId ?? favorite.spaceId
+                        )
                     }
             } else {
                 ContentUnavailableView("Page unavailable", systemImage: "doc.text")

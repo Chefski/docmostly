@@ -9,6 +9,7 @@ final class AppState {
     var serverURLString: String
     var currentUser: CurrentUserResponse?
     var spaces: [DocmostSpace] = []
+    var selectedSidebarDestination: SidebarDestination?
     var selectedSpaceID: String?
     var selectedPageID: String?
     var isOffline = false
@@ -106,8 +107,7 @@ final class AppState {
         try? await authService.logout(client: apiClient)
         currentUser = nil
         spaces = []
-        selectedSpaceID = nil
-        selectedPageID = nil
+        resetNavigationSelection()
         phase = .unauthenticated
     }
 
@@ -120,7 +120,7 @@ final class AppState {
         do {
             let response: PaginatedResponse<DocmostSpace> = try await apiClient.send(.spaces())
             spaces = response.items
-            selectedSpaceID = selectedSpaceID ?? response.items.first?.id
+            selectDefaultSpaceIfNeeded()
             isOffline = false
             try cacheRepository?.saveSpaces(response.items)
         } catch {
@@ -227,8 +227,7 @@ final class AppState {
     func clearCache() {
         try? cacheRepository?.clearAll()
         spaces = []
-        selectedSpaceID = nil
-        selectedPageID = nil
+        resetNavigationSelection()
     }
 
     func storedSessionCookies() async -> [StoredHTTPCookie] {
@@ -238,7 +237,7 @@ final class AppState {
     private func loadCachedSpaces() {
         guard let cached = try? cacheRepository?.loadSpaces() else { return }
         spaces = cached
-        selectedSpaceID = selectedSpaceID ?? cached.first?.id
+        selectDefaultSpaceIfNeeded()
     }
 
     private func loadCachedSidebarPages(spaceId: String, pageId: String?) throws -> [DocmostPage] {

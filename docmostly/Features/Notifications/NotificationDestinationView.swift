@@ -9,8 +9,10 @@ struct NotificationDestinationView: View {
         if let page = notification.page {
             PageReaderView(pageID: page.slugId)
                 .task(id: notification.id) {
-                    appState.selectedSpaceID = notification.spaceId ?? notification.space?.id ?? appState.selectedSpaceID
-                    appState.selectedPageID = page.slugId
+                    appState.selectPage(
+                        id: page.slugId,
+                        spaceID: notification.spaceId ?? notification.space?.id
+                    )
                 }
         } else {
             ContentUnavailableView("Page unavailable", systemImage: "bell")

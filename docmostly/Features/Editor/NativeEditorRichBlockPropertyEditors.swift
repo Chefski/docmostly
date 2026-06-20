@@ -174,7 +174,7 @@ struct NativeEditorTransclusionSourceEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Synced block ID", text: identifierBinding)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Content", text: textBinding, axis: .vertical)
@@ -208,11 +208,11 @@ struct NativeEditorTransclusionReferenceEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Source page ID", text: sourcePageBinding)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Synced block ID", text: transclusionBinding)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
         }
     }
@@ -242,8 +242,8 @@ struct NativeEditorEmbedEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("URL", text: sourceBinding)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Provider", text: providerBinding)
@@ -275,7 +275,7 @@ struct NativeEditorMathBlockEditor: View {
 
     var body: some View {
         TextField("Expression", text: expressionBinding, axis: .vertical)
-            .textInputAutocapitalization(.never)
+            .docmostlyTextInputAutocapitalization(.never)
             .textFieldStyle(.roundedBorder)
             .lineLimit(1...4)
     }
@@ -297,8 +297,8 @@ struct NativeEditorDiagramEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Source", text: sourceBinding)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
                 .textFieldStyle(.roundedBorder)
 
             HStack(spacing: 8) {

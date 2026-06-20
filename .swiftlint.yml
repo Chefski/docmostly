@@ -1,0 +1,16 @@
+excluded:
+  - .agents
+  - .codex
+  - .derivedData
+
+file_length:
+  warning: 600
+  error: 800
+
+function_body_length:
+  warning: 80
+  error: 120
+
+type_body_length:
+  warning: 400
+  error: 500

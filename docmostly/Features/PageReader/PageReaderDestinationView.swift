@@ -8,7 +8,7 @@ struct PageReaderDestinationView: View {
     var body: some View {
         PageReaderView(pageID: pageID)
             .task(id: pageID) {
-                appState.selectedPageID = pageID
+                appState.selectPage(id: pageID)
             }
     }
 }

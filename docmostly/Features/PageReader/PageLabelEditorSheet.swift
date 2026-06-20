@@ -34,7 +34,7 @@ struct PageLabelEditorSheet: View {
 
                 Section("Add Label") {
                     TextField("Search or create", text: $draftName)
-                        .textInputAutocapitalization(.never)
+                        .docmostlyTextInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
                     let normalizedName = DocmostLabelNameValidator.normalized(draftName)

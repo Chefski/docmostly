@@ -9,9 +9,9 @@ struct ServerSetupView: View {
             Form {
                 Section("Docmost server") {
                     TextField("https://docs.example.com", text: $viewModel.serverURL)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
+                        .docmostlyTextInputAutocapitalization(.never)
+                        .docmostlyKeyboardType(.url)
+                        .docmostlyTextContentType(.url)
                         .autocorrectionDisabled()
 
                     if let errorMessage = viewModel.errorMessage {

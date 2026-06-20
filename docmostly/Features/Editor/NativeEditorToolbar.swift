@@ -103,8 +103,8 @@ struct NativeEditorToolbar: View {
         .padding(.bottom, 6)
         .alert("Link", isPresented: $isShowingLinkPrompt) {
             TextField("URL", text: $linkURLString)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
             Button("Apply") {
                 viewModel.applyLink(linkURLString)
                 linkURLString = ""

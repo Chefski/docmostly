@@ -8,24 +8,13 @@ struct MainShellView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarRootView()
         } content: {
-            if let selectedSpace {
-                PageTreeView(space: selectedSpace)
-            } else {
-                ContentUnavailableView("Select a space", systemImage: "square.stack.3d.up")
-            }
+            MainShellContentView()
         } detail: {
-            if let selectedPageID = appState.selectedPageID {
-                PageReaderView(pageID: selectedPageID)
-            } else {
-                RecentPagesView()
-            }
+            MainShellDetailView()
         }
+        .navigationSplitViewStyle(.balanced)
         .task {
             await appState.loadSpaces()
         }
-    }
-
-    private var selectedSpace: DocmostSpace? {
-        appState.spaces.first { $0.id == appState.selectedSpaceID }
     }
 }

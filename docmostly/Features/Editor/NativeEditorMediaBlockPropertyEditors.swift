@@ -8,8 +8,8 @@ struct NativeEditorMediaBlockEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Source", text: sourceBinding)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Alt text", text: alternativeTextBinding)
@@ -17,15 +17,15 @@ struct NativeEditorMediaBlockEditor: View {
 
             HStack(spacing: 8) {
                 TextField("Width", text: widthBinding)
-                    .keyboardType(.numberPad)
+                    .docmostlyKeyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("Height", text: heightBinding)
-                    .keyboardType(.numberPad)
+                    .docmostlyKeyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("Align", text: alignmentBinding)
-                    .textInputAutocapitalization(.never)
+                    .docmostlyTextInputAutocapitalization(.never)
                     .textFieldStyle(.roundedBorder)
             }
         }
@@ -99,8 +99,8 @@ struct NativeEditorPDFBlockEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Source", text: sourceBinding)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Name", text: nameBinding)
@@ -108,11 +108,11 @@ struct NativeEditorPDFBlockEditor: View {
 
             HStack(spacing: 8) {
                 TextField("Width", text: widthBinding)
-                    .keyboardType(.numberPad)
+                    .docmostlyKeyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("Height", text: heightBinding)
-                    .keyboardType(.numberPad)
+                    .docmostlyKeyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
             }
         }
@@ -169,15 +169,15 @@ struct NativeEditorAttachmentBlockEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("URL", text: urlBinding)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
+                .docmostlyTextInputAutocapitalization(.never)
+                .docmostlyKeyboardType(.url)
                 .textFieldStyle(.roundedBorder)
 
             TextField("Name", text: nameBinding)
                 .textFieldStyle(.roundedBorder)
 
             TextField("MIME type", text: mimeBinding)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
         }
     }

@@ -13,12 +13,12 @@ struct SpaceSettingsDetailFormView: View {
         Form {
             Section("Details") {
                 TextField("Name", text: $viewModel.draft.name)
-                    .textInputAutocapitalization(.words)
+                    .docmostlyTextInputAutocapitalization(.words)
                     .onChange(of: viewModel.draft.name) { _, newValue in
                         viewModel.draft.setName(newValue)
                     }
                 TextField("Slug", text: $viewModel.draft.slug)
-                    .textInputAutocapitalization(.never)
+                    .docmostlyTextInputAutocapitalization(.never)
                 TextField("Description", text: $viewModel.draft.description, axis: .vertical)
                     .lineLimit(2...)
             }
@@ -45,7 +45,7 @@ struct SpaceSettingsDetailFormView: View {
                 }
 
                 TextField("Search members", text: $memberSearchText)
-                    .textInputAutocapitalization(.never)
+                    .docmostlyTextInputAutocapitalization(.never)
 
                 if viewModel.isLoading {
                     ProgressView("Loading members")

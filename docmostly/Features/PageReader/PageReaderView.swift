@@ -351,8 +351,7 @@ struct PageReaderView: View {
     }
 
     private func selectBreadcrumb(_ page: DocmostPage) {
-        appState.selectedSpaceID = page.spaceId
-        appState.selectedPageID = page.slugId
+        appState.selectPage(id: page.slugId, spaceID: page.spaceId, revealSpaceInSidebar: true)
     }
 
     private func toggleFavorite() {
@@ -381,8 +380,7 @@ struct PageReaderView: View {
         Task {
             do {
                 let page = try await appState.duplicatePage(pageId: editorViewModel.currentPageID)
-                appState.selectedSpaceID = page.spaceId
-                appState.selectedPageID = page.slugId
+                appState.selectPage(id: page.slugId, spaceID: page.spaceId, revealSpaceInSidebar: true)
             } catch {
                 pageActionErrorMessage = error.localizedDescription
             }
@@ -404,8 +402,7 @@ struct PageReaderView: View {
 
         do {
             try await appState.movePageToSpace(pageId: editorViewModel.currentPageID, spaceId: targetSpaceID)
-            appState.selectedSpaceID = targetSpaceID
-            appState.selectedPageID = nil
+            appState.selectSpace(id: targetSpaceID)
             dismiss()
             return nil
         } catch {
@@ -419,7 +416,7 @@ struct PageReaderView: View {
         Task {
             do {
                 try await appState.deletePage(pageId: editorViewModel.currentPageID)
-                appState.selectedPageID = nil
+                appState.clearSelectedPage()
                 dismiss()
             } catch {
                 pageActionErrorMessage = error.localizedDescription

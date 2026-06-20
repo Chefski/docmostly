@@ -47,7 +47,9 @@ struct NativeEditorBlockRow: View {
                 TextEditor(text: $block.text, selection: $block.selection)
                     .font(block.kind.editorFont)
                     .scrollContentBackground(.hidden)
+                    .scrollDisabled(true)
                     .frame(maxWidth: .infinity, minHeight: minimumEditorHeight, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .focused(focusedField, equals: .block(block.id))
                     .accessibilityLabel(block.kind.accessibilityLabel)
                     .onChange(of: block.selection) { _, _ in

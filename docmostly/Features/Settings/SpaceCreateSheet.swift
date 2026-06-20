@@ -12,12 +12,12 @@ struct SpaceCreateSheet: View {
             Form {
                 Section("Space") {
                     TextField("Name", text: $draft.name)
-                        .textInputAutocapitalization(.words)
+                        .docmostlyTextInputAutocapitalization(.words)
                         .onChange(of: draft.name) { _, newValue in
                             draft.setName(newValue)
                         }
                     TextField("Slug", text: $draft.slug)
-                        .textInputAutocapitalization(.never)
+                        .docmostlyTextInputAutocapitalization(.never)
                     TextField("Description", text: $draft.description, axis: .vertical)
                         .lineLimit(2...)
                 }

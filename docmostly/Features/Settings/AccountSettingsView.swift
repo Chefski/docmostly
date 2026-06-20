@@ -8,7 +8,7 @@ struct AccountSettingsView: View {
         Form {
             Section("Profile") {
                 TextField("Name", text: $viewModel.accountDraft.name)
-                    .textInputAutocapitalization(.words)
+                    .docmostlyTextInputAutocapitalization(.words)
                 LabeledContent(
                     "Email",
                     value: viewModel.accountDraft.email.isEmpty ? "Unavailable" : viewModel.accountDraft.email

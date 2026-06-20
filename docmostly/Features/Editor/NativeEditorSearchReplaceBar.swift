@@ -6,7 +6,7 @@ struct NativeEditorSearchReplaceBar: View {
     var body: some View {
         HStack(spacing: 8) {
             TextField("Find", text: $viewModel.searchQuery)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
 
             Text(viewModel.searchMatchSummary)
@@ -22,7 +22,7 @@ struct NativeEditorSearchReplaceBar: View {
                 .labelStyle(.iconOnly)
 
             TextField("Replace", text: $viewModel.replacementText)
-                .textInputAutocapitalization(.never)
+                .docmostlyTextInputAutocapitalization(.never)
                 .textFieldStyle(.roundedBorder)
 
             Button("Replace", systemImage: "arrow.triangle.2.circlepath", action: viewModel.replaceCurrentSearchMatch)

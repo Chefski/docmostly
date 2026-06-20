@@ -45,8 +45,7 @@ struct RecentPagesView: View {
         .navigationDestination(for: DocmostPage.self) { page in
             PageReaderView(pageID: page.slugId)
                 .task(id: page.id) {
-                    appState.selectedSpaceID = page.spaceId
-                    appState.selectedPageID = page.slugId
+                    appState.selectPage(id: page.slugId, spaceID: page.spaceId)
                 }
         }
     }

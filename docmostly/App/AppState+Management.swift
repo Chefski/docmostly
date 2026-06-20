@@ -88,7 +88,7 @@ extension AppState {
         ))
         spaces.append(space)
         spaces.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        selectedSpaceID = space.id
+        selectSpace(id: space.id)
         isOffline = false
         return space
     }
@@ -120,9 +120,9 @@ extension AppState {
 
         try await apiClient.sendVoid(.deleteSpace(spaceId: spaceId))
         spaces.removeAll { $0.id == spaceId }
-        if selectedSpaceID == spaceId {
-            selectedSpaceID = spaces.first?.id
-            selectedPageID = nil
+        if selectedSpaceID == spaceId || selectedSidebarDestination == .space(spaceId) {
+            resetNavigationSelection()
+            selectDefaultSpaceIfNeeded()
         }
         isOffline = false
     }

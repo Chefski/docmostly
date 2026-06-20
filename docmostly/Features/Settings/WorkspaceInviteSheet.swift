@@ -14,7 +14,7 @@ struct WorkspaceInviteSheet: View {
                 Section("Invite") {
                     TextField("Email addresses", text: $draft.emailsText, axis: .vertical)
                         .lineLimit(2...)
-                        .textInputAutocapitalization(.never)
+                        .docmostlyTextInputAutocapitalization(.never)
                         .onChange(of: draft.emailsText) {
                             hasEdited = true
                         }

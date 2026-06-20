@@ -15,13 +15,13 @@ struct LoginView: View {
 
                 Section("Account") {
                     TextField("Email", text: $viewModel.email)
-                        .textContentType(.username)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
+                        .docmostlyTextContentType(.username)
+                        .docmostlyTextInputAutocapitalization(.never)
+                        .docmostlyKeyboardType(.emailAddress)
                         .autocorrectionDisabled()
 
                     SecureField("Password", text: $viewModel.password)
-                        .textContentType(.password)
+                        .docmostlyTextContentType(.password)
 
                     if let errorMessage = viewModel.errorMessage {
                         Text(errorMessage)

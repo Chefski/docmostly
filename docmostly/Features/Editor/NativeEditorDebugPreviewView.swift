@@ -13,7 +13,9 @@ struct NativeEditorDebugPreviewView: View {
                     .frame(maxWidth: 900, alignment: .leading)
             }
                 .navigationTitle("Inline Editor")
+                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
         }
         .safeAreaInset(edge: .bottom) {
             if viewModel.isEditing {

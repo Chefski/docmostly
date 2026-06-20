@@ -10,8 +10,7 @@ struct SpaceDestinationView: View {
             if let space {
                 PageTreeView(space: space)
                     .task {
-                        appState.selectedSpaceID = space.id
-                        appState.selectedPageID = nil
+                        appState.selectSpace(id: space.id)
                     }
             } else {
                 ContentUnavailableView("Space unavailable", systemImage: "square.stack.3d.up")

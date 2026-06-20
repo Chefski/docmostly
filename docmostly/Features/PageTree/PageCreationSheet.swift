@@ -18,7 +18,7 @@ struct PageCreationSheet: View {
 
                 Section("Page") {
                     TextField("Untitled", text: $title)
-                        .textInputAutocapitalization(.sentences)
+                        .docmostlyTextInputAutocapitalization(.sentences)
                 }
 
                 if let errorMessage {

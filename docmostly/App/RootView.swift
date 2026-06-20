@@ -10,6 +10,8 @@ struct RootView: View {
             #if DEBUG
             if CommandLine.arguments.contains("-NativeEditorPreview") {
                 NativeEditorDebugPreviewView()
+            } else if CommandLine.arguments.contains("-MainShellPreview") {
+                MainShellDebugPreviewView()
             } else {
                 appContent
             }
@@ -20,6 +22,7 @@ struct RootView: View {
         .task {
             #if DEBUG
             guard CommandLine.arguments.contains("-NativeEditorPreview") == false else { return }
+            guard CommandLine.arguments.contains("-MainShellPreview") == false else { return }
             #endif
             appState.configure(modelContext: modelContext)
             await appState.restore()

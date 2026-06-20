@@ -36,7 +36,9 @@ struct NativeEditorInlineCommentComposerView: View {
             .padding()
             .background(.background)
             .navigationTitle("Inline Comment")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: dismiss.callAsFunction)

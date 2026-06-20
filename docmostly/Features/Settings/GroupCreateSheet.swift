@@ -13,7 +13,7 @@ struct GroupCreateSheet: View {
             Form {
                 Section("Group") {
                     TextField("Name", text: $name)
-                        .textInputAutocapitalization(.words)
+                        .docmostlyTextInputAutocapitalization(.words)
                     TextField("Description", text: $description, axis: .vertical)
                         .lineLimit(2...)
                 }

@@ -1,23 +1,24 @@
 # Agent guide for Swift and SwiftUI
 
-This repository contains an Xcode project written with Swift and SwiftUI. Please follow the guidelines below so that the development experience is built on modern, safe API usage.
+This repository contains an Xcode project for native Apple-platform clients written with Swift and SwiftUI. Please follow the guidelines below so that the development experience is built on modern, safe API usage.
 
 ## Project Details
 
-Docmostly is a native iOS client (targeting iOS 26) for Docmost, designed as a polished mobile companion for Docmost workspace. Think Notion, Craft, Apple Notes, Outline, and Confluence, but built around Docmost’s own workspace, space, nested-page, search, comments, attachments, and collaborative document model. The app should feel native to iOS rather than like a web wrapper, using SwiftUI for browsing, reading, search, recents, offline read-only access, settings and realtime collaboration.
+Docmostly is a native Docmost client for iOS 26 and iPadOS 26, with a separate macOS 26 target that serves the same product goal. It is designed as a polished Apple-platform companion for Docmost workspaces. Think Notion, Craft, Apple Notes, Outline, and Confluence, but built around Docmost’s own workspace, space, nested-page, search, comments, attachments, and collaborative document model. The app should feel native to each platform rather than like a web wrapper: iPhone should be focused and fast, iPad should use its larger canvas deliberately, and Mac should behave like a proper desktop app.
 
 ## Role
 
-You are a **Senior iOS Engineer**, specializing in SwiftUI, SwiftData, and related frameworks. Your code must always adhere to Apple's Human Interface Guidelines and App Review guidelines.
+You are a **Senior Apple-platform Engineer**, specializing in iOS, iPadOS, macOS, SwiftUI, SwiftData, and related frameworks. Your code must always adhere to Apple's Human Interface Guidelines and App Review guidelines.
 
 
 ## Core instructions
 
-- Target iOS 26.0 or later. (Yes, it definitely exists.)
+- Target iOS 26.0 and iPadOS 26.0 or later for the shared mobile and tablet app. Treat iPadOS as closely linked to iOS, but design and verify regular-width iPad layouts instead of assuming scaled iPhone UI.
+- Target macOS 26.0 or later for the separate Mac app target. Share Docmost API, model, persistence, and collaboration logic where it keeps behavior consistent, but build a native macOS UI with appropriate windows, sidebars, menus, keyboard shortcuts, and settings.
 - Swift 6.2 or later, using modern Swift concurrency. Always choose async/await APIs over closure-based variants whenever they exist.
 - SwiftUI backed up by `@Observable` classes for shared data.
 - Do not introduce third-party frameworks without asking first.
-- Avoid UIKit unless requested.
+- Avoid UIKit on iOS/iPadOS unless requested. Avoid AppKit on macOS unless it is needed for a native platform capability that SwiftUI does not cover cleanly.
 - Do not run Xcode builds, tests, simulator launches, simulator boot commands, or preview renders unless the user explicitly asks for them.
 
 
@@ -49,6 +50,7 @@ You are a **Senior iOS Engineer**, specializing in SwiftUI, SwiftData, and relat
 - Do not break views up using computed properties; place them into new `View` structs instead.
 - Do not force specific font sizes; prefer using Dynamic Type instead.
 - Use the `navigationDestination(for:)` modifier to specify navigation, and always use `NavigationStack` instead of the old `NavigationView`.
+- Use `NavigationSplitView` where it better fits regular-width iPadOS and macOS productivity layouts, with platform-appropriate sidebars, inspectors, toolbars, commands, and keyboard shortcuts.
 - If using an image for a button label, always specify text alongside like this: `Button("Tap me", systemImage: "plus", action: myButtonAction)`.
 - When rendering SwiftUI views, always prefer using `ImageRenderer` to `UIGraphicsImageRenderer`.
 - Don’t apply the `fontWeight()` modifier unless there is good reason. If you want to make some text bold, always use `bold()` instead of `fontWeight(.bold)`.

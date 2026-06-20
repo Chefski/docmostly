@@ -14,9 +14,9 @@ struct WorkspaceSettingsView: View {
 
             Section("Identity") {
                 TextField("Name", text: $viewModel.workspaceDraft.name)
-                    .textInputAutocapitalization(.words)
+                    .docmostlyTextInputAutocapitalization(.words)
                 TextField("Icon", text: $viewModel.workspaceDraft.logo)
-                    .textInputAutocapitalization(.never)
+                    .docmostlyTextInputAutocapitalization(.never)
                 if let workspace = viewModel.workspace {
                     LabeledContent("Members", value: (workspace.memberCount ?? 0).formatted(.number))
                     if let plan = workspace.plan {

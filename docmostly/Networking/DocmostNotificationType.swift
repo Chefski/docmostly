@@ -14,6 +14,20 @@ nonisolated enum DocmostNotificationType: Hashable, Sendable {
     case pageApprovalRejected
     case unknown(String)
 
+    private static let knownTypesByRawValue: [String: Self] = [
+        Self.commentUserMention.rawValue: .commentUserMention,
+        Self.commentCreated.rawValue: .commentCreated,
+        Self.commentResolved.rawValue: .commentResolved,
+        Self.pageUserMention.rawValue: .pageUserMention,
+        Self.pagePermissionGranted.rawValue: .pagePermissionGranted,
+        Self.pageUpdated.rawValue: .pageUpdated,
+        Self.pageVerificationExpiring.rawValue: .pageVerificationExpiring,
+        Self.pageVerificationExpired.rawValue: .pageVerificationExpired,
+        Self.pageVerified.rawValue: .pageVerified,
+        Self.pageApprovalRequested.rawValue: .pageApprovalRequested,
+        Self.pageApprovalRejected.rawValue: .pageApprovalRejected
+    ]
+
     var rawValue: String {
         switch self {
         case .commentUserMention:
@@ -49,31 +63,6 @@ extension DocmostNotificationType: Decodable {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)
 
-        switch rawValue {
-        case Self.commentUserMention.rawValue:
-            self = .commentUserMention
-        case Self.commentCreated.rawValue:
-            self = .commentCreated
-        case Self.commentResolved.rawValue:
-            self = .commentResolved
-        case Self.pageUserMention.rawValue:
-            self = .pageUserMention
-        case Self.pagePermissionGranted.rawValue:
-            self = .pagePermissionGranted
-        case Self.pageUpdated.rawValue:
-            self = .pageUpdated
-        case Self.pageVerificationExpiring.rawValue:
-            self = .pageVerificationExpiring
-        case Self.pageVerificationExpired.rawValue:
-            self = .pageVerificationExpired
-        case Self.pageVerified.rawValue:
-            self = .pageVerified
-        case Self.pageApprovalRequested.rawValue:
-            self = .pageApprovalRequested
-        case Self.pageApprovalRejected.rawValue:
-            self = .pageApprovalRejected
-        default:
-            self = .unknown(rawValue)
-        }
+        self = Self.knownTypesByRawValue[rawValue] ?? .unknown(rawValue)
     }
 }

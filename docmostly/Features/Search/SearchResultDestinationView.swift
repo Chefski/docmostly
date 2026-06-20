@@ -8,8 +8,7 @@ struct SearchResultDestinationView: View {
     var body: some View {
         PageReaderView(pageID: result.slugId)
             .task(id: result.id) {
-                appState.selectedSpaceID = result.space.id
-                appState.selectedPageID = result.slugId
+                appState.selectPage(id: result.slugId, spaceID: result.space.id)
             }
     }
 }

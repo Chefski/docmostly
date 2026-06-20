@@ -67,7 +67,7 @@ final class PageTreeViewModel {
                 title: title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
             insert(PageTreeNode(page: page), parentPageId: parentPageId)
-            appState.selectedPageID = page.slugId
+            appState.selectPage(id: page.slugId, spaceID: page.spaceId, revealSpaceInSidebar: true)
             return page
         }
     }
@@ -78,8 +78,7 @@ final class PageTreeViewModel {
             if page.spaceId == node.spaceId {
                 insert(PageTreeNode(page: page), parentPageId: page.parentPageId)
             }
-            appState.selectedSpaceID = page.spaceId
-            appState.selectedPageID = page.slugId
+            appState.selectPage(id: page.slugId, spaceID: page.spaceId, revealSpaceInSidebar: true)
             return page
         }
         return page != nil
@@ -89,10 +88,7 @@ final class PageTreeViewModel {
         let moved: Bool? = await performAction {
             try await appState.movePageToSpace(pageId: node.id, spaceId: targetSpaceId)
             nodes = nodes.removing(id: node.id)
-            appState.selectedSpaceID = targetSpaceId
-            if appState.selectedPageID == node.slugId {
-                appState.selectedPageID = nil
-            }
+            appState.selectSpace(id: targetSpaceId, clearsPage: appState.selectedPageID == node.slugId)
             return true
         }
         return moved == true
@@ -103,7 +99,7 @@ final class PageTreeViewModel {
             try await appState.deletePage(pageId: node.id)
             nodes = nodes.removing(id: node.id)
             if appState.selectedPageID == node.slugId {
-                appState.selectedPageID = nil
+                appState.clearSelectedPage()
             }
             return ()
         }
