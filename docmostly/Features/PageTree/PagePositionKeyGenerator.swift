@@ -33,7 +33,7 @@ nonisolated enum PagePositionKeyGenerator {
     }
 }
 
-private extension PagePositionKeyGenerator {
+nonisolated private extension PagePositionKeyGenerator {
     static func midpoint(lower: String, upper: String) throws -> String {
         var paddedLower = lower.padding(
             toLength: max(lower.count, upper.count),
@@ -329,24 +329,24 @@ private extension PagePositionKeyGenerator {
     }
 }
 
-private enum PagePositionIntegerDirection {
+nonisolated private enum PagePositionIntegerDirection {
     case positive
     case negative
 }
 
-private enum PagePositionIntegerLimit {
+nonisolated private enum PagePositionIntegerLimit {
     case lower
     case upper
 }
 
-private enum PagePositionKeyGeneratorError: Error {
+nonisolated private enum PagePositionKeyGeneratorError: Error {
     case invalidBounds
     case invalidCharacter
     case invalidInteger
     case invalidKey
 }
 
-private extension String {
+nonisolated private extension String {
     func leftPadding(toLength length: Int, with character: Character) -> String {
         guard count < length else { return self }
         return String(repeating: String(character), count: length - count) + self

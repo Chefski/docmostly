@@ -1,6 +1,6 @@
 import Foundation
 
-enum PageTreeDropOperation: Equatable, Sendable {
+nonisolated enum PageTreeDropOperation: Equatable, Sendable {
     case reorderBefore(targetID: String)
     case reorderAfter(targetID: String)
     case makeChild(targetID: String)

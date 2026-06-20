@@ -1,6 +1,6 @@
 import Foundation
 
-struct PageTreeNode: Identifiable, Hashable, Sendable {
+nonisolated struct PageTreeNode: Identifiable, Hashable, Sendable {
     let id: String
     let slugId: String
     var title: String

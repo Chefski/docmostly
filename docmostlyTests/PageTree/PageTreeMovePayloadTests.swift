@@ -17,7 +17,7 @@ struct PageTreeMovePayloadTests {
             operation: .reorderAfter(targetID: "a2")
         )
 
-        #expect(payload == PageTreeMovePayload(pageId: "a1", parentPageId: "a", position: "a1"))
+        #expect(payload == PageTreeMovePayload(pageId: "a1", parentPageId: "a", position: "a2"))
     }
 
     @Test func makeChildAppendsUnderTarget() throws {
@@ -26,7 +26,7 @@ struct PageTreeMovePayloadTests {
             operation: .makeChild(targetID: "a")
         )
 
-        #expect(payload == PageTreeMovePayload(pageId: "b", parentPageId: "a", position: "a1"))
+        #expect(payload == PageTreeMovePayload(pageId: "b", parentPageId: "a", position: "a2"))
     }
 
     @Test func adjacentMovesUsePostMoveNeighbors() throws {
@@ -46,8 +46,8 @@ struct PageTreeMovePayloadTests {
             operation: .reorderBefore(targetID: "c")
         )
 
-        #expect(afterTarget == PageTreeMovePayload(pageId: "b", parentPageId: nil, position: "a0k"))
-        #expect(beforeTarget == PageTreeMovePayload(pageId: "b", parentPageId: nil, position: "a0k"))
+        #expect(afterTarget == PageTreeMovePayload(pageId: "b", parentPageId: nil, position: "a0V"))
+        #expect(beforeTarget == PageTreeMovePayload(pageId: "b", parentPageId: nil, position: "a0V"))
     }
 
     private var tree: [PageTreeNode] {

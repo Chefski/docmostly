@@ -1,6 +1,6 @@
 import Foundation
 
-struct PageCreationRequest: Identifiable {
+nonisolated struct PageCreationRequest: Identifiable, Sendable {
     let id = UUID()
     let parent: PageTreeNode?
     let spaceName: String

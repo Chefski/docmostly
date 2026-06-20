@@ -59,7 +59,7 @@ nonisolated struct SpaceSettingsDraft: Equatable, Sendable {
         if trimmedSlug.count > 100 {
             return "Space slug must be 100 characters or fewer."
         }
-        if trimmedSlug.allSatisfy(\.isASCIIAlphaNumeric) == false {
+        if trimmedSlug.allSatisfy({ $0.isASCIIAlphaNumeric }) == false {
             return "Space slug must be alphanumeric."
         }
         if description.count > 500 {
@@ -120,14 +120,14 @@ nonisolated struct SpaceSettingsDraft: Equatable, Sendable {
     }
 }
 
-private extension Character {
+nonisolated private extension Character {
     var isASCIIAlphaNumeric: Bool {
         guard let scalar = unicodeScalars.first, unicodeScalars.dropFirst().isEmpty else { return false }
         return scalar.isASCIIAlphaNumeric
     }
 }
 
-private extension Unicode.Scalar {
+nonisolated private extension Unicode.Scalar {
     var isASCIIAlphaNumeric: Bool {
         (65...90).contains(value) || (97...122).contains(value) || (48...57).contains(value)
     }

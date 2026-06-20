@@ -1,6 +1,6 @@
 import Foundation
 
-extension Array where Element == PageTreeNode {
+nonisolated extension Array where Element == PageTreeNode {
     func sortedByPosition() -> [PageTreeNode] {
         sorted { lhs, rhs in
             (lhs.position ?? "") < (rhs.position ?? "")

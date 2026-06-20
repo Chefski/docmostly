@@ -30,7 +30,7 @@ nonisolated struct SettingsRoleOption: Identifiable, Hashable, Sendable {
     }
 }
 
-extension UserUpdate {
+nonisolated extension UserUpdate {
     var hasChanges: Bool {
         name != nil ||
         email != nil ||
@@ -46,7 +46,7 @@ extension UserUpdate {
     }
 }
 
-extension WorkspaceUpdate {
+nonisolated extension WorkspaceUpdate {
     var hasChanges: Bool {
         name != nil ||
         logo != nil ||
