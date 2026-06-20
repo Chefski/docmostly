@@ -12,7 +12,7 @@ struct MacRootView: View {
                         Button("Refresh Spaces", systemImage: "arrow.clockwise", action: refreshSpaces)
 
                         Button("Search", systemImage: "magnifyingglass") {
-                            appState.selectSidebarDestination(.search)
+                            appState.selectSidebarUtilityDestination(.search)
                         }
                     }
                 }

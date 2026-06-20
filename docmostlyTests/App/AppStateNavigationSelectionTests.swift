@@ -49,6 +49,17 @@ struct AppStateNavigationSelectionTests {
         #expect(appState.selectedPageID == "page-1")
     }
 
+    @Test func selectingASidebarUtilityDestinationClearsTheCurrentPage() {
+        let appState = makeAppState()
+        appState.selectPage(id: "page-1", spaceID: "space-1")
+
+        appState.selectSidebarUtilityDestination(.search)
+
+        #expect(appState.selectedSidebarDestination == .search)
+        #expect(appState.selectedSpaceID == "space-1")
+        #expect(appState.selectedPageID == nil)
+    }
+
     @Test func defaultSpaceSelectionDoesNotOverrideAnExistingSpace() {
         let appState = makeAppState()
         appState.selectedSpaceID = "space-2"

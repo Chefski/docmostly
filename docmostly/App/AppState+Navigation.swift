@@ -9,6 +9,16 @@ extension AppState {
         }
     }
 
+    func selectSidebarUtilityDestination(_ destination: SidebarDestination) {
+        if case .space(let spaceID) = destination {
+            selectSpace(id: spaceID)
+            return
+        }
+
+        selectedSidebarDestination = destination
+        selectedPageID = nil
+    }
+
     func selectSpace(id spaceID: String, clearsPage: Bool = true) {
         selectedSpaceID = spaceID
         selectedSidebarDestination = .space(spaceID)

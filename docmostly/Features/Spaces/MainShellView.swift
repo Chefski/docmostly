@@ -5,6 +5,17 @@ struct MainShellView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
+        #if os(macOS)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            MacWorkspaceSidebarView()
+        } detail: {
+            MacMainShellDetailView()
+        }
+        .navigationSplitViewStyle(.balanced)
+        .task {
+            await appState.loadSpaces()
+        }
+        #else
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarRootView()
         } content: {
@@ -16,5 +27,6 @@ struct MainShellView: View {
         .task {
             await appState.loadSpaces()
         }
+        #endif
     }
 }

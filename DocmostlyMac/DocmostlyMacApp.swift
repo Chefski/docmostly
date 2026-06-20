@@ -54,6 +54,6 @@ struct DocmostlyMacApp: App {
     }
 
     private func select(_ destination: SidebarDestination) {
-        appState.selectSidebarDestination(destination)
+        appState.selectSidebarUtilityDestination(destination)
     }
 }

@@ -30,7 +30,9 @@ final class DocmostlyMacUITests: XCTestCase {
         app.buttons["Search"].click()
         XCTAssertTrue(app.staticTexts["Search"].waitForExistence(timeout: 5))
 
-        app.buttons["Engineering"].click()
+        app.buttons["Product"].click()
+        XCTAssertTrue(app.menuItems["Engineering"].waitForExistence(timeout: 5))
+        app.menuItems["Engineering"].click()
         XCTAssertTrue(app.buttons["Architecture"].waitForExistence(timeout: 5))
     }
 
