@@ -6,6 +6,10 @@ struct PageTreeNodeView: View {
     let node: PageTreeNode
     let depth: Int
     let viewModel: PageTreeViewModel
+    let createChild: (PageTreeNode) -> Void
+    let duplicate: (PageTreeNode) -> Void
+    let moveToSpace: (PageTreeNode) -> Void
+    let delete: (PageTreeNode) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,10 +39,34 @@ struct PageTreeNodeView: View {
             .padding(.leading, Double(depth) * 16)
             .contentShape(.rect)
             .listRowBackground(appState.selectedPageID == node.slugId ? DocmostlyTheme.primaryTint : nil)
+            .draggable(node.id)
+            .dropDestination(for: String.self, action: handleDrop)
+            .contextMenu {
+                Button("New subpage", systemImage: "plus") {
+                    createChild(node)
+                }
+                Button("Duplicate", systemImage: "doc.on.doc") {
+                    duplicate(node)
+                }
+                Button("Move to Space", systemImage: "folder") {
+                    moveToSpace(node)
+                }
+                Button("Move to Trash", systemImage: "trash", role: .destructive) {
+                    delete(node)
+                }
+            }
 
             if viewModel.expandedIDs.contains(node.id) {
                 ForEach(node.children) { child in
-                    PageTreeNodeView(node: child, depth: depth + 1, viewModel: viewModel)
+                    PageTreeNodeView(
+                        node: child,
+                        depth: depth + 1,
+                        viewModel: viewModel,
+                        createChild: createChild,
+                        duplicate: duplicate,
+                        moveToSpace: moveToSpace,
+                        delete: delete
+                    )
                 }
             }
         }
@@ -56,5 +84,18 @@ struct PageTreeNodeView: View {
         Task {
             await viewModel.toggle(node: node, appState: appState)
         }
+    }
+
+    private func handleDrop(pageIDs: [String], location: CGPoint) -> Bool {
+        guard let pageID = pageIDs.first, pageID != node.id else { return false }
+
+        Task {
+            await viewModel.movePage(
+                sourceID: pageID,
+                operation: .makeChild(targetID: node.id),
+                appState: appState
+            )
+        }
+        return true
     }
 }

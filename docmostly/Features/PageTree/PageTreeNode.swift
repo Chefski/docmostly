@@ -3,14 +3,38 @@ import Foundation
 struct PageTreeNode: Identifiable, Hashable, Sendable {
     let id: String
     let slugId: String
-    let title: String
+    var title: String
     let icon: String?
     let spaceId: String
-    let parentPageId: String?
-    let position: String?
-    let hasChildren: Bool
+    var parentPageId: String?
+    var position: String?
+    var hasChildren: Bool
     var children: [PageTreeNode]
     var isChildrenLoaded: Bool
+
+    init(
+        id: String,
+        slugId: String,
+        title: String,
+        icon: String?,
+        spaceId: String,
+        parentPageId: String?,
+        position: String?,
+        hasChildren: Bool,
+        children: [PageTreeNode] = [],
+        isChildrenLoaded: Bool = false
+    ) {
+        self.id = id
+        self.slugId = slugId
+        self.title = title.isEmpty ? "Untitled" : title
+        self.icon = icon
+        self.spaceId = spaceId
+        self.parentPageId = parentPageId
+        self.position = position
+        self.hasChildren = hasChildren
+        self.children = children
+        self.isChildrenLoaded = isChildrenLoaded
+    }
 
     init(page: DocmostPage) {
         id = page.id

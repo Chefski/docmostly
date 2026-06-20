@@ -21,14 +21,14 @@ final class AppState {
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
 
     init(
-        settingsStore: LocalSettingsStore = LocalSettingsStore(),
+        settingsStore: LocalSettingsStore? = nil,
         authService: AuthService = AuthService(),
         crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil
     ) {
-        self.settingsStore = settingsStore
+        self.settingsStore = settingsStore ?? LocalSettingsStore()
         self.authService = authService
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
-        serverURLString = settingsStore.loadServerURLString()
+        serverURLString = self.settingsStore.loadServerURLString()
     }
 
     static func production(crdtRuntimeBundle: Bundle = .main) -> AppState {

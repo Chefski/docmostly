@@ -37,7 +37,8 @@ final class CachedSpace {
             createdAt: nil,
             updatedAt: updatedAt,
             memberCount: memberCount,
-            membership: nil
+            membership: nil,
+            settings: nil
         )
     }
 }

@@ -12,4 +12,5 @@ nonisolated struct DocmostSpace: Decodable, Identifiable, Hashable, Sendable {
     let updatedAt: Date?
     let memberCount: Int?
     let membership: SpaceMembership?
+    let settings: DocmostSpaceSettings?
 }
