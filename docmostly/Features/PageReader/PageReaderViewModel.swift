@@ -12,6 +12,13 @@ final class PageReaderViewModel {
     var draftComment = ""
     var isPostingComment = false
     var resolvingCommentIDs: Set<String> = []
+    var breadcrumbs: [DocmostPage] = []
+    var labels: [DocmostLabel] = []
+    var isFavoritePage = false
+    var isWatchingPage: Bool?
+    var isTogglingFavorite = false
+    var isTogglingWatch = false
+    var engagementErrorMessage: String?
 
     func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
@@ -20,6 +27,80 @@ final class PageReaderViewModel {
 
         attachmentLinks = appState.attachmentLinks(pageId: pageID)
         comments = (try? await appState.loadComments(pageId: pageID)) ?? []
+        await loadEngagement(pageID: pageID, appState: appState)
+    }
+
+    func loadEngagement(pageID: String, appState: AppState) async {
+        engagementErrorMessage = nil
+
+        do {
+            breadcrumbs = try await appState.loadPageBreadcrumbs(pageId: pageID)
+        } catch {
+            breadcrumbs = []
+            engagementErrorMessage = error.localizedDescription
+        }
+
+        do {
+            labels = try await appState.loadPageLabels(pageId: pageID)
+        } catch {
+            labels = []
+            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
+        }
+
+        do {
+            let favoriteIDs = try await appState.loadFavoriteIds(type: .page)
+            isFavoritePage = favoriteIDs.contains(pageID)
+        } catch {
+            isFavoritePage = false
+            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
+        }
+
+        do {
+            isWatchingPage = try await appState.loadPageWatchStatus(pageId: pageID).watching
+        } catch {
+            isWatchingPage = nil
+            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
+        }
+    }
+
+    func toggleFavorite(pageID: String, appState: AppState) async {
+        guard isTogglingFavorite == false else { return }
+
+        isTogglingFavorite = true
+        engagementErrorMessage = nil
+        defer { isTogglingFavorite = false }
+
+        do {
+            if isFavoritePage {
+                try await appState.removeFavorite(type: .page, pageId: pageID)
+                isFavoritePage = false
+            } else {
+                try await appState.addFavorite(type: .page, pageId: pageID)
+                isFavoritePage = true
+            }
+        } catch {
+            engagementErrorMessage = error.localizedDescription
+        }
+    }
+
+    func toggleWatch(pageID: String, appState: AppState) async {
+        guard isTogglingWatch == false else { return }
+
+        isTogglingWatch = true
+        engagementErrorMessage = nil
+        defer { isTogglingWatch = false }
+
+        do {
+            let response: WatchStatusResponse
+            if isWatchingPage == true {
+                response = try await appState.unwatchPage(pageId: pageID)
+            } else {
+                response = try await appState.watchPage(pageId: pageID)
+            }
+            isWatchingPage = response.watching
+        } catch {
+            engagementErrorMessage = error.localizedDescription
+        }
     }
 
     func postComment(pageID: String, appState: AppState) async {

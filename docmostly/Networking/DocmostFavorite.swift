@@ -9,6 +9,7 @@ nonisolated struct DocmostFavorite: Decodable, Identifiable, Hashable, Sendable 
     let type: FavoriteType
     let workspaceId: String
     let createdAt: Date?
-    let page: DocmostPage?
-    let space: DocmostSpace?
+    let page: DocmostFavoritePage?
+    let space: DocmostFavoriteSpace?
+    let template: DocmostFavoriteTemplate?
 }

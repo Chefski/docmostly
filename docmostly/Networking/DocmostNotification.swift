@@ -14,9 +14,9 @@ nonisolated struct DocmostNotification: Decodable, Identifiable, Hashable, Senda
     let emailedAt: Date?
     let archivedAt: Date?
     let createdAt: Date?
-    let actor: DocmostUser?
-    let page: DocmostPage?
-    let space: DocmostSpace?
+    let actor: DocmostNotificationActor?
+    let page: DocmostNotificationPage?
+    let space: DocmostNotificationSpace?
     let comment: DocmostComment?
 
     var isUnread: Bool {

@@ -3,6 +3,46 @@ import Testing
 @testable import docmostly
 
 struct EngagementDecodingTests {
+    @Test func decodesBreadcrumbs() throws {
+        let data = Data("""
+        {
+          "data": [
+            {
+              "id": "page-1",
+              "slugId": "roadmap",
+              "title": "Roadmap",
+              "content": null,
+              "icon": "📄",
+              "coverPhoto": null,
+              "parentPageId": null,
+              "creatorId": "user-1",
+              "spaceId": "space-1",
+              "workspaceId": "workspace-1",
+              "isLocked": false,
+              "lastUpdatedById": "user-1",
+              "createdAt": "2026-06-20T08:00:00.000Z",
+              "updatedAt": "2026-06-20T08:30:00.000Z",
+              "deletedAt": null,
+              "position": "a0",
+              "hasChildren": true
+            }
+          ],
+          "success": true,
+          "status": 200
+        }
+        """.utf8)
+
+        let envelope = try DocmostJSONDecoder.make().decode(
+            APIEnvelope<[DocmostPage]>.self,
+            from: data
+        )
+        let page = try #require(envelope.data.first)
+
+        #expect(page.id == "page-1")
+        #expect(page.title == "Roadmap")
+        #expect(page.hasChildren == true)
+    }
+
     @Test func decodesFavorites() throws {
         let data = Data("""
         {

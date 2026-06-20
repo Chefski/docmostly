@@ -6,6 +6,12 @@ struct SidebarRootView: View {
     var body: some View {
         List {
             Section {
+                NavigationLink(value: SidebarDestination.favorites) {
+                    Label("Favorites", systemImage: "star")
+                }
+                NavigationLink(value: SidebarDestination.notifications) {
+                    Label("Notifications", systemImage: "bell")
+                }
                 NavigationLink(value: SidebarDestination.search) {
                     Label("Search", systemImage: "magnifyingglass")
                 }
@@ -36,6 +42,10 @@ struct SidebarRootView: View {
         .navigationTitle("Docmostly")
         .navigationDestination(for: SidebarDestination.self) { destination in
             switch destination {
+            case .favorites:
+                FavoritesView()
+            case .notifications:
+                NotificationListView()
             case .search:
                 SearchView()
             case .settings:

@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct PageReaderView: View {
     @Environment(AppState.self) var appState
+    @Environment(\.dismiss) private var dismiss
     @State var viewModel = PageReaderViewModel()
     @State var editorViewModel: NativeRichEditorViewModel?
     @State var realtimeEventClient = NativeEditorRealtimeEventClient()
@@ -15,6 +16,8 @@ struct PageReaderView: View {
     @State private var attachmentUploadErrorMessage: String?
     @State private var inlineCommentContext: NativeEditorInlineCommentContext?
     @State private var inlineCommentErrorMessage: String?
+    @State private var pageActionErrorMessage: String?
+    @State private var isConfirmingPageTrash = false
     @State private var pendingInlineCommentID: String?
     @State private var pendingInlineCommentDraft: String?
     @State private var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
@@ -32,6 +35,11 @@ struct PageReaderView: View {
                     } else if let errorMessage = editorViewModel.errorMessage {
                         ErrorStateView(title: "Page unavailable", message: errorMessage, retry: retry)
                     } else {
+                        PageReaderMetadataView(
+                            breadcrumbs: viewModel.breadcrumbs,
+                            labels: viewModel.labels,
+                            selectPage: selectBreadcrumb
+                        )
                         NativeEditorBodyView(viewModel: editorViewModel, focusedField: $editorFocusedField)
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
@@ -57,6 +65,29 @@ struct PageReaderView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Refresh", systemImage: "arrow.clockwise", action: retry)
+
+                if let editorViewModel, editorViewModel.errorMessage == nil {
+                    Button(
+                        viewModel.isFavoritePage ? "Remove Favorite" : "Add Favorite",
+                        systemImage: viewModel.isFavoritePage ? "star.fill" : "star",
+                        action: toggleFavorite
+                    )
+                    .disabled(viewModel.isTogglingFavorite)
+
+                    Button(
+                        viewModel.isWatchingPage == true ? "Unwatch Page" : "Watch Page",
+                        systemImage: viewModel.isWatchingPage == true ? "eye.fill" : "eye",
+                        action: toggleWatch
+                    )
+                    .disabled(viewModel.isTogglingWatch)
+
+                    Menu("Page Actions", systemImage: "ellipsis.circle") {
+                        Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
+                        Button("Move to Trash", systemImage: "trash", role: .destructive) {
+                            isConfirmingPageTrash = true
+                        }
+                    }
+                }
 
                 if let editorViewModel, editorViewModel.isSaving {
                     ProgressView()
@@ -107,6 +138,17 @@ struct PageReaderView: View {
             }
         } message: {
             Text(inlineCommentErrorMessage ?? "")
+        }
+        .alert("Page Action Failed", isPresented: pageActionFailedBinding) {
+            Button("OK", role: .cancel) {
+                pageActionErrorMessage = nil
+            }
+        } message: {
+            Text(pageActionErrorMessage ?? "")
+        }
+        .confirmationDialog("Move this page to trash?", isPresented: $isConfirmingPageTrash) {
+            Button("Move to Trash", role: .destructive, action: trashCurrentPage)
+            Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $isShowingMentionPicker) {
             if let editorViewModel {
@@ -272,6 +314,69 @@ struct PageReaderView: View {
 
     private var attachmentAllowedContentTypes: [UTType] {
         attachmentImportKind?.allowedContentTypes ?? NativeEditorAttachmentImportKind.file.allowedContentTypes
+    }
+
+    private var pageActionFailedBinding: Binding<Bool> {
+        Binding {
+            pageActionErrorMessage != nil
+        } set: { isPresented in
+            if isPresented == false {
+                pageActionErrorMessage = nil
+            }
+        }
+    }
+
+    private func selectBreadcrumb(_ page: DocmostPage) {
+        appState.selectedSpaceID = page.spaceId
+        appState.selectedPageID = page.slugId
+    }
+
+    private func toggleFavorite() {
+        guard let editorViewModel else { return }
+
+        Task {
+            await viewModel.toggleFavorite(pageID: editorViewModel.currentPageID, appState: appState)
+            pageActionErrorMessage = viewModel.engagementErrorMessage
+            viewModel.engagementErrorMessage = nil
+        }
+    }
+
+    private func toggleWatch() {
+        guard let editorViewModel else { return }
+
+        Task {
+            await viewModel.toggleWatch(pageID: editorViewModel.currentPageID, appState: appState)
+            pageActionErrorMessage = viewModel.engagementErrorMessage
+            viewModel.engagementErrorMessage = nil
+        }
+    }
+
+    private func duplicateCurrentPage() {
+        guard let editorViewModel else { return }
+
+        Task {
+            do {
+                let page = try await appState.duplicatePage(pageId: editorViewModel.currentPageID)
+                appState.selectedSpaceID = page.spaceId
+                appState.selectedPageID = page.slugId
+            } catch {
+                pageActionErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func trashCurrentPage() {
+        guard let editorViewModel else { return }
+
+        Task {
+            do {
+                try await appState.deletePage(pageId: editorViewModel.currentPageID)
+                appState.selectedPageID = nil
+                dismiss()
+            } catch {
+                pageActionErrorMessage = error.localizedDescription
+            }
+        }
     }
 }
 

@@ -6,9 +6,9 @@ extension AppState {
             throw APIError.connectionFailed("Breadcrumbs require a network connection.")
         }
 
-        let response: PaginatedResponse<DocmostPage> = try await apiClient.send(.pageBreadcrumbs(pageId: pageId))
+        let response: [DocmostPage] = try await apiClient.send(.pageBreadcrumbs(pageId: pageId))
         isOffline = false
-        return response.items
+        return response
     }
 
     func loadRecentPages(
