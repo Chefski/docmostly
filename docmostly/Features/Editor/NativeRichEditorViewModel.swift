@@ -30,6 +30,7 @@ final class NativeRichEditorViewModel {
     var resolvedRemoteCursors: [NativeEditorResolvedRemoteCursor] = []
 
     @ObservationIgnored private var editablePageID: String
+    @ObservationIgnored private var editablePageSpaceID: String?
     @ObservationIgnored var lastSavedTitle: String
     @ObservationIgnored var lastSavedDocument = NativeEditorDocument()
     @ObservationIgnored var lastRemoteUpdatedAt: Date?
@@ -78,6 +79,10 @@ final class NativeRichEditorViewModel {
         editablePageID
     }
 
+    var currentSpaceID: String? {
+        editablePageSpaceID
+    }
+
     var isShowingSlashCommands: Bool {
         activeSlashCommandQuery != nil
     }
@@ -108,6 +113,7 @@ final class NativeRichEditorViewModel {
         do {
             let page = try await appState.loadEditablePage(idOrSlugId: pageID)
             editablePageID = page.id
+            editablePageSpaceID = page.spaceId
             title = page.title
             document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
             lastSavedTitle = title

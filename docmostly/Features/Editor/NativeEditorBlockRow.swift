@@ -12,6 +12,8 @@ struct NativeEditorBlockRow: View {
     let delete: () -> Void
     let tableActions: NativeEditorTableEditingActions?
     let richBlockActions: NativeEditorRichBlockEditingActions?
+    let pageID: String
+    let spaceID: String?
     let moveBefore: (UUID) -> Void
     let selectionChanged: () -> Void
     let dropText: (String) -> Bool
@@ -55,7 +57,9 @@ struct NativeEditorBlockRow: View {
                 NativeEditorRichBlockPreviewView(
                     block: block,
                     tableActions: tableActions,
-                    richBlockActions: richBlockActions
+                    richBlockActions: richBlockActions,
+                    pageID: pageID,
+                    spaceID: spaceID
                 )
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

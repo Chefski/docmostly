@@ -18,6 +18,8 @@ struct PageReaderView: View {
     @State private var inlineCommentErrorMessage: String?
     @State private var pageActionErrorMessage: String?
     @State private var isConfirmingPageTrash = false
+    @State private var isShowingLabelEditor = false
+    @State private var isShowingMoveToSpace = false
     @State private var pendingInlineCommentID: String?
     @State private var pendingInlineCommentDraft: String?
     @State private var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
@@ -82,6 +84,12 @@ struct PageReaderView: View {
                     .disabled(viewModel.isTogglingWatch)
 
                     Menu("Page Actions", systemImage: "ellipsis.circle") {
+                        if editorViewModel.canEdit {
+                            Button("Edit Labels", systemImage: "tag", action: showLabelEditor)
+                        }
+                        if editorViewModel.currentSpaceID != nil {
+                            Button("Move to Space", systemImage: "folder", action: showMoveToSpace)
+                        }
                         Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
                         Button("Move to Trash", systemImage: "trash", role: .destructive) {
                             isConfirmingPageTrash = true
@@ -161,6 +169,22 @@ struct PageReaderView: View {
                     selectedText: inlineCommentContext.selectedText,
                     submit: createInlineComment
                 )
+            }
+        }
+        .sheet(isPresented: $isShowingLabelEditor) {
+            if let editorViewModel {
+                PageLabelEditorSheet(pageID: editorViewModel.currentPageID, viewModel: viewModel)
+            }
+        }
+        .sheet(isPresented: $isShowingMoveToSpace) {
+            if let editorViewModel, let currentSpaceID = editorViewModel.currentSpaceID {
+                PageReaderMoveToSpaceSheet(
+                    pageTitle: editorViewModel.title,
+                    currentSpaceID: currentSpaceID,
+                    spaces: appState.spaces
+                ) { targetSpaceID in
+                    await moveCurrentPage(to: targetSpaceID)
+                }
             }
         }
         .task(id: pageID) {
@@ -362,6 +386,30 @@ struct PageReaderView: View {
             } catch {
                 pageActionErrorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func showLabelEditor() {
+        isShowingLabelEditor = true
+    }
+
+    private func showMoveToSpace() {
+        isShowingMoveToSpace = true
+    }
+
+    private func moveCurrentPage(to targetSpaceID: String) async -> String? {
+        guard let editorViewModel else {
+            return "Page unavailable."
+        }
+
+        do {
+            try await appState.movePageToSpace(pageId: editorViewModel.currentPageID, spaceId: targetSpaceID)
+            appState.selectedSpaceID = targetSpaceID
+            appState.selectedPageID = nil
+            dismiss()
+            return nil
+        } catch {
+            return error.localizedDescription
         }
     }
 

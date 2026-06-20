@@ -18,7 +18,9 @@ final class PageReaderViewModel {
     var isWatchingPage: Bool?
     var isTogglingFavorite = false
     var isTogglingWatch = false
+    var isUpdatingLabels = false
     var engagementErrorMessage: String?
+    var labelEditorErrorMessage: String?
 
     func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
@@ -100,6 +102,44 @@ final class PageReaderViewModel {
             isWatchingPage = response.watching
         } catch {
             engagementErrorMessage = error.localizedDescription
+        }
+    }
+
+    func addLabel(named draftName: String, pageID: String, appState: AppState) async {
+        guard isUpdatingLabels == false else { return }
+
+        let normalizedName = DocmostLabelNameValidator.normalized(draftName)
+        if let validationMessage = DocmostLabelNameValidator.validationMessage(
+            for: normalizedName,
+            existingLabels: labels
+        ) {
+            labelEditorErrorMessage = validationMessage
+            return
+        }
+
+        isUpdatingLabels = true
+        labelEditorErrorMessage = nil
+        defer { isUpdatingLabels = false }
+
+        do {
+            labels = try await appState.addPageLabels(pageId: pageID, names: [normalizedName])
+        } catch {
+            labelEditorErrorMessage = error.localizedDescription
+        }
+    }
+
+    func removeLabel(_ label: DocmostLabel, pageID: String, appState: AppState) async {
+        guard isUpdatingLabels == false else { return }
+
+        isUpdatingLabels = true
+        labelEditorErrorMessage = nil
+        defer { isUpdatingLabels = false }
+
+        do {
+            try await appState.removePageLabel(pageId: pageID, labelId: label.id)
+            labels.removeAll { $0.id == label.id }
+        } catch {
+            labelEditorErrorMessage = error.localizedDescription
         }
     }
 

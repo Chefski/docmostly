@@ -34,6 +34,8 @@ struct NativeEditorBodyView: View {
                         delete: { viewModel.deleteBlock(block.id) },
                         tableActions: viewModel.canEdit ? tableEditingActions : nil,
                         richBlockActions: viewModel.canEdit ? richBlockEditingActions : nil,
+                        pageID: viewModel.currentPageID,
+                        spaceID: viewModel.currentSpaceID,
                         moveBefore: { movedBlockID in
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },

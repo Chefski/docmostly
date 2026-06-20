@@ -4,6 +4,8 @@ struct NativeEditorRichBlockPreviewView: View {
     let block: NativeEditorBlock
     var tableActions: NativeEditorTableEditingActions?
     var richBlockActions: NativeEditorRichBlockEditingActions?
+    let pageID: String
+    let spaceID: String?
 
     var body: some View {
         switch block.kind {
@@ -109,7 +111,9 @@ struct NativeEditorRichBlockPreviewView: View {
                 }
             }
         case .subpages:
-            previewShell(systemImage: "doc.on.doc", title: "Subpages", subtitle: "Child pages are shown by Docmost.")
+            previewShell(systemImage: "doc.on.doc", title: "Subpages", subtitle: nil) {
+                NativeEditorSubpagesView(pageID: pageID, spaceID: spaceID)
+            }
         case .transclusionSource(let source):
             previewShell(
                 systemImage: "arrow.trianglehead.2.clockwise",
