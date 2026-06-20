@@ -30,6 +30,15 @@ struct SpaceSettingsDetailFormView: View {
             }
             .disabled(canManage == false)
 
+            Section("Notifications") {
+                Toggle("Watch this space", isOn: watchingSpaceBinding)
+                    .disabled(viewModel.isLoadingWatchStatus || viewModel.isTogglingWatch)
+
+                if viewModel.isLoadingWatchStatus || viewModel.isTogglingWatch {
+                    ProgressView(viewModel.isLoadingWatchStatus ? "Loading watch status" : "Updating watch status")
+                }
+            }
+
             Section("Members") {
                 if canManage {
                     Button("Add Members", systemImage: "person.badge.plus", action: showAddMembers)
@@ -81,6 +90,7 @@ struct SpaceSettingsDetailFormView: View {
         }
         .task(id: viewModel.space.id) {
             await viewModel.loadMembers(appState: appState)
+            await viewModel.loadWatchStatus(appState: appState)
         }
         .confirmationDialog("Delete Space", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive, action: deleteSpace)
@@ -94,6 +104,16 @@ struct SpaceSettingsDetailFormView: View {
     private func save() {
         Task {
             _ = await viewModel.save(appState: appState)
+        }
+    }
+
+    private var watchingSpaceBinding: Binding<Bool> {
+        Binding {
+            viewModel.isWatchingSpace
+        } set: { shouldWatch in
+            Task {
+                await viewModel.setWatchingSpace(shouldWatch, appState: appState)
+            }
         }
     }
 

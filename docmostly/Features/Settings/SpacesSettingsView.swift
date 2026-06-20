@@ -9,7 +9,9 @@ struct SpacesSettingsView: View {
     var body: some View {
         List {
             ForEach(filteredSpaces) { space in
-                NavigationLink(value: space) {
+                NavigationLink {
+                    SpaceSettingsDetailView(space: space, canManage: canManage(space))
+                } label: {
                     SpaceRowView(space: space)
                 }
             }
@@ -25,9 +27,6 @@ struct SpacesSettingsView: View {
                 Button("New Space", systemImage: "plus", action: showCreateSpace)
                     .disabled(viewModel.canManageWorkspace == false)
             }
-        }
-        .navigationDestination(for: DocmostSpace.self) { space in
-            SpaceSettingsDetailView(space: space, canManage: canManage(space))
         }
         .sheet(isPresented: $isShowingCreateSpace) {
             SpaceCreateSheet()

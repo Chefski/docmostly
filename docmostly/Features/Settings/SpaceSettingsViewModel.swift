@@ -10,6 +10,9 @@ final class SpaceSettingsViewModel {
     var isLoading = false
     var isSaving = false
     var isDeleting = false
+    var isLoadingWatchStatus = false
+    var isTogglingWatch = false
+    var isWatchingSpace = false
     var errorMessage: String?
     var statusMessage: String?
 
@@ -29,6 +32,17 @@ final class SpaceSettingsViewModel {
 
         do {
             members = try await appState.loadSpaceMembers(spaceId: space.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadWatchStatus(appState: AppState) async {
+        isLoadingWatchStatus = true
+        defer { isLoadingWatchStatus = false }
+
+        do {
+            isWatchingSpace = try await appState.loadSpaceWatchStatus(spaceId: space.id).watching
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -117,6 +131,27 @@ final class SpaceSettingsViewModel {
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func setWatchingSpace(_ shouldWatch: Bool, appState: AppState) async {
+        guard isTogglingWatch == false else { return }
+        guard shouldWatch != isWatchingSpace else { return }
+
+        isTogglingWatch = true
+        clearMessages()
+        defer { isTogglingWatch = false }
+
+        do {
+            let response = if shouldWatch {
+                try await appState.watchSpace(spaceId: space.id)
+            } else {
+                try await appState.unwatchSpace(spaceId: space.id)
+            }
+            isWatchingSpace = response.watching
+            statusMessage = response.watching ? "Space watch enabled." : "Space watch disabled."
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
