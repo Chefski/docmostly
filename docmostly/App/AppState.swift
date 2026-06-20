@@ -220,8 +220,8 @@ final class AppState {
         (try? cacheRepository?.loadAttachmentLinks(pageId: pageId)) ?? []
     }
 
-    func recentCachedPages() -> [CachedPage] {
-        (try? cacheRepository?.loadRecentPages()) ?? []
+    func recentCachedPages(limit: Int = 20) -> [CachedPage] {
+        (try? cacheRepository?.loadRecentPages(limit: limit)) ?? []
     }
 
     func clearCache() {

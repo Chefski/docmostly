@@ -53,7 +53,35 @@ nonisolated enum Endpoint: Sendable {
     case movePage(pageId: String, parentPageId: String?, position: String)
     case movePageToSpace(pageId: String, spaceId: String)
     case duplicatePage(pageId: String, spaceId: String? = nil)
+    case pageBreadcrumbs(pageId: String)
     case recentPages(spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
+    case favorites(type: FavoriteType? = nil, spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
+    case favoriteIds(type: FavoriteType, spaceId: String? = nil)
+    case addFavorite(type: FavoriteType, pageId: String? = nil, spaceId: String? = nil, templateId: String? = nil)
+    case removeFavorite(type: FavoriteType, pageId: String? = nil, spaceId: String? = nil, templateId: String? = nil)
+    case notifications(type: NotificationListType = .all, cursor: String? = nil, limit: Int = 20)
+    case unreadNotificationCount
+    case markNotificationsRead(notificationIds: [String])
+    case markAllNotificationsRead
+    case pageLabels(pageId: String)
+    case workspaceLabels(type: LabelType = .page, query: String? = nil, cursor: String? = nil, limit: Int = 50)
+    case addPageLabels(pageId: String, names: [String])
+    case removePageLabel(pageId: String, labelId: String)
+    case labelPages(
+        labelId: String? = nil,
+        name: String? = nil,
+        spaceId: String? = nil,
+        query: String? = nil,
+        cursor: String? = nil,
+        limit: Int = 20
+    )
+    case watchPage(pageId: String)
+    case unwatchPage(pageId: String)
+    case pageWatchStatus(pageId: String)
+    case watchedSpaceIds
+    case watchSpace(spaceId: String)
+    case unwatchSpace(spaceId: String)
+    case spaceWatchStatus(spaceId: String)
     case search(query: String, spaceId: String? = nil, limit: Int = 20)
     case updatePage(
         pageId: String,
@@ -159,8 +187,50 @@ nonisolated enum Endpoint: Sendable {
             "pages/move-to-space"
         case .duplicatePage:
             "pages/duplicate"
+        case .pageBreadcrumbs:
+            "pages/breadcrumbs"
         case .recentPages:
             "pages/recent"
+        case .favorites:
+            "favorites"
+        case .favoriteIds:
+            "favorites/ids"
+        case .addFavorite:
+            "favorites/add"
+        case .removeFavorite:
+            "favorites/remove"
+        case .notifications:
+            "notifications"
+        case .unreadNotificationCount:
+            "notifications/unread-count"
+        case .markNotificationsRead:
+            "notifications/mark-read"
+        case .markAllNotificationsRead:
+            "notifications/mark-all-read"
+        case .pageLabels:
+            "pages/labels"
+        case .workspaceLabels:
+            "labels"
+        case .addPageLabels:
+            "pages/labels/add"
+        case .removePageLabel:
+            "pages/labels/remove"
+        case .labelPages:
+            "labels/pages"
+        case .watchPage:
+            "pages/watch"
+        case .unwatchPage:
+            "pages/unwatch"
+        case .pageWatchStatus:
+            "pages/watch-status"
+        case .watchedSpaceIds:
+            "spaces/watched-ids"
+        case .watchSpace:
+            "spaces/watch"
+        case .unwatchSpace:
+            "spaces/unwatch"
+        case .spaceWatchStatus:
+            "spaces/watch-status"
         case .search:
             "search"
         case .updatePage:
@@ -220,7 +290,8 @@ nonisolated enum Endpoint: Sendable {
     // swiftlint:disable cyclomatic_complexity function_body_length
     private func bodyData() throws -> Data? {
         switch self {
-        case .workspacePublic, .logout, .collabToken, .currentUser, .workspaceInfo:
+        case .workspacePublic, .logout, .collabToken, .currentUser, .workspaceInfo,
+                .unreadNotificationCount, .markAllNotificationsRead, .watchedSpaceIds:
             return nil
         case .login(let email, let password):
             return try encode(LoginRequest(email: email, password: password))
@@ -287,8 +358,57 @@ nonisolated enum Endpoint: Sendable {
             return try encode(MovePageToSpaceRequest(pageId: pageId, spaceId: spaceId))
         case .duplicatePage(let pageId, let spaceId):
             return try encode(DuplicatePageRequest(pageId: pageId, spaceId: spaceId))
+        case .pageBreadcrumbs(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
         case .recentPages(let spaceId, let cursor, let limit):
             return try encode(RecentPagesRequest(spaceId: spaceId, cursor: cursor, limit: limit))
+        case .favorites(let type, let spaceId, let cursor, let limit):
+            return try encode(FavoritesRequest(
+                type: type?.rawValue,
+                spaceId: spaceId,
+                cursor: cursor,
+                limit: limit
+            ))
+        case .favoriteIds(let type, let spaceId):
+            return try encode(FavoriteIdsRequest(type: type.rawValue, spaceId: spaceId))
+        case .addFavorite(let type, let pageId, let spaceId, let templateId),
+                .removeFavorite(let type, let pageId, let spaceId, let templateId):
+            return try encode(FavoriteMutationRequest(
+                type: type.rawValue,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            ))
+        case .notifications(let type, let cursor, let limit):
+            return try encode(NotificationsRequest(type: type.rawValue, cursor: cursor, limit: limit))
+        case .markNotificationsRead(let notificationIds):
+            return try encode(MarkNotificationsReadRequest(notificationIds: notificationIds))
+        case .pageLabels(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
+        case .workspaceLabels(let type, let query, let cursor, let limit):
+            return try encode(LabelsRequest(
+                type: type.rawValue,
+                query: query,
+                cursor: cursor,
+                limit: limit
+            ))
+        case .addPageLabels(let pageId, let names):
+            return try encode(AddPageLabelsRequest(pageId: pageId, names: names))
+        case .removePageLabel(let pageId, let labelId):
+            return try encode(RemovePageLabelRequest(pageId: pageId, labelId: labelId))
+        case .labelPages(let labelId, let name, let spaceId, let query, let cursor, let limit):
+            return try encode(LabelPagesRequest(
+                labelId: labelId,
+                name: name,
+                spaceId: spaceId,
+                query: query,
+                cursor: cursor,
+                limit: limit
+            ))
+        case .watchPage(let pageId), .unwatchPage(let pageId), .pageWatchStatus(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
+        case .watchSpace(let spaceId), .unwatchSpace(let spaceId), .spaceWatchStatus(let spaceId):
+            return try encode(SpaceInfoRequest(spaceId: spaceId))
         case .search(let query, let spaceId, let limit):
             return try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
         case .updatePage(let pageId, let title, let content, let format, let operation):
@@ -511,6 +631,61 @@ nonisolated private struct DuplicatePageRequest: Encodable {
 
 nonisolated private struct RecentPagesRequest: Encodable {
     let spaceId: String?
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct FavoritesRequest: Encodable {
+    let type: String?
+    let spaceId: String?
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct FavoriteIdsRequest: Encodable {
+    let type: String
+    let spaceId: String?
+}
+
+nonisolated private struct FavoriteMutationRequest: Encodable {
+    let type: String
+    let pageId: String?
+    let spaceId: String?
+    let templateId: String?
+}
+
+nonisolated private struct NotificationsRequest: Encodable {
+    let type: String
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct MarkNotificationsReadRequest: Encodable {
+    let notificationIds: [String]
+}
+
+nonisolated private struct LabelsRequest: Encodable {
+    let type: String
+    let query: String?
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct AddPageLabelsRequest: Encodable {
+    let pageId: String
+    let names: [String]
+}
+
+nonisolated private struct RemovePageLabelRequest: Encodable {
+    let pageId: String
+    let labelId: String
+}
+
+nonisolated private struct LabelPagesRequest: Encodable {
+    let labelId: String?
+    let name: String?
+    let spaceId: String?
+    let query: String?
     let cursor: String?
     let limit: Int
 }

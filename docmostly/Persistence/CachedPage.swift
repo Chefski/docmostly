@@ -52,7 +52,7 @@ final class CachedPage {
             creator: nil,
             lastUpdatedBy: nil,
             contributors: nil,
-            space: DocmostPageSpace(id: nil, name: nil, slug: spaceSlug)
+            space: DocmostPageSpace(id: nil, name: nil, slug: spaceSlug, logo: nil)
         )
     }
 }
