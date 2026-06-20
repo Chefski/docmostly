@@ -20,11 +20,8 @@ struct MainShellDebugPreviewView: View {
         appState.configure(modelContext: modelContext)
         appState.serverURLString = "https://docs.example.com"
         appState.currentUser = MainShellDebugPreviewFixtures.currentUser
-        appState.spaces = MainShellDebugPreviewFixtures.spaces
         appState.isOffline = true
         appState.statusMessage = nil
-        appState.resetNavigationSelection()
-        appState.selectDefaultSpaceIfNeeded()
 
         let cache = CacheRepository(context: modelContext)
         try? cache.clearAll()
@@ -42,7 +39,12 @@ struct MainShellDebugPreviewView: View {
 
         for page in MainShellDebugPreviewFixtures.cachedPages {
             try? cache.savePage(page, htmlContent: "<p>\(page.title)</p>")
+            try? cache.saveEditablePage(MainShellDebugPreviewFixtures.editablePage(from: page))
         }
+
+        appState.spaces = MainShellDebugPreviewFixtures.spaces
+        appState.resetNavigationSelection()
+        appState.selectDefaultSpaceIfNeeded()
     }
 }
 
@@ -199,6 +201,31 @@ private enum MainShellDebugPreviewFixtures {
             contributors: nil,
             space: DocmostPageSpace(id: spaceId, name: nil, slug: spaceId, logo: nil)
         )
+    }
+
+    static func editablePage(from page: DocmostPage) -> DocmostEditablePage {
+        DocmostEditablePage(
+            id: page.id,
+            slugId: page.slugId,
+            title: page.title,
+            content: document(title: page.title),
+            icon: page.icon,
+            spaceId: page.spaceId,
+            updatedAt: page.updatedAt,
+            permissions: page.permissions,
+            lastUpdatedBy: nil
+        )
+    }
+
+    private static func document(title: String) -> ProseMirrorDocument {
+        ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                content: [
+                    ProseMirrorNode(type: "text", text: "\(title) native preview content")
+                ]
+            )
+        ])
     }
 }
 #endif

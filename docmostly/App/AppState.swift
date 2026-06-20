@@ -172,12 +172,19 @@ final class AppState {
 
     func loadEditablePage(idOrSlugId: String) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            throw APIError.connectionFailed("Editing requires a network connection.")
+            return try requireCachedEditablePage(idOrSlugId: idOrSlugId)
         }
 
-        let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
-        isOffline = false
-        return page
+        do {
+            let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
+            try cacheRepository?.saveEditablePage(page)
+            isOffline = false
+            return page
+        } catch {
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try requireCachedEditablePage(idOrSlugId: idOrSlugId)
+        }
     }
 
     func updatePage(pageId: String, title: String, document: ProseMirrorDocument) async throws -> DocmostEditablePage {
@@ -247,6 +254,13 @@ final class AppState {
     private func requireCachedPage(idOrSlugId: String) throws -> CachedPage {
         guard let cached = try cacheRepository?.loadPage(idOrSlugId: idOrSlugId) else {
             throw APIError.connectionFailed("This page is not cached for offline reading.")
+        }
+        return cached
+    }
+
+    private func requireCachedEditablePage(idOrSlugId: String) throws -> DocmostEditablePage {
+        guard let cached = try cacheRepository?.loadEditablePage(idOrSlugId: idOrSlugId) else {
+            throw APIError.connectionFailed("This page is not cached for offline native reading.")
         }
         return cached
     }

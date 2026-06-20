@@ -27,14 +27,17 @@ struct PageTreeNodeView: View {
                         .accessibilityHidden(true)
                 }
 
-                NavigationLink(value: node) {
-                    Label {
-                        Text(node.title)
-                            .lineLimit(2)
-                    } icon: {
-                        Text(node.icon?.isEmpty == false ? node.icon ?? "" : "📄")
-                    }
+                #if os(macOS)
+                Button(action: openInDetailColumn) {
+                    PageTreeNodeLabel(node: node)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(node.title)
+                #else
+                NavigationLink(value: node) {
+                    PageTreeNodeLabel(node: node)
+                }
+                #endif
             }
             .padding(.leading, Double(depth) * 16)
             .contentShape(.rect)
@@ -86,6 +89,10 @@ struct PageTreeNodeView: View {
         }
     }
 
+    private func openInDetailColumn() {
+        appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
+    }
+
     private func handleDrop(pageIDs: [String], location: CGPoint) -> Bool {
         guard let pageID = pageIDs.first, pageID != node.id else { return false }
 
@@ -97,5 +104,18 @@ struct PageTreeNodeView: View {
             )
         }
         return true
+    }
+}
+
+private struct PageTreeNodeLabel: View {
+    let node: PageTreeNode
+
+    var body: some View {
+        Label {
+            Text(node.title)
+                .lineLimit(2)
+        } icon: {
+            Text(node.icon?.isEmpty == false ? node.icon ?? "" : "📄")
+        }
     }
 }

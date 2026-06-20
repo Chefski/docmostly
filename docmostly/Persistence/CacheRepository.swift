@@ -43,14 +43,26 @@ final class CacheRepository {
     }
 
     func savePage(_ page: DocmostPage, htmlContent: String) throws {
-        try deleteCachedPage(id: page.id)
-        let cachedPage = CachedPage(page: page, htmlContent: htmlContent)
-        context.insert(cachedPage)
+        if let cachedPage = try loadPage(idOrSlugId: page.id) {
+            cachedPage.update(page: page, htmlContent: htmlContent)
+        } else {
+            context.insert(CachedPage(page: page, htmlContent: htmlContent))
+        }
 
         let links = AttachmentExtractor.extractLinks(fromHTML: htmlContent)
         try deleteAttachments(pageId: page.id)
         for link in links {
             context.insert(CachedAttachment(link: link, pageId: page.id))
+        }
+
+        try context.save()
+    }
+
+    func saveEditablePage(_ page: DocmostEditablePage) throws {
+        if let cachedPage = try loadPage(idOrSlugId: page.id) {
+            cachedPage.update(editablePage: page)
+        } else {
+            context.insert(CachedPage(editablePage: page))
         }
 
         try context.save()
@@ -64,6 +76,10 @@ final class CacheRepository {
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
+    }
+
+    func loadEditablePage(idOrSlugId: String) throws -> DocmostEditablePage? {
+        try loadPage(idOrSlugId: idOrSlugId)?.asEditablePage()
     }
 
     func loadRecentPages(limit: Int = 20) throws -> [CachedPage] {
@@ -101,17 +117,6 @@ final class CacheRepository {
         let descriptor = FetchDescriptor<CachedPageTreeItem>(
             predicate: #Predicate { item in
                 item.spaceId == spaceId && item.parentPageId == parentPageId
-            }
-        )
-        for item in try context.fetch(descriptor) {
-            context.delete(item)
-        }
-    }
-
-    private func deleteCachedPage(id: String) throws {
-        let descriptor = FetchDescriptor<CachedPage>(
-            predicate: #Predicate { page in
-                page.id == id
             }
         )
         for item in try context.fetch(descriptor) {
