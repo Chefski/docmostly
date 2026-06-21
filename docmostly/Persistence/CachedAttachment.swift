@@ -21,6 +21,19 @@ final class CachedAttachment {
         self.cachedAt = cachedAt
     }
 
+    func update(link: DocmostAttachmentLink, cachedAt: Date = Date.now) {
+        id = link.id
+        fileName = link.fileName
+        path = link.path
+        self.cachedAt = cachedAt
+    }
+
+    func matches(link: DocmostAttachmentLink) -> Bool {
+        id == link.id &&
+            fileName == link.fileName &&
+            path == link.path
+    }
+
     func asLink() -> DocmostAttachmentLink {
         DocmostAttachmentLink(id: id, fileName: fileName, path: path)
     }

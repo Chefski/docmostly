@@ -7,6 +7,12 @@ struct MainShellDebugPreviewView: View {
     @State private var appState = AppState(settingsStore: LocalSettingsStore(userDefaults: .standard))
     @State private var isPrepared = false
 
+    let modelContainer: ModelContainer?
+
+    init(modelContainer: ModelContainer? = nil) {
+        self.modelContainer = modelContainer
+    }
+
     var body: some View {
         MainShellView()
             .environment(appState)
@@ -17,7 +23,7 @@ struct MainShellDebugPreviewView: View {
         guard isPrepared == false else { return }
         isPrepared = true
 
-        appState.configure(modelContext: modelContext)
+        appState.configure(modelContext: modelContext, modelContainer: modelContainer)
         appState.serverURLString = "https://docs.example.com"
         appState.currentUser = MainShellDebugPreviewFixtures.currentUser
         appState.isOffline = true
@@ -28,6 +34,8 @@ struct MainShellDebugPreviewView: View {
             serverBaseURL: "https://docs.example.com",
             userID: MainShellDebugPreviewFixtures.currentUser.user.id
         )
+        appState.configurePreviewCacheScope(scope)
+
         try? cache.clearAll()
         try? cache.saveSpaces(MainShellDebugPreviewFixtures.spaces, scope: scope)
         try? cache.savePageTree(

@@ -29,6 +29,27 @@ final class CachedSpace {
         self.cachedAt = cachedAt
     }
 
+    func update(space: DocmostSpace, cachedAt: Date = Date.now) {
+        name = space.name
+        spaceDescription = space.description
+        logo = space.logo
+        slug = space.slug
+        hostname = space.hostname
+        memberCount = space.memberCount
+        updatedAt = space.updatedAt
+        self.cachedAt = cachedAt
+    }
+
+    func matches(space: DocmostSpace) -> Bool {
+        name == space.name &&
+            spaceDescription == space.description &&
+            logo == space.logo &&
+            slug == space.slug &&
+            hostname == space.hostname &&
+            memberCount == space.memberCount &&
+            updatedAt == space.updatedAt
+    }
+
     func asSpace() -> DocmostSpace {
         DocmostSpace(
             id: id,

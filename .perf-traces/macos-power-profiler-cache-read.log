@@ -1,0 +1,7 @@
+Starting recording with the Power Profiler template. Attaching to: DocmostlyMac (3156). Time limit: 8.0 s
+Ctrl-C to stop the recording
+Run issues were detected (trace is still ready to be viewed):
+* [Error] The Power Profiler instrument is not supported on macOS. Record on iOS or iPadOS instead.
+
+Recording failed with errors. Saving output file...
+Output file saved as: macos-power-profiler-cache-read.trace

@@ -41,24 +41,29 @@ nonisolated enum NativeEditorJSCRDTRuntimeSource {
 
 @MainActor
 extension NativeEditorJSCRDTEngineFactory {
+    static func lazyBundled(in bundle: Bundle = .main) -> any NativeEditorCRDTDocumentEngineFactory {
+        NativeEditorLazyJSCRDTEngineFactory(bundle: bundle)
+    }
+
     static func bundledIfAvailable(in bundle: Bundle = .main) -> (any NativeEditorCRDTDocumentEngineFactory)? {
-        do {
-            let runtimeSource = try NativeEditorJSCRDTRuntimeSource.bundled(in: bundle)
-            return NativeEditorJSCRDTEngineFactory(runtimeSource: runtimeSource)
-        } catch NativeEditorJSCRDTRuntimeSourceError.missingBundledResource {
+        guard bundle.url(
+            forResource: NativeEditorJSCRDTRuntimeSource.bundledResourceName,
+            withExtension: NativeEditorJSCRDTRuntimeSource.bundledResourceExtension
+        ) != nil else {
             return nil
-        } catch {
-            return NativeEditorFailingCRDTEngineFactory(error: error)
         }
+
+        return lazyBundled(in: bundle)
     }
 }
 
 @MainActor
-private final class NativeEditorFailingCRDTEngineFactory: NativeEditorCRDTDocumentEngineFactory {
-    private let error: any Error
+private final class NativeEditorLazyJSCRDTEngineFactory: NativeEditorCRDTDocumentEngineFactory {
+    private let bundle: Bundle
+    private var runtimeSource: String?
 
-    init(error: any Error) {
-        self.error = error
+    init(bundle: Bundle) {
+        self.bundle = bundle
     }
 
     func makeDocumentEngine(
@@ -66,6 +71,22 @@ private final class NativeEditorFailingCRDTEngineFactory: NativeEditorCRDTDocume
         title: String,
         document: NativeEditorDocument
     ) async throws -> any NativeEditorCRDTDocumentEngine {
-        throw error
+        let runtimeSource = try cachedRuntimeSource()
+        return try NativeEditorJSCRDTDocumentEngine(
+            pageID: pageID,
+            title: title,
+            document: document,
+            runtimeSource: runtimeSource
+        )
+    }
+
+    private func cachedRuntimeSource() throws -> String {
+        if let runtimeSource {
+            return runtimeSource
+        }
+
+        let loadedSource = try NativeEditorJSCRDTRuntimeSource.bundled(in: bundle)
+        runtimeSource = loadedSource
+        return loadedSource
     }
 }

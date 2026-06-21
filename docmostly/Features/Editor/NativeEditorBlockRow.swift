@@ -15,6 +15,7 @@ struct NativeEditorBlockRow: View {
     let pageID: String
     let spaceID: String?
     let moveBefore: (UUID) -> Void
+    let blockChanged: () -> Void
     let selectionChanged: () -> Void
     let dropText: (String) -> Bool
 
@@ -100,6 +101,9 @@ struct NativeEditorBlockRow: View {
             }
 
             return dropText(rawBlockID)
+        }
+        .onChange(of: block) { _, _ in
+            blockChanged()
         }
     }
 

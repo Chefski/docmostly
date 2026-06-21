@@ -1,6 +1,6 @@
 import Foundation
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func nodes(from blocks: [NativeEditorBlock]) -> [ProseMirrorNode] {
         var result: [ProseMirrorNode] = []
         var index = blocks.startIndex

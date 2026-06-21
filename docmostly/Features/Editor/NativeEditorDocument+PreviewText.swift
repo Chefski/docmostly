@@ -1,6 +1,6 @@
 import Foundation
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func previewText(for kind: NativeEditorBlockKind) -> String {
         if let mediaPreviewText = mediaPreviewText(for: kind) {
             return mediaPreviewText

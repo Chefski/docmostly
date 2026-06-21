@@ -11,8 +11,9 @@ final class SearchViewModel {
 
     func search(appState: AppState) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else {
+        guard trimmed.count >= 2 else {
             results = []
+            errorMessage = nil
             return
         }
 
@@ -21,8 +22,12 @@ final class SearchViewModel {
         defer { isSearching = false }
 
         do {
-            results = try await appState.search(query: trimmed, spaceId: appState.selectedSpaceID)
+            let fetchedResults = try await appState.search(query: trimmed, spaceId: appState.selectedSpaceID)
+            guard Task.isCancelled == false else { return }
+            guard trimmed == query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            results = fetchedResults
         } catch {
+            guard Task.isCancelled == false else { return }
             errorMessage = error.localizedDescription
         }
     }

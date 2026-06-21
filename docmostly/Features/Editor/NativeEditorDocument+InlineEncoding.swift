@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func marks(from run: AttributedString.Runs.Run) -> [ProseMirrorMark]? {
         var marks: [ProseMirrorMark] = []
         appendPresentationMarks(from: run, to: &marks)

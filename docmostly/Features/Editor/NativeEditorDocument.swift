@@ -1,6 +1,6 @@
 import Foundation
 
-struct NativeEditorDocument: Equatable {
+nonisolated struct NativeEditorDocument: Equatable {
     var blocks: [NativeEditorBlock]
 
     init(blocks: [NativeEditorBlock] = [Self.emptyBlock()]) {

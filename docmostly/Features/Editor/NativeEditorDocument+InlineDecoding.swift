@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func inlineContent(from node: ProseMirrorNode) -> [NativeEditorInlineContent] {
         switch node.type {
         case "text":
@@ -116,7 +116,7 @@ extension NativeEditorDocument {
     }
 }
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func apply(_ marks: [NativeEditorTextMark], to text: inout AttributedString) {
         for mark in marks {
             if applyPresentationMark(mark, to: &text) {

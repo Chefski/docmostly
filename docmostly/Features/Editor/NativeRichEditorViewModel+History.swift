@@ -79,12 +79,7 @@ extension NativeRichEditorViewModel {
 
         guard let before = lastKnownSnapshot else {
             lastKnownSnapshot = makeHistorySnapshot()
-            recalculateDirty()
-            return
-        }
-
-        guard makeHistorySnapshot() != before else {
-            recalculateDirty()
+            isDirty = true
             return
         }
 
@@ -94,11 +89,16 @@ extension NativeRichEditorViewModel {
         }
 
         let after = makeHistorySnapshot()
+        guard after != before else {
+            recalculateDirty()
+            return
+        }
+
         appendUndoSnapshot(before)
         redoStack.removeAll()
         lastKnownSnapshot = after
         updateHistoryAvailability()
-        recalculateDirty()
+        isDirty = true
         queueCRDTLocalChange(before: before, after: after)
     }
 

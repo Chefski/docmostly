@@ -63,7 +63,10 @@ struct NativeEditorMentionPickerView: View {
         searchTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(250))
+                try Task.checkCancellation()
                 await search(query: query)
+            } catch is CancellationError {
+                return
             } catch {
                 return
             }
@@ -73,7 +76,7 @@ struct NativeEditorMentionPickerView: View {
     @MainActor
     private func search(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else {
+        guard trimmed.count >= 2 else {
             results = []
             errorMessage = nil
             return
@@ -86,8 +89,12 @@ struct NativeEditorMentionPickerView: View {
         }
 
         do {
-            results = try await appState.search(query: trimmed, spaceId: appState.selectedSpaceID)
+            let fetchedResults = try await appState.search(query: trimmed, spaceId: appState.selectedSpaceID)
+            guard Task.isCancelled == false else { return }
+            guard trimmed == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            results = fetchedResults
         } catch {
+            guard Task.isCancelled == false else { return }
             results = []
             errorMessage = error.localizedDescription
         }

@@ -173,7 +173,7 @@ private extension NativeEditorBlockKind {
     }
 }
 
-enum NativeEditorRichBlockNodeFactory {
+nonisolated enum NativeEditorRichBlockNodeFactory {
     static func calloutNode(from callout: NativeEditorCalloutBlock) -> ProseMirrorNode {
         var attrs: [String: ProseMirrorJSONValue] = ["type": .string(callout.style)]
         if let icon = callout.icon {

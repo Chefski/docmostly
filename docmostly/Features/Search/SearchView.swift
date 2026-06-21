@@ -27,8 +27,15 @@ struct SearchView: View {
         .navigationTitle("Search")
         .searchable(text: $viewModel.query, prompt: "Search pages")
         .task(id: viewModel.query) {
-            try? await Task.sleep(for: .milliseconds(300))
-            await viewModel.search(appState: appState)
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+                try Task.checkCancellation()
+                await viewModel.search(appState: appState)
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
         }
         .navigationDestination(for: DocmostSearchResult.self) { result in
             SearchResultDestinationView(result: result)

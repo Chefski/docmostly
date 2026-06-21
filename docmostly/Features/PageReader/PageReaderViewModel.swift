@@ -4,7 +4,13 @@ import Observation
 @MainActor
 @Observable
 final class PageReaderViewModel {
-    var comments: [DocmostComment] = []
+    var comments: [DocmostComment] = [] {
+        didSet {
+            rebuildCommentBuckets()
+        }
+    }
+    private(set) var openComments: [DocmostComment] = []
+    private(set) var resolvedComments: [DocmostComment] = []
     var attachmentLinks: [DocmostAttachmentLink] = []
     var isLoading = false
     var errorMessage: String?
@@ -22,14 +28,6 @@ final class PageReaderViewModel {
     var engagementErrorMessage: String?
     var labelEditorErrorMessage: String?
 
-    var openComments: [DocmostComment] {
-        topLevelComments.filter { $0.isResolved == false }
-    }
-
-    var resolvedComments: [DocmostComment] {
-        topLevelComments.filter(\.isResolved)
-    }
-
     var openCommentCount: Int {
         openComments.count
     }
@@ -43,42 +41,21 @@ final class PageReaderViewModel {
         errorMessage = nil
         defer { isLoading = false }
 
-        attachmentLinks = appState.attachmentLinks(pageId: pageID)
-        comments = (try? await appState.loadComments(pageId: pageID)) ?? []
-        await loadEngagement(pageID: pageID, appState: appState)
+        async let cachedAttachmentLinks = appState.attachmentLinks(pageId: pageID)
+        async let loadedComments = captureLoad {
+            try await appState.loadComments(pageId: pageID)
+        }
+        async let loadedEngagement = fetchEngagement(pageID: pageID, appState: appState)
+
+        attachmentLinks = await cachedAttachmentLinks
+        let commentOutcome = await loadedComments
+        comments = commentOutcome.value ?? []
+        commentErrorMessage = commentOutcome.errorMessage
+        apply(await loadedEngagement)
     }
 
     func loadEngagement(pageID: String, appState: AppState) async {
-        engagementErrorMessage = nil
-
-        do {
-            breadcrumbs = try await appState.loadPageBreadcrumbs(pageId: pageID)
-        } catch {
-            breadcrumbs = []
-            engagementErrorMessage = error.localizedDescription
-        }
-
-        do {
-            labels = try await appState.loadPageLabels(pageId: pageID)
-        } catch {
-            labels = []
-            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
-        }
-
-        do {
-            let favoriteIDs = try await appState.loadFavoriteIds(type: .page)
-            isFavoritePage = favoriteIDs.contains(pageID)
-        } catch {
-            isFavoritePage = false
-            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
-        }
-
-        do {
-            isWatchingPage = try await appState.loadPageWatchStatus(pageId: pageID).watching
-        } catch {
-            isWatchingPage = nil
-            engagementErrorMessage = engagementErrorMessage ?? error.localizedDescription
-        }
+        apply(await fetchEngagement(pageID: pageID, appState: appState))
     }
 
     func toggleFavorite(pageID: String, appState: AppState) async {
@@ -228,7 +205,73 @@ final class PageReaderViewModel {
         resolvingCommentIDs.remove(id)
     }
 
-    private var topLevelComments: [DocmostComment] {
-        comments.filter { $0.parentCommentId == nil }
+    private func rebuildCommentBuckets() {
+        let topLevelComments = comments.filter { $0.parentCommentId == nil }
+        openComments = topLevelComments.filter { $0.isResolved == false }
+        resolvedComments = topLevelComments.filter(\.isResolved)
     }
+
+    private func fetchEngagement(pageID: String, appState: AppState) async -> PageReaderEngagementSnapshot {
+        async let loadedBreadcrumbs = captureLoad {
+            try await appState.loadPageBreadcrumbs(pageId: pageID)
+        }
+        async let loadedLabels = captureLoad {
+            try await appState.loadPageLabels(pageId: pageID)
+        }
+        async let loadedFavoriteIDs = captureLoad {
+            try await appState.loadFavoriteIds(type: .page)
+        }
+        async let loadedWatchStatus = captureLoad {
+            try await appState.loadPageWatchStatus(pageId: pageID)
+        }
+
+        let breadcrumbsOutcome = await loadedBreadcrumbs
+        let labelsOutcome = await loadedLabels
+        let favoriteIDsOutcome = await loadedFavoriteIDs
+        let watchStatusOutcome = await loadedWatchStatus
+
+        return PageReaderEngagementSnapshot(
+            breadcrumbs: breadcrumbsOutcome.value ?? [],
+            labels: labelsOutcome.value ?? [],
+            isFavoritePage: favoriteIDsOutcome.value?.contains(pageID) ?? false,
+            isWatchingPage: watchStatusOutcome.value?.watching,
+            errorMessage: [
+                breadcrumbsOutcome.errorMessage,
+                labelsOutcome.errorMessage,
+                favoriteIDsOutcome.errorMessage,
+                watchStatusOutcome.errorMessage
+            ].compactMap(\.self).first
+        )
+    }
+
+    private func apply(_ snapshot: PageReaderEngagementSnapshot) {
+        breadcrumbs = snapshot.breadcrumbs
+        labels = snapshot.labels
+        isFavoritePage = snapshot.isFavoritePage
+        isWatchingPage = snapshot.isWatchingPage
+        engagementErrorMessage = snapshot.errorMessage
+    }
+
+    private func captureLoad<Value: Sendable>(
+        _ operation: () async throws -> Value
+    ) async -> PageReaderLoadOutcome<Value> {
+        do {
+            return PageReaderLoadOutcome(value: try await operation(), errorMessage: nil)
+        } catch {
+            return PageReaderLoadOutcome(value: nil, errorMessage: error.localizedDescription)
+        }
+    }
+}
+
+private struct PageReaderEngagementSnapshot: Sendable {
+    let breadcrumbs: [DocmostPage]
+    let labels: [DocmostLabel]
+    let isFavoritePage: Bool
+    let isWatchingPage: Bool?
+    let errorMessage: String?
+}
+
+private struct PageReaderLoadOutcome<Value: Sendable>: Sendable {
+    let value: Value?
+    let errorMessage: String?
 }

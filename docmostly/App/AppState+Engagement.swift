@@ -17,9 +17,9 @@ extension AppState {
         limit: Int = 20
     ) async throws -> PaginatedResponse<DocmostPage> {
         guard let apiClient else {
-            let pages = recentCachedPages(limit: limit)
+            let pages = await recentCachedPages(limit: limit)
             return PaginatedResponse(
-                items: pages.map { $0.asPage() },
+                items: pages,
                 meta: PaginationMeta(
                     limit: limit,
                     hasNextPage: false,
@@ -42,9 +42,9 @@ extension AppState {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            let pages = recentCachedPages(limit: limit)
+            let pages = await recentCachedPages(limit: limit)
             return PaginatedResponse(
-                items: pages.map { $0.asPage() },
+                items: pages,
                 meta: PaginationMeta(
                     limit: limit,
                     hasNextPage: false,

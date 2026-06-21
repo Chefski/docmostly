@@ -120,7 +120,7 @@ private extension NativeEditorBlockKind {
     }
 }
 
-extension NativeEditorRichBlockNodeFactory {
+nonisolated extension NativeEditorRichBlockNodeFactory {
     static func mediaNode(from media: NativeEditorMediaBlock, type: String) -> ProseMirrorNode {
         var attrs = sourceAttrs(
             sourceKey: "src",

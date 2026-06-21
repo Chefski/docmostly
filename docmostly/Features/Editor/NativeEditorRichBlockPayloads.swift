@@ -1,6 +1,6 @@
 import Foundation
 
-struct NativeEditorTable: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorTable: Equatable, Hashable, Sendable {
     static let maximumRowCount = 200
     static let maximumColumnCount = 50
 
@@ -21,18 +21,18 @@ struct NativeEditorTable: Equatable, Hashable, Sendable {
     }
 }
 
-struct NativeEditorTableRow: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorTableRow: Equatable, Hashable, Sendable {
     var cells: [NativeEditorTableCell]
 }
 
-struct NativeEditorTableCell: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorTableCell: Equatable, Hashable, Sendable {
     var plainText: String
     var isHeader: Bool
     var backgroundColorName: String?
     var columnWidth: Int?
 }
 
-struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {
     var source: String?
     var alternativeText: String?
     var attachmentID: String?
@@ -43,7 +43,7 @@ struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {
     var alignment: String?
 }
 
-struct NativeEditorMediaBlockUpdate: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorMediaBlockUpdate: Equatable, Hashable, Sendable {
     var source: String
     var alternativeText: String
     var width: String
@@ -51,7 +51,7 @@ struct NativeEditorMediaBlockUpdate: Equatable, Hashable, Sendable {
     var alignment: String
 }
 
-struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
     var source: String?
     var name: String?
     var attachmentID: String?
@@ -60,7 +60,7 @@ struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
     var height: String?
 }
 
-struct NativeEditorAttachmentBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorAttachmentBlock: Equatable, Hashable, Sendable {
     var url: String?
     var name: String?
     var mimeType: String?
@@ -68,19 +68,19 @@ struct NativeEditorAttachmentBlock: Equatable, Hashable, Sendable {
     var attachmentID: String?
 }
 
-struct NativeEditorCalloutBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorCalloutBlock: Equatable, Hashable, Sendable {
     var style: String
     var icon: String?
     var previewText: String
 }
 
-struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
     var summary: String
     var previewText: String
     var isOpen: Bool
 }
 
-struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
     var layout: String
     var widthMode: String
     var columnCount: Int
@@ -88,17 +88,17 @@ struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
     var columnTexts: [String] = []
 }
 
-struct NativeEditorTransclusionSourceBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorTransclusionSourceBlock: Equatable, Hashable, Sendable {
     var identifier: String?
     var previewText: String
 }
 
-struct NativeEditorTransclusionReferenceBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorTransclusionReferenceBlock: Equatable, Hashable, Sendable {
     var sourcePageID: String?
     var transclusionID: String?
 }
 
-struct NativeEditorEmbedBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorEmbedBlock: Equatable, Hashable, Sendable {
     var source: String?
     var provider: String?
     var alignment: String?
@@ -106,7 +106,7 @@ struct NativeEditorEmbedBlock: Equatable, Hashable, Sendable {
     var height: String?
 }
 
-struct NativeEditorDiagramBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorDiagramBlock: Equatable, Hashable, Sendable {
     var source: String?
     var title: String?
     var alternativeText: String?
@@ -118,6 +118,6 @@ struct NativeEditorDiagramBlock: Equatable, Hashable, Sendable {
     var alignment: String?
 }
 
-struct NativeEditorMathBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorMathBlock: Equatable, Hashable, Sendable {
     var text: String
 }

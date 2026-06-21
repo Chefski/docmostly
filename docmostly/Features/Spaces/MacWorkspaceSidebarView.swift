@@ -10,9 +10,9 @@ struct MacWorkspaceSidebarView: View {
     @State private var isShowingTrash = false
 
     var body: some View {
-        List {
-            if let selectedSpace {
-                Section {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: MacSidebarMetrics.rowSpacing) {
+                if let selectedSpace {
                     MacSidebarSpacePickerRow(
                         selectedSpace: selectedSpace,
                         spaces: appState.spaces,
@@ -50,18 +50,31 @@ struct MacWorkspaceSidebarView: View {
                         isSelected: false,
                         action: beginCreateRoot
                     )
-                }
 
-                Section {
+                    MacSidebarPagesHeaderView(
+                        space: selectedSpace,
+                        viewModel: viewModel,
+                        isPerformingAction: viewModel.isPerformingAction || viewModel.isPerformingSpaceAction,
+                        showTrash: showTrash,
+                        showSpaceSettings: showSpaceSettings,
+                        createRoot: beginCreateRoot
+                    )
+                    .padding(.top, MacSidebarMetrics.pagesHeaderTopPadding)
+
                     if viewModel.isLoading && viewModel.nodes.isEmpty {
                         ProgressView("Loading pages")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    ForEach(viewModel.nodes) { node in
+                    ForEach(viewModel.visibleNodes) { visibleNode in
                         PageTreeNodeView(
-                            node: node,
-                            depth: 0,
-                            viewModel: viewModel,
+                            node: visibleNode.node,
+                            depth: visibleNode.depth,
+                            isExpanded: visibleNode.isExpanded,
+                            isSelected: appState.selectedPageID == visibleNode.node.slugId,
+                            toggle: toggleNode,
+                            openInDetailColumn: openInDetailColumn,
+                            movePage: movePage,
                             createChild: beginCreateChild,
                             duplicate: beginDuplicate,
                             moveToSpace: beginMoveToSpace,
@@ -79,28 +92,18 @@ struct MacWorkspaceSidebarView: View {
                         Text(appState.isOffline ? "No cached pages" : "No pages")
                             .foregroundStyle(.secondary)
                     }
-                } header: {
-                    MacSidebarPagesHeaderView(
-                        space: selectedSpace,
-                        viewModel: viewModel,
-                        isPerformingAction: viewModel.isPerformingAction || viewModel.isPerformingSpaceAction,
-                        showTrash: showTrash,
-                        showSpaceSettings: showSpaceSettings,
-                        createRoot: beginCreateRoot
-                    )
+                } else {
+                    Text(appState.isOffline ? "No cached spaces" : "No spaces")
+                        .foregroundStyle(.secondary)
                 }
-                .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
-            } else {
-                Text(appState.isOffline ? "No cached spaces" : "No spaces")
-                    .foregroundStyle(.secondary)
-            }
 
-            if appState.isOffline {
-                OfflineBadgeView(text: "Offline")
-                    .listRowSeparator(.hidden)
+                if appState.isOffline {
+                    OfflineBadgeView(text: "Offline")
+                }
             }
+            .padding(.horizontal, MacSidebarMetrics.horizontalPadding)
+            .padding(.vertical, MacSidebarMetrics.verticalPadding)
         }
-        .listStyle(.sidebar)
         .navigationTitle("Docmostly")
         .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
         .task(id: selectedSpace?.id) {
@@ -151,12 +154,17 @@ struct MacWorkspaceSidebarView: View {
 
     private func loadSelectedSpacePages() async {
         guard let selectedSpace else {
-            viewModel.nodes = []
+            viewModel.clearPages()
             return
         }
 
-        await viewModel.loadRoot(spaceId: selectedSpace.id, appState: appState)
-        await viewModel.loadSpaceActionState(spaceId: selectedSpace.id, appState: appState)
+        async let loadRoot: Void = viewModel.loadRoot(spaceId: selectedSpace.id, appState: appState)
+        async let loadSpaceActionState: Void = viewModel.loadSpaceActionState(
+            spaceId: selectedSpace.id,
+            appState: appState
+        )
+        await loadRoot
+        await loadSpaceActionState
     }
 
     private func selectSpace(_ space: DocmostSpace) {
@@ -189,6 +197,22 @@ struct MacWorkspaceSidebarView: View {
         }
     }
 
+    private func toggleNode(_ node: PageTreeNode) {
+        Task {
+            await viewModel.toggle(node: node, appState: appState)
+        }
+    }
+
+    private func openInDetailColumn(_ node: PageTreeNode) {
+        appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
+    }
+
+    private func movePage(sourceID: String, operation: PageTreeDropOperation) {
+        Task {
+            await viewModel.movePage(sourceID: sourceID, operation: operation, appState: appState)
+        }
+    }
+
     private func createPage(title: String, parentPageId: String?) async -> String? {
         guard let selectedSpace else { return "No space selected." }
         let page = await viewModel.createPage(
@@ -208,6 +232,15 @@ struct MacWorkspaceSidebarView: View {
     private func showSpaceSettings() {
         appState.selectSidebarUtilityDestination(.settings)
     }
+}
+
+private enum MacSidebarMetrics {
+    static let horizontalPadding: CGFloat = 10
+    static let verticalPadding: CGFloat = 8
+    static let rowSpacing: CGFloat = 1
+    static let rowHeight: CGFloat = 28
+    static let selectionCornerRadius: CGFloat = 6
+    static let pagesHeaderTopPadding: CGFloat = 10
 }
 
 private struct MacSidebarSpacePickerRow: View {
@@ -239,6 +272,11 @@ private struct MacSidebarSpacePickerRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(selectedSpace.name)
+        .accessibilityAddTraits(.isButton)
+        .frame(maxWidth: .infinity, minHeight: MacSidebarMetrics.rowHeight, alignment: .leading)
+        .contentShape(.rect)
     }
 }
 
@@ -255,7 +293,11 @@ private struct MacSidebarActionRow: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .listRowBackground(isSelected ? DocmostlyTheme.primaryTint : Color.clear)
+        .frame(maxWidth: .infinity, minHeight: MacSidebarMetrics.rowHeight, alignment: .leading)
+        .background(
+            isSelected ? DocmostlyTheme.primaryTint : Color.clear,
+            in: .rect(cornerRadius: MacSidebarMetrics.selectionCornerRadius)
+        )
     }
 }
 

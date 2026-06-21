@@ -27,6 +27,7 @@ struct PageReaderView: View {
     @State private var activePanel: PageReaderPanel?
     @State private var scrollPosition = ScrollPosition()
     @State private var usesFullWidth = false
+    @State private var realtimePageID: String?
     @FocusState private var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
@@ -268,16 +269,20 @@ struct PageReaderView: View {
         .task(id: pageID) {
             await loadNativePage()
         }
-        .task(id: editorViewModel?.currentPageID) {
+        .task(id: realtimePageID) {
+            guard realtimePageID != nil else { return }
             await monitorRemotePageChanges()
         }
-        .task(id: editorViewModel?.currentPageID) {
+        .task(id: realtimePageID) {
+            guard realtimePageID != nil else { return }
             await monitorRealtimeEvents()
         }
-        .task(id: editorViewModel?.currentPageID) {
+        .task(id: realtimePageID) {
+            guard realtimePageID != nil else { return }
             await monitorCollaborationPresence()
         }
-        .task(id: editorViewModel?.currentPageID) {
+        .task(id: realtimePageID) {
+            guard realtimePageID != nil else { return }
             await monitorCRDTDocumentSnapshots()
         }
         .onChange(of: editorFocusedField) { _, newValue in
@@ -315,20 +320,34 @@ struct PageReaderView: View {
 
     private func loadNativePage() async {
         editorFocusedField = nil
+        realtimePageID = nil
         editorViewModel = nil
         let editorViewModel = NativeRichEditorViewModel(pageID: pageID)
 
         await editorViewModel.load(appState: appState)
+        guard Task.isCancelled == false else { return }
+
         if editorViewModel.errorMessage == nil {
-            await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
-                to: editorViewModel,
-                appState: appState
-            )
             self.editorViewModel = editorViewModel
             if editorViewModel.canEdit == false {
                 readerMode = .read
             }
-            await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+
+            async let attachCRDT: Void = NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
+                to: editorViewModel,
+                appState: appState
+            )
+            async let loadCompanions: Void = viewModel.loadCompanions(
+                pageID: editorViewModel.currentPageID,
+                appState: appState
+            )
+            await attachCRDT
+            guard Task.isCancelled == false else {
+                await loadCompanions
+                return
+            }
+            realtimePageID = editorViewModel.currentPageID
+            await loadCompanions
         } else {
             self.editorViewModel = editorViewModel
         }
@@ -607,29 +626,29 @@ private extension PageReaderView {
     func monitorRemotePageChanges() async {
         guard let editorViewModel else { return }
         guard editorViewModel.usesCRDTDocumentEngine == false else { return }
-        editorViewModel.realtimeStatus = .connecting
-
-        do {
-            _ = try appState.collaborationWebSocketURL()
-            _ = try await appState.loadCollaborationToken()
-        } catch {
-            editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
-        }
 
         while Task.isCancelled == false {
             guard editorViewModel.usesCRDTDocumentEngine == false else { return }
 
             do {
+                try await Task.sleep(for: PageReaderFallbackRefreshPolicy.refreshDelay)
+                guard Task.isCancelled == false else { return }
+
                 let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
                 editorViewModel.handleRemotePageSnapshot(page)
-                try await Task.sleep(for: .seconds(4))
             } catch {
+                guard Task.isCancelled == false else { return }
                 editorViewModel.realtimeStatus = .failed(error.localizedDescription)
-                try? await Task.sleep(for: .seconds(8))
+                try? await Task.sleep(for: PageReaderFallbackRefreshPolicy.failureRetryDelay)
             }
         }
     }
 
+}
+
+private enum PageReaderFallbackRefreshPolicy {
+    static let refreshDelay: Duration = .seconds(120)
+    static let failureRetryDelay: Duration = .seconds(180)
 }
 
 private extension PageReaderView {

@@ -114,7 +114,7 @@ extension NativeRichEditorViewModel {
     }
 }
 
-enum NativeEditorTableNodeFactory {
+nonisolated enum NativeEditorTableNodeFactory {
     static func node(from table: NativeEditorTable) -> ProseMirrorNode {
         ProseMirrorNode(type: "table", content: table.rows.map(rowNode(from:)))
     }

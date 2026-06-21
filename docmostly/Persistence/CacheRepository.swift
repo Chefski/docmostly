@@ -15,20 +15,68 @@ nonisolated struct CacheScope: Equatable, Hashable, Sendable {
     }
 }
 
-@MainActor
-final class CacheRepository {
+nonisolated final class CacheRepository {
     private let context: ModelContext
+    private var deferredSaveDepth = 0
+    private var hasDeferredChanges = false
 
     init(context: ModelContext) {
         self.context = context
     }
 
-    func saveSpaces(_ spaces: [DocmostSpace], scope: CacheScope) throws {
-        try deleteSpaces(scope: scope)
-        for space in spaces {
-            context.insert(CachedSpace(space: space, scope: scope))
+    func performBatch(_ body: () throws -> Void) throws {
+        deferredSaveDepth += 1
+        do {
+            try body()
+        } catch {
+            deferredSaveDepth -= 1
+            if deferredSaveDepth == 0 {
+                hasDeferredChanges = false
+            }
+            throw error
         }
-        try context.save()
+
+        deferredSaveDepth -= 1
+        if deferredSaveDepth == 0, hasDeferredChanges {
+            hasDeferredChanges = false
+            try context.save()
+        }
+    }
+
+    func saveSpaces(_ spaces: [DocmostSpace], scope: CacheScope) throws {
+        let existingSpaces = try loadCachedSpaces(scope: scope)
+        var existingByID: [String: CachedSpace] = [:]
+        var hasChanges = false
+        let incomingIDs = Set(spaces.map(\.id))
+
+        for space in existingSpaces {
+            guard incomingIDs.contains(space.id) else {
+                context.delete(space)
+                hasChanges = true
+                continue
+            }
+
+            if existingByID[space.id] == nil {
+                existingByID[space.id] = space
+            } else {
+                context.delete(space)
+                hasChanges = true
+            }
+        }
+
+        for space in spaces {
+            if let existing = existingByID.removeValue(forKey: space.id) {
+                if existing.matches(space: space) == false {
+                    existing.update(space: space)
+                    hasChanges = true
+                }
+            } else {
+                context.insert(CachedSpace(space: space, scope: scope))
+                hasChanges = true
+            }
+        }
+
+        try saveIfNeeded(hasChanges)
     }
 
     func loadSpaces(scope: CacheScope) throws -> [DocmostSpace] {
@@ -44,11 +92,39 @@ final class CacheRepository {
     }
 
     func savePageTree(spaceId: String, parentPageId: String?, pages: [DocmostPage], scope: CacheScope) throws {
-        try deleteTreeItems(spaceId: spaceId, parentPageId: parentPageId, scope: scope)
-        for page in pages {
-            context.insert(CachedPageTreeItem(page: page, scope: scope))
+        let existingItems = try loadTreeItems(spaceId: spaceId, parentPageId: parentPageId, scope: scope)
+        var existingByID: [String: CachedPageTreeItem] = [:]
+        let incomingIDs = Set(pages.map(\.id))
+        var hasChanges = false
+
+        for item in existingItems {
+            guard incomingIDs.contains(item.id) else {
+                context.delete(item)
+                hasChanges = true
+                continue
+            }
+
+            if existingByID[item.id] == nil {
+                existingByID[item.id] = item
+            } else {
+                context.delete(item)
+                hasChanges = true
+            }
         }
-        try context.save()
+
+        for page in pages {
+            if let existing = existingByID.removeValue(forKey: page.id) {
+                if existing.matches(page: page) == false {
+                    existing.update(page: page)
+                    hasChanges = true
+                }
+            } else {
+                context.insert(CachedPageTreeItem(page: page, scope: scope))
+                hasChanges = true
+            }
+        }
+
+        try saveIfNeeded(hasChanges)
     }
 
     func loadPageTree(spaceId: String, parentPageId: String?, scope: CacheScope) throws -> [DocmostPage] {
@@ -68,29 +144,38 @@ final class CacheRepository {
     }
 
     func savePage(_ page: DocmostPage, htmlContent: String, scope: CacheScope) throws {
+        var hasChanges = false
         if let cachedPage = try loadPage(idOrSlugId: page.id, scope: scope) {
-            cachedPage.update(page: page, htmlContent: htmlContent)
+            if cachedPage.matches(page: page, htmlContent: htmlContent) == false {
+                cachedPage.update(page: page, htmlContent: htmlContent)
+                hasChanges = true
+            }
         } else {
             context.insert(CachedPage(page: page, htmlContent: htmlContent, scope: scope))
+            hasChanges = true
         }
 
         let links = AttachmentExtractor.extractLinks(fromHTML: htmlContent)
-        try deleteAttachments(pageId: page.id, scope: scope)
-        for link in links {
-            context.insert(CachedAttachment(link: link, pageId: page.id, scope: scope))
+        if try syncAttachments(links, pageId: page.id, scope: scope) {
+            hasChanges = true
         }
 
-        try context.save()
+        try saveIfNeeded(hasChanges)
     }
 
     func saveEditablePage(_ page: DocmostEditablePage, scope: CacheScope) throws {
+        var hasChanges = false
         if let cachedPage = try loadPage(idOrSlugId: page.id, scope: scope) {
-            cachedPage.update(editablePage: page)
+            if cachedPage.matches(editablePage: page) == false {
+                cachedPage.update(editablePage: page)
+                hasChanges = true
+            }
         } else {
             context.insert(CachedPage(editablePage: page, scope: scope))
+            hasChanges = true
         }
 
-        try context.save()
+        try saveIfNeeded(hasChanges)
     }
 
     func loadPage(idOrSlugId: String, scope: CacheScope) throws -> CachedPage? {
@@ -111,6 +196,10 @@ final class CacheRepository {
         try loadPage(idOrSlugId: idOrSlugId, scope: scope)?.asEditablePage()
     }
 
+    func loadPageSnapshot(idOrSlugId: String, scope: CacheScope) throws -> CachedPageSnapshot? {
+        try loadPage(idOrSlugId: idOrSlugId, scope: scope)?.snapshot()
+    }
+
     func loadRecentPages(limit: Int = 20, scope: CacheScope) throws -> [CachedPage] {
         let serverBaseURL = scope.serverBaseURL
         let userID = scope.userID
@@ -124,9 +213,18 @@ final class CacheRepository {
         return try context.fetch(descriptor)
     }
 
+    func loadRecentPageValues(limit: Int = 20, scope: CacheScope) throws -> [DocmostPage] {
+        try loadRecentPages(limit: limit, scope: scope).map { $0.asPage() }
+    }
+
     func markOpened(_ cachedPage: CachedPage) throws {
         cachedPage.lastOpenedAt = Date.now
-        try context.save()
+        try saveIfNeeded(true)
+    }
+
+    func markOpened(idOrSlugId: String, scope: CacheScope) throws {
+        guard let cachedPage = try loadPage(idOrSlugId: idOrSlugId, scope: scope) else { return }
+        try markOpened(cachedPage)
     }
 
     func loadAttachmentLinks(pageId: String, scope: CacheScope) throws -> [DocmostAttachmentLink] {
@@ -143,15 +241,53 @@ final class CacheRepository {
         return try context.fetch(descriptor).map { $0.asLink() }
     }
 
+    func searchCachedPages(query: String, limit: Int = 100, scope: CacheScope) throws -> [DocmostSearchResult] {
+        let pages = try loadRecentPages(limit: limit, scope: scope)
+        return pages
+            .filter { page in
+                page.title.localizedStandardContains(query) || page.htmlContent.localizedStandardContains(query)
+            }
+            .map { page in
+                DocmostSearchResult(
+                    id: page.id,
+                    title: page.title,
+                    icon: page.icon,
+                    parentPageId: page.parentPageId,
+                    slugId: page.slugId,
+                    creatorId: nil,
+                    createdAt: nil,
+                    updatedAt: page.updatedAt,
+                    rank: nil,
+                    highlight: "Cached page",
+                    space: SearchResultSpace(
+                        id: page.spaceId,
+                        name: page.spaceSlug ?? "Cached",
+                        slug: page.spaceSlug,
+                        icon: nil
+                    )
+                )
+            }
+    }
+
     func clearAll() throws {
         try deleteAll(CachedAttachment.self)
         try deleteAll(CachedPage.self)
         try deleteAll(CachedPageTreeItem.self)
         try deleteAll(CachedSpace.self)
-        try context.save()
+        try saveIfNeeded(true)
     }
 
-    private func deleteSpaces(scope: CacheScope) throws {
+    private func saveIfNeeded(_ hasChanges: Bool) throws {
+        guard hasChanges else { return }
+
+        if deferredSaveDepth > 0 {
+            hasDeferredChanges = true
+        } else {
+            try context.save()
+        }
+    }
+
+    private func loadCachedSpaces(scope: CacheScope) throws -> [CachedSpace] {
         let serverBaseURL = scope.serverBaseURL
         let userID = scope.userID
         let descriptor = FetchDescriptor<CachedSpace>(
@@ -159,12 +295,10 @@ final class CacheRepository {
                 space.cacheServerBaseURL == serverBaseURL && space.cacheUserID == userID
             }
         )
-        for item in try context.fetch(descriptor) {
-            context.delete(item)
-        }
+        return try context.fetch(descriptor)
     }
 
-    private func deleteTreeItems(spaceId: String, parentPageId: String?, scope: CacheScope) throws {
+    private func loadTreeItems(spaceId: String, parentPageId: String?, scope: CacheScope) throws -> [CachedPageTreeItem] {
         let serverBaseURL = scope.serverBaseURL
         let userID = scope.userID
         let parentID = parentPageId
@@ -176,12 +310,10 @@ final class CacheRepository {
                     item.parentPageId == parentID
             }
         )
-        for item in try context.fetch(descriptor) {
-            context.delete(item)
-        }
+        return try context.fetch(descriptor)
     }
 
-    private func deleteAttachments(pageId: String, scope: CacheScope) throws {
+    private func loadAttachments(pageId: String, scope: CacheScope) throws -> [CachedAttachment] {
         let serverBaseURL = scope.serverBaseURL
         let userID = scope.userID
         let descriptor = FetchDescriptor<CachedAttachment>(
@@ -191,9 +323,47 @@ final class CacheRepository {
                     attachment.pageId == pageId
             }
         )
-        for item in try context.fetch(descriptor) {
-            context.delete(item)
+        return try context.fetch(descriptor)
+    }
+
+    private func syncAttachments(
+        _ links: [DocmostAttachmentLink],
+        pageId: String,
+        scope: CacheScope
+    ) throws -> Bool {
+        let existingAttachments = try loadAttachments(pageId: pageId, scope: scope)
+        var existingByID: [String: CachedAttachment] = [:]
+        let incomingIDs = Set(links.map(\.id))
+        var hasChanges = false
+
+        for attachment in existingAttachments {
+            guard incomingIDs.contains(attachment.id) else {
+                context.delete(attachment)
+                hasChanges = true
+                continue
+            }
+
+            if existingByID[attachment.id] == nil {
+                existingByID[attachment.id] = attachment
+            } else {
+                context.delete(attachment)
+                hasChanges = true
+            }
         }
+
+        for link in links {
+            if let existing = existingByID.removeValue(forKey: link.id) {
+                if existing.matches(link: link) == false {
+                    existing.update(link: link)
+                    hasChanges = true
+                }
+            } else {
+                context.insert(CachedAttachment(link: link, pageId: pageId, scope: scope))
+                hasChanges = true
+            }
+        }
+
+        return hasChanges
     }
 
     private func deleteAll<T: PersistentModel>(_ model: T.Type) throws {

@@ -1,6 +1,6 @@
 import Foundation
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func table(from node: ProseMirrorNode) -> NativeEditorTable {
         let rows = (node.content ?? [])
             .filter { $0.type == "tableRow" }

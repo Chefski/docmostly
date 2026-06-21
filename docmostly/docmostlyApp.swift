@@ -8,7 +8,7 @@ struct DocmostlyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(modelContainer: sharedModelContainer)
                 .environment(appState)
         }
         .modelContainer(sharedModelContainer)

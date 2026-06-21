@@ -1,0 +1,93 @@
+## output_259.json
+Trace: /var/folders/wf/z4gtsgpn0_vbfyjx5jz7z4pw0000gn/T/codex-ios-ettrace.2FwZgK/run-20260621-082056.runtime-preview/output_259.json
+Total duration:     33.009440
+Idle self total:    30.663143
+Unattributed total: 0.023426
+Active total:       2.322871
+
+Threads
+ 33.009440  100.00%total output_259
+
+Top active self frames
+  0.168695    7.26%active swift_conformsToProtocolMaybeInstantiateSuperclasses(swift::TargetMetadata<swift::InProcess> const*, swift::TargetProtocolDescriptor<swift::InProcess> const*, bool)::$_2::operator()((anonymous namespace)::ConformanceSection const&) const::'lambda'(swift::TargetProtocolConformanceDescriptor<swift::InProcess> const&)::operator()(swift::TargetProtocolConformanceDescriptor<swift::InProcess> const&) const
+  0.100758    4.34%active _pthread_mutex_unlock_init_slow
+  0.072964    3.14%active -[CUIStructuredThemeStore lookupAssetForKey:]
+  0.071074    3.06%active objc_msgSend
+  0.057220    2.46%active swift_conformsToProtocolMaybeInstantiateSuperclasses(swift::TargetMetadata<swift::InProcess> const*, swift::TargetProtocolDescriptor<swift::InProcess> const*, bool)
+  0.041124    1.77%active UIKitCore
+  0.039992    1.72%active ETTrace
+  0.035665    1.54%active <deduplicated_symbol>
+  0.031187    1.34%active task_policy_set
+  0.030584    1.32%active DYLD-STUB$$pthread_getspecific
+  0.025869    1.11%active swift::MetadataCacheKey::operator==(swift::MetadataCacheKey const&) const
+  0.025717    1.11%active objc_retainAutoreleasedReturnValue
+  0.025548    1.10%active objc_autoreleaseReturnValue
+  0.025122    1.08%active _xzm_xzone_malloc_tiny
+  0.020684    0.89%active swift_release
+  0.020646    0.89%active getMethodNoSuper_nolock(objc_class*, objc_selector*)
+  0.020533    0.88%active task_info
+  0.015667    0.67%active swift_retain
+  0.015627    0.67%active specialized find1<A>(_:key:filter:)
+  0.015383    0.66%active objc_retain
+  0.015373    0.66%active libsystem_platform.dylib
+  0.015330    0.66%active mach_vm_map
+  0.015217    0.66%active ApplyVariationsToGlyph(int, short*, unsigned int, glyphVariation const*, int, short const*, int, int, unsigned short const*, float*, float*, float*, float*, float*, float*, int)
+  0.015075    0.65%active ApplyAllPointDeltas(int, float*, char const*, float, void const*)
+  0.015025    0.65%active SwiftData
+  0.014912    0.64%active __libplatform_init
+  0.010511    0.45%active objc_release
+  0.010464    0.45%active _os_nospin_lock_unlock_slow
+  0.010414    0.45%active mach_voucher_extract_attr_content
+  0.010381    0.45%active -[__NSDictionaryM objectForKey:]
+  0.010374    0.45%active CA::AttrList::get(unsigned int, _CAValueType, void*) const
+  0.010347    0.45%active mach_make_memory_entry_64
+  0.010339    0.45%active CFRelease
+  0.010321    0.44%active -[__NSDictionaryM objectForKeyedSubscript:]
+  0.010319    0.44%active libicucore.A.dylib
+  0.010303    0.44%active CFEqual
+  0.010295    0.44%active csr_check
+  0.010279    0.44%active _platform_memchr
+  0.010274    0.44%active _mapStrIsEqual(_NXMapTable*, void const*, void const*)
+  0.010266    0.44%active getCache(swift::TargetTypeContextDescriptor<swift::InProcess> const&)
+
+Top inclusive frames
+  7.596614  327.04%active UIKitCore
+  4.154380  178.85%active AG::Graph::UpdateStack::update()
+  3.739740  161.00%active AG::Graph::update_attribute(AG::data::ptr<AG::Node>, unsigned int)
+  3.538380  152.33%active AG::Graph::input_value_ref_slow(AG::data::ptr<AG::Node>, AG::AttributeID, unsigned int, unsigned int, AGSwiftMetadata const*, unsigned char&, long)
+  3.400611  146.40%active <deduplicated_symbol>
+  3.260925  140.38%active AGGraphGetValue
+  2.605082  112.15%active ETTrace
+  2.322871  100.00%active closure #1 in KitRendererCommon(_:)
+  2.322871  100.00%active __debug_main_executable_dylib_entry_point
+  2.313475   99.60%active LayoutEngineBox.sizeThatFits(_:)
+  2.224286   95.76%active implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)
+  2.121840   91.35%active static ModifiedContent<>._makeView(view:inputs:)
+  2.085086   89.76%active closure #2 in static ModifiedContent<>._makeView(view:inputs:)
+  1.654128   71.21%active -[NSObject(UIAccessibilityElementTraversal) _addAccessibilityElementsAndOrderedContainersWithOptions:toCollection:]
+  1.282305   55.20%active schedulerStepScheduledMainSectionContinue
+  1.282305   55.20%active _UIUpdateSequenceRunNext
+  1.282305   55.20%active UC::DriverCore::continueProcessing()
+  1.067248   45.95%active SwiftData
+  1.054724   45.41%active __CFRunLoopDoSources0
+  0.997922   42.96%active LayoutProxy.size(in:)
+  0.969214   41.72%active specialized implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)
+  0.956703   41.19%active UnaryLayoutEngine.sizeThatFits(_:)
+  0.956703   41.19%active SwiftUICore
+  0.950546   40.92%active partial apply for implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)
+  0.909550   39.16%active CA::Layer::update_if_needed_(CA::Transaction*, CA::LayerUpdateReason)
+  0.909550   39.16%active CA::Layer::perform_update_(CA::Layer*, CALayer*, unsigned int, CA::LayerUpdateReason, CA::Transaction*)
+  0.853920   36.76%active -[UIView(CALayerDelegate) layoutSublayersOfLayer:]
+  0.682070   29.36%active mshMIGPerform
+  0.677543   29.17%active __setupUpdateSequence_block_invoke_2
+  0.677543   29.17%active _UIApplicationFlushCATransaction
+  0.673425   28.99%active partial apply for closure #1 in closure #1 in InsetLayoutComputer.Engine.sizeThatFits(_:)
+  0.673425   28.99%active InsetViewLayout.sizeThatFits(_:)
+  0.673425   28.99%active InsetViewLayout.secondaryProposal(parentProposal:spacing:)
+  0.673425   28.99%active InsetViewLayout.primaryMinimum(parentProposalWithoutSpacing:)
+  0.673425   28.99%active InsetLayoutComputer.Engine.sizeThatFits(_:)
+  0.673425   28.99%active AG::Graph::with_update(AG::data::ptr<AG::Node>, AG::ClosureFunction<void>)
+  0.672577   28.95%active CA::Transaction::commit()
+  0.667445   28.73%active CA::Transaction::flush_as_runloop_observer(bool)
+  0.662323   28.51%active CA::Context::commit_transaction(CA::Transaction*, double, double*)
+  0.633023   27.25%active protocol witness for Rule.value.getter in conformance PlatformItemListTransformModifier<A>.Transform

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum NativeEditorBlockKind: Equatable, Sendable {
+nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
     case paragraph
     case heading(level: Int)
     case bulletListItem

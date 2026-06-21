@@ -16,11 +16,15 @@ struct PageTreeView: View {
                 ProgressView("Loading pages")
             }
 
-            ForEach(viewModel.nodes) { node in
+            ForEach(viewModel.visibleNodes) { visibleNode in
                 PageTreeNodeView(
-                    node: node,
-                    depth: 0,
-                    viewModel: viewModel,
+                    node: visibleNode.node,
+                    depth: visibleNode.depth,
+                    isExpanded: visibleNode.isExpanded,
+                    isSelected: appState.selectedPageID == visibleNode.node.slugId,
+                    toggle: toggleNode,
+                    openInDetailColumn: openInDetailColumn,
+                    movePage: movePage,
                     createChild: beginCreateChild,
                     duplicate: beginDuplicate,
                     moveToSpace: beginMoveToSpace,
@@ -123,6 +127,22 @@ struct PageTreeView: View {
         }
     }
 
+    private func toggleNode(_ node: PageTreeNode) {
+        Task {
+            await viewModel.toggle(node: node, appState: appState)
+        }
+    }
+
+    private func openInDetailColumn(_ node: PageTreeNode) {
+        appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
+    }
+
+    private func movePage(sourceID: String, operation: PageTreeDropOperation) {
+        Task {
+            await viewModel.movePage(sourceID: sourceID, operation: operation, appState: appState)
+        }
+    }
+
     private func createPage(title: String, parentPageId: String?) async -> String? {
         let page = await viewModel.createPage(
             title: title,
@@ -142,8 +162,10 @@ struct PageTreeView: View {
     }
 
     private func refreshPages() async {
-        await viewModel.loadRoot(spaceId: space.id, appState: appState)
-        await viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
+        async let loadRoot: Void = viewModel.loadRoot(spaceId: space.id, appState: appState)
+        async let loadSpaceActionState: Void = viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
+        await loadRoot
+        await loadSpaceActionState
     }
 }
 

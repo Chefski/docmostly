@@ -4,8 +4,9 @@ import Observation
 @MainActor
 @Observable
 final class PageTreeViewModel {
-    var nodes: [PageTreeNode] = []
-    var expandedIDs: Set<String> = []
+    private(set) var nodes: [PageTreeNode] = []
+    private(set) var visibleNodes: [PageTreeVisibleNode] = []
+    private var expandedIDs: Set<String> = []
     var isLoading = false
     var isPerformingAction = false
     var isLoadingTrash = false
@@ -30,9 +31,16 @@ final class PageTreeViewModel {
         do {
             let pages = try await appState.loadSidebarPages(spaceId: spaceId)
             nodes = pages.map(PageTreeNode.init(page:)).sortedByPosition()
+            rebuildVisibleNodes()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func clearPages() {
+        nodes = []
+        expandedIDs = []
+        rebuildVisibleNodes()
     }
 
     func loadSpaceActionState(spaceId: String, appState: AppState) async {
@@ -40,20 +48,18 @@ final class PageTreeViewModel {
         spaceActionErrorMessage = nil
         defer { isLoadingSpaceActions = false }
 
-        do {
-            let favoriteIDs = try await appState.loadFavoriteIds(type: .space)
-            isFavoriteSpace = favoriteIDs.contains(spaceId)
-        } catch {
-            isFavoriteSpace = false
-            spaceActionErrorMessage = error.localizedDescription
+        async let favoriteIDsOutcome = captureLoad {
+            try await appState.loadFavoriteIds(type: .space)
+        }
+        async let watchStatusOutcome = captureLoad {
+            try await appState.loadSpaceWatchStatus(spaceId: spaceId)
         }
 
-        do {
-            isWatchingSpace = try await appState.loadSpaceWatchStatus(spaceId: spaceId).watching
-        } catch {
-            isWatchingSpace = nil
-            spaceActionErrorMessage = spaceActionErrorMessage ?? error.localizedDescription
-        }
+        let favorites = await favoriteIDsOutcome
+        let watchStatus = await watchStatusOutcome
+        isFavoriteSpace = favorites.value?.contains(spaceId) ?? false
+        isWatchingSpace = watchStatus.value?.watching
+        spaceActionErrorMessage = favorites.errorMessage ?? watchStatus.errorMessage
     }
 
     func toggleSpaceFavorite(spaceId: String, appState: AppState) async {
@@ -98,10 +104,12 @@ final class PageTreeViewModel {
     func toggle(node: PageTreeNode, appState: AppState) async {
         if expandedIDs.contains(node.id) {
             expandedIDs.remove(node.id)
+            rebuildVisibleNodes()
             return
         }
 
         expandedIDs.insert(node.id)
+        rebuildVisibleNodes()
 
         guard node.hasChildren, node.isChildrenLoaded == false else {
             return
@@ -114,6 +122,7 @@ final class PageTreeViewModel {
                 existing.children = childNodes
                 existing.isChildrenLoaded = true
             }
+            rebuildVisibleNodes()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -129,6 +138,7 @@ final class PageTreeViewModel {
             if let parentPageId {
                 try await ensureChildrenLoaded(parentPageId: parentPageId, appState: appState)
                 expandedIDs.insert(parentPageId)
+                rebuildVisibleNodes()
             }
 
             let page = try await appState.createPage(
@@ -158,6 +168,7 @@ final class PageTreeViewModel {
         let moved: Bool? = await performAction {
             try await appState.movePageToSpace(pageId: node.id, spaceId: targetSpaceId)
             nodes = nodes.removing(id: node.id)
+            rebuildVisibleNodes()
             appState.selectSpace(id: targetSpaceId, clearsPage: appState.selectedPageID == node.slugId)
             return true
         }
@@ -168,6 +179,7 @@ final class PageTreeViewModel {
         await performAction {
             try await appState.deletePage(pageId: node.id)
             nodes = nodes.removing(id: node.id)
+            rebuildVisibleNodes()
             if appState.selectedPageID == node.slugId {
                 appState.clearSelectedPage()
             }
@@ -186,9 +198,11 @@ final class PageTreeViewModel {
                 node.parentPageId = payload.parentPageId
                 node.position = payload.position
             }
+            rebuildVisibleNodes()
             try await appState.movePage(payload)
         } catch {
             nodes = previousNodes
+            rebuildVisibleNodes()
             errorMessage = error.localizedDescription
         }
     }
@@ -230,12 +244,14 @@ final class PageTreeViewModel {
             existing.isChildrenLoaded = true
             existing.hasChildren = true
         }
+        rebuildVisibleNodes()
     }
 
     private func insert(_ node: PageTreeNode, parentPageId: String?) {
         if parentPageId == nil {
             nodes.append(node)
             nodes = nodes.sortedByPosition()
+            rebuildVisibleNodes()
             return
         }
 
@@ -245,6 +261,11 @@ final class PageTreeViewModel {
             parent.hasChildren = true
             parent.isChildrenLoaded = true
         }
+        rebuildVisibleNodes()
+    }
+
+    private func rebuildVisibleNodes() {
+        visibleNodes = nodes.visibleNodes(expandedIDs: expandedIDs)
     }
 
     private func performAction<Result>(_ action: () async throws -> Result) async -> Result? {
@@ -259,6 +280,21 @@ final class PageTreeViewModel {
             return nil
         }
     }
+
+    private func captureLoad<Value: Sendable>(
+        _ operation: () async throws -> Value
+    ) async -> PageTreeLoadOutcome<Value> {
+        do {
+            return PageTreeLoadOutcome(value: try await operation(), errorMessage: nil)
+        } catch {
+            return PageTreeLoadOutcome(value: nil, errorMessage: error.localizedDescription)
+        }
+    }
+}
+
+private struct PageTreeLoadOutcome<Value: Sendable>: Sendable {
+    let value: Value?
+    let errorMessage: String?
 }
 
 private extension String {

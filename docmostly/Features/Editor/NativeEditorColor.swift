@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension Color {
+nonisolated extension Color {
     init?(docmostlyHex value: String) {
         var hex = value.trimmingCharacters(in: .whitespacesAndNewlines)
 

@@ -8,7 +8,7 @@ struct DocmostlyMacApp: App {
 
     var body: some Scene {
         WindowGroup("Docmostly", id: "main") {
-            MacRootView()
+            MacRootView(modelContainer: sharedModelContainer)
                 .environment(appState)
                 .modelContainer(sharedModelContainer)
                 .frame(minWidth: 980, minHeight: 680)

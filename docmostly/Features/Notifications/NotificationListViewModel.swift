@@ -17,13 +17,23 @@ final class NotificationListViewModel {
         errorMessage = nil
         defer { isLoading = false }
 
-        do {
-            let response = try await appState.loadNotifications(type: selectedType, limit: 50)
-            notifications = response.items
-            unreadCount = try await appState.loadUnreadNotificationCount()
-        } catch {
-            errorMessage = error.localizedDescription
+        async let loadedNotifications = captureLoad {
+            try await appState.loadNotifications(type: selectedType, limit: 50)
         }
+        async let loadedUnreadCount = captureLoad {
+            try await appState.loadUnreadNotificationCount()
+        }
+
+        let notificationOutcome = await loadedNotifications
+        let unreadCountOutcome = await loadedUnreadCount
+
+        if let response = notificationOutcome.value {
+            notifications = response.items
+        }
+        if let count = unreadCountOutcome.value {
+            unreadCount = count
+        }
+        errorMessage = notificationOutcome.errorMessage ?? unreadCountOutcome.errorMessage
     }
 
     func markRead(_ notification: DocmostNotification, appState: AppState) async {
@@ -58,4 +68,19 @@ final class NotificationListViewModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    private func captureLoad<Value: Sendable>(
+        _ operation: () async throws -> Value
+    ) async -> NotificationLoadOutcome<Value> {
+        do {
+            return NotificationLoadOutcome(value: try await operation(), errorMessage: nil)
+        } catch {
+            return NotificationLoadOutcome(value: nil, errorMessage: error.localizedDescription)
+        }
+    }
+}
+
+private struct NotificationLoadOutcome<Value: Sendable>: Sendable {
+    let value: Value?
+    let errorMessage: String?
 }

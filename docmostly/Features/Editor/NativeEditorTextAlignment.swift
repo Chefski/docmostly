@@ -1,6 +1,6 @@
 import Foundation
 
-enum NativeEditorTextAlignment: String, Equatable, Sendable {
+nonisolated enum NativeEditorTextAlignment: String, Equatable, Sendable {
     case left
     case center
     case right

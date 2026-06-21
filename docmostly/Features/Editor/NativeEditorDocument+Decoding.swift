@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension NativeEditorDocument {
+nonisolated extension NativeEditorDocument {
     static func blocks(from node: ProseMirrorNode) -> [NativeEditorBlock] {
         if let editableBlocks = editableBlocks(from: node) {
             return editableBlocks

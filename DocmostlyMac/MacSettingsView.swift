@@ -23,7 +23,9 @@ struct MacSettingsView: View {
 
                 Section("Local Data") {
                     Button("Clear Offline Cache", systemImage: "trash", role: .destructive) {
-                        appState.clearCache()
+                        Task {
+                            await appState.clearCache()
+                        }
                     }
                 }
 

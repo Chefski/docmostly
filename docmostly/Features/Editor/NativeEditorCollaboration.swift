@@ -123,7 +123,7 @@ nonisolated enum NativeEditorPresenceColor {
 
 nonisolated enum NativeEditorAwarenessTiming {
     static let staleStateInterval: TimeInterval = 30
-    static let staleStateCheckDelay: Duration = .seconds(3)
+    static let staleStateCheckDelay: Duration = .seconds(10)
     static let localStateRefreshDelay: Duration = .seconds(15)
 }
 

@@ -20,8 +20,13 @@ final class AppState {
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
     @ObservationIgnored private var cacheRepository: CacheRepository?
+    @ObservationIgnored private var cacheReader: CacheReadRepository?
+    @ObservationIgnored private var cacheWriter: CacheWriteRepository?
     @ObservationIgnored private var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
+    @ObservationIgnored private var spacesLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
+    @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
 
     init(
         settingsStore: LocalSettingsStore? = nil,
@@ -38,14 +43,77 @@ final class AppState {
 
     static func production(crdtRuntimeBundle: Bundle = .main) -> AppState {
         AppState(
-            crdtDocumentEngineFactory: NativeEditorJSCRDTEngineFactory.bundledIfAvailable(in: crdtRuntimeBundle)
+            crdtDocumentEngineFactory: NativeEditorJSCRDTEngineFactory.lazyBundled(in: crdtRuntimeBundle)
         )
     }
 
-    func configure(modelContext: ModelContext) {
+    func configure(modelContext: ModelContext, modelContainer: ModelContainer? = nil) {
         if cacheRepository == nil {
             cacheRepository = CacheRepository(context: modelContext)
         }
+        if cacheReader == nil, let modelContainer {
+            cacheReader = CacheReadRepository(modelContainer: modelContainer)
+        }
+        if cacheWriter == nil, let modelContainer {
+            cacheWriter = CacheWriteRepository(modelContainer: modelContainer)
+        }
+    }
+
+    #if DEBUG
+    func configurePreviewCacheScope(_ scope: CacheScope) {
+        cacheScope = scope
+    }
+    #endif
+
+    private func scheduleCacheWrite(_ operation: CacheWriteOperation) {
+        pendingCacheWrites.append(operation)
+        cacheWriteTask?.cancel()
+        cacheWriteTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await Task.sleep(for: .milliseconds(750))
+            } catch {
+                return
+            }
+
+            await self.flushScheduledCacheWrites()
+        }
+    }
+
+    private func flushScheduledCacheWrites() async {
+        let operations = pendingCacheWrites
+        pendingCacheWrites.removeAll(keepingCapacity: true)
+        cacheWriteTask = nil
+
+        guard let cacheWriter else {
+            flushScheduledCacheWritesOnMainActor(operations)
+            return
+        }
+
+        do {
+            try await cacheWriter.perform(operations)
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func flushScheduledCacheWritesOnMainActor(_ operations: [CacheWriteOperation]) {
+        guard let cacheRepository else { return }
+
+        for operation in operations {
+            do {
+                try operation.perform(using: cacheRepository)
+            } catch {
+                statusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelScheduledCacheWrites() {
+        cacheWriteTask?.cancel()
+        cacheWriteTask = nil
+        pendingCacheWrites.removeAll(keepingCapacity: true)
     }
 
     func restore() async {
@@ -77,7 +145,7 @@ final class AppState {
             currentUser = nil
             cacheScope = nil
             phase = serverURLString.isEmpty ? .needsServer : .unauthenticated
-            loadCachedSpaces()
+            await loadCachedSpaces()
         }
     }
 
@@ -88,6 +156,7 @@ final class AppState {
 
         serverURLString = url.absoluteString
         settingsStore.saveServerURLString(serverURLString)
+        cancelScheduledCacheWrites()
         apiClient = client
         currentUser = nil
         cacheScope = nil
@@ -113,6 +182,7 @@ final class AppState {
 
     func logout() async {
         try? await authService.logout(client: apiClient)
+        cancelScheduledCacheWrites()
         currentUser = nil
         cacheScope = nil
         spaces = []
@@ -121,8 +191,23 @@ final class AppState {
     }
 
     func loadSpaces() async {
+        if let spacesLoadTask {
+            await spacesLoadTask.value
+            return
+        }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performLoadSpaces()
+        }
+        spacesLoadTask = task
+        await task.value
+        spacesLoadTask = nil
+    }
+
+    private func performLoadSpaces() async {
         guard let apiClient else {
-            loadCachedSpaces()
+            await loadCachedSpaces()
             return
         }
 
@@ -132,7 +217,7 @@ final class AppState {
             selectDefaultSpaceIfNeeded()
             isOffline = false
             if let cacheScope {
-                try cacheRepository?.saveSpaces(response.items, scope: cacheScope)
+                scheduleCacheWrite(.saveSpaces(response.items, cacheScope))
             }
         } catch {
             isOffline = true
@@ -141,78 +226,80 @@ final class AppState {
                 spaces = []
                 return
             }
-            loadCachedSpaces()
+            await loadCachedSpaces()
         }
     }
 
     func loadSidebarPages(spaceId: String, pageId: String? = nil) async throws -> [DocmostPage] {
         guard let apiClient else {
-            return try loadCachedSidebarPages(spaceId: spaceId, pageId: pageId)
+            return try await loadCachedSidebarPages(spaceId: spaceId, pageId: pageId)
         }
 
         do {
             let response: PaginatedResponse<DocmostPage> = try await apiClient.send(
                 .sidebarPages(spaceId: pageId == nil ? spaceId : nil, pageId: pageId)
             )
+            isOffline = false
             if let cacheScope {
-                try cacheRepository?.savePageTree(
+                scheduleCacheWrite(.savePageTree(
                     spaceId: spaceId,
                     parentPageId: pageId,
                     pages: response.items,
                     scope: cacheScope
-                )
+                ))
             }
-            isOffline = false
             return response.items
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            return try loadCachedSidebarPages(spaceId: spaceId, pageId: pageId)
+            return try await loadCachedSidebarPages(spaceId: spaceId, pageId: pageId)
         }
     }
 
     func loadPage(idOrSlugId: String) async throws -> PageLoadResult {
         guard let apiClient else {
-            let cached = try requireCachedPage(idOrSlugId: idOrSlugId)
-            return PageLoadResult(page: cached.asPage(), html: cached.htmlContent, isFromCache: true)
+            let cached = try await requireCachedPage(idOrSlugId: idOrSlugId)
+            return PageLoadResult(page: cached.page, html: cached.htmlContent, isFromCache: true)
         }
 
         do {
             let page: DocmostPage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .html))
             let html = page.content ?? ""
-            if let cacheScope {
-                try cacheRepository?.savePage(page, htmlContent: html, scope: cacheScope)
-            }
             isOffline = false
+            if let cacheScope {
+                scheduleCacheWrite(.savePage(page, htmlContent: html, scope: cacheScope))
+            }
             return PageLoadResult(page: page, html: html, isFromCache: false)
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            let cached = try requireCachedPage(idOrSlugId: idOrSlugId)
-            try cacheRepository?.markOpened(cached)
-            return PageLoadResult(page: cached.asPage(), html: cached.htmlContent, isFromCache: true)
+            let cached = try await requireCachedPage(idOrSlugId: idOrSlugId)
+            if let cacheScope {
+                scheduleCacheWrite(.markOpened(idOrSlugId: idOrSlugId, scope: cacheScope))
+            }
+            return PageLoadResult(page: cached.page, html: cached.htmlContent, isFromCache: true)
         }
     }
 
     func loadEditablePage(idOrSlugId: String) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            return try requireCachedEditablePage(idOrSlugId: idOrSlugId)
+            return try await requireCachedEditablePage(idOrSlugId: idOrSlugId)
         }
 
         do {
             let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
-            if let cacheScope {
-                try cacheRepository?.saveEditablePage(page, scope: cacheScope)
-            }
             isOffline = false
+            if let cacheScope {
+                scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
+            }
             return page
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            return try requireCachedEditablePage(idOrSlugId: idOrSlugId)
+            return try await requireCachedEditablePage(idOrSlugId: idOrSlugId)
         }
     }
 
@@ -238,7 +325,7 @@ final class AppState {
         }
 
         guard let apiClient else {
-            return try searchCachedPages(query: query)
+            return try await searchCachedPages(query: query)
         }
 
         do {
@@ -249,22 +336,33 @@ final class AppState {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            return try searchCachedPages(query: query)
+            return try await searchCachedPages(query: query)
         }
     }
 
-    func attachmentLinks(pageId: String) -> [DocmostAttachmentLink] {
+    func attachmentLinks(pageId: String) async -> [DocmostAttachmentLink] {
         guard let cacheScope else { return [] }
+        if let cacheReader {
+            return (try? await cacheReader.loadAttachmentLinks(pageId: pageId, scope: cacheScope)) ?? []
+        }
         return (try? cacheRepository?.loadAttachmentLinks(pageId: pageId, scope: cacheScope)) ?? []
     }
 
-    func recentCachedPages(limit: Int = 20) -> [CachedPage] {
+    func recentCachedPages(limit: Int = 20) async -> [DocmostPage] {
         guard let cacheScope else { return [] }
-        return (try? cacheRepository?.loadRecentPages(limit: limit, scope: cacheScope)) ?? []
+        if let cacheReader {
+            return (try? await cacheReader.loadRecentPageValues(limit: limit, scope: cacheScope)) ?? []
+        }
+        return (try? cacheRepository?.loadRecentPageValues(limit: limit, scope: cacheScope)) ?? []
     }
 
-    func clearCache() {
-        try? cacheRepository?.clearAll()
+    func clearCache() async {
+        cancelScheduledCacheWrites()
+        if let cacheWriter {
+            try? await cacheWriter.perform([.clearAll])
+        } else {
+            try? cacheRepository?.clearAll()
+        }
         spaces = []
         resetNavigationSelection()
     }
@@ -284,65 +382,63 @@ final class AppState {
         return status != 401 && status != 403
     }
 
-    private func loadCachedSpaces() {
-        guard
-            let cacheScope,
-            let cached = try? cacheRepository?.loadSpaces(scope: cacheScope)
-        else {
-            return
+    private func loadCachedSpaces() async {
+        guard let cacheScope else { return }
+
+        let cached: [DocmostSpace]?
+        if let cacheReader {
+            cached = try? await cacheReader.loadSpaces(scope: cacheScope)
+        } else {
+            cached = try? cacheRepository?.loadSpaces(scope: cacheScope)
         }
+
+        guard let cached else { return }
         spaces = cached
         selectDefaultSpaceIfNeeded()
     }
 
-    private func loadCachedSidebarPages(spaceId: String, pageId: String?) throws -> [DocmostPage] {
+    private func loadCachedSidebarPages(spaceId: String, pageId: String?) async throws -> [DocmostPage] {
         let scope = try requireCacheScope(message: "This page tree is not cached for the active account.")
+        if let cacheReader {
+            return try await cacheReader.loadPageTree(spaceId: spaceId, parentPageId: pageId, scope: scope)
+        }
         return try cacheRepository?.loadPageTree(spaceId: spaceId, parentPageId: pageId, scope: scope) ?? []
     }
 
-    private func requireCachedPage(idOrSlugId: String) throws -> CachedPage {
+    private func requireCachedPage(idOrSlugId: String) async throws -> CachedPageSnapshot {
         let scope = try requireCacheScope(message: "This page is not cached for offline reading.")
-        guard let cached = try cacheRepository?.loadPage(idOrSlugId: idOrSlugId, scope: scope) else {
+        let cached: CachedPageSnapshot?
+        if let cacheReader {
+            cached = try await cacheReader.loadPageSnapshot(idOrSlugId: idOrSlugId, scope: scope)
+        } else {
+            cached = try cacheRepository?.loadPageSnapshot(idOrSlugId: idOrSlugId, scope: scope)
+        }
+        guard let cached else {
             throw APIError.connectionFailed("This page is not cached for offline reading.")
         }
         return cached
     }
 
-    private func requireCachedEditablePage(idOrSlugId: String) throws -> DocmostEditablePage {
+    private func requireCachedEditablePage(idOrSlugId: String) async throws -> DocmostEditablePage {
         let scope = try requireCacheScope(message: "This page is not cached for offline native reading.")
-        guard let cached = try cacheRepository?.loadEditablePage(idOrSlugId: idOrSlugId, scope: scope) else {
+        let cached: DocmostEditablePage?
+        if let cacheReader {
+            cached = try await cacheReader.loadEditablePage(idOrSlugId: idOrSlugId, scope: scope)
+        } else {
+            cached = try cacheRepository?.loadEditablePage(idOrSlugId: idOrSlugId, scope: scope)
+        }
+        guard let cached else {
             throw APIError.connectionFailed("This page is not cached for offline native reading.")
         }
         return cached
     }
 
-    private func searchCachedPages(query: String) throws -> [DocmostSearchResult] {
+    private func searchCachedPages(query: String) async throws -> [DocmostSearchResult] {
         let scope = try requireCacheScope(message: "Search cache is unavailable until you sign in.")
-        let pages = try cacheRepository?.loadRecentPages(limit: 100, scope: scope) ?? []
-        return pages
-            .filter { page in
-                page.title.localizedStandardContains(query) || page.htmlContent.localizedStandardContains(query)
-            }
-            .map { page in
-                DocmostSearchResult(
-                    id: page.id,
-                    title: page.title,
-                    icon: page.icon,
-                    parentPageId: page.parentPageId,
-                    slugId: page.slugId,
-                    creatorId: nil,
-                    createdAt: nil,
-                    updatedAt: page.updatedAt,
-                    rank: nil,
-                    highlight: "Cached page",
-                    space: SearchResultSpace(
-                        id: page.spaceId,
-                        name: page.spaceSlug ?? "Cached",
-                        slug: page.spaceSlug,
-                        icon: nil
-                    )
-                )
-            }
+        if let cacheReader {
+            return try await cacheReader.searchCachedPages(query: query, limit: 100, scope: scope)
+        }
+        return try cacheRepository?.searchCachedPages(query: query, limit: 100, scope: scope) ?? []
     }
 
     private func updateCacheScope() {

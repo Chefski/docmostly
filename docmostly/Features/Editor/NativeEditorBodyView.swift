@@ -53,6 +53,10 @@ struct NativeEditorBodyView: View {
                             guard authoringIsAvailable else { return }
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
+                        blockChanged: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.handleDocumentChanged()
+                        },
                         selectionChanged: {
                             guard authoringIsAvailable else { return }
                             viewModel.handleLocalSelectionChanged()
@@ -86,9 +90,6 @@ struct NativeEditorBodyView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
             }
-        }
-        .onChange(of: viewModel.document) {
-            viewModel.handleDocumentChanged()
         }
         .onChange(of: viewModel.title) {
             viewModel.handleTitleChanged()

@@ -91,7 +91,9 @@ struct SettingsView: View {
     }
 
     private func clearCache() {
-        appState.clearCache()
+        Task {
+            await appState.clearCache()
+        }
     }
 
     private func logout() {

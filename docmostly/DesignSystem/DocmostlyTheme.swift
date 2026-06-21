@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum DocmostlyTheme {
+nonisolated enum DocmostlyTheme {
     static let primary = Color.primary
     static let primaryAccent = Color.primary
     static let primaryTint = Color.primary.opacity(0.10)

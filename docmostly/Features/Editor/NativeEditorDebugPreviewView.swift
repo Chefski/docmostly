@@ -29,9 +29,6 @@ struct NativeEditorDebugPreviewView: View {
         .onChange(of: focusedField) { _, newValue in
             updateFocus(newValue)
         }
-        .onChange(of: viewModel.document) {
-            viewModel.handleDocumentChanged()
-        }
         .onChange(of: viewModel.title) {
             viewModel.handleTitleChanged()
         }

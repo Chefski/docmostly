@@ -53,6 +53,23 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         #expect(try await engine.encodeStateVector() == Data([1]))
     }
 
+    @Test func productionAppStateDefersMissingRuntimeFailureUntilEngineCreation() async throws {
+        let bundle = try makeBundle(runtimeSource: nil)
+        defer { try? FileManager.default.removeItem(at: bundle.bundleURL) }
+        let appState = AppState.production(crdtRuntimeBundle: bundle)
+
+        do {
+            _ = try await appState.makeCRDTDocumentEngine(
+                pageID: "page-1",
+                title: "Page",
+                document: document(text: "Seed")
+            )
+            Issue.record("Expected missing runtime resource to throw")
+        } catch let error as NativeEditorJSCRDTRuntimeSourceError {
+            #expect(error == .missingBundledResource(filename: NativeEditorJSCRDTRuntimeSource.bundledResourceFilename))
+        }
+    }
+
     @Test func mainBundleRuntimeIntegratesLocalTextChange() async throws {
         let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
         let engine = try NativeEditorJSCRDTDocumentEngine(

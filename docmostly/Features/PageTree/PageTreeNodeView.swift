@@ -1,11 +1,13 @@
 import SwiftUI
 
 struct PageTreeNodeView: View {
-    @Environment(AppState.self) private var appState
-
     let node: PageTreeNode
     let depth: Int
-    let viewModel: PageTreeViewModel
+    let isExpanded: Bool
+    let isSelected: Bool
+    let toggle: (PageTreeNode) -> Void
+    let openInDetailColumn: (PageTreeNode) -> Void
+    let movePage: (String, PageTreeDropOperation) -> Void
     let createChild: (PageTreeNode) -> Void
     let duplicate: (PageTreeNode) -> Void
     let moveToSpace: (PageTreeNode) -> Void
@@ -16,13 +18,13 @@ struct PageTreeNodeView: View {
             HStack(spacing: PageTreeSidebarMetrics.columnSpacing) {
                 PageTreeDisclosureColumn(
                     hasChildren: node.hasChildren,
-                    isExpanded: viewModel.expandedIDs.contains(node.id),
+                    isExpanded: isExpanded,
                     title: node.title,
-                    toggle: toggle
+                    toggle: toggleNode
                 )
 
                 #if os(macOS)
-                Button(action: openInDetailColumn) {
+                Button(action: openNodeInDetailColumn) {
                     PageTreeNodeLabel(node: node)
                 }
                 .buttonStyle(.plain)
@@ -37,7 +39,7 @@ struct PageTreeNodeView: View {
             .frame(maxWidth: .infinity, minHeight: PageTreeSidebarMetrics.rowHeight, alignment: .leading)
             .contentShape(.rect)
             .background(
-                appState.selectedPageID == node.slugId ? DocmostlyTheme.primaryTint : Color.clear,
+                isSelected ? DocmostlyTheme.primaryTint : Color.clear,
                 in: .rect(cornerRadius: PageTreeSidebarMetrics.selectionCornerRadius)
             )
             .draggable(node.id)
@@ -56,45 +58,23 @@ struct PageTreeNodeView: View {
                     delete(node)
                 }
             }
-
-            if viewModel.expandedIDs.contains(node.id) {
-                ForEach(node.children) { child in
-                    PageTreeNodeView(
-                        node: child,
-                        depth: depth + 1,
-                        viewModel: viewModel,
-                        createChild: createChild,
-                        duplicate: duplicate,
-                        moveToSpace: moveToSpace,
-                        delete: delete
-                    )
-                }
-            }
         }
         .listRowInsets(PageTreeSidebarMetrics.listRowInsets)
         .listRowSeparator(.hidden)
     }
 
-    private func toggle() {
-        Task {
-            await viewModel.toggle(node: node, appState: appState)
-        }
+    private func toggleNode() {
+        toggle(node)
     }
 
-    private func openInDetailColumn() {
-        appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
+    private func openNodeInDetailColumn() {
+        openInDetailColumn(node)
     }
 
     private func handleDrop(pageIDs: [String], location: CGPoint) -> Bool {
         guard let pageID = pageIDs.first, pageID != node.id else { return false }
 
-        Task {
-            await viewModel.movePage(
-                sourceID: pageID,
-                operation: .makeChild(targetID: node.id),
-                appState: appState
-            )
-        }
+        movePage(pageID, .makeChild(targetID: node.id))
         return true
     }
 }

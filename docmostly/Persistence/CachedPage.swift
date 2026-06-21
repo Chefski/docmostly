@@ -68,6 +68,18 @@ final class CachedPage {
         cachedAt = Date.now
     }
 
+    func matches(page: DocmostPage, htmlContent: String) -> Bool {
+        id == page.id &&
+            slugId == page.slugId &&
+            title == page.title &&
+            self.htmlContent == htmlContent &&
+            icon == page.icon &&
+            parentPageId == page.parentPageId &&
+            spaceId == page.spaceId &&
+            (page.space?.slug == nil || spaceSlug == page.space?.slug) &&
+            updatedAt == page.updatedAt
+    }
+
     func update(editablePage: DocmostEditablePage) {
         id = editablePage.id
         slugId = editablePage.slugId
@@ -77,6 +89,20 @@ final class CachedPage {
         spaceId = editablePage.spaceId
         updatedAt = editablePage.updatedAt
         cachedAt = Date.now
+    }
+
+    func matches(editablePage: DocmostEditablePage) -> Bool {
+        id == editablePage.id &&
+            slugId == editablePage.slugId &&
+            title == editablePage.title &&
+            cachedProseMirrorDocument() == (editablePage.content ?? ProseMirrorDocument()) &&
+            icon == editablePage.icon &&
+            spaceId == editablePage.spaceId &&
+            updatedAt == editablePage.updatedAt
+    }
+
+    func snapshot() -> CachedPageSnapshot {
+        CachedPageSnapshot(page: asPage(), htmlContent: htmlContent)
     }
 
     func asPage() -> DocmostPage {
@@ -121,4 +147,14 @@ final class CachedPage {
             lastUpdatedBy: nil
         )
     }
+
+    private func cachedProseMirrorDocument() -> ProseMirrorDocument? {
+        guard let proseMirrorJSONData else { return nil }
+        return try? JSONDecoder().decode(ProseMirrorDocument.self, from: proseMirrorJSONData)
+    }
+}
+
+nonisolated struct CachedPageSnapshot: Sendable {
+    let page: DocmostPage
+    let htmlContent: String
 }

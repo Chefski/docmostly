@@ -29,6 +29,27 @@ final class CachedPageTreeItem {
         self.cachedAt = cachedAt
     }
 
+    func update(page: DocmostPage, cachedAt: Date = Date.now) {
+        slugId = page.slugId
+        title = page.title
+        icon = page.icon
+        parentPageId = page.parentPageId
+        spaceId = page.spaceId
+        position = page.position
+        hasChildren = page.hasChildren ?? false
+        self.cachedAt = cachedAt
+    }
+
+    func matches(page: DocmostPage) -> Bool {
+        slugId == page.slugId &&
+            title == page.title &&
+            icon == page.icon &&
+            parentPageId == page.parentPageId &&
+            spaceId == page.spaceId &&
+            position == page.position &&
+            hasChildren == (page.hasChildren ?? false)
+    }
+
     func asPage() -> DocmostPage {
         DocmostPage(
             id: id,

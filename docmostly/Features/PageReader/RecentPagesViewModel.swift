@@ -18,7 +18,7 @@ final class RecentPagesViewModel {
             pages = response.items
         } catch {
             errorMessage = error.localizedDescription
-            pages = appState.recentCachedPages(limit: 30).map { $0.asPage() }
+            pages = await appState.recentCachedPages(limit: 30)
         }
     }
 }

@@ -1,0 +1,93 @@
+## output_259.json
+Trace: /var/folders/wf/z4gtsgpn0_vbfyjx5jz7z4pw0000gn/T/codex-ios-ettrace.2FwZgK/run-20260621-081822.launch/output_259.json
+Total duration:     15.786271
+Idle self total:    13.580424
+Unattributed total: 0.001127
+Active total:       2.204719
+
+Threads
+ 15.786271  100.00%total output_259
+
+Top active self frames
+  0.587498   26.65%active ETTrace
+  0.170450    7.73%active ____sigwait_nocancel
+  0.157658    7.15%active swift_conformsToProtocolMaybeInstantiateSuperclasses(swift::TargetMetadata<swift::InProcess> const*, swift::TargetProtocolDescriptor<swift::InProcess> const*, bool)::$_2::operator()((anonymous namespace)::ConformanceSection const&) const::'lambda'(swift::TargetProtocolConformanceDescriptor<swift::InProcess> const&)::operator()(swift::TargetProtocolConformanceDescriptor<swift::InProcess> const&) const
+  0.096378    4.37%active readClass(objc_class*, bool, bool)
+  0.071481    3.24%active swift_conformsToProtocolMaybeInstantiateSuperclasses(swift::TargetMetadata<swift::InProcess> const*, swift::TargetProtocolDescriptor<swift::InProcess> const*, bool)
+  0.065687    2.98%active <deduplicated_symbol>
+  0.060461    2.74%active task_info
+  0.045845    2.08%active task_policy_set
+  0.045649    2.07%active _mapStrHash(_NXMapTable*, void const*)
+  0.034797    1.58%active map_images_nolock
+  0.031063    1.41%active getMethodNoSuper_nolock(objc_class*, objc_selector*)
+  0.030938    1.40%active csr_check
+  0.029956    1.36%active __CFFromUTF8
+  0.018980    0.86%active swift::equalContexts(swift::TargetContextDescriptor<swift::InProcess> const*, swift::TargetContextDescriptor<swift::InProcess> const*)
+  0.015417    0.70%active UIKitCore
+  0.015324    0.70%active mach_voucher_extract_attr_content
+  0.014886    0.68%active swift::_getWitnessTable(swift::TargetProtocolConformanceDescriptor<swift::InProcess> const*, swift::TargetMetadata<swift::InProcess> const*, void const* const*)
+  0.010325    0.47%active -[CUIStructuredThemeStore lookupAssetForKey:]
+  0.010301    0.47%active swift::_contextDescriptorMatchesMangling(swift::TargetContextDescriptor<swift::InProcess> const*, swift::Demangle::__runtime::Node*)
+  0.010282    0.47%active swift::_searchConformancesByMangledTypeName(swift::Demangle::__runtime::Node*)
+  0.010241    0.46%active prepareMethodLists(objc_class*, method_list_t**, int, bool, bool, char const*)
+  0.010229    0.46%active realizeClassWithoutSwift(objc_class*, objc_class*)
+  0.010219    0.46%active lookUpImpOrForward
+  0.010199    0.46%active swift_getTypeByMangledNameImpl(swift::MetadataRequest, __swift::__runtime::llvm::StringRef, void const* const*, std::__1::function<void const* (unsigned int, unsigned int)>, std::__1::function<swift::TargetWitnessTable<swift::InProcess> const* (swift::TargetMetadata<swift::InProcess> const*, unsigned int)>)
+  0.010192    0.46%active libsystem_platform.dylib
+  0.010095    0.46%active _xzm_xzone_malloc_tiny
+  0.009976    0.45%active TSFNTFont::GetFormat() const
+  0.005584    0.25%active objc_msgSend$customView
+  0.005294    0.24%active type metadata accessor for _ButtonGesture
+  0.005272    0.24%active [AXUIKitGlue _accessibilityInitializeSubclassRuntimeOverrides]_block_invoke_3
+  0.005271    0.24%active type metadata accessor for UICollectionViewListCoordinator
+  0.005246    0.24%active type metadata accessor for ViewBodyAccessor
+  0.005233    0.24%active _os_nospin_lock_lock_slow
+  0.005199    0.24%active TnameTable::EnumerateNames(std::__1::function<void (sfntNameRecord_BE const&, int, unsigned long, bool*)>) const
+  0.005196    0.24%active bool objc::DenseMapBase<objc::DenseMap<DisguisedPtr<objc_class>, objc::detail::DenseSetEmpty, objc::DenseMapValueInfo<objc::detail::DenseSetEmpty>, objc::DenseMapInfo<DisguisedPtr<objc_class>>, objc::detail::DenseSetPair<DisguisedPtr<objc_class>>>, DisguisedPtr<objc_class>, objc::detail::DenseSetEmpty, objc::DenseMapValueInfo<objc::detail::DenseSetEmpty>, objc::DenseMapInfo<DisguisedPtr<objc_class>>, objc::detail::DenseSetPair<DisguisedPtr<objc_class>>>::LookupBucketFor<DisguisedPtr<objc_class>>(DisguisedPtr<objc_class> const&, objc::detail::DenseSetPair<DisguisedPtr<objc_class>> const*&) const
+  0.005195    0.24%active bool objc::DenseMapBase<objc::DenseMap<method_t const*, void*, objc::DenseMapValueInfo<void*>, objc::DenseMapInfo<method_t const*>, objc::detail::DenseMapPair<method_t const*, void*>>, method_t const*, void*, objc::DenseMapValueInfo<void*>, objc::DenseMapInfo<method_t const*>, objc::detail::DenseMapPair<method_t const*, void*>>::LookupBucketFor<method_t const*>(method_t const* const&, objc::detail::DenseMapPair<method_t const*, void*> const*&) const
+  0.005194    0.24%active +[NSMutableString allocWithZone:]
+  0.005191    0.24%active __CF_IS_OBJC
+  0.005186    0.24%active -[RBSymbolAnimator setAnchorPoint:]
+  0.005181    0.24%active lazy protocol witness table accessor for type AccessibilityChildBehavior.Combine and conformance AccessibilityChildBehavior.Combine
+
+Top inclusive frames
+ 11.817899  536.03%active ETTrace
+  2.649340  120.17%active UIKitCore
+  2.514102  114.03%active <deduplicated_symbol>
+  2.189773   99.32%active __debug_main_executable_dylib_entry_point
+  1.973757   89.52%active closure #1 in KitRendererCommon(_:)
+  1.784092   80.92%active AG::Graph::UpdateStack::update()
+  1.488832   67.53%active AG::Graph::update_attribute(AG::data::ptr<AG::Node>, unsigned int)
+  1.458109   66.14%active AG::Graph::input_value_ref_slow(AG::data::ptr<AG::Node>, AG::AttributeID, unsigned int, unsigned int, AGSwiftMetadata const*, unsigned char&, long)
+  1.151748   52.24%active specialized implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)
+  1.125575   51.05%active AGGraphGetValue
+  0.918537   41.66%active LayoutEngineBox.sizeThatFits(_:)
+  0.790372   35.85%active -[UIApplication(UIKitApplicationAccessibility) _accessibilityInit]
+  0.790232   35.84%active SwiftData
+  0.739749   33.55%active -[NSBundle loadAndReturnError:]
+  0.677326   30.72%active -[UIApplication(UIKitApplicationAccessibility) _updateApplicationAccessibility]
+  0.634048   28.76%active LayoutProxy.size(in:)
+  0.626703   28.43%active -[UIApplication(UIKitApplicationAccessibility) _accessibilityBundlePrincipalClass]
+  0.612554   27.78%active _CFBundleLoadExecutableAndReturnError
+  0.612554   27.78%active _CFBundleDlfcnLoadFramework
+  0.607702   27.56%active CA::Layer::update_if_needed_(CA::Transaction*, CA::LayerUpdateReason)
+  0.607702   27.56%active CA::Layer::perform_update_(CA::Layer*, CALayer*, unsigned int, CA::LayerUpdateReason, CA::Transaction*)
+  0.596771   27.07%active CA::Transaction::commit()
+  0.596771   27.07%active CA::Layer::layout_and_display_if_needed(CA::Transaction*)
+  0.596771   27.07%active CA::Context::commit_transaction(CA::Transaction*, double, double*)
+  0.587425   26.64%active UnaryLayoutEngine.sizeThatFits(_:)
+  0.587425   26.64%active SwiftUICore
+  0.582584   26.42%active -[UIView(CALayerDelegate) layoutSublayersOfLayer:]
+  0.571522   25.92%active __CFRunLoopDoBlocks
+  0.571522   25.92%active __CFRUNLOOP_IS_CALLING_OUT_TO_A_BLOCK__
+  0.571522   25.92%active [UIApplication _firstCommitBlock]_block_invoke_2
+  0.519210   23.55%active swift_conformsToProtocolMaybeInstantiateSuperclasses(swift::TargetMetadata<swift::InProcess> const*, swift::TargetProtocolDescriptor<swift::InProcess> const*, bool)
+  0.499423   22.65%active partial apply for implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)
+  0.499158   22.64%active static ModifiedContent<>._makeViewList(view:inputs:)
+  0.489128   22.19%active closure #2 in static ModifiedContent<>._makeViewList(view:inputs:)
+  0.446543   20.25%active static ModifiedContent<>._makeView(view:inputs:)
+  0.423037   19.19%active closure #1 in ViewGraphRootValueUpdater.render(interval:updateDisplayList:targetTimestamp:)
+  0.423037   19.19%active ViewGraphRootValueUpdater.render(interval:updateDisplayList:targetTimestamp:)
+  0.421623   19.12%active closure #2 in static ModifiedContent<>._makeView(view:inputs:)
+  0.394521   17.89%active _dispatch_once_callout
+  0.387694   17.58%active _UIHostingView.layoutSubviews()

@@ -1,6 +1,6 @@
 import Foundation
 
-enum AttachmentExtractor {
+nonisolated enum AttachmentExtractor {
     static func extractLinks(fromHTML html: String) -> [DocmostAttachmentLink] {
         var links: [DocmostAttachmentLink] = []
         var remaining = html[...]

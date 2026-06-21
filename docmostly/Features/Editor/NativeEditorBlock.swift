@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct NativeEditorBlock: Identifiable, Equatable {
+nonisolated struct NativeEditorBlock: Identifiable, Equatable {
     let id: UUID
     var kind: NativeEditorBlockKind
     var text: AttributedString

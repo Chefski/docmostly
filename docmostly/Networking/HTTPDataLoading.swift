@@ -8,6 +8,8 @@ nonisolated protocol HTTPDataLoading: Sendable {
 nonisolated enum DocmostURLSessionFactory {
     static func makeAPIURLSession() -> any HTTPDataLoading {
         let configuration = URLSessionConfiguration.default
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never

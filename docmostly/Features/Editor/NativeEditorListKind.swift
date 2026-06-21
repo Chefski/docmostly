@@ -1,6 +1,6 @@
 import Foundation
 
-enum NativeEditorListKind: Equatable {
+nonisolated enum NativeEditorListKind: Equatable {
     case bullet
     case ordered
     case task

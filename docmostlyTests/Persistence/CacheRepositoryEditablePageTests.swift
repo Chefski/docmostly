@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import docmostly
@@ -59,6 +60,54 @@ struct CacheRepositoryEditablePageTests {
         #expect(cached.permissions?.canEdit == false)
     }
 
+    @Test func savingUnchangedHTMLPageReusesCachedPageAndAttachmentRows() throws {
+        let (repository, context) = makeRepositoryAndContext()
+        let page = htmlPage(title: "Roadmap")
+        let html = """
+        <p>Updated plan <a href="/api/files/file-1/diagram.svg">diagram</a></p>
+        """
+
+        try repository.savePage(page, htmlContent: html, scope: scope)
+        let firstPages = try cachedPages(context: context)
+        let firstAttachments = try cachedAttachments(context: context)
+
+        try repository.savePage(page, htmlContent: html, scope: scope)
+        let secondPages = try cachedPages(context: context)
+        let secondAttachments = try cachedAttachments(context: context)
+
+        #expect(secondPages.count == 1)
+        #expect(secondAttachments.count == 1)
+        #expect(firstPages[0] === secondPages[0])
+        #expect(firstAttachments[0] === secondAttachments[0])
+        #expect(firstPages[0].cachedAt == secondPages[0].cachedAt)
+        #expect(firstAttachments[0].cachedAt == secondAttachments[0].cachedAt)
+    }
+
+    @Test func savingChangedAttachmentUpdatesExistingRowWithoutReplacingPage() throws {
+        let (repository, context) = makeRepositoryAndContext()
+        let page = htmlPage(title: "Roadmap")
+
+        try repository.savePage(
+            page,
+            htmlContent: #"<p><a href="/api/files/file-1/diagram.svg">diagram</a></p>"#,
+            scope: scope
+        )
+        let originalPageRow = try #require(cachedPages(context: context).first)
+        let originalAttachmentRow = try #require(cachedAttachments(context: context).first)
+
+        try repository.savePage(
+            page,
+            htmlContent: #"<p><a href="/api/files/file-1/updated-diagram.svg">diagram</a></p>"#,
+            scope: scope
+        )
+        let updatedPageRow = try #require(cachedPages(context: context).first)
+        let updatedAttachmentRow = try #require(cachedAttachments(context: context).first)
+
+        #expect(updatedPageRow === originalPageRow)
+        #expect(updatedAttachmentRow === originalAttachmentRow)
+        #expect(updatedAttachmentRow.fileName == "updated-diagram.svg")
+    }
+
     @Test func cachedEditablePagesAreScopedByServerAndUser() throws {
         let repository = makeRepository()
         let otherUserScope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-2")
@@ -72,8 +121,27 @@ struct CacheRepositoryEditablePageTests {
     }
 
     private func makeRepository() -> CacheRepository {
+        makeRepositoryAndContext().0
+    }
+
+    private func makeRepositoryAndContext() -> (CacheRepository, ModelContext) {
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
-        return CacheRepository(context: ModelContext(container))
+        let context = ModelContext(container)
+        return (CacheRepository(context: context), context)
+    }
+
+    private func cachedPages(context: ModelContext) throws -> [CachedPage] {
+        let descriptor = FetchDescriptor<CachedPage>(
+            sortBy: [SortDescriptor(\.id)]
+        )
+        return try context.fetch(descriptor)
+    }
+
+    private func cachedAttachments(context: ModelContext) throws -> [CachedAttachment] {
+        let descriptor = FetchDescriptor<CachedAttachment>(
+            sortBy: [SortDescriptor(\.id)]
+        )
+        return try context.fetch(descriptor)
     }
 
     private func editablePage(content: ProseMirrorDocument?) -> DocmostEditablePage {
