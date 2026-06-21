@@ -95,7 +95,7 @@ extension NativeEditorDocument {
         let start = node.attrs?["start"]?.intValue ?? 1
         return (node.content ?? []).enumerated().flatMap { offset, listItem in
             listItemBlocks(
-                kind: .orderedListItem(ordinal: start + offset),
+                kind: .orderedListItem(ordinal: orderedListOrdinal(start: start, offset: offset)),
                 item: listItem,
                 indentLevel: indentLevel
             )
@@ -129,6 +129,11 @@ extension NativeEditorDocument {
         }
 
         return [block] + nestedBlocks
+    }
+
+    private static func orderedListOrdinal(start: Int, offset: Int) -> Int {
+        let result = start.addingReportingOverflow(offset)
+        return result.overflow ? Int.max : result.partialValue
     }
 
     private static func singleEditableBlock(from node: ProseMirrorNode) -> NativeEditorBlock? {

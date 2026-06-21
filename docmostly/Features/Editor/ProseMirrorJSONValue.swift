@@ -10,6 +10,7 @@ nonisolated enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
     case null
 
     init(from decoder: Decoder) throws {
+        try ProseMirrorDecodingLimits.validateCodingDepth(decoder)
         let container = try decoder.singleValueContainer()
 
         if container.decodeNil() {
@@ -23,8 +24,10 @@ nonisolated enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
         } else if let value = try? container.decode(String.self) {
             self = .string(value)
         } else if let value = try? container.decode([String: ProseMirrorJSONValue].self) {
+            try ProseMirrorDecodingLimits.validateAttributeCount(value.count, decoder: decoder)
             self = .object(value)
         } else if let value = try? container.decode([ProseMirrorJSONValue].self) {
+            try ProseMirrorDecodingLimits.validateChildCount(value.count, decoder: decoder)
             self = .array(value)
         } else {
             throw DecodingError.dataCorruptedError(
@@ -67,7 +70,7 @@ nonisolated enum ProseMirrorJSONValue: Codable, Hashable, Sendable {
         case .int(let value):
             value
         case .double(let value):
-            Int(value)
+            Int(exactly: value)
         case .string(let value):
             Int(value)
         default:

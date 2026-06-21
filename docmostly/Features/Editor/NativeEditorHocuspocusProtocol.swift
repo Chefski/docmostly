@@ -4,6 +4,9 @@ nonisolated enum NativeEditorHocuspocusProtocolError: Error, Equatable, Sendable
     case invalidUTF8
     case unexpectedEnd
     case invalidMessageType(Int)
+    case varUintOverflow
+    case payloadTooLarge
+    case tooManyAwarenessStates
 }
 
 nonisolated enum NativeEditorHocuspocusMessageType: Int, Sendable {
@@ -147,6 +150,10 @@ nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
     }
 
     static func awarenessUpdate(states: [NativeEditorAwarenessState]) throws -> Data {
+        guard states.count <= NativeEditorAwarenessState.maximumDecodedStateCount else {
+            throw NativeEditorHocuspocusProtocolError.tooManyAwarenessStates
+        }
+
         var encoder = NativeEditorLib0Encoder()
         encoder.writeVarUint(states.count)
 
@@ -210,6 +217,8 @@ nonisolated struct NativeEditorCollaborationStatelessEvent: Decodable, Equatable
 }
 
 nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
+    static let maximumDecodedStateCount = 256
+
     let clientID: Int
     let clock: Int
     let payload: NativeEditorAwarenessPayload?
@@ -225,6 +234,10 @@ nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
     static func decodeUpdate(_ data: Data) throws -> [NativeEditorAwarenessState] {
         var decoder = NativeEditorLib0Decoder(data: data)
         let count = try decoder.readVarUint()
+        guard count <= maximumDecodedStateCount else {
+            throw NativeEditorHocuspocusProtocolError.tooManyAwarenessStates
+        }
+
         var states: [NativeEditorAwarenessState] = []
         states.reserveCapacity(count)
 
@@ -315,6 +328,8 @@ nonisolated struct NativeEditorLib0Encoder: Sendable {
 }
 
 nonisolated struct NativeEditorLib0Decoder: Sendable {
+    static let maximumDecodedPayloadBytes = 5_000_000
+
     private let bytes: [UInt8]
     private var offset = 0
 
@@ -322,20 +337,41 @@ nonisolated struct NativeEditorLib0Decoder: Sendable {
         bytes = Array(data)
     }
 
+    var remainingByteCount: Int {
+        bytes.count - offset
+    }
+
     mutating func readVarUint() throws -> Int {
         var value = 0
-        var multiplier = 1
+        var shift = 0
+        var byteCount = 0
 
         while offset < bytes.count {
             let byte = Int(bytes[offset])
             offset += 1
-            value += (byte & 0x7F) * multiplier
+            byteCount += 1
+
+            guard byteCount <= 10, shift < Int.bitWidth else {
+                throw NativeEditorHocuspocusProtocolError.varUintOverflow
+            }
+
+            let payload = byte & 0x7F
+            guard payload <= Int.max >> shift else {
+                throw NativeEditorHocuspocusProtocolError.varUintOverflow
+            }
+
+            let component = payload << shift
+            let added = value.addingReportingOverflow(component)
+            guard added.overflow == false else {
+                throw NativeEditorHocuspocusProtocolError.varUintOverflow
+            }
+            value = added.partialValue
 
             if byte < 0x80 {
                 return value
             }
 
-            multiplier *= 128
+            shift += 7
         }
 
         throw NativeEditorHocuspocusProtocolError.unexpectedEnd
@@ -351,7 +387,10 @@ nonisolated struct NativeEditorLib0Decoder: Sendable {
 
     mutating func readVarUint8Array() throws -> Data {
         let length = try readVarUint()
-        guard offset + length <= bytes.count else {
+        guard length <= Self.maximumDecodedPayloadBytes else {
+            throw NativeEditorHocuspocusProtocolError.payloadTooLarge
+        }
+        guard length <= bytes.count - offset else {
             throw NativeEditorHocuspocusProtocolError.unexpectedEnd
         }
 

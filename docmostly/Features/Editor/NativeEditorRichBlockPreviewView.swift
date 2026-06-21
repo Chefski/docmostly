@@ -23,16 +23,10 @@ struct NativeEditorRichBlockPreviewView: View {
                 .padding(.vertical)
                 .accessibilityLabel("Divider")
         case .table(let table):
-            previewShell(
-                systemImage: "tablecells",
-                title: "Table",
-                subtitle: "\(table.rows.count) rows, \(table.columnCount) columns"
-            ) {
-                if let tableActions {
-                    NativeEditorTableEditor(blockID: block.id, table: table, actions: tableActions)
-                } else {
-                    NativeEditorTablePreview(table: table)
-                }
+            if let tableActions {
+                NativeEditorTableEditor(blockID: block.id, table: table, actions: tableActions)
+            } else {
+                NativeEditorTablePreview(table: table)
             }
         case .image(let media):
             previewShell(systemImage: "photo", title: "Image", subtitle: media.alternativeText ?? media.source) {

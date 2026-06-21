@@ -1,6 +1,12 @@
 import Foundation
 
+nonisolated enum NativeEditorCRDTSyncCoordinatorError: Error, Equatable, Sendable {
+    case remotePayloadTooLarge
+}
+
 actor NativeEditorCRDTSyncCoordinator {
+    nonisolated static let maximumRemoteSyncPayloadBytes = NativeEditorLib0Decoder.maximumDecodedPayloadBytes
+
     private let documentEngine: any NativeEditorCRDTDocumentEngine
     private var pendingLocalEchoCounts: [Data: Int] = [:]
 
@@ -15,8 +21,10 @@ actor NativeEditorCRDTSyncCoordinator {
     func receive(_ message: NativeEditorYjsSyncMessage) async throws -> [NativeEditorYjsSyncMessage] {
         switch message {
         case .stepOne(let stateVector):
+            try validateRemotePayload(stateVector)
             return [.stepTwo(try await documentEngine.encodeStateAsUpdate(for: stateVector))]
         case .stepTwo(let update), .update(let update):
+            try validateRemotePayload(update)
             guard consumeLocalEcho(for: update) == false else { return [] }
             try await documentEngine.applyRemoteUpdate(update)
             return []
@@ -47,5 +55,11 @@ actor NativeEditorCRDTSyncCoordinator {
         }
 
         return true
+    }
+
+    private func validateRemotePayload(_ data: Data) throws {
+        guard data.count <= Self.maximumRemoteSyncPayloadBytes else {
+            throw NativeEditorCRDTSyncCoordinatorError.remotePayloadTooLarge
+        }
     }
 }

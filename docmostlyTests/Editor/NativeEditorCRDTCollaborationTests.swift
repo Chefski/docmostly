@@ -38,6 +38,25 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(engine.appliedRemoteUpdates == [Data([6, 7]), Data([8, 9])])
     }
 
+    @Test func rejectsOversizedRemoteCRDTSyncUpdates() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        let update = Data(
+            repeating: 0,
+            count: NativeEditorCRDTSyncCoordinator.maximumRemoteSyncPayloadBytes + 1
+        )
+
+        do {
+            _ = try await coordinator.receive(.update(update))
+            Issue.record("Expected oversized remote update to be rejected")
+        } catch let error as NativeEditorCRDTSyncCoordinatorError {
+            #expect(error == .remotePayloadTooLarge)
+        } catch {
+            Issue.record("Expected CRDT sync size error, got \(error)")
+        }
+        #expect(engine.appliedRemoteUpdates == [])
+    }
+
     @Test func skipsOneMatchingCRDTUpdateEchoAfterLocalBroadcast() async throws {
         let engine = RecordingCRDTDocumentEngine()
         let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)

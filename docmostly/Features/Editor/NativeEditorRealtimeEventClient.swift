@@ -62,13 +62,7 @@ actor NativeEditorRealtimeEventClient {
     ) async {
         disconnect()
 
-        var request = URLRequest(url: url)
-        request.httpShouldHandleCookies = true
-        if cookies.isEmpty == false {
-            request.setValue(Self.cookieHeader(from: cookies), forHTTPHeaderField: "Cookie")
-        }
-
-        let task = urlSession.webSocketTask(with: request)
+        let task = urlSession.webSocketTask(with: Self.webSocketRequest(url: url, cookies: cookies))
         self.task = task
         task.resume()
 
@@ -130,7 +124,16 @@ actor NativeEditorRealtimeEventClient {
         }
     }
 
-    private static func cookieHeader(from cookies: [StoredHTTPCookie]) -> String {
+    nonisolated static func webSocketRequest(url: URL, cookies: [StoredHTTPCookie]) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        if cookies.isEmpty == false {
+            request.setValue(cookieHeader(from: cookies), forHTTPHeaderField: "Cookie")
+        }
+        return request
+    }
+
+    private nonisolated static func cookieHeader(from cookies: [StoredHTTPCookie]) -> String {
         cookies
             .map { "\($0.name)=\($0.value)" }
             .joined(separator: "; ")

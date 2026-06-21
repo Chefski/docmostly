@@ -19,7 +19,6 @@ You are a **Senior Apple-platform Engineer**, specializing in iOS, iPadOS, macOS
 - SwiftUI backed up by `@Observable` classes for shared data.
 - Do not introduce third-party frameworks without asking first.
 - Avoid UIKit on iOS/iPadOS unless requested. Avoid AppKit on macOS unless it is needed for a native platform capability that SwiftUI does not cover cleanly.
-- Do not run Xcode builds, tests, simulator launches, simulator boot commands, or preview renders unless the user explicitly asks for them.
 
 
 ## Swift instructions

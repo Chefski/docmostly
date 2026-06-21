@@ -34,27 +34,39 @@ struct PageTreeView: View {
                     .foregroundStyle(DocmostlyTheme.destructive)
             }
 
+            if let spaceActionErrorMessage = viewModel.spaceActionErrorMessage {
+                Text(spaceActionErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(DocmostlyTheme.destructive)
+            }
+
             if viewModel.nodes.isEmpty && viewModel.isLoading == false {
                 Text(appState.isOffline ? "No cached pages" : "No pages")
                     .foregroundStyle(.secondary)
             }
         }
+        .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
         .navigationTitle(space.name)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if viewModel.isPerformingAction {
+                if viewModel.isPerformingAction || viewModel.isPerformingSpaceAction {
                     ProgressView()
                 }
 
-                Button("Trash", systemImage: "trash", action: showTrash)
+                PageTreeSpaceActionsMenu(
+                    space: space,
+                    viewModel: viewModel,
+                    showTrash: showTrash,
+                    showSpaceSettings: showSpaceSettings
+                )
                 Button("New Page", systemImage: "plus", action: beginCreateRoot)
             }
         }
         .refreshable {
-            await viewModel.loadRoot(spaceId: space.id, appState: appState)
+            await refreshPages()
         }
         .task(id: space.id) {
-            await viewModel.loadRoot(spaceId: space.id, appState: appState)
+            await refreshPages()
         }
         .navigationDestination(for: PageTreeNode.self) { node in
             PageReaderDestinationView(pageID: node.slugId)
@@ -123,5 +135,68 @@ struct PageTreeView: View {
 
     private func showTrash() {
         isShowingTrash = true
+    }
+
+    private func showSpaceSettings() {
+        appState.selectSidebarUtilityDestination(.settings)
+    }
+
+    private func refreshPages() async {
+        await viewModel.loadRoot(spaceId: space.id, appState: appState)
+        await viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
+    }
+}
+
+struct PageTreeSpaceActionsMenu: View {
+    @Environment(AppState.self) private var appState
+
+    let space: DocmostSpace
+    let viewModel: PageTreeViewModel
+    let showTrash: () -> Void
+    let showSpaceSettings: () -> Void
+
+    var body: some View {
+        Menu("Space Actions", systemImage: "ellipsis") {
+            Button(favoriteTitle, systemImage: favoriteSystemImage, action: toggleFavorite)
+                .disabled(viewModel.isTogglingSpaceFavorite || viewModel.isLoadingSpaceActions)
+
+            Button(watchTitle, systemImage: watchSystemImage, action: toggleWatch)
+                .disabled(viewModel.isTogglingSpaceWatch || viewModel.isLoadingSpaceActions)
+
+            Divider()
+
+            Button("Space Settings", systemImage: "gearshape", action: showSpaceSettings)
+
+            Button("Trash", systemImage: "trash", role: .destructive, action: showTrash)
+        }
+        .labelStyle(.iconOnly)
+    }
+
+    private var favoriteTitle: String {
+        viewModel.isFavoriteSpace ? "Remove from Favorites" : "Add to Favorites"
+    }
+
+    private var favoriteSystemImage: String {
+        viewModel.isFavoriteSpace ? "star.slash" : "star"
+    }
+
+    private var watchTitle: String {
+        viewModel.isWatchingSpace == true ? "Unwatch Space" : "Watch Space"
+    }
+
+    private var watchSystemImage: String {
+        viewModel.isWatchingSpace == true ? "eye.slash" : "eye"
+    }
+
+    private func toggleFavorite() {
+        Task {
+            await viewModel.toggleSpaceFavorite(spaceId: space.id, appState: appState)
+        }
+    }
+
+    private func toggleWatch() {
+        Task {
+            await viewModel.toggleSpaceWatch(spaceId: space.id, appState: appState)
+        }
     }
 }

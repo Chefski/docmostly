@@ -12,15 +12,12 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func insertTableRowAbove(blockID: UUID, rowIndex: Int) {
+        insertTableRow(blockID: blockID, insertionIndex: rowIndex)
+    }
+
     func insertTableRowBelow(blockID: UUID, rowIndex: Int) {
-        updateTable(blockID: blockID) { table in
-            let columnCount = max(table.columnCount, 1)
-            let insertionIndex = min(max(rowIndex + 1, 0), table.rows.count)
-            let newRow = NativeEditorTableRow(cells: (0..<columnCount).map { _ in
-                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil)
-            })
-            table.rows.insert(newRow, at: insertionIndex)
-        }
+        insertTableRow(blockID: blockID, insertionIndex: rowIndex + 1)
     }
 
     func deleteTableRow(blockID: UUID, rowIndex: Int) {
@@ -30,23 +27,12 @@ extension NativeRichEditorViewModel {
         }
     }
 
-    func insertTableColumnAfter(blockID: UUID, columnIndex: Int) {
-        updateTable(blockID: blockID) { table in
-            guard table.rows.isEmpty == false else {
-                table.rows = [NativeEditorTableRow(cells: [
-                    NativeEditorTableCell(plainText: "", isHeader: true, backgroundColorName: nil)
-                ])]
-                return
-            }
+    func insertTableColumnBefore(blockID: UUID, columnIndex: Int) {
+        insertTableColumn(blockID: blockID, insertionIndex: columnIndex)
+    }
 
-            let insertionIndex = min(max(columnIndex + 1, 0), max(table.columnCount, 0))
-            for rowIndex in table.rows.indices {
-                let isHeader = table.rows[rowIndex].cells.first?.isHeader ?? (rowIndex == table.rows.startIndex)
-                let newCell = NativeEditorTableCell(plainText: "", isHeader: isHeader, backgroundColorName: nil)
-                let cellIndex = min(insertionIndex, table.rows[rowIndex].cells.count)
-                table.rows[rowIndex].cells.insert(newCell, at: cellIndex)
-            }
-        }
+    func insertTableColumnAfter(blockID: UUID, columnIndex: Int) {
+        insertTableColumn(blockID: blockID, insertionIndex: columnIndex + 1)
     }
 
     func deleteTableColumn(blockID: UUID, columnIndex: Int) {
@@ -55,6 +41,58 @@ extension NativeRichEditorViewModel {
 
             for rowIndex in table.rows.indices where table.rows[rowIndex].cells.indices.contains(columnIndex) {
                 table.rows[rowIndex].cells.remove(at: columnIndex)
+            }
+        }
+    }
+
+    func updateTableColumnWidth(blockID: UUID, columnIndex: Int, width: Int) {
+        updateTable(blockID: blockID) { table in
+            let clampedWidth = min(max(width, 96), 480)
+
+            for rowIndex in table.rows.indices where table.rows[rowIndex].cells.indices.contains(columnIndex) {
+                table.rows[rowIndex].cells[columnIndex].columnWidth = clampedWidth
+            }
+        }
+    }
+
+    private func insertTableRow(blockID: UUID, insertionIndex: Int) {
+        updateTable(blockID: blockID) { table in
+            let columnCount = max(table.columnCount, 1)
+            let normalizedInsertionIndex = min(max(insertionIndex, 0), table.rows.count)
+            let startsEmpty = table.rows.isEmpty
+            let newRow = NativeEditorTableRow(cells: (0..<columnCount).map { columnIndex in
+                NativeEditorTableCell(
+                    plainText: "",
+                    isHeader: startsEmpty,
+                    backgroundColorName: nil,
+                    columnWidth: table.columnWidth(at: columnIndex)
+                )
+            })
+            table.rows.insert(newRow, at: normalizedInsertionIndex)
+        }
+    }
+
+    private func insertTableColumn(blockID: UUID, insertionIndex: Int) {
+        updateTable(blockID: blockID) { table in
+            guard table.rows.isEmpty == false else {
+                table.rows = [NativeEditorTableRow(cells: [
+                    NativeEditorTableCell(plainText: "", isHeader: true, backgroundColorName: nil)
+                ])]
+                return
+            }
+
+            let normalizedInsertionIndex = min(max(insertionIndex, 0), max(table.columnCount, 0))
+            let inheritedWidth = table.columnWidth(at: min(normalizedInsertionIndex, max(table.columnCount - 1, 0)))
+            for rowIndex in table.rows.indices {
+                let isHeader = table.rows[rowIndex].cells.first?.isHeader ?? (rowIndex == table.rows.startIndex)
+                let newCell = NativeEditorTableCell(
+                    plainText: "",
+                    isHeader: isHeader,
+                    backgroundColorName: nil,
+                    columnWidth: inheritedWidth
+                )
+                let cellIndex = min(normalizedInsertionIndex, table.rows[rowIndex].cells.count)
+                table.rows[rowIndex].cells.insert(newCell, at: cellIndex)
             }
         }
     }
@@ -94,11 +132,17 @@ enum NativeEditorTableNodeFactory {
     }
 
     private static func cellAttrs(from cell: NativeEditorTableCell) -> [String: ProseMirrorJSONValue]? {
-        guard let backgroundColorName = cell.backgroundColorName, backgroundColorName.isEmpty == false else {
-            return nil
+        var attrs: [String: ProseMirrorJSONValue] = [:]
+
+        if let backgroundColorName = cell.backgroundColorName, backgroundColorName.isEmpty == false {
+            attrs["backgroundColorName"] = .string(backgroundColorName.lowercased())
         }
 
-        return ["backgroundColorName": .string(backgroundColorName.lowercased())]
+        if let columnWidth = cell.columnWidth {
+            attrs["colwidth"] = .array([.int(columnWidth)])
+        }
+
+        return attrs.isEmpty ? nil : attrs
     }
 
     private static func paragraphNode(_ text: String) -> ProseMirrorNode {

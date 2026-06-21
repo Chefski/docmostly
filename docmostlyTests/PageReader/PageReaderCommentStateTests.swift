@@ -108,12 +108,73 @@ struct PageReaderCommentStateTests {
         #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: inlineComment) == false)
     }
 
+    @Test func commentTabsOnlyIncludeTopLevelCommentsSplitByResolution() throws {
+        let viewModel = PageReaderViewModel()
+        viewModel.comments = [
+            try comment(id: "open-parent", text: "Open", resolvedAt: nil),
+            try comment(id: "resolved-parent", text: "Resolved", resolvedAt: "2026-06-17T10:05:00.000Z"),
+            try comment(id: "open-reply", text: "Reply", resolvedAt: nil, parentCommentId: "open-parent")
+        ]
+
+        #expect(viewModel.openComments.map(\.id) == ["open-parent"])
+        #expect(viewModel.resolvedComments.map(\.id) == ["resolved-parent"])
+        #expect(viewModel.openCommentCount == 1)
+        #expect(viewModel.resolvedCommentCount == 1)
+    }
+
+    @Test func tableOfContentsItemsIncludeNonEmptyHeadingsThroughLevelFour() {
+        let firstHeadingID = UUID()
+        let fourthHeadingID = UUID()
+        let document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(
+                id: firstHeadingID,
+                kind: .heading(level: 1),
+                text: AttributedString("Overview"),
+                alignment: .left
+            ),
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Body"), alignment: .left),
+            NativeEditorBlock(kind: .heading(level: 2), text: AttributedString("   "), alignment: .left),
+            NativeEditorBlock(
+                id: fourthHeadingID,
+                kind: .heading(level: 4),
+                text: AttributedString("Details"),
+                alignment: .left
+            ),
+            NativeEditorBlock(kind: .heading(level: 5), text: AttributedString("Ignored"), alignment: .left)
+        ])
+
+        #expect(PageReaderTableOfContentsItem.items(in: document) == [
+            PageReaderTableOfContentsItem(id: firstHeadingID, title: "Overview", level: 1),
+            PageReaderTableOfContentsItem(id: fourthHeadingID, title: "Details", level: 4)
+        ])
+    }
+
     private func comment(id: String, text: String, resolvedAt: String?) throws -> DocmostComment {
-        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page")
+        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page", parentCommentId: nil)
     }
 
     private func comment(id: String, text: String, resolvedAt: String?, type: String) throws -> DocmostComment {
+        try comment(id: id, text: text, resolvedAt: resolvedAt, type: type, parentCommentId: nil)
+    }
+
+    private func comment(
+        id: String,
+        text: String,
+        resolvedAt: String?,
+        parentCommentId: String?
+    ) throws -> DocmostComment {
+        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page", parentCommentId: parentCommentId)
+    }
+
+    private func comment(
+        id: String,
+        text: String,
+        resolvedAt: String?,
+        type: String,
+        parentCommentId: String?
+    ) throws -> DocmostComment {
         let resolvedAtJSON = resolvedAt.map { "\"\($0)\"" } ?? "null"
+        let parentCommentIdJSON = parentCommentId.map { "\"\($0)\"" } ?? "null"
         let data = Data("""
         {
           "id": "\(id)",
@@ -122,7 +183,7 @@ struct PageReaderCommentStateTests {
           "type": "\(type)",
           "creatorId": "user-1",
           "pageId": "page-1",
-          "parentCommentId": null,
+          "parentCommentId": \(parentCommentIdJSON),
           "resolvedById": null,
           "resolvedAt": \(resolvedAtJSON),
           "workspaceId": "workspace-1",

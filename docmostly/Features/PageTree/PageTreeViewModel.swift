@@ -11,6 +11,16 @@ final class PageTreeViewModel {
     var isLoadingTrash = false
     var trashPages: [DocmostPage] = []
     var errorMessage: String?
+    var isLoadingSpaceActions = false
+    var isFavoriteSpace = false
+    var isWatchingSpace: Bool?
+    var isTogglingSpaceFavorite = false
+    var isTogglingSpaceWatch = false
+    var spaceActionErrorMessage: String?
+
+    var isPerformingSpaceAction: Bool {
+        isLoadingSpaceActions || isTogglingSpaceFavorite || isTogglingSpaceWatch
+    }
 
     func loadRoot(spaceId: String, appState: AppState) async {
         isLoading = true
@@ -22,6 +32,66 @@ final class PageTreeViewModel {
             nodes = pages.map(PageTreeNode.init(page:)).sortedByPosition()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadSpaceActionState(spaceId: String, appState: AppState) async {
+        isLoadingSpaceActions = true
+        spaceActionErrorMessage = nil
+        defer { isLoadingSpaceActions = false }
+
+        do {
+            let favoriteIDs = try await appState.loadFavoriteIds(type: .space)
+            isFavoriteSpace = favoriteIDs.contains(spaceId)
+        } catch {
+            isFavoriteSpace = false
+            spaceActionErrorMessage = error.localizedDescription
+        }
+
+        do {
+            isWatchingSpace = try await appState.loadSpaceWatchStatus(spaceId: spaceId).watching
+        } catch {
+            isWatchingSpace = nil
+            spaceActionErrorMessage = spaceActionErrorMessage ?? error.localizedDescription
+        }
+    }
+
+    func toggleSpaceFavorite(spaceId: String, appState: AppState) async {
+        guard isTogglingSpaceFavorite == false else { return }
+
+        isTogglingSpaceFavorite = true
+        spaceActionErrorMessage = nil
+        defer { isTogglingSpaceFavorite = false }
+
+        do {
+            if isFavoriteSpace {
+                try await appState.removeFavorite(type: .space, spaceId: spaceId)
+                isFavoriteSpace = false
+            } else {
+                try await appState.addFavorite(type: .space, spaceId: spaceId)
+                isFavoriteSpace = true
+            }
+        } catch {
+            spaceActionErrorMessage = error.localizedDescription
+        }
+    }
+
+    func toggleSpaceWatch(spaceId: String, appState: AppState) async {
+        guard isTogglingSpaceWatch == false else { return }
+
+        isTogglingSpaceWatch = true
+        spaceActionErrorMessage = nil
+        defer { isTogglingSpaceWatch = false }
+
+        do {
+            let response = if isWatchingSpace == true {
+                try await appState.unwatchSpace(spaceId: spaceId)
+            } else {
+                try await appState.watchSpace(spaceId: spaceId)
+            }
+            isWatchingSpace = response.watching
+        } catch {
+            spaceActionErrorMessage = error.localizedDescription
         }
     }
 

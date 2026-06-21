@@ -55,6 +55,23 @@ struct NativeRichEditorTableTests {
         #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
     }
 
+    @Test func updatesTableColumnWidthAndReencodesCellColwidth() {
+        let viewModel = tableViewModel()
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.updateTableColumnWidth(blockID: blockID, columnIndex: 1, width: 236)
+
+        guard case .table(let table) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+
+        #expect(table.rows.allSatisfy { $0.cells[1].columnWidth == 236 })
+        let node = viewModel.document.proseMirrorDocument.content.first
+        let firstRowSecondCell = node?.content?.first?.content?[1]
+        #expect(firstRowSecondCell?.attrs?["colwidth"] == .array([.int(236)]))
+    }
+
     private func tableViewModel() -> NativeRichEditorViewModel {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/table"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")

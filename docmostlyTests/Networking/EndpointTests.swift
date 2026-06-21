@@ -10,6 +10,7 @@ struct EndpointTests {
 
         #expect(request.url?.absoluteString == "https://docs.example.com/api/pages/info")
         #expect(request.httpMethod == "POST")
+        #expect(request.httpShouldHandleCookies == false)
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
 
         let body = try #require(request.httpBody)

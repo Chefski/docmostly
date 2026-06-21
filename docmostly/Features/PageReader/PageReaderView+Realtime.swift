@@ -8,7 +8,7 @@ extension PageReaderView {
         while Task.isCancelled == false {
             do {
                 let url = try appState.realtimeEventWebSocketURL()
-                let cookies = await appState.storedSessionCookies()
+                let cookies = await appState.activeSessionCookies(for: url)
                 let events = await realtimeEventClient.events(url: url, cookies: cookies)
 
                 for try await event in events {

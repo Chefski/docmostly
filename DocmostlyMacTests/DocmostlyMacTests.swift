@@ -21,9 +21,10 @@ struct DocmostlyMacTests {
             membership: nil,
             settings: nil
         )
+        let scope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-1")
 
-        try repository.saveSpaces([space])
+        try repository.saveSpaces([space], scope: scope)
 
-        #expect(try repository.loadSpaces().map(\.id) == ["space-1"])
+        #expect(try repository.loadSpaces(scope: scope).map(\.id) == ["space-1"])
     }
 }

@@ -5,20 +5,25 @@ actor DocmostAPIClient {
     nonisolated let baseURL: URL
     private let loader: any HTTPDataLoading
     private let decoder: JSONDecoder
+    private let cookieJar: SessionCookieJar?
 
     init(
         baseURL: URL,
-        loader: any HTTPDataLoading = URLSession.shared,
-        decoder: JSONDecoder = DocmostJSONDecoder.make()
+        loader: any HTTPDataLoading = DocmostURLSessionFactory.makeAPIURLSession(),
+        decoder: JSONDecoder = DocmostJSONDecoder.make(),
+        cookieJar: SessionCookieJar? = nil
     ) {
         self.baseURL = baseURL
         self.loader = loader
         self.decoder = decoder
+        self.cookieJar = cookieJar
     }
 
     func send<T: Decodable & Sendable>(_ endpoint: Endpoint, as type: T.Type = T.self) async throws -> T {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
+        let endpointRequest = try endpoint.urlRequest(baseURL: baseURL)
+        let request = await authenticatedRequest(endpointRequest)
         let (data, response) = try await loader.data(for: request)
+        await ingestCookies(from: response, requestURL: request.url)
         try validate(response: response, data: data)
 
         do {
@@ -30,8 +35,10 @@ actor DocmostAPIClient {
     }
 
     func sendVoid(_ endpoint: Endpoint) async throws {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
+        let endpointRequest = try endpoint.urlRequest(baseURL: baseURL)
+        let request = await authenticatedRequest(endpointRequest)
         let (data, response) = try await loader.data(for: request)
+        await ingestCookies(from: response, requestURL: request.url)
         try validate(response: response, data: data)
     }
 
@@ -58,7 +65,7 @@ actor DocmostAPIClient {
 
         var request = URLRequest(url: uploadFileURL)
         request.httpMethod = "POST"
-        request.httpShouldHandleCookies = true
+        request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(
             "multipart/form-data; boundary=\(multipartBody.boundary)",
@@ -66,9 +73,36 @@ actor DocmostAPIClient {
         )
         request.setValue(multipartBody.contentLength.description, forHTTPHeaderField: "Content-Length")
 
+        request = await authenticatedRequest(request)
         let (data, response) = try await loader.upload(for: request, fromFile: multipartBody.fileURL)
+        await ingestCookies(from: response, requestURL: request.url)
         try validate(response: response, data: data)
         return try decodeUploadResponse(from: data)
+    }
+
+    private func authenticatedRequest(_ request: URLRequest) async -> URLRequest {
+        var request = request
+        request.httpShouldHandleCookies = false
+        guard
+            let cookieJar,
+            let url = request.url,
+            let cookieHeader = await cookieJar.cookieHeader(for: url)
+        else {
+            return request
+        }
+        request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        return request
+    }
+
+    private func ingestCookies(from response: URLResponse, requestURL: URL?) async {
+        guard
+            let cookieJar,
+            let requestURL,
+            let httpResponse = response as? HTTPURLResponse
+        else {
+            return
+        }
+        await cookieJar.ingestCookies(from: httpResponse, requestURL: requestURL)
     }
 
     private func validate(response: URLResponse, data: Data) throws {

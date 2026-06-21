@@ -191,4 +191,24 @@ struct NativeEditorRealtimeEventTests {
 
         #expect(policy.nextDelaySeconds() == 1)
     }
+
+    @Test func realtimeSocketRequestUsesExplicitActiveCookiesOnly() throws {
+        let url = try #require(URL(string: "wss://docs.example.com/socket.io/?EIO=4&transport=websocket"))
+        let cookies = [
+            StoredHTTPCookie(
+                name: "authToken",
+                value: "secret",
+                domain: "docs.example.com",
+                path: "/",
+                expiresAt: nil,
+                isSecure: true,
+                isHTTPOnly: true
+            )
+        ]
+
+        let request = NativeEditorRealtimeEventClient.webSocketRequest(url: url, cookies: cookies)
+
+        #expect(request.value(forHTTPHeaderField: "Cookie") == "authToken=secret")
+        #expect(request.httpShouldHandleCookies == false)
+    }
 }

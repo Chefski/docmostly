@@ -12,20 +12,14 @@ struct PageTreeNodeView: View {
     let delete: (PageTreeNode) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                if node.hasChildren {
-                    Button(expandButtonTitle, systemImage: expandButtonImage, action: toggle)
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel(expandButtonTitle)
-                } else {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 5))
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 28)
-                        .accessibilityHidden(true)
-                }
+        VStack(alignment: .leading, spacing: PageTreeSidebarMetrics.branchSpacing) {
+            HStack(spacing: PageTreeSidebarMetrics.columnSpacing) {
+                PageTreeDisclosureColumn(
+                    hasChildren: node.hasChildren,
+                    isExpanded: viewModel.expandedIDs.contains(node.id),
+                    title: node.title,
+                    toggle: toggle
+                )
 
                 #if os(macOS)
                 Button(action: openInDetailColumn) {
@@ -39,9 +33,13 @@ struct PageTreeNodeView: View {
                 }
                 #endif
             }
-            .padding(.leading, Double(depth) * 16)
+            .padding(.leading, CGFloat(depth) * PageTreeSidebarMetrics.depthIndent)
+            .frame(maxWidth: .infinity, minHeight: PageTreeSidebarMetrics.rowHeight, alignment: .leading)
             .contentShape(.rect)
-            .listRowBackground(appState.selectedPageID == node.slugId ? DocmostlyTheme.primaryTint : nil)
+            .background(
+                appState.selectedPageID == node.slugId ? DocmostlyTheme.primaryTint : Color.clear,
+                in: .rect(cornerRadius: PageTreeSidebarMetrics.selectionCornerRadius)
+            )
             .draggable(node.id)
             .dropDestination(for: String.self, action: handleDrop)
             .contextMenu {
@@ -73,14 +71,8 @@ struct PageTreeNodeView: View {
                 }
             }
         }
-    }
-
-    private var expandButtonImage: String {
-        viewModel.expandedIDs.contains(node.id) ? "chevron.down" : "chevron.right"
-    }
-
-    private var expandButtonTitle: String {
-        viewModel.expandedIDs.contains(node.id) ? "Collapse \(node.title)" : "Expand \(node.title)"
+        .listRowInsets(PageTreeSidebarMetrics.listRowInsets)
+        .listRowSeparator(.hidden)
     }
 
     private func toggle() {
@@ -107,15 +99,88 @@ struct PageTreeNodeView: View {
     }
 }
 
+enum PageTreeSidebarMetrics {
+    static let rowHeight: CGFloat = 26
+    static let branchSpacing: CGFloat = 0
+    static let depthIndent: CGFloat = 18
+    static let columnSpacing: CGFloat = 5
+    static let iconTitleSpacing: CGFloat = 8
+    static let disclosureWidth: CGFloat = 22
+    static let iconWidth: CGFloat = 26
+    static let selectionCornerRadius: CGFloat = 6
+    static let leafBulletSize: CGFloat = 5
+    static let listRowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
+}
+
+private struct PageTreeDisclosureColumn: View {
+    let hasChildren: Bool
+    let isExpanded: Bool
+    let title: String
+    let toggle: () -> Void
+
+    var body: some View {
+        if hasChildren {
+            Button(expandButtonTitle, systemImage: expandButtonImage, action: toggle)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .imageScale(.medium)
+                .foregroundStyle(.secondary)
+                .frame(width: PageTreeSidebarMetrics.disclosureWidth, height: PageTreeSidebarMetrics.rowHeight)
+                .accessibilityLabel(expandButtonTitle)
+        } else {
+            Image(systemName: "circle.fill")
+                .resizable()
+                .frame(width: PageTreeSidebarMetrics.leafBulletSize, height: PageTreeSidebarMetrics.leafBulletSize)
+                .foregroundStyle(.tertiary)
+                .frame(width: PageTreeSidebarMetrics.disclosureWidth, height: PageTreeSidebarMetrics.rowHeight)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var expandButtonImage: String {
+        isExpanded ? "chevron.down" : "chevron.right"
+    }
+
+    private var expandButtonTitle: String {
+        isExpanded ? "Collapse \(title)" : "Expand \(title)"
+    }
+}
+
 private struct PageTreeNodeLabel: View {
     let node: PageTreeNode
 
     var body: some View {
-        Label {
+        HStack(spacing: PageTreeSidebarMetrics.iconTitleSpacing) {
+            PageTreeNodeIcon(icon: node.icon)
+
             Text(node.title)
-                .lineLimit(2)
-        } icon: {
-            Text(node.icon?.isEmpty == false ? node.icon ?? "" : "📄")
+                .font(.body)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, minHeight: PageTreeSidebarMetrics.rowHeight, alignment: .leading)
+        .contentShape(.rect)
+    }
+}
+
+private struct PageTreeNodeIcon: View {
+    let icon: String?
+
+    var body: some View {
+        Group {
+            if let icon, icon.isEmpty == false {
+                Text(icon)
+                    .font(.body)
+                    .lineLimit(1)
+            } else {
+                Image(systemName: "doc.text")
+                    .font(.body)
+                    .imageScale(.large)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: PageTreeSidebarMetrics.iconWidth, height: PageTreeSidebarMetrics.rowHeight)
+        .accessibilityHidden(true)
     }
 }

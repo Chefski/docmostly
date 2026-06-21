@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 final class CachedPageTreeItem {
+    var cacheServerBaseURL: String = ""
+    var cacheUserID: String = ""
     var id: String = ""
     var slugId: String = ""
     var title: String = ""
@@ -13,7 +15,9 @@ final class CachedPageTreeItem {
     var hasChildren: Bool = false
     var cachedAt: Date = Date.now
 
-    init(page: DocmostPage, cachedAt: Date = Date.now) {
+    init(page: DocmostPage, scope: CacheScope, cachedAt: Date = Date.now) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
         id = page.id
         slugId = page.slugId
         title = page.title

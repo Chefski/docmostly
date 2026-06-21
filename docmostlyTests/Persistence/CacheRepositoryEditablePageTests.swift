@@ -4,6 +4,8 @@ import Testing
 
 @MainActor
 struct CacheRepositoryEditablePageTests {
+    private let scope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-1")
+
     @Test func savingEditablePagePreservesNativeDocumentForOfflineReading() throws {
         let repository = makeRepository()
         let document = ProseMirrorDocument(content: [
@@ -15,9 +17,9 @@ struct CacheRepositoryEditablePageTests {
             )
         ])
 
-        try repository.saveEditablePage(editablePage(content: document))
+        try repository.saveEditablePage(editablePage(content: document), scope: scope)
 
-        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1")
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
         let cached = try #require(loadedPage)
         #expect(cached.id == "page-1")
         #expect(cached.slugId == "roadmap")
@@ -28,9 +30,9 @@ struct CacheRepositoryEditablePageTests {
     @Test func cachedEditablePagesAreReadOnly() throws {
         let repository = makeRepository()
 
-        try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()))
+        try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()), scope: scope)
 
-        let loadedPage = try repository.loadEditablePage(idOrSlugId: "roadmap")
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "roadmap", scope: scope)
         let cached = try #require(loadedPage)
         #expect(cached.permissions?.canEdit == false)
     }
@@ -47,14 +49,26 @@ struct CacheRepositoryEditablePageTests {
             )
         ])
 
-        try repository.saveEditablePage(editablePage(content: document))
-        try repository.savePage(htmlPage(title: "Roadmap updated"), htmlContent: "<p>Updated</p>")
+        try repository.saveEditablePage(editablePage(content: document), scope: scope)
+        try repository.savePage(htmlPage(title: "Roadmap updated"), htmlContent: "<p>Updated</p>", scope: scope)
 
-        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1")
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
         let cached = try #require(loadedPage)
         #expect(cached.title == "Roadmap updated")
         #expect(cached.content == document)
         #expect(cached.permissions?.canEdit == false)
+    }
+
+    @Test func cachedEditablePagesAreScopedByServerAndUser() throws {
+        let repository = makeRepository()
+        let otherUserScope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-2")
+        let otherServerScope = CacheScope(serverBaseURL: "https://other.example.com", userID: "user-1")
+
+        try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()), scope: scope)
+
+        #expect(try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope) != nil)
+        #expect(try repository.loadEditablePage(idOrSlugId: "page-1", scope: otherUserScope) == nil)
+        #expect(try repository.loadEditablePage(idOrSlugId: "page-1", scope: otherServerScope) == nil)
     }
 
     private func makeRepository() -> CacheRepository {

@@ -9,10 +9,16 @@ struct NativeEditorDocument: Equatable {
 
     init(proseMirrorJSONData data: Data) throws {
         let document = try JSONDecoder().decode(ProseMirrorDocument.self, from: data)
+        try document.validateNativeEditorBudget()
         self.init(proseMirrorDocument: document)
     }
 
     init(proseMirrorDocument: ProseMirrorDocument) {
+        guard proseMirrorDocument.isWithinNativeEditorBudget else {
+            blocks = [Self.emptyBlock()]
+            return
+        }
+
         let decodedBlocks = proseMirrorDocument.content.flatMap(Self.blocks(from:))
         blocks = decodedBlocks.isEmpty ? [Self.emptyBlock()] : decodedBlocks
     }

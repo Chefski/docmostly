@@ -61,6 +61,7 @@ enum NativeEditorRichBlockFixtures {
                   "content": [
                     {
                       "type": "tableHeader",
+                      "attrs": { "colwidth": [210] },
                       "content": [
                         {
                           "type": "paragraph",
@@ -70,6 +71,7 @@ enum NativeEditorRichBlockFixtures {
                     },
                     {
                       "type": "tableHeader",
+                      "attrs": { "colwidth": [240] },
                       "content": [
                         {
                           "type": "paragraph",
@@ -84,7 +86,7 @@ enum NativeEditorRichBlockFixtures {
                   "content": [
                     {
                       "type": "tableCell",
-                      "attrs": { "backgroundColorName": "gray" },
+                      "attrs": { "backgroundColorName": "gray", "colwidth": [210] },
                       "content": [
                         {
                           "type": "paragraph",
@@ -94,6 +96,7 @@ enum NativeEditorRichBlockFixtures {
                     },
                     {
                       "type": "tableCell",
+                      "attrs": { "colwidth": [240] },
                       "content": [
                         {
                           "type": "paragraph",

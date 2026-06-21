@@ -224,6 +224,23 @@ struct NativeEditorHocuspocusProtocolTests {
         ])
     }
 
+    @Test func rejectsOverflowingVarUintInsteadOfTrapping() {
+        var decoder = NativeEditorLib0Decoder(data: Data(repeating: 0xFF, count: 12))
+
+        #expect(throws: NativeEditorHocuspocusProtocolError.varUintOverflow) {
+            _ = try decoder.readVarUint()
+        }
+    }
+
+    @Test func rejectsAwarenessUpdatesWithExcessiveStateCounts() {
+        let count = NativeEditorAwarenessState.maximumDecodedStateCount + 1
+        let update = encodeVarUint(count)
+
+        #expect(throws: NativeEditorHocuspocusProtocolError.tooManyAwarenessStates) {
+            _ = try NativeEditorAwarenessState.decodeUpdate(update)
+        }
+    }
+
     private func makeHocuspocusFrame(documentName: String, messageType: Int, payload: Data) -> Data {
         var data = Data()
         data.append(encodeVarString(documentName))

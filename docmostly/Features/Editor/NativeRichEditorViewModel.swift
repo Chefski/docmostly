@@ -30,6 +30,7 @@ final class NativeRichEditorViewModel {
     var resolvedRemoteCursors: [NativeEditorResolvedRemoteCursor] = []
 
     @ObservationIgnored private var editablePageID: String
+    @ObservationIgnored private var editablePageSlugID: String
     @ObservationIgnored private var editablePageSpaceID: String?
     @ObservationIgnored var lastSavedTitle: String
     @ObservationIgnored var lastSavedDocument = NativeEditorDocument()
@@ -55,6 +56,7 @@ final class NativeRichEditorViewModel {
         self.pageID = pageID
         title = initialTitle
         editablePageID = pageID
+        editablePageSlugID = pageID
         lastSavedTitle = initialTitle
         let awarenessUpdates = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         localAwarenessUpdateStream = awarenessUpdates.stream
@@ -77,6 +79,10 @@ final class NativeRichEditorViewModel {
 
     var currentPageID: String {
         editablePageID
+    }
+
+    var currentPageSlugID: String {
+        editablePageSlugID
     }
 
     var currentSpaceID: String? {
@@ -113,6 +119,7 @@ final class NativeRichEditorViewModel {
         do {
             let page = try await appState.loadEditablePage(idOrSlugId: pageID)
             editablePageID = page.id
+            editablePageSlugID = page.slugId
             editablePageSpaceID = page.spaceId
             title = page.title
             document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
@@ -157,6 +164,7 @@ final class NativeRichEditorViewModel {
                 document: document.proseMirrorDocument
             )
             editablePageID = page.id
+            editablePageSlugID = page.slugId
             title = page.title
             lastSavedTitle = title
             lastSavedDocument = document

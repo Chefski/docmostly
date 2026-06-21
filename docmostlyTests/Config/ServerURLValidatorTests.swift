@@ -21,4 +21,10 @@ struct ServerURLValidatorTests {
             _ = try ServerURLValidator.normalizedURL(from: "ftp://docs.example.com")
         }
     }
+
+    @Test func rejectsCleartextHTTPURLs() {
+        #expect(throws: ServerURLValidationError.unsupportedScheme) {
+            _ = try ServerURLValidator.normalizedURL(from: "http://docs.example.com")
+        }
+    }
 }

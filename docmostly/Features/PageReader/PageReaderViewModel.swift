@@ -22,6 +22,22 @@ final class PageReaderViewModel {
     var engagementErrorMessage: String?
     var labelEditorErrorMessage: String?
 
+    var openComments: [DocmostComment] {
+        topLevelComments.filter { $0.isResolved == false }
+    }
+
+    var resolvedComments: [DocmostComment] {
+        topLevelComments.filter(\.isResolved)
+    }
+
+    var openCommentCount: Int {
+        openComments.count
+    }
+
+    var resolvedCommentCount: Int {
+        resolvedComments.count
+    }
+
     func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
         errorMessage = nil
@@ -210,5 +226,9 @@ final class PageReaderViewModel {
     func removeComment(id: String) {
         comments.removeAll { $0.id == id }
         resolvingCommentIDs.remove(id)
+    }
+
+    private var topLevelComments: [DocmostComment] {
+        comments.filter { $0.parentCommentId == nil }
     }
 }

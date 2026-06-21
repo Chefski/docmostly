@@ -84,7 +84,9 @@ actor NativeEditorCollaborationPresenceClient {
     ) async {
         await disconnectGracefully()
 
-        let task = urlSession.webSocketTask(with: URLRequest(url: context.url))
+        var request = URLRequest(url: context.url)
+        request.httpShouldHandleCookies = false
+        let task = urlSession.webSocketTask(with: request)
         self.task = task
         activeDocumentName = context.documentName
         task.resume()

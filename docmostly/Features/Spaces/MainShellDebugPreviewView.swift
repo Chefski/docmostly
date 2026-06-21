@@ -24,22 +24,28 @@ struct MainShellDebugPreviewView: View {
         appState.statusMessage = nil
 
         let cache = CacheRepository(context: modelContext)
+        let scope = CacheScope(
+            serverBaseURL: "https://docs.example.com",
+            userID: MainShellDebugPreviewFixtures.currentUser.user.id
+        )
         try? cache.clearAll()
-        try? cache.saveSpaces(MainShellDebugPreviewFixtures.spaces)
+        try? cache.saveSpaces(MainShellDebugPreviewFixtures.spaces, scope: scope)
         try? cache.savePageTree(
             spaceId: MainShellDebugPreviewFixtures.productSpaceID,
             parentPageId: nil,
-            pages: MainShellDebugPreviewFixtures.productPages
+            pages: MainShellDebugPreviewFixtures.productPages,
+            scope: scope
         )
         try? cache.savePageTree(
             spaceId: MainShellDebugPreviewFixtures.engineeringSpaceID,
             parentPageId: nil,
-            pages: MainShellDebugPreviewFixtures.engineeringPages
+            pages: MainShellDebugPreviewFixtures.engineeringPages,
+            scope: scope
         )
 
         for page in MainShellDebugPreviewFixtures.cachedPages {
-            try? cache.savePage(page, htmlContent: "<p>\(page.title)</p>")
-            try? cache.saveEditablePage(MainShellDebugPreviewFixtures.editablePage(from: page))
+            try? cache.savePage(page, htmlContent: "<p>\(page.title)</p>", scope: scope)
+            try? cache.saveEditablePage(MainShellDebugPreviewFixtures.editablePage(from: page), scope: scope)
         }
 
         appState.spaces = MainShellDebugPreviewFixtures.spaces

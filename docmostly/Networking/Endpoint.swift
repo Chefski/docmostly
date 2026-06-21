@@ -128,7 +128,7 @@ nonisolated enum Endpoint: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.httpShouldHandleCookies = true
+        request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try bodyData()
         if request.httpBody != nil {

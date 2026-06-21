@@ -10,6 +10,7 @@ nonisolated enum NativeEditorJSCRDTEngineError: Error, LocalizedError, Equatable
     case invalidDataResult(String)
     case invalidJSONResult(String)
     case invalidDate(String)
+    case remotePayloadTooLarge
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ nonisolated enum NativeEditorJSCRDTEngineError: Error, LocalizedError, Equatable
             "The JavaScript collaboration runtime returned invalid JSON from \(function)."
         case .invalidDate(let value):
             "The JavaScript collaboration runtime returned an invalid date: \(value)."
+        case .remotePayloadTooLarge:
+            "The remote collaboration update is too large."
         }
     }
 }
@@ -103,13 +106,15 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     }
 
     func encodeStateAsUpdate(for stateVector: Data) async throws -> Data {
-        try dataResult(
+        try Self.validateRemotePayload(stateVector)
+        return try dataResult(
             from: callRequired("encodeStateAsUpdate", arguments: [stateVector.base64EncodedString()]),
             function: "encodeStateAsUpdate"
         )
     }
 
     func applyRemoteUpdate(_ update: Data) async throws {
+        try Self.validateRemotePayload(update)
         _ = try callRequired("applyRemoteUpdate", arguments: [update.base64EncodedString()])
         try drainRuntimeOutputs()
     }
@@ -304,6 +309,12 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         let message = exception.toString() ?? "Unknown JavaScript exception."
         context.exception = nil
         throw NativeEditorJSCRDTEngineError.scriptEvaluationFailed(message)
+    }
+
+    private static func validateRemotePayload(_ data: Data) throws {
+        guard data.count <= NativeEditorCRDTSyncCoordinator.maximumRemoteSyncPayloadBytes else {
+            throw NativeEditorJSCRDTEngineError.remotePayloadTooLarge
+        }
     }
 }
 

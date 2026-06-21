@@ -1,6 +1,7 @@
 import Foundation
 
 nonisolated enum PagePositionKeyGenerator {
+    private static let maximumOrderKeyLength = 128
     private static let digits = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
     private static let first = Character("0")
     private static let last = Character("z")
@@ -17,19 +18,23 @@ nonisolated enum PagePositionKeyGenerator {
             try validateOrderKey(upper)
         }
 
+        let result: String
         switch (lower, upper) {
         case (nil, nil):
-            return String(firstPositive) + String(first)
+            result = String(firstPositive) + String(first)
         case (nil, .some(let upper)):
-            return try decrementInteger(getIntegerPart(upper))
+            result = try decrementInteger(getIntegerPart(upper))
         case (.some(let lower), nil):
-            return try incrementInteger(getIntegerPart(lower))
+            result = try incrementInteger(getIntegerPart(lower))
         case (.some(let lower), .some(let upper)):
             guard lower < upper else {
                 throw PagePositionKeyGeneratorError.invalidBounds
             }
-            return try midpoint(lower: lower, upper: upper)
+            result = try midpoint(lower: lower, upper: upper)
         }
+
+        try validateOrderKey(result)
+        return result
     }
 }
 
@@ -156,6 +161,9 @@ nonisolated private extension PagePositionKeyGenerator {
     }
 
     static func validateOrderKey(_ orderKey: String) throws {
+        guard orderKey.count <= maximumOrderKeyLength else {
+            throw PagePositionKeyGeneratorError.invalidKey
+        }
         _ = try getIntegerPart(orderKey)
     }
 

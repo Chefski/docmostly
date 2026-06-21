@@ -13,7 +13,7 @@ nonisolated enum ServerURLValidationError: Error, Equatable, LocalizedError {
         case .malformed:
             "Enter a valid server URL."
         case .unsupportedScheme:
-            "Use an HTTPS or HTTP server URL."
+            "Use an HTTPS server URL."
         case .missingHost:
             "The server URL needs a host name."
         }
@@ -36,7 +36,7 @@ nonisolated enum ServerURLValidator {
             throw ServerURLValidationError.unsupportedScheme
         }
 
-        guard scheme == "https" || scheme == "http" else {
+        guard scheme == "https" else {
             throw ServerURLValidationError.unsupportedScheme
         }
 

@@ -81,11 +81,15 @@ struct MacWorkspaceSidebarView: View {
                     }
                 } header: {
                     MacSidebarPagesHeaderView(
-                        isPerformingAction: viewModel.isPerformingAction,
+                        space: selectedSpace,
+                        viewModel: viewModel,
+                        isPerformingAction: viewModel.isPerformingAction || viewModel.isPerformingSpaceAction,
                         showTrash: showTrash,
+                        showSpaceSettings: showSpaceSettings,
                         createRoot: beginCreateRoot
                     )
                 }
+                .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
             } else {
                 Text(appState.isOffline ? "No cached spaces" : "No spaces")
                     .foregroundStyle(.secondary)
@@ -99,9 +103,6 @@ struct MacWorkspaceSidebarView: View {
         .listStyle(.sidebar)
         .navigationTitle("Docmostly")
         .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
-        .refreshable {
-            await refresh()
-        }
         .task(id: selectedSpace?.id) {
             await loadSelectedSpacePages()
         }
@@ -148,11 +149,6 @@ struct MacWorkspaceSidebarView: View {
         return appState.spaces.first
     }
 
-    private func refresh() async {
-        await appState.loadSpaces()
-        await loadSelectedSpacePages()
-    }
-
     private func loadSelectedSpacePages() async {
         guard let selectedSpace else {
             viewModel.nodes = []
@@ -160,12 +156,13 @@ struct MacWorkspaceSidebarView: View {
         }
 
         await viewModel.loadRoot(spaceId: selectedSpace.id, appState: appState)
+        await viewModel.loadSpaceActionState(spaceId: selectedSpace.id, appState: appState)
     }
 
     private func selectSpace(_ space: DocmostSpace) {
         appState.selectSpace(id: space.id)
         Task {
-            await viewModel.loadRoot(spaceId: space.id, appState: appState)
+            await loadSelectedSpacePages()
         }
     }
 
@@ -206,6 +203,10 @@ struct MacWorkspaceSidebarView: View {
     private func showTrash() {
         guard selectedSpace != nil else { return }
         isShowingTrash = true
+    }
+
+    private func showSpaceSettings() {
+        appState.selectSidebarUtilityDestination(.settings)
     }
 }
 
@@ -259,13 +260,18 @@ private struct MacSidebarActionRow: View {
 }
 
 private struct MacSidebarPagesHeaderView: View {
+    let space: DocmostSpace
+    let viewModel: PageTreeViewModel
     let isPerformingAction: Bool
     let showTrash: () -> Void
+    let showSpaceSettings: () -> Void
     let createRoot: () -> Void
 
     var body: some View {
         HStack {
             Text("Pages")
+                .font(.callout)
+                .bold()
 
             Spacer()
 
@@ -274,14 +280,42 @@ private struct MacSidebarPagesHeaderView: View {
                     .controlSize(.small)
             }
 
-            Button("Trash", systemImage: "trash", action: showTrash)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
+            PageTreeSpaceActionsMenu(
+                space: space,
+                viewModel: viewModel,
+                showTrash: showTrash,
+                showSpaceSettings: showSpaceSettings
+            )
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .imageScale(.medium)
+            .foregroundStyle(.secondary)
+            .help("Space actions")
 
-            Button("New page", systemImage: "plus", action: createRoot)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
+            MacSidebarHeaderButton("New page", systemImage: "plus", action: createRoot)
         }
+    }
+}
+
+private struct MacSidebarHeaderButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    init(_ title: String, systemImage: String, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.action = action
+    }
+
+    var body: some View {
+        Button(title, systemImage: systemImage, action: action)
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .imageScale(.medium)
+            .foregroundStyle(.secondary)
+            .help(title)
     }
 }
 #endif

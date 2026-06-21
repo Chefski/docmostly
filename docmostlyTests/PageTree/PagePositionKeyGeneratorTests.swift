@@ -13,4 +13,14 @@ struct PagePositionKeyGeneratorTests {
         #expect(try PagePositionKeyGenerator.key(between: "a0", and: "a0V") == "a0F")
         #expect(try PagePositionKeyGenerator.key(between: "a0V", and: "a1") == "a0k")
     }
+
+    @Test func rejectsOversizedRemotePositionKeys() {
+        let oversized = "a" + String(repeating: "0", count: 512)
+
+        do {
+            _ = try PagePositionKeyGenerator.key(between: oversized, and: nil)
+            Issue.record("Expected oversized order key to be rejected")
+        } catch {
+        }
+    }
 }

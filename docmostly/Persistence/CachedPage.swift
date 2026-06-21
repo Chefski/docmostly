@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 final class CachedPage {
+    var cacheServerBaseURL: String = ""
+    var cacheUserID: String = ""
     var id: String = ""
     var slugId: String = ""
     var title: String = ""
@@ -19,9 +21,12 @@ final class CachedPage {
     init(
         page: DocmostPage,
         htmlContent: String,
+        scope: CacheScope,
         proseMirrorDocument: ProseMirrorDocument? = nil,
         cachedAt: Date = Date.now
     ) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
         id = page.id
         slugId = page.slugId
         title = page.title
@@ -36,7 +41,9 @@ final class CachedPage {
         lastOpenedAt = cachedAt
     }
 
-    init(editablePage: DocmostEditablePage, cachedAt: Date = Date.now) {
+    init(editablePage: DocmostEditablePage, scope: CacheScope, cachedAt: Date = Date.now) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
         id = editablePage.id
         slugId = editablePage.slugId
         title = editablePage.title

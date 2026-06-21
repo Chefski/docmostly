@@ -1,10 +1,23 @@
 import Foundation
 
 struct NativeEditorTable: Equatable, Hashable, Sendable {
+    static let maximumRowCount = 200
+    static let maximumColumnCount = 50
+
     var rows: [NativeEditorTableRow]
 
     var columnCount: Int {
         rows.map(\.cells.count).max() ?? 0
+    }
+
+    func columnWidth(at columnIndex: Int) -> Int? {
+        for row in rows where row.cells.indices.contains(columnIndex) {
+            if let width = row.cells[columnIndex].columnWidth {
+                return width
+            }
+        }
+
+        return nil
     }
 }
 
@@ -16,6 +29,7 @@ struct NativeEditorTableCell: Equatable, Hashable, Sendable {
     var plainText: String
     var isHeader: Bool
     var backgroundColorName: String?
+    var columnWidth: Int?
 }
 
 struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {

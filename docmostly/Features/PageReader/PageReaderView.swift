@@ -23,6 +23,10 @@ struct PageReaderView: View {
     @State private var pendingInlineCommentID: String?
     @State private var pendingInlineCommentDraft: String?
     @State private var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
+    @State private var readerMode = PageReaderMode.edit
+    @State private var activePanel: PageReaderPanel?
+    @State private var scrollPosition = ScrollPosition()
+    @State private var usesFullWidth = false
     @FocusState private var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
@@ -42,17 +46,15 @@ struct PageReaderView: View {
                             labels: viewModel.labels,
                             selectPage: selectBreadcrumb
                         )
-                        NativeEditorBodyView(viewModel: editorViewModel, focusedField: $editorFocusedField)
+                        NativeEditorBodyView(
+                            viewModel: editorViewModel,
+                            focusedField: $editorFocusedField,
+                            isAuthoringEnabled: readerMode == .edit
+                        )
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
                             serverURLString: appState.serverURLString
                         )
-                        CommentsSectionView(
-                            viewModel: viewModel,
-                            pageID: editorViewModel.currentPageID
-                        ) { commentID, isResolved in
-                            await markInlineCommentResolved(commentID: commentID, isResolved: isResolved)
-                        }
                     }
                 } else {
                     LoadingStateView(title: "Loading page")
@@ -60,37 +62,74 @@ struct PageReaderView: View {
                 }
             }
             .padding()
-            .frame(maxWidth: 900, alignment: .leading)
+            .frame(maxWidth: usesFullWidth ? .infinity : 900, alignment: .leading)
+            .scrollTargetLayout()
         }
+        .scrollPosition($scrollPosition)
         .safeAreaPadding(.bottom, 72)
         .navigationTitle(editorViewModel?.title.isEmpty == false ? editorViewModel?.title ?? "Page" : "Page")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise", action: retry)
-
                 if let editorViewModel, editorViewModel.errorMessage == nil {
-                    Button(
-                        viewModel.isFavoritePage ? "Remove Favorite" : "Add Favorite",
-                        systemImage: viewModel.isFavoritePage ? "star.fill" : "star",
-                        action: toggleFavorite
-                    )
-                    .disabled(viewModel.isTogglingFavorite)
+                    Picker("Page Mode", selection: $readerMode) {
+                        ForEach(PageReaderMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.small)
+                    .disabled(editorViewModel.canEdit == false)
 
-                    Button(
-                        viewModel.isWatchingPage == true ? "Unwatch Page" : "Watch Page",
-                        systemImage: viewModel.isWatchingPage == true ? "eye.fill" : "eye",
-                        action: toggleWatch
-                    )
-                    .disabled(viewModel.isTogglingWatch)
+                    if let pageShareURL {
+                        ShareLink(item: pageShareURL) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    } else {
+                        Button("Share", systemImage: "square.and.arrow.up") { }
+                            .disabled(true)
+                    }
 
-                    Menu("Page Actions", systemImage: "ellipsis.circle") {
+                    Button("Comments", systemImage: "text.bubble", action: showComments)
+
+                    Button("Table of Contents", systemImage: "list.bullet", action: showTableOfContents)
+
+                    Menu("More", systemImage: "ellipsis") {
+                        Button("Copy Link", systemImage: "link", action: copyPageLink)
+
+                        Button("Copy as Markdown", systemImage: "doc.plaintext", action: copyPageMarkdown)
+
+                        Button(
+                            viewModel.isFavoritePage ? "Remove from Favorites" : "Add to Favorites",
+                            systemImage: viewModel.isFavoritePage ? "star.fill" : "star",
+                            action: toggleFavorite
+                        )
+                        .disabled(viewModel.isTogglingFavorite)
+
+                        Button(
+                            viewModel.isWatchingPage == true ? "Stop Watching" : "Watch Page",
+                            systemImage: viewModel.isWatchingPage == true ? "eye.slash" : "eye",
+                            action: toggleWatch
+                        )
+                        .disabled(viewModel.isTogglingWatch)
+
+                        Divider()
+
+                        Toggle(isOn: $usesFullWidth) {
+                            Label("Full Width", systemImage: "arrow.left.and.right")
+                        }
+
+                        Divider()
+
                         if editorViewModel.canEdit {
                             Button("Edit Labels", systemImage: "tag", action: showLabelEditor)
                         }
                         if editorViewModel.currentSpaceID != nil {
-                            Button("Move to Space", systemImage: "folder", action: showMoveToSpace)
+                            Button("Move", systemImage: "arrow.right", action: showMoveToSpace)
                         }
                         Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
+
+                        Divider()
+
                         Button("Move to Trash", systemImage: "trash", role: .destructive) {
                             isConfirmingPageTrash = true
                         }
@@ -103,7 +142,7 @@ struct PageReaderView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if let editorViewModel, editorViewModel.isEditing, editorViewModel.canEdit {
+            if let editorViewModel, readerMode == .edit, editorViewModel.isEditing, editorViewModel.canEdit {
                 VStack(spacing: 6) {
                     if isUploadingAttachment {
                         ProgressView("Uploading attachment")
@@ -187,6 +226,45 @@ struct PageReaderView: View {
                 }
             }
         }
+        #if os(macOS)
+        .inspector(isPresented: activePanelIsPresented) {
+            if let activePanel, let editorViewModel {
+                PageReaderSupplementaryPanelView(
+                    viewModel: viewModel,
+                    panel: activePanel,
+                    pageID: editorViewModel.currentPageID,
+                    tableOfContentsItems: tableOfContentsItems,
+                    selectHeading: selectHeading,
+                    markInlineCommentResolved: markInlineCommentResolved,
+                    close: closeSupplementaryPanel
+                )
+            }
+        }
+        #else
+        .sheet(item: $activePanel) { panel in
+            if let editorViewModel {
+                NavigationStack {
+                    PageReaderSupplementaryPanelView(
+                        viewModel: viewModel,
+                        panel: panel,
+                        pageID: editorViewModel.currentPageID,
+                        tableOfContentsItems: tableOfContentsItems,
+                        selectHeading: selectHeading,
+                        markInlineCommentResolved: markInlineCommentResolved,
+                        close: closeSupplementaryPanel
+                    )
+                    .navigationTitle(panel.title)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done", action: closeSupplementaryPanel)
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+            }
+        }
+        #endif
         .task(id: pageID) {
             await loadNativePage()
         }
@@ -212,6 +290,18 @@ struct PageReaderView: View {
                 pendingInlineCommentDraft = nil
             }
         }
+        .onChange(of: readerMode) { _, mode in
+            if mode == .read {
+                editorFocusedField = nil
+                editorViewModel?.clearFocus()
+                autosaveInlineEdits()
+            }
+        }
+        .onChange(of: editorViewModel?.canEdit) { _, canEdit in
+            if canEdit == false {
+                readerMode = .read
+            }
+        }
         .onDisappear {
             autosaveInlineEdits()
         }
@@ -235,6 +325,9 @@ struct PageReaderView: View {
                 appState: appState
             )
             self.editorViewModel = editorViewModel
+            if editorViewModel.canEdit == false {
+                readerMode = .read
+            }
             await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
         } else {
             self.editorViewModel = editorViewModel
@@ -372,6 +465,91 @@ struct PageReaderView: View {
             pageActionErrorMessage = viewModel.engagementErrorMessage
             viewModel.engagementErrorMessage = nil
         }
+    }
+
+    private func showComments() {
+        toggleSupplementaryPanel(.comments)
+    }
+
+    private func showTableOfContents() {
+        toggleSupplementaryPanel(.tableOfContents)
+    }
+
+    private func toggleSupplementaryPanel(_ panel: PageReaderPanel) {
+        activePanel = activePanel == panel ? nil : panel
+    }
+
+    private func closeSupplementaryPanel() {
+        activePanel = nil
+    }
+
+    private func selectHeading(_ item: PageReaderTableOfContentsItem) {
+        #if !os(macOS)
+        closeSupplementaryPanel()
+        #endif
+        scrollPosition.scrollTo(id: item.id, anchor: .top)
+    }
+
+    private var tableOfContentsItems: [PageReaderTableOfContentsItem] {
+        guard let editorViewModel else { return [] }
+        return PageReaderTableOfContentsItem.items(in: editorViewModel.document)
+    }
+
+    private var activePanelIsPresented: Binding<Bool> {
+        Binding {
+            activePanel != nil
+        } set: { isPresented in
+            if isPresented == false {
+                activePanel = nil
+            }
+        }
+    }
+
+    private var pageShareURL: URL? {
+        guard let editorViewModel, let baseURL = URL(string: appState.serverURLString) else {
+            return nil
+        }
+
+        let pageSlug = PageSlugBuilder.slug(slugId: editorViewModel.currentPageSlugID, title: editorViewModel.title)
+        if let spaceSlug = currentSpaceSlug {
+            return baseURL
+                .appending(path: "s")
+                .appending(path: spaceSlug)
+                .appending(path: "p")
+                .appending(path: pageSlug)
+        }
+
+        return baseURL
+            .appending(path: "p")
+            .appending(path: pageSlug)
+    }
+
+    private var currentSpaceSlug: String? {
+        guard let editorViewModel else { return nil }
+
+        if let currentSpaceID = editorViewModel.currentSpaceID,
+           let space = appState.spaces.first(where: { $0.id == currentSpaceID }) {
+            return space.slug
+        }
+
+        return viewModel.breadcrumbs.compactMap { $0.space?.slug }.first
+    }
+
+    private func copyPageLink() {
+        guard let pageShareURL else {
+            pageActionErrorMessage = "Page link is unavailable."
+            return
+        }
+
+        NativeEditorClipboard.write(pageShareURL.absoluteString)
+    }
+
+    private func copyPageMarkdown() {
+        guard let editorViewModel else { return }
+
+        let title = editorViewModel.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let markdown = editorViewModel.markdownForDocument()
+        NativeEditorClipboard.write("# \(title)\n\n\(markdown)")
     }
 
     private func duplicateCurrentPage() {

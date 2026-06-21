@@ -2,7 +2,10 @@ import Foundation
 
 extension NativeEditorDocument {
     static func table(from node: ProseMirrorNode) -> NativeEditorTable {
-        let rows = (node.content ?? []).filter { $0.type == "tableRow" }.map { row in
+        let rows = (node.content ?? [])
+            .filter { $0.type == "tableRow" }
+            .prefix(NativeEditorTable.maximumRowCount)
+            .map { row in
             let cells = tableCells(from: row)
             return NativeEditorTableRow(cells: cells)
         }
@@ -144,12 +147,29 @@ extension NativeEditorDocument {
     private static func tableCells(from row: ProseMirrorNode) -> [NativeEditorTableCell] {
         let cellTypes = ["tableCell", "tableHeader"]
 
-        return (row.content ?? []).filter { cellTypes.contains($0.type) }.map { cell in
+        return (row.content ?? [])
+            .filter { cellTypes.contains($0.type) }
+            .prefix(NativeEditorTable.maximumColumnCount)
+            .map { cell in
             NativeEditorTableCell(
                 plainText: plainText(in: cell.content ?? []),
                 isHeader: cell.type == "tableHeader",
-                backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue
+                backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
+                columnWidth: tableColumnWidth(from: cell.attrs)
             )
+        }
+    }
+
+    private static func tableColumnWidth(from attrs: [String: ProseMirrorJSONValue]?) -> Int? {
+        guard let value = attrs?["colwidth"] ?? attrs?["colWidth"] else {
+            return nil
+        }
+
+        switch value {
+        case .array(let values):
+            return values.compactMap(\.intValue).first
+        default:
+            return value.intValue
         }
     }
 

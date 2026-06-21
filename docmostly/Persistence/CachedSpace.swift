@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 final class CachedSpace {
+    var cacheServerBaseURL: String = ""
+    var cacheUserID: String = ""
     var id: String = ""
     var name: String = ""
     var spaceDescription: String?
@@ -13,7 +15,9 @@ final class CachedSpace {
     var updatedAt: Date?
     var cachedAt: Date = Date.now
 
-    init(space: DocmostSpace, cachedAt: Date = Date.now) {
+    init(space: DocmostSpace, scope: CacheScope, cachedAt: Date = Date.now) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
         id = space.id
         name = space.name
         spaceDescription = space.description

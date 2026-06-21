@@ -14,11 +14,11 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        let columnCount = headerCells.count
+        let columnCount = min(headerCells.count, NativeEditorTable.maximumColumnCount)
         var rows = [tableRow(from: headerCells, isHeader: true, columnCount: columnCount)]
         var currentIndex = lines.index(after: separatorIndex)
 
-        while currentIndex < lines.endIndex {
+        while currentIndex < lines.endIndex, rows.count < NativeEditorTable.maximumRowCount {
             let line = lines[currentIndex]
             guard
                 let cells = markdownTableCells(from: line),

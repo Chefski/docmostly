@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -80,6 +81,8 @@ struct NativeEditorDocumentTests {
         }
         #expect(table.rows.count == 2)
         #expect(table.rows[0].cells.map(\.plainText) == ["Feature", "Status"])
+        #expect(table.columnWidth(at: 0) == 210)
+        #expect(table.columnWidth(at: 1) == 240)
 
         guard case .image(let image) = blocks[1].kind else {
             Issue.record("Expected image block")
@@ -158,6 +161,86 @@ struct NativeEditorDocumentTests {
         #expect(document.proseMirrorDocument == original)
     }
 
+    @Test func rejectsDeeplyNestedProseMirrorJSON() throws {
+        do {
+            _ = try JSONDecoder().decode(
+                ProseMirrorDocument.self,
+                from: deeplyNestedDocumentData(depth: 180)
+            )
+            Issue.record("Expected deeply nested ProseMirror JSON to be rejected")
+        } catch {
+        }
+    }
+
+    @Test func outOfRangeNumericAttributesDoNotTrapNativeDecoding() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": { "level": 9223372036854775808 },
+              "content": [{ "type": "text", "text": "Huge" }]
+            }
+          ]
+        }
+        """.utf8)
+
+        let document = try NativeEditorDocument(proseMirrorJSONData: data)
+
+        #expect(document.blocks.first?.kind == .heading(level: 1))
+    }
+
+    @Test func capsDecodedTableDimensions() {
+        let oversizedRow = ProseMirrorNode(
+            type: "tableRow",
+            content: (0..<(NativeEditorTable.maximumColumnCount + 5)).map { index in
+                ProseMirrorNode(
+                    type: "tableCell",
+                    content: [
+                        ProseMirrorNode(
+                            type: "paragraph",
+                            content: [ProseMirrorNode(type: "text", text: "C\(index)")]
+                        )
+                    ]
+                )
+            }
+        )
+        let tableNode = ProseMirrorNode(
+            type: "table",
+            content: Array(repeating: oversizedRow, count: NativeEditorTable.maximumRowCount + 5)
+        )
+        let document = NativeEditorDocument(proseMirrorDocument: ProseMirrorDocument(content: [tableNode]))
+
+        guard case .table(let table) = document.blocks.first?.kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(table.rows.count == NativeEditorTable.maximumRowCount)
+        #expect(table.columnCount == NativeEditorTable.maximumColumnCount)
+    }
+
+    @Test func capsMarkdownTableDimensions() {
+        let header = "| " + (0..<(NativeEditorTable.maximumColumnCount + 5))
+            .map { "H\($0)" }
+            .joined(separator: " | ") + " |"
+        let separator = "| " + Array(repeating: "---", count: NativeEditorTable.maximumColumnCount + 5)
+            .joined(separator: " | ") + " |"
+        let row = "| " + (0..<(NativeEditorTable.maximumColumnCount + 5))
+            .map { "C\($0)" }
+            .joined(separator: " | ") + " |"
+        let markdown = ([header, separator] + Array(repeating: row, count: NativeEditorTable.maximumRowCount + 5))
+            .joined(separator: "\n")
+        let blocks = NativeEditorMarkdownParser.blocks(from: markdown)
+
+        guard case .table(let table) = blocks.first?.kind else {
+            Issue.record("Expected table block")
+            return
+        }
+        #expect(table.rows.count == NativeEditorTable.maximumRowCount)
+        #expect(table.columnCount == NativeEditorTable.maximumColumnCount)
+    }
+
     @Test func roundTripsRichDocmostBlocksWithoutDroppingAttributes() throws {
         let original = try JSONDecoder().decode(
             ProseMirrorDocument.self,
@@ -201,6 +284,15 @@ struct NativeEditorDocumentTests {
         let mathRun = try run(containing: "x^2", in: block.text)
         #expect(mathRun[NativeEditorMathInlineAttribute.self]?.text == "x^2")
         #expect(document.proseMirrorDocument == original)
+    }
+
+    private func deeplyNestedDocumentData(depth: Int) -> Data {
+        var node = #"{"type":"text","text":"Leaf"}"#
+        for _ in 0..<depth {
+            node = #"{"type":"paragraph","content":["# + node + #"]}"#
+        }
+        let document = #"{"type":"doc","content":["# + node + #"]}"#
+        return Data(document.utf8)
     }
 
     private func richBlocks() throws -> [NativeEditorBlock] {

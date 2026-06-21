@@ -3,6 +3,7 @@ import SwiftUI
 struct NativeEditorBodyView: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
+    var isAuthoringEnabled = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -11,7 +12,7 @@ struct NativeEditorBodyView: View {
                 .bold()
                 .textFieldStyle(.plain)
                 .focused(focusedField, equals: .title)
-                .disabled(viewModel.canEdit == false)
+                .disabled(authoringIsAvailable == false)
                 .accessibilityLabel("Page title")
 
             if let saveErrorMessage = viewModel.saveErrorMessage {
@@ -27,31 +28,47 @@ struct NativeEditorBodyView: View {
                         focusedField: focusedField,
                         isSelected: viewModel.selectedBlockID == block.id,
                         isShowingControls: viewModel.visibleBlockControlsID == block.id,
-                        isReadOnly: viewModel.canEdit == false,
-                        select: { viewModel.selectBlock(block.id) },
-                        showControls: { viewModel.showBlockControls(for: block.id) },
-                        insertBelow: { viewModel.insertBlock(after: block.id) },
-                        delete: { viewModel.deleteBlock(block.id) },
-                        tableActions: viewModel.canEdit ? tableEditingActions : nil,
-                        richBlockActions: viewModel.canEdit ? richBlockEditingActions : nil,
+                        isReadOnly: authoringIsAvailable == false,
+                        select: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.selectBlock(block.id)
+                        },
+                        showControls: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.showBlockControls(for: block.id)
+                        },
+                        insertBelow: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.insertBlock(after: block.id)
+                        },
+                        delete: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.deleteBlock(block.id)
+                        },
+                        tableActions: authoringIsAvailable ? tableEditingActions : nil,
+                        richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
                         pageID: viewModel.currentPageID,
                         spaceID: viewModel.currentSpaceID,
                         moveBefore: { movedBlockID in
+                            guard authoringIsAvailable else { return }
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
                         selectionChanged: {
+                            guard authoringIsAvailable else { return }
                             viewModel.handleLocalSelectionChanged()
                         },
                         dropText: { text in
-                            viewModel.dropMarkdown(text, before: block.id)
+                            guard authoringIsAvailable else { return false }
+                            return viewModel.dropMarkdown(text, before: block.id)
                         }
                     )
+                    .id(block.id)
 
-                    if viewModel.selectedBlockID == block.id {
+                    if authoringIsAvailable, viewModel.selectedBlockID == block.id {
                         NativeEditorBlockSelectionBar(delete: viewModel.deleteSelectedBlock)
                     }
 
-                    if viewModel.activeBlockID == block.id, viewModel.isShowingSlashCommands {
+                    if authoringIsAvailable, viewModel.activeBlockID == block.id, viewModel.isShowingSlashCommands {
                         NativeEditorSlashCommandMenu(viewModel: viewModel)
                             .padding(.leading, 34)
                     }
@@ -64,7 +81,7 @@ struct NativeEditorBodyView: View {
                 }
             }
 
-            if viewModel.canEdit {
+            if authoringIsAvailable {
                 Button("Add Block", systemImage: "plus", action: viewModel.appendBlock)
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -82,6 +99,10 @@ struct NativeEditorBodyView: View {
         }
     }
 
+    private var authoringIsAvailable: Bool {
+        isAuthoringEnabled && viewModel.canEdit
+    }
+
     private var tableEditingActions: NativeEditorTableEditingActions {
         NativeEditorTableEditingActions(
             updateCell: { blockID, rowIndex, columnIndex, text in
@@ -92,10 +113,13 @@ struct NativeEditorBodyView: View {
                     text: text
                 )
             },
+            insertRowAbove: viewModel.insertTableRowAbove,
             insertRowBelow: viewModel.insertTableRowBelow,
             deleteRow: viewModel.deleteTableRow,
+            insertColumnBefore: viewModel.insertTableColumnBefore,
             insertColumnAfter: viewModel.insertTableColumnAfter,
-            deleteColumn: viewModel.deleteTableColumn
+            deleteColumn: viewModel.deleteTableColumn,
+            updateColumnWidth: viewModel.updateTableColumnWidth
         )
     }
 

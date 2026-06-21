@@ -41,6 +41,7 @@ extension AppState {
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
+            guard canUseOfflineCache(after: error) else { throw error }
             let pages = recentCachedPages(limit: limit)
             return PaginatedResponse(
                 items: pages.map { $0.asPage() },
