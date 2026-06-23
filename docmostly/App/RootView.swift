@@ -41,7 +41,7 @@ struct RootView: View {
             case .restoring:
                 LoadingStateView(title: "Restoring session")
             case .needsServer:
-                ServerSetupView()
+                LoginView()
             case .unauthenticated:
                 LoginView()
             case .authenticated:

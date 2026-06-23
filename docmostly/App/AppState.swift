@@ -12,6 +12,7 @@ final class AppState {
     var selectedSidebarDestination: SidebarDestination?
     var selectedSpaceID: String?
     var selectedPageID: String?
+    var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
 
@@ -39,6 +40,7 @@ final class AppState {
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
         serverURLString = self.settingsStore.loadServerURLString()
+        savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()
     }
 
     static func production(crdtRuntimeBundle: Bundle = .main) -> AppState {
@@ -156,6 +158,7 @@ final class AppState {
 
         serverURLString = url.absoluteString
         settingsStore.saveServerURLString(serverURLString)
+        savedServerURLStrings = settingsStore.loadSavedServerURLStrings()
         cancelScheduledCacheWrites()
         apiClient = client
         currentUser = nil

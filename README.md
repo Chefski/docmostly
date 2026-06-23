@@ -1,14 +1,14 @@
 # Docmostly
 
-Docmostly is an open source iOS app for [Docmost](https://docmost.com), built as a native mobile companion for Docmost workspaces.
+Docmostly is an open source Apple-platform app for [Docmost](https://docmost.com), built as a native companion for Docmost workspaces across iPhone, iPad, and Mac.
 
-The goal is to make Docmost feel at home on iPhone and iPad: fast browsing, reliable reading, search, recent pages, offline read-only access, settings, comments, attachments, and collaboration features designed with SwiftUI instead of a web wrapper.
+The goal is to make Docmost feel at home on iPhone, iPad, and macOS: fast browsing, reliable reading, search, recent pages, offline read-only access, settings, comments, attachments, and collaboration features designed with SwiftUI instead of a web wrapper.
 
 Docmostly is an independent open source project and is not affiliated with, sponsored by, or endorsed by Docmost.
 
 ## Project Goals
 
-- Provide a polished native iOS experience for Docmost.
+- Provide polished native iOS, iPadOS, and macOS experiences for Docmost.
 - Support workspace, space, and nested page browsing.
 - Make search and recent documents quick to access.
 - Keep cached content available for offline read-only use.
@@ -23,13 +23,13 @@ Docmostly is built with:
 - SwiftUI
 - SwiftData
 - Modern Swift concurrency
-- Native iOS APIs
+- Native Apple-platform APIs
 
-The app targets iOS 26.0 or later.
+The iPhone and iPad app targets iOS 26.0 and iPadOS 26.0 or later. The Mac app targets macOS 26.0 or later.
 
 ## Status
 
-Docmostly is under active development. The current focus is building a robust native foundation for authentication, workspace navigation, page reading, caching, search, comments, attachments, and collaboration.
+Docmostly is under active development. The current focus is building a robust native foundation for authentication, workspace navigation, page reading, caching, search, comments, attachments, and collaboration across iPhone, iPad, and Mac.
 
 ## Getting Started
 
@@ -37,15 +37,15 @@ To work on Docmostly locally:
 
 1. Clone the repository.
 2. Open `docmostly.xcodeproj` in Xcode.
-3. Select the `docmostly` scheme.
-4. Run the app on an iOS 26.0 or later simulator or device.
+3. Select the `docmostly` scheme for iPhone or iPad, or the `DocmostlyMac` scheme for macOS.
+4. Run the app on an iOS 26.0, iPadOS 26.0, or macOS 26.0 or later simulator, device, or Mac.
 5. Connect the app to a Docmost workspace when prompted.
 
 You will need a running Docmost instance or access to an existing Docmost workspace to use the app.
 
 ## Contributing
 
-Contributions are welcome. Please keep changes focused, native to iOS, and aligned with the existing SwiftUI architecture.
+Contributions are welcome. Please keep changes focused, native to each supported Apple platform, and aligned with the existing SwiftUI architecture.
 
 Before opening a pull request:
 
