@@ -23,6 +23,25 @@ struct NativeEditorRichMarkdownExportTests {
         #expect(viewModel.markdownForDocument() == "[\(source)](\(source))")
     }
 
+    @Test func documentMarkdownConversionPreservesSizedIframeEmbedMarkdownShape() {
+        let source = "https://player.example.com/embed/demo"
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .embed(NativeEditorEmbedBlock(
+                    source: source,
+                    provider: "iframe",
+                    alignment: "center",
+                    width: "800",
+                    height: "600"
+                )),
+                text: AttributedString(source),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == "[\(source)](\(source))")
+    }
+
     @Test func documentMarkdownConversionPreservesImageTitle() {
         let viewModel = configuredViewModel(blocks: [
             NativeEditorBlock(
