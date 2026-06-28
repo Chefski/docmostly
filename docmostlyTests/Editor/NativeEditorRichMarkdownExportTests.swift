@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct NativeEditorRichMarkdownExportTests {
+    @Test func documentMarkdownConversionPreservesImageTitle() {
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .image(NativeEditorMediaBlock(
+                    source: "/files/image.png",
+                    alternativeText: "Architecture",
+                    title: "System diagram",
+                    attachmentID: nil,
+                    sizeInBytes: nil,
+                    width: nil,
+                    height: nil,
+                    aspectRatio: nil,
+                    alignment: nil
+                )),
+                text: AttributedString("Architecture"),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == #"![Architecture](/files/image.png "System diagram")"#)
+    }
+
     @Test func documentMarkdownConversionPreservesRichBlockMeaning() {
         let viewModel = configuredViewModel(blocks: richMarkdownFixtureBlocks())
 

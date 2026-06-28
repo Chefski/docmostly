@@ -86,6 +86,22 @@ struct NativeEditorMarkdownImportTests {
         #expect(blocks[3].rawNode?.attrs?["attachmentId"] == .string("file-1"))
     }
 
+    @Test func markdownImageTitleImportsAsNativeMediaTitle() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: #"![Architecture](/files/image.png "System diagram")"#
+        ).first)
+
+        guard case .image(let image) = block.kind else {
+            Issue.record("Expected Markdown image to import as a native image block.")
+            return
+        }
+
+        #expect(image.source == "/files/image.png")
+        #expect(image.alternativeText == "Architecture")
+        #expect(image.title == "System diagram")
+        #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
+    }
+
     @Test func genericMarkdownLinksRemainEditableParagraphText() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[Example](https://example.com)").first)
 
