@@ -110,17 +110,15 @@ nonisolated extension NativeEditorDocument {
         from run: AttributedString.Runs.Run,
         to marks: inout [ProseMirrorMark]
     ) {
-        guard let commentID = run[NativeEditorCommentIDAttribute.self], commentID.isEmpty == false else {
-            return
+        for comment in run.nativeEditorInlineComments {
+            appendMarkIfMissing(
+                ProseMirrorMark(
+                    type: "comment",
+                    attrs: commentAttrs(comment.commentID, comment.isResolved)
+                ),
+                to: &marks
+            )
         }
-
-        appendMarkIfMissing(
-            ProseMirrorMark(
-                type: "comment",
-                attrs: commentAttrs(commentID, run[NativeEditorCommentResolvedAttribute.self] ?? false)
-            ),
-            to: &marks
-        )
     }
 
     private static func simpleProseMirrorMark(from mark: NativeEditorTextMark) -> ProseMirrorMark? {
