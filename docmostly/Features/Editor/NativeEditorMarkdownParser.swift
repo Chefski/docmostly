@@ -206,7 +206,8 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func detailsInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
-        guard text == ":::details " else { return nil }
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedText == ":::details" else { return nil }
 
         let details = NativeEditorDetailsBlock(summary: "Details", previewText: "Details", isOpen: true)
         return NativeEditorMarkdownInputRule(kind: .details(details), text: details.summary)
