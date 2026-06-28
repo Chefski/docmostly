@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorMarkdownImportTests {
     @Test func markdownLinksImportAsNativeMediaAndAttachmentBlocks() throws {
         let blocks = NativeEditorMarkdownParser.blocks(from: """
