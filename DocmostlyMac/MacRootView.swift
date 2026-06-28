@@ -219,7 +219,7 @@ struct MacRootView: View {
     }
 }
 
-private struct MacQuickPageCreationSheet: View {
+struct MacQuickPageCreationSheet: View {
     let selectedSpace: DocmostSpace?
     let createRootPage: (String) async -> String?
 
