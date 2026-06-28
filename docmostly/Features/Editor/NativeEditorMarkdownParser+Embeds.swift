@@ -221,7 +221,7 @@ extension NativeEditorMarkdownParser {
 
         while currentIndex < lines.endIndex {
             let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            if let attributes = htmlTagAttributes(from: line, tagName: "source") {
+            if let attributes = firstHTMLTagAttributes(in: line, tagName: "source") {
                 sourceAttributes = attributes
             }
 
@@ -254,15 +254,15 @@ extension NativeEditorMarkdownParser {
         }
 
         var childAttributes: [String: String] = [:]
-        var currentIndex = lines.index(after: index)
+        var currentIndex = index
 
         while currentIndex < lines.endIndex {
             let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            if let attributes = htmlTagAttributes(from: line, tagName: type == "pdf" ? "iframe" : "a") {
+            if let attributes = firstHTMLTagAttributes(in: line, tagName: type == "pdf" ? "iframe" : "a") {
                 childAttributes = attributes
             }
 
-            if line.localizedCaseInsensitiveCompare("</div>") == .orderedSame {
+            if containsHTMLClosingTag(in: line, tagName: "div") {
                 let block = typedMediaDivBlock(type: type, attributes: attributes, childAttributes: childAttributes)
                 return (block, lines.index(after: currentIndex))
             }
