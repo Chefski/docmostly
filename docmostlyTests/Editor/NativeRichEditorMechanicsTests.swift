@@ -108,7 +108,7 @@ struct NativeRichEditorMechanicsTests {
 
         #expect(details.summary == "Details")
         #expect(details.previewText == "Details")
-        #expect(block.rawNode?.type == "details")
+        #expect(NativeEditorDocument.node(from: block).type == "details")
     }
 
     @Test func markdownInputRuleSupportsDocmostDefaultCalloutShortcut() {
