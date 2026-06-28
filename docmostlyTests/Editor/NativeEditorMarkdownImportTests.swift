@@ -47,6 +47,45 @@ struct NativeEditorMarkdownImportTests {
         #expect(blocks[3].rawNode?.type == "attachment")
     }
 
+    @Test func docmostAttachmentLinksImportWithAttachmentIDs() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: """
+        ![Hero](/api/files/image-1/Hero.png)
+        [Launch demo.mp4](/api/files/video-1/Launch%20demo.mp4)
+        [Spec.pdf](/api/files/pdf-1/Spec.pdf)
+        [Archive.zip](/api/files/file-1/Archive.zip)
+        """)
+
+        #expect(blocks.count == 4)
+
+        guard case .image(let image) = blocks[0].kind else {
+            Issue.record("Expected Docmost image link to import as an image block.")
+            return
+        }
+        #expect(image.attachmentID == "image-1")
+        #expect(blocks[0].rawNode?.attrs?["attachmentId"] == .string("image-1"))
+
+        guard case .video(let video) = blocks[1].kind else {
+            Issue.record("Expected Docmost video link to import as a video block.")
+            return
+        }
+        #expect(video.attachmentID == "video-1")
+        #expect(blocks[1].rawNode?.attrs?["attachmentId"] == .string("video-1"))
+
+        guard case .pdf(let pdf) = blocks[2].kind else {
+            Issue.record("Expected Docmost PDF link to import as a PDF block.")
+            return
+        }
+        #expect(pdf.attachmentID == "pdf-1")
+        #expect(blocks[2].rawNode?.attrs?["attachmentId"] == .string("pdf-1"))
+
+        guard case .attachment(let attachment) = blocks[3].kind else {
+            Issue.record("Expected Docmost file link to import as an attachment block.")
+            return
+        }
+        #expect(attachment.attachmentID == "file-1")
+        #expect(blocks[3].rawNode?.attrs?["attachmentId"] == .string("file-1"))
+    }
+
     @Test func genericMarkdownLinksRemainEditableParagraphText() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[Example](https://example.com)").first)
 

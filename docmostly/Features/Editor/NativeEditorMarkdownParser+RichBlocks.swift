@@ -221,13 +221,14 @@ extension NativeEditorMarkdownParser {
         let destinationStartIndex = line.index(after: openDestinationIndex)
         let destination = String(line[destinationStartIndex..<closeDestinationIndex])
         let source = markdownLinkSource(from: destination)
+        let attachmentID = docmostAttachmentID(from: source)
         guard source.isEmpty == false else { return nil }
 
         let media = NativeEditorMediaBlock(
             source: source,
             alternativeText: altText.isEmpty ? nil : altText,
             title: nil,
-            attachmentID: nil,
+            attachmentID: attachmentID,
             sizeInBytes: nil,
             width: nil,
             height: nil,
@@ -273,13 +274,14 @@ extension NativeEditorMarkdownParser {
     private static func linkedFileBlockKind(title: String, source: String) -> NativeEditorBlockKind? {
         guard let fileExtension = markdownLinkFileExtension(from: source) else { return nil }
         let title = title.isEmpty ? nil : title
+        let attachmentID = docmostAttachmentID(from: source)
 
         if videoFileExtensions.contains(fileExtension) {
             return .video(NativeEditorMediaBlock(
                 source: source,
                 alternativeText: nil,
                 title: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil,
@@ -293,7 +295,7 @@ extension NativeEditorMarkdownParser {
                 source: source,
                 alternativeText: nil,
                 title: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil,
@@ -306,7 +308,7 @@ extension NativeEditorMarkdownParser {
             return .pdf(NativeEditorPDFBlock(
                 source: source,
                 name: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil
@@ -318,7 +320,7 @@ extension NativeEditorMarkdownParser {
             name: title,
             mimeType: nil,
             sizeInBytes: nil,
-            attachmentID: nil
+            attachmentID: attachmentID
         ))
     }
 
@@ -473,19 +475,7 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func markdownLinkFileExtension(from source: String) -> String? {
-        let pathSource: String
-        if let components = URLComponents(string: source), components.scheme != nil {
-            guard let componentPath = components.path.nonEmpty else { return nil }
-            pathSource = componentPath
-        } else {
-            pathSource = source
-        }
-
-        let path = pathSource.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-            .first?
-            .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
-            .first
-            .map(String.init) ?? pathSource
+        let path = markdownLinkPath(from: source)
         guard
             let fileExtension = path.split(separator: ".").last?.lowercased(),
             fileExtension != path.lowercased()
@@ -494,6 +484,43 @@ extension NativeEditorMarkdownParser {
         }
 
         return fileExtension
+    }
+
+    private static func docmostAttachmentID(from source: String) -> String? {
+        let pathComponents = markdownLinkPath(from: source)
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+        guard
+            let apiIndex = pathComponents.firstIndex(of: "api"),
+            pathComponents.indices.contains(pathComponents.index(after: apiIndex))
+        else {
+            return nil
+        }
+
+        let filesIndex = pathComponents.index(after: apiIndex)
+        guard pathComponents[filesIndex] == "files" else { return nil }
+
+        let attachmentIndex = pathComponents.index(after: filesIndex)
+        guard pathComponents.indices.contains(attachmentIndex) else { return nil }
+
+        let attachmentID = pathComponents[attachmentIndex]
+        guard attachmentID.isEmpty == false else { return nil }
+        return attachmentID.removingPercentEncoding ?? attachmentID
+    }
+
+    private static func markdownLinkPath(from source: String) -> String {
+        let pathSource: String
+        if let components = URLComponents(string: source), components.scheme != nil {
+            pathSource = components.path.nonEmpty ?? ""
+        } else {
+            pathSource = source
+        }
+
+        return pathSource.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+            .first?
+            .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+            .first
+            .map(String.init) ?? pathSource
     }
 
     private static func escapedMarkdownLinkText(_ text: String) -> String {
