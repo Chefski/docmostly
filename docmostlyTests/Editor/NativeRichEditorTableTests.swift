@@ -205,6 +205,33 @@ struct NativeRichEditorTableTests {
         #expect(preservedText.marks?.contains(ProseMirrorMark(type: "bold")) == true)
     }
 
+    @Test func markdownExportPreservesRelativeLinksInsideTableCells() {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "File", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Spec",
+                    inlineContent: [
+                        .text("Spec", marks: [.link(href: "/api/files/file-1/Spec.pdf")])
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+
+        #expect(
+            NativeEditorMarkdownParser.tableMarkdown(from: table) ==
+                """
+                | File |
+                | --- |
+                | [Spec](/api/files/file-1/Spec.pdf) |
+                """
+        )
+    }
+
     @Test func editingTableCellPreservesUnsupportedRichContentInOtherCells() throws {
         let data = Data("""
         {
