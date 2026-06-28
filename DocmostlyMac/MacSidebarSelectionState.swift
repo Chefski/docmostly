@@ -1,6 +1,6 @@
 import Foundation
 
-struct MacSidebarSelectionState {
+nonisolated struct MacSidebarSelectionState {
     let destination: SidebarDestination?
     let selectedPageID: String?
 
