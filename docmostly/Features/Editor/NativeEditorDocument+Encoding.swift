@@ -219,8 +219,8 @@ nonisolated extension NativeEditorDocument {
         switch block.kind {
         case .callout:
             ProseMirrorNode(type: "callout", content: [textContainerNode(type: "paragraph", block: block)])
-        case .details:
-            ProseMirrorNode(type: "details")
+        case .details(let details):
+            NativeEditorRichBlockNodeFactory.detailsNode(from: details)
         case .pageBreak:
             ProseMirrorNode(type: "pageBreak")
         case .divider:

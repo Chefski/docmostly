@@ -68,6 +68,36 @@ struct NativeRichEditorMechanicsTests {
         #expect(viewModel.markdownForDocument() == "---")
     }
 
+    @Test func markdownInputRuleSupportsDocmostDetailsShortcut() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString(":::details ")
+        viewModel.handleDocumentChanged()
+
+        guard case .details(let details) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost details shortcut to create a native details block.")
+            return
+        }
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Details")
+
+        let node = viewModel.document.proseMirrorDocument.content[0]
+        #expect(node.type == "details")
+        #expect(node.attrs?["open"] == .bool(true))
+        #expect(node.content?.first?.type == "detailsSummary")
+        #expect(node.content?.first?.content?.first?.text == "Details")
+        #expect(node.content?[1].type == "detailsContent")
+        #expect(node.content?[1].content?.first?.content?.first?.text == "Details")
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])

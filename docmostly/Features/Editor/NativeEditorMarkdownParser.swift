@@ -48,6 +48,10 @@ enum NativeEditorMarkdownParser {
             return codeRule
         }
 
+        if let detailsRule = detailsInputRule(from: text) {
+            return detailsRule
+        }
+
         return lineInputRule(from: text)
     }
 
@@ -120,6 +124,13 @@ enum NativeEditorMarkdownParser {
 
         let language = String(text.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
         return NativeEditorMarkdownInputRule(kind: .codeBlock(language: language.isEmpty ? nil : language), text: "")
+    }
+
+    private static func detailsInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
+        guard text == ":::details " else { return nil }
+
+        let details = NativeEditorDetailsBlock(summary: "Details", previewText: "Details", isOpen: true)
+        return NativeEditorMarkdownInputRule(kind: .details(details), text: details.summary)
     }
 
     private static func lineInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
