@@ -84,6 +84,8 @@ actor SessionCookieJar {
         }
 
         let name = String(nameValue[..<separatorIndex])
+        let valueStart = nameValue.index(after: separatorIndex)
+        let cookieValue = String(nameValue[valueStart...])
         guard name.isEmpty == false else { return }
 
         var domain = requestURL.host?.lowercased() ?? ""
@@ -117,7 +119,7 @@ actor SessionCookieJar {
 
         let expiredCookie = StoredHTTPCookie(
             name: name,
-            value: value,
+            value: cookieValue,
             domain: domain,
             path: path,
             expiresAt: .distantPast,
