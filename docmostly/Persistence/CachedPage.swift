@@ -15,8 +15,8 @@ final class CachedPage {
     var spaceId: String = ""
     var spaceSlug: String?
     var updatedAt: Date?
-    var canEdit: Bool = false
-    var hasRestriction: Bool = false
+    var canEdit: Bool?
+    var hasRestriction: Bool?
     var cachedAt: Date = Date.now
     var lastOpenedAt: Date = Date.now
 
@@ -57,8 +57,8 @@ final class CachedPage {
         icon = editablePage.icon
         spaceId = editablePage.spaceId
         updatedAt = editablePage.updatedAt
-        canEdit = editablePage.permissions?.canEdit ?? false
-        hasRestriction = editablePage.permissions?.hasRestriction ?? false
+        canEdit = editablePage.permissions?.canEdit
+        hasRestriction = editablePage.permissions?.hasRestriction
         self.cachedAt = cachedAt
         lastOpenedAt = cachedAt
     }
@@ -82,7 +82,7 @@ final class CachedPage {
 
     func matches(page: DocmostPage, htmlContent: String) -> Bool {
         let permissionsMatch = if let permissions = page.permissions {
-            canEdit == permissions.canEdit && hasRestriction == permissions.hasRestriction
+            canEdit == Optional(permissions.canEdit) && hasRestriction == Optional(permissions.hasRestriction)
         } else {
             true
         }
@@ -107,15 +107,15 @@ final class CachedPage {
         icon = editablePage.icon
         spaceId = editablePage.spaceId
         updatedAt = editablePage.updatedAt
-        canEdit = editablePage.permissions?.canEdit ?? false
-        hasRestriction = editablePage.permissions?.hasRestriction ?? false
+        canEdit = editablePage.permissions?.canEdit
+        hasRestriction = editablePage.permissions?.hasRestriction
         cachedAt = Date.now
     }
 
-    func updateLocalDraft(title: String, document: ProseMirrorDocument) {
+    func updateLocalDraft(title: String, document: ProseMirrorDocument) throws {
+        let data = try JSONEncoder().encode(document)
         self.title = title
-        proseMirrorJSONData = try? JSONEncoder().encode(document)
-        updatedAt = Date.now
+        proseMirrorJSONData = data
         cachedAt = Date.now
     }
 
@@ -127,8 +127,7 @@ final class CachedPage {
             icon == editablePage.icon &&
             spaceId == editablePage.spaceId &&
             updatedAt == editablePage.updatedAt &&
-            canEdit == (editablePage.permissions?.canEdit ?? false) &&
-            hasRestriction == (editablePage.permissions?.hasRestriction ?? false)
+            permissions == editablePage.permissions
     }
 
     func snapshot() -> CachedPageSnapshot {
@@ -173,9 +172,14 @@ final class CachedPage {
             icon: icon,
             spaceId: spaceId,
             updatedAt: updatedAt,
-            permissions: DocmostPagePermissions(canEdit: canEdit, hasRestriction: hasRestriction),
+            permissions: permissions,
             lastUpdatedBy: nil
         )
+    }
+
+    private var permissions: DocmostPagePermissions? {
+        guard let canEdit, let hasRestriction else { return nil }
+        return DocmostPagePermissions(canEdit: canEdit, hasRestriction: hasRestriction)
     }
 
     private func cachedProseMirrorDocument() -> ProseMirrorDocument? {

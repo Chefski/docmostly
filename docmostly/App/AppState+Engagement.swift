@@ -477,17 +477,24 @@ extension AppState {
     }
 
     private func queuePageLabels(pageId: String, names: [String]) async throws -> [DocmostLabel] {
-        try await queueOfflineMutation(.addPageLabels(pageId: pageId, names: names))
-
         let existingLabels = pageLabelsByID[pageId] ?? []
         let existingNames = Set(existingLabels.map(\.name))
-        let now = Date.now
-        let localLabels = names
+        let offlineLabels = names
             .filter { existingNames.contains($0) == false }
-            .map { name in
+            .map { OfflinePageLabel(pageId: pageId, name: $0) }
+
+        guard offlineLabels.isEmpty == false else {
+            return existingLabels
+        }
+
+        try await queueOfflineMutation(.addPageLabels(pageId: pageId, labels: offlineLabels))
+
+        let now = Date.now
+        let localLabels = offlineLabels
+            .map { label in
                 DocmostLabel(
-                    id: "offline-label-\(pageId)-\(name)",
-                    name: name,
+                    id: label.id,
+                    name: label.name,
                     type: .page,
                     workspaceId: currentUser?.workspace.id,
                     createdAt: now,
@@ -500,6 +507,12 @@ extension AppState {
     }
 
     private func queueRemovePageLabel(pageId: String, labelId: String) async throws {
+        if labelId.hasPrefix("offline-label-") {
+            try await removePendingOfflineLabelProjection(pageId: pageId, labelId: labelId)
+            pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+            return
+        }
+
         try await queueOfflineMutation(.removePageLabel(pageId: pageId, labelId: labelId))
         pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
     }

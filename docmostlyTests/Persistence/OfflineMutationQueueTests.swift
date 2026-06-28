@@ -89,21 +89,86 @@ struct OfflineMutationQueueTests {
         let queue = makeQueue()
         let first = try queue.enqueue(
             .createComment(
+                localId: "offline-comment-1",
                 pageId: "page-1",
                 content: #"{"type":"doc","content":[]}"#,
+                plainText: "Offline comment",
                 type: .page,
                 selection: nil,
                 yjsSelection: nil
             ),
             scope: scope
         )
-        let second = try queue.enqueue(.addPageLabels(pageId: "page-1", names: ["ios", "offline"]), scope: scope)
+        let second = try queue.enqueue(
+            .addPageLabels(pageId: "page-1", labels: [
+                OfflinePageLabel(pageId: "page-1", name: "ios"),
+                OfflinePageLabel(pageId: "page-1", name: "offline")
+            ]),
+            scope: scope
+        )
         let third = try queue.enqueue(
             .movePage(pageId: "page-1", parentPageId: "parent-1", position: "a000001"),
             scope: scope
         )
 
         #expect(try queue.pending(scope: scope).map(\.id) == [first.id, second.id, third.id])
+    }
+
+    @Test func removingPendingOfflineLabelCollapsesQueuedAdd() throws {
+        let queue = makeQueue()
+        let removedLabel = OfflinePageLabel(pageId: "page-1", name: "ios")
+        let retainedLabel = OfflinePageLabel(pageId: "page-1", name: "offline")
+        _ = try queue.enqueue(
+            .addPageLabels(pageId: "page-1", labels: [removedLabel, retainedLabel]),
+            scope: scope
+        )
+
+        try queue.removePendingPageLabel(pageId: "page-1", localId: removedLabel.id, scope: scope)
+
+        let pending = try queue.pending(scope: scope)
+        #expect(pending.map(\.payload) == [
+            .addPageLabels(pageId: "page-1", labels: [retainedLabel])
+        ])
+
+        try queue.removePendingPageLabel(pageId: "page-1", localId: retainedLabel.id, scope: scope)
+        #expect(try queue.pending(scope: scope).isEmpty)
+    }
+
+    @Test func replacingQueuedInlineCommentIDPatchesPendingPageUpdates() throws {
+        let queue = makeQueue()
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(
+                    type: "text",
+                    marks: [
+                        ProseMirrorMark(
+                            type: "comment",
+                            attrs: ["commentId": .string("offline-comment-1"), "resolved": .bool(false)]
+                        )
+                    ],
+                    text: "Marked"
+                )
+            ])
+        ])
+
+        _ = try queue.enqueue(
+            .updatePage(pageId: "page-1", title: "Draft", document: document),
+            scope: scope
+        )
+
+        try queue.replaceQueuedInlineCommentID(
+            localId: "offline-comment-1",
+            serverId: "comment-1",
+            scope: scope
+        )
+
+        let pending = try queue.pending(scope: scope)
+        guard case .updatePage(_, _, let patchedDocument) = try #require(pending.first?.payload) else {
+            Issue.record("Expected a queued page update")
+            return
+        }
+        let mark = try #require(patchedDocument.content.first?.content?.first?.marks?.first)
+        #expect(mark.attrs?["commentId"] == .string("comment-1"))
     }
 
     @Test func failedMutationStaysQueuedForRetry() throws {

@@ -12,8 +12,8 @@ nonisolated final class OfflineMutationQueue {
 
     @discardableResult
     func enqueue(_ payload: OfflineMutationPayload, scope: CacheScope) throws -> OfflineMutationRecord {
-        let replacementOrder = try removeCoalescedMutation(for: payload, scope: scope)
         let payloadData = try encoder.encode(payload)
+        let replacementOrder = try removeCoalescedMutation(for: payload, scope: scope)
         let replayOrder = if let replacementOrder {
             replacementOrder
         } else {
@@ -28,6 +28,35 @@ nonisolated final class OfflineMutationQueue {
         context.insert(mutation)
         try context.save()
         return try record(from: mutation)
+    }
+
+    func removeCoalescedMutations(for payload: OfflineMutationPayload, scope: CacheScope) throws {
+        _ = try removeCoalescedMutation(for: payload, scope: scope)
+        try context.save()
+    }
+
+    func removePendingPageLabel(pageId: String, localId: String, scope: CacheScope) throws {
+        try updatePendingMutations(scope: scope) { payload in
+            guard case .addPageLabels(let queuedPageId, let labels) = payload, queuedPageId == pageId else {
+                return .unchanged
+            }
+
+            let filteredLabels = labels.filter { $0.id != localId }
+            guard filteredLabels.count != labels.count else {
+                return .unchanged
+            }
+            guard filteredLabels.isEmpty == false else {
+                return .delete
+            }
+            return .replace(.addPageLabels(pageId: pageId, labels: filteredLabels))
+        }
+    }
+
+    func replaceQueuedInlineCommentID(localId: String, serverId: String, scope: CacheScope) throws {
+        try updatePendingMutations(scope: scope) { payload in
+            let replacement = payload.replacingCommentIDs([localId: serverId])
+            return replacement == payload ? .unchanged : .replace(replacement)
+        }
     }
 
     func pending(scope: CacheScope, limit: Int? = nil) throws -> [OfflineMutationRecord] {
@@ -91,6 +120,47 @@ nonisolated final class OfflineMutationQueue {
             context.delete(mutation)
         }
         return replayOrder
+    }
+
+    private enum PendingMutationUpdate {
+        case unchanged
+        case replace(OfflineMutationPayload)
+        case delete
+    }
+
+    private func updatePendingMutations(
+        scope: CacheScope,
+        transform: (OfflineMutationPayload) throws -> PendingMutationUpdate
+    ) throws {
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<QueuedOfflineMutation>(
+            predicate: #Predicate { mutation in
+                mutation.cacheServerBaseURL == serverBaseURL && mutation.cacheUserID == userID
+            }
+        )
+        let mutations = try context.fetch(descriptor)
+        var hasChanges = false
+
+        for mutation in mutations {
+            let payload = try decoder.decode(OfflineMutationPayload.self, from: mutation.payloadData)
+            switch try transform(payload) {
+            case .unchanged:
+                continue
+            case .replace(let replacement):
+                mutation.kindRaw = replacement.kind.rawValue
+                mutation.coalescingKey = replacement.coalescingKey
+                mutation.payloadData = try encoder.encode(replacement)
+                mutation.updatedAt = Date.now
+                hasChanges = true
+            case .delete:
+                context.delete(mutation)
+                hasChanges = true
+            }
+        }
+
+        guard hasChanges else { return }
+        try context.save()
     }
 
     private func nextReplayOrder(scope: CacheScope) throws -> Int {

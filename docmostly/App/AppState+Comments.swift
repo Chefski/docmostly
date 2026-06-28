@@ -120,16 +120,19 @@ extension AppState {
         selection: String? = nil,
         yjsSelection: NativeEditorYjsSelection? = nil
     ) async throws -> DocmostComment {
+        let localId = "offline-comment-\(UUID().uuidString)"
         try await queueOfflineMutation(.createComment(
+            localId: localId,
             pageId: pageId,
             content: content,
+            plainText: text,
             type: type,
             selection: selection,
             yjsSelection: yjsSelection
         ))
 
         let comment = DocmostComment(
-            id: "offline-comment-\(UUID().uuidString)",
+            id: localId,
             content: text,
             selection: selection,
             type: type.rawValue,

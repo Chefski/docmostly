@@ -45,12 +45,19 @@ extension AppState {
     }
 
     func movePage(_ payload: PageTreeMovePayload) async throws {
+        let offlinePayload = OfflineMutationPayload.movePage(
+            pageId: payload.pageId,
+            parentPageId: payload.parentPageId,
+            position: payload.position
+        )
+
         guard let apiClient else {
-            try await queueOfflineMutation(.movePage(
-                pageId: payload.pageId,
-                parentPageId: payload.parentPageId,
-                position: payload.position
-            ))
+            try await queueOfflineMutation(offlinePayload)
+            return
+        }
+
+        guard pendingOfflineMutationCount == 0 else {
+            try await queueOfflineMutation(offlinePayload)
             return
         }
 
@@ -66,17 +73,20 @@ extension AppState {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            try await queueOfflineMutation(.movePage(
-                pageId: payload.pageId,
-                parentPageId: payload.parentPageId,
-                position: payload.position
-            ))
+            try await queueOfflineMutation(offlinePayload)
         }
     }
 
     func movePageToSpace(pageId: String, spaceId: String) async throws {
+        let offlinePayload = OfflineMutationPayload.movePageToSpace(pageId: pageId, spaceId: spaceId)
+
         guard let apiClient else {
-            try await queueOfflineMutation(.movePageToSpace(pageId: pageId, spaceId: spaceId))
+            try await queueOfflineMutation(offlinePayload)
+            return
+        }
+
+        guard pendingOfflineMutationCount == 0 else {
+            try await queueOfflineMutation(offlinePayload)
             return
         }
 
@@ -88,7 +98,7 @@ extension AppState {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            try await queueOfflineMutation(.movePageToSpace(pageId: pageId, spaceId: spaceId))
+            try await queueOfflineMutation(offlinePayload)
         }
     }
 

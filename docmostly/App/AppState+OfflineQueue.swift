@@ -2,6 +2,10 @@ import Foundation
 
 extension AppState {
     func canQueueOfflineMutation(after error: Error) -> Bool {
+        if error is CancellationError {
+            return false
+        }
+
         guard let apiError = error as? APIError else {
             return true
         }
@@ -11,7 +15,7 @@ extension AppState {
             return true
         case .httpStatus(let status, _):
             return status == 408 || status == 429 || status >= 500
-        case .missingData, .responseTooLarge:
+        case .missingData, .decodingFailed, .responseTooLarge:
             return false
         }
     }
@@ -39,11 +43,9 @@ extension AppState {
         }
 
         do {
-            if let offlineQueueRepository {
-                pendingOfflineMutationCount = try await offlineQueueRepository.count(scope: cacheScope)
-            } else {
-                pendingOfflineMutationCount = try offlineQueue?.count(scope: cacheScope) ?? 0
-            }
+            let records = try await pendingOfflineMutations(scope: cacheScope)
+            pendingOfflineMutationCount = records.count
+            applyOfflineProjections(from: records)
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -89,22 +91,7 @@ extension AppState {
         document: ProseMirrorDocument
     ) async throws -> DocmostEditablePage {
         try await queueOfflineMutation(.updatePage(pageId: pageId, title: title, document: document))
-
-        do {
-            return try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
-        } catch {
-            return DocmostEditablePage(
-                id: pageId,
-                slugId: pageId,
-                title: title,
-                content: document,
-                icon: nil,
-                spaceId: "",
-                updatedAt: Date.now,
-                permissions: DocmostPagePermissions(canEdit: true, hasRestriction: false),
-                lastUpdatedBy: pagePerson(from: currentUser?.user)
-            )
-        }
+        return try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
     }
 
     func setProjectedFavorite(
@@ -144,6 +131,8 @@ extension AppState {
 
         guard let apiClient, let cacheScope else { return }
 
+        var inlineCommentIDMappings: [String: String] = [:]
+
         do {
             while true {
                 let records = try await pendingOfflineMutations(scope: cacheScope, limit: 25)
@@ -154,21 +143,28 @@ extension AppState {
 
                 for record in records {
                     do {
-                        try await replay(record, using: apiClient)
+                        let payload = record.payload.replacingCommentIDs(inlineCommentIDMappings)
+                        if let mapping = try await replay(record, payload: payload, using: apiClient) {
+                            inlineCommentIDMappings[mapping.localID] = mapping.serverID
+                        }
                         try await removeOfflineMutation(id: record.id, scope: cacheScope)
                         await refreshOfflineMutationCount()
                     } catch {
-                        try? await markOfflineMutationFailed(
-                            id: record.id,
-                            scope: cacheScope,
-                            message: error.localizedDescription
-                        )
-                        await refreshOfflineMutationCount()
                         if canQueueOfflineMutation(after: error) {
+                            try? await markOfflineMutationFailed(
+                                id: record.id,
+                                scope: cacheScope,
+                                message: error.localizedDescription
+                            )
+                            await refreshOfflineMutationCount()
                             isOffline = true
+                            statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
+                            return
                         }
-                        statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
-                        return
+
+                        try? await removeOfflineMutation(id: record.id, scope: cacheScope)
+                        await refreshOfflineMutationCount()
+                        statusMessage = "Dropped queued offline change: \(error.localizedDescription)"
                     }
                 }
             }
@@ -177,40 +173,107 @@ extension AppState {
         }
     }
 
-    // swiftlint:disable cyclomatic_complexity
-    private func replay(_ record: OfflineMutationRecord, using apiClient: DocmostAPIClient) async throws {
-        switch record.payload {
+    private func replay(
+        _ record: OfflineMutationRecord,
+        payload: OfflineMutationPayload,
+        using apiClient: DocmostAPIClient
+    ) async throws -> (localID: String, serverID: String)? {
+        switch payload {
         case .updatePage(let pageId, let title, let document):
-            let page: DocmostEditablePage = try await apiClient.send(.updatePage(
+            try await replayPageUpdate(
                 pageId: pageId,
                 title: title,
-                content: document,
-                format: .json,
-                operation: .replace
-            ))
-            scheduleCacheWrite(.saveEditablePage(page, scope: record.scope))
-        case .createComment(let pageId, let content, let type, let selection, let yjsSelection):
-            let comment: DocmostComment = try await apiClient.send(.createComment(
-                pageId: pageId,
-                content: content,
-                type: type,
-                selection: selection,
-                yjsSelection: yjsSelection
-            ))
-            applyReplayedComment(comment)
+                document: document,
+                scope: record.scope,
+                using: apiClient
+            )
+            return nil
+        case .createComment:
+            return try await replayCommentCreation(payload, scope: record.scope, using: apiClient)
         case .resolveComment(let commentId, let pageId, let resolved):
-            let comment: DocmostComment = try await apiClient.send(.resolveComment(
+            try await replayCommentResolution(
                 commentId: commentId,
                 pageId: pageId,
-                resolved: resolved
-            ))
-            applyReplayedComment(comment)
-        case .addPageLabels(let pageId, let names):
-            let labels: [DocmostLabel] = try await apiClient.send(.addPageLabels(pageId: pageId, names: names))
-            pageLabelsByID[pageId] = labels
+                resolved: resolved,
+                using: apiClient
+            )
+            return nil
+        case .addPageLabels(let pageId, let labels):
+            try await replayPageLabelAddition(pageId: pageId, labels: labels, using: apiClient)
+            return nil
         case .removePageLabel(let pageId, let labelId):
             try await apiClient.sendVoid(.removePageLabel(pageId: pageId, labelId: labelId))
             pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+            return nil
+        case .addFavorite, .removeFavorite:
+            try await replayFavorite(payload, using: apiClient)
+            return nil
+        case .watchPage, .unwatchPage, .watchSpace, .unwatchSpace:
+            try await replayWatch(payload, using: apiClient)
+            return nil
+        case .movePage(let pageId, let parentPageId, let position):
+            try await apiClient.sendVoid(.movePage(pageId: pageId, parentPageId: parentPageId, position: position))
+            return nil
+        case .movePageToSpace(let pageId, let spaceId):
+            try await apiClient.sendVoid(.movePageToSpace(pageId: pageId, spaceId: spaceId))
+            return nil
+        }
+    }
+
+    private func replayPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        scope: CacheScope,
+        using apiClient: DocmostAPIClient
+    ) async throws {
+        let page: DocmostEditablePage = try await apiClient.send(.updatePage(
+            pageId: pageId,
+            title: title,
+            content: document,
+            format: .json,
+            operation: .replace
+        ))
+        scheduleCacheWrite(.saveEditablePage(page, scope: scope))
+    }
+
+    private func replayCommentCreation(
+        _ payload: OfflineMutationPayload,
+        scope: CacheScope,
+        using apiClient: DocmostAPIClient
+    ) async throws -> (localID: String, serverID: String)? {
+        guard case .createComment(
+            let localId,
+            let pageId,
+            let content,
+            _,
+            let type,
+            let selection,
+            let yjsSelection
+        ) = payload else {
+            return nil
+        }
+
+        let comment: DocmostComment = try await apiClient.send(.createComment(
+            pageId: pageId,
+            content: content,
+            type: type,
+            selection: selection,
+            yjsSelection: yjsSelection
+        ))
+        applyReplayedComment(comment, replacingLocalID: localId)
+        guard type == .inline, comment.id != localId else { return nil }
+
+        do {
+            try await replaceQueuedInlineCommentID(localId: localId, serverId: comment.id, scope: scope)
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+        return (localId, comment.id)
+    }
+
+    private func replayFavorite(_ payload: OfflineMutationPayload, using apiClient: DocmostAPIClient) async throws {
+        switch payload {
         case .addFavorite(let type, let pageId, let spaceId, let templateId):
             try await apiClient.sendVoid(.addFavorite(
                 type: type,
@@ -239,6 +302,13 @@ extension AppState {
                 templateId: templateId,
                 isFavorite: false
             )
+        default:
+            return
+        }
+    }
+
+    private func replayWatch(_ payload: OfflineMutationPayload, using apiClient: DocmostAPIClient) async throws {
+        switch payload {
         case .watchPage(let pageId):
             let response: WatchStatusResponse = try await apiClient.send(.watchPage(pageId: pageId))
             pageWatchStatusByID[pageId] = response.watching
@@ -251,15 +321,38 @@ extension AppState {
         case .unwatchSpace(let spaceId):
             let response: WatchStatusResponse = try await apiClient.send(.unwatchSpace(spaceId: spaceId))
             spaceWatchStatusByID[spaceId] = response.watching
-        case .movePage(let pageId, let parentPageId, let position):
-            try await apiClient.sendVoid(.movePage(pageId: pageId, parentPageId: parentPageId, position: position))
-        case .movePageToSpace(let pageId, let spaceId):
-            try await apiClient.sendVoid(.movePageToSpace(pageId: pageId, spaceId: spaceId))
+        default:
+            return
         }
     }
-    // swiftlint:enable cyclomatic_complexity
 
-    private func pendingOfflineMutations(scope: CacheScope, limit: Int) async throws -> [OfflineMutationRecord] {
+    private func replayCommentResolution(
+        commentId: String,
+        pageId: String,
+        resolved: Bool,
+        using apiClient: DocmostAPIClient
+    ) async throws {
+        let comment: DocmostComment = try await apiClient.send(.resolveComment(
+            commentId: commentId,
+            pageId: pageId,
+            resolved: resolved
+        ))
+        applyReplayedComment(comment)
+    }
+
+    private func replayPageLabelAddition(
+        pageId: String,
+        labels: [OfflinePageLabel],
+        using apiClient: DocmostAPIClient
+    ) async throws {
+        let labels: [DocmostLabel] = try await apiClient.send(.addPageLabels(
+            pageId: pageId,
+            names: labels.map(\.name)
+        ))
+        pageLabelsByID[pageId] = labels
+    }
+
+    private func pendingOfflineMutations(scope: CacheScope, limit: Int? = nil) async throws -> [OfflineMutationRecord] {
         if let offlineQueueRepository {
             return try await offlineQueueRepository.pending(scope: scope, limit: limit)
         }
@@ -274,6 +367,34 @@ extension AppState {
         try offlineQueue?.remove(id: id, scope: scope)
     }
 
+    private func removeCoalescedOfflineMutations(for payload: OfflineMutationPayload, scope: CacheScope) async throws {
+        if let offlineQueueRepository {
+            try await offlineQueueRepository.removeCoalescedMutations(for: payload, scope: scope)
+            return
+        }
+        try offlineQueue?.removeCoalescedMutations(for: payload, scope: scope)
+    }
+
+    private func removePendingOfflinePageLabel(pageId: String, localId: String, scope: CacheScope) async throws {
+        if let offlineQueueRepository {
+            try await offlineQueueRepository.removePendingPageLabel(pageId: pageId, localId: localId, scope: scope)
+            return
+        }
+        try offlineQueue?.removePendingPageLabel(pageId: pageId, localId: localId, scope: scope)
+    }
+
+    private func replaceQueuedInlineCommentID(localId: String, serverId: String, scope: CacheScope) async throws {
+        if let offlineQueueRepository {
+            try await offlineQueueRepository.replaceQueuedInlineCommentID(
+                localId: localId,
+                serverId: serverId,
+                scope: scope
+            )
+            return
+        }
+        try offlineQueue?.replaceQueuedInlineCommentID(localId: localId, serverId: serverId, scope: scope)
+    }
+
     private func markOfflineMutationFailed(id: String, scope: CacheScope, message: String) async throws {
         if let offlineQueueRepository {
             try await offlineQueueRepository.markFailed(id: id, scope: scope, message: message)
@@ -282,9 +403,149 @@ extension AppState {
         try offlineQueue?.markFailed(id: id, scope: scope, message: message)
     }
 
-    private func applyReplayedComment(_ comment: DocmostComment) {
-        guard var comments = pageCommentsByID[comment.pageId] else { return }
-        if let index = comments.firstIndex(where: { $0.id == comment.id }) {
+    func clearPendingPageUpdate(pageId: String, title: String, document: ProseMirrorDocument) async throws {
+        guard let cacheScope else { return }
+        try await removeCoalescedOfflineMutations(
+            for: .updatePage(pageId: pageId, title: title, document: document),
+            scope: cacheScope
+        )
+        await refreshOfflineMutationCount()
+    }
+
+    func removePendingOfflineLabelProjection(pageId: String, labelId: String) async throws {
+        guard let cacheScope else { return }
+        try await removePendingOfflinePageLabel(pageId: pageId, localId: labelId, scope: cacheScope)
+        await refreshOfflineMutationCount()
+    }
+
+    private func applyOfflineProjections(from records: [OfflineMutationRecord]) {
+        for record in records {
+            applyOfflineProjection(record.payload)
+        }
+    }
+
+    // swiftlint:disable cyclomatic_complexity
+    private func applyOfflineProjection(_ payload: OfflineMutationPayload) {
+        switch payload {
+        case .createComment(let localId, let pageId, _, let plainText, let type, let selection, _):
+            applyProjectedCommentCreation(
+                localId: localId,
+                pageId: pageId,
+                plainText: plainText,
+                type: type,
+                selection: selection
+            )
+        case .resolveComment(let commentId, let pageId, let resolved):
+            applyProjectedCommentResolution(commentId: commentId, pageId: pageId, resolved: resolved)
+        case .addPageLabels(let pageId, let labels):
+            applyProjectedPageLabels(pageId: pageId, labels: labels)
+        case .removePageLabel(let pageId, let labelId):
+            pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+        case .addFavorite(let type, let pageId, let spaceId, let templateId):
+            setProjectedFavorite(
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId,
+                isFavorite: true
+            )
+        case .removeFavorite(let type, let pageId, let spaceId, let templateId):
+            setProjectedFavorite(
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId,
+                isFavorite: false
+            )
+        case .watchPage(let pageId):
+            pageWatchStatusByID[pageId] = true
+        case .unwatchPage(let pageId):
+            pageWatchStatusByID[pageId] = false
+        case .watchSpace(let spaceId):
+            spaceWatchStatusByID[spaceId] = true
+        case .unwatchSpace(let spaceId):
+            spaceWatchStatusByID[spaceId] = false
+        case .updatePage, .movePage, .movePageToSpace:
+            break
+        }
+    }
+    // swiftlint:enable cyclomatic_complexity
+
+    private func applyProjectedCommentCreation(
+        localId: String,
+        pageId: String,
+        plainText: String,
+        type: DocmostCommentType,
+        selection: String?
+    ) {
+        let comment = DocmostComment(
+            id: localId,
+            content: plainText,
+            selection: selection,
+            type: type.rawValue,
+            creatorId: currentUser?.user.id ?? "offline",
+            pageId: pageId,
+            workspaceId: currentUser?.workspace.id,
+            createdAt: Date.now,
+            creator: currentUser?.user
+        )
+        applyReplayedComment(comment)
+    }
+
+    private func applyProjectedPageLabels(pageId: String, labels: [OfflinePageLabel]) {
+        var projectedLabels = pageLabelsByID[pageId] ?? []
+        var existingIDs = Set(projectedLabels.map(\.id))
+        var existingNames = Set(projectedLabels.map(\.name))
+        let now = Date.now
+        for label in labels {
+            guard existingIDs.contains(label.id) == false, existingNames.contains(label.name) == false else {
+                continue
+            }
+
+            projectedLabels.append(DocmostLabel(
+                id: label.id,
+                name: label.name,
+                type: .page,
+                workspaceId: currentUser?.workspace.id,
+                createdAt: now,
+                updatedAt: now
+            ))
+            existingIDs.insert(label.id)
+            existingNames.insert(label.name)
+        }
+        pageLabelsByID[pageId] = projectedLabels
+    }
+
+    private func applyProjectedCommentResolution(commentId: String, pageId: String, resolved: Bool) {
+        if var comments = pageCommentsByID[pageId],
+           let index = comments.firstIndex(where: { $0.id == commentId }) {
+            let existing = comments[index]
+            comments[index] = DocmostComment(
+                id: existing.id,
+                content: existing.content,
+                selection: existing.selection,
+                type: existing.type,
+                creatorId: existing.creatorId,
+                pageId: existing.pageId,
+                parentCommentId: existing.parentCommentId,
+                resolvedById: resolved ? currentUser?.user.id : nil,
+                resolvedAt: resolved ? Date.now : nil,
+                workspaceId: existing.workspaceId,
+                createdAt: existing.createdAt,
+                editedAt: existing.editedAt,
+                deletedAt: existing.deletedAt,
+                creator: existing.creator,
+                resolvedBy: resolved ? currentUser?.user : nil
+            )
+            pageCommentsByID[pageId] = comments
+        }
+    }
+
+    private func applyReplayedComment(_ comment: DocmostComment, replacingLocalID localID: String? = nil) {
+        var comments = pageCommentsByID[comment.pageId] ?? []
+        if let localID, let index = comments.firstIndex(where: { $0.id == localID }) {
+            comments[index] = comment
+        } else if let index = comments.firstIndex(where: { $0.id == comment.id }) {
             comments[index] = comment
         } else {
             comments.append(comment)
@@ -292,8 +553,4 @@ extension AppState {
         pageCommentsByID[comment.pageId] = comments
     }
 
-    private func pagePerson(from user: DocmostUser?) -> DocmostPagePerson? {
-        guard let user else { return nil }
-        return DocmostPagePerson(id: user.id, name: user.name, avatarUrl: user.avatarUrl)
-    }
 }

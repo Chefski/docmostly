@@ -1,32 +1,18 @@
 import Foundation
 
-nonisolated enum OfflineMutationKind: String, Codable, CaseIterable, Sendable {
-    case updatePage
-    case createComment
-    case resolveComment
-    case addPageLabels
-    case removePageLabel
-    case addFavorite
-    case removeFavorite
-    case watchPage
-    case unwatchPage
-    case watchSpace
-    case unwatchSpace
-    case movePage
-    case movePageToSpace
-}
-
 nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
     case updatePage(pageId: String, title: String, document: ProseMirrorDocument)
     case createComment(
+        localId: String,
         pageId: String,
         content: String,
+        plainText: String,
         type: DocmostCommentType,
         selection: String?,
         yjsSelection: NativeEditorYjsSelection?
     )
     case resolveComment(commentId: String, pageId: String, resolved: Bool)
-    case addPageLabels(pageId: String, names: [String])
+    case addPageLabels(pageId: String, labels: [OfflinePageLabel])
     case removePageLabel(pageId: String, labelId: String)
     case addFavorite(type: FavoriteType, pageId: String?, spaceId: String?, templateId: String?)
     case removeFavorite(type: FavoriteType, pageId: String?, spaceId: String?, templateId: String?)
@@ -87,16 +73,23 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
             nil
         }
     }
-}
 
-nonisolated struct OfflineMutationRecord: Identifiable, Equatable, Sendable {
-    let id: String
-    let scope: CacheScope
-    let kind: OfflineMutationKind
-    let payload: OfflineMutationPayload
-    let createdAt: Date
-    let updatedAt: Date
-    let replayOrder: Int
-    let attemptCount: Int
-    let lastErrorMessage: String?
+    func replacingCommentIDs(_ mappings: [String: String]) -> OfflineMutationPayload {
+        guard mappings.isEmpty == false else { return self }
+
+        switch self {
+        case .updatePage(let pageId, let title, let document):
+            var patchedDocument = document
+            var didReplace = false
+            for mapping in mappings {
+                let replacement = patchedDocument.replacingCommentID(mapping.key, with: mapping.value)
+                patchedDocument = replacement.document
+                didReplace = didReplace || replacement.didReplace
+            }
+            guard didReplace else { return self }
+            return .updatePage(pageId: pageId, title: title, document: patchedDocument)
+        default:
+            return self
+        }
+    }
 }

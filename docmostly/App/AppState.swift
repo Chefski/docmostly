@@ -347,6 +347,11 @@ final class AppState {
             if let cacheScope {
                 scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
             }
+            do {
+                try await clearPendingPageUpdate(pageId: pageId, title: title, document: document)
+            } catch {
+                statusMessage = error.localizedDescription
+            }
             scheduleOfflineQueueReconciliation()
             return page
         } catch {

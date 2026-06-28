@@ -206,7 +206,7 @@ nonisolated final class CacheRepository {
             throw APIError.connectionFailed("This page is not cached for offline editing.")
         }
 
-        cachedPage.updateLocalDraft(title: title, document: document)
+        try cachedPage.updateLocalDraft(title: title, document: document)
         try saveIfNeeded(true)
         guard let page = try cachedPage.asEditablePage() else {
             throw APIError.connectionFailed("This page is not cached for offline editing.")

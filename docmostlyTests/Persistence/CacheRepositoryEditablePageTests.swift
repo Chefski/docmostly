@@ -84,6 +84,42 @@ struct CacheRepositoryEditablePageTests {
         #expect(updatedPage.permissions?.canEdit == true)
     }
 
+    @Test func savingEditablePageWithMissingPermissionsKeepsPermissionsUnknown() throws {
+        let repository = makeRepository()
+
+        try repository.saveEditablePage(
+            editablePage(content: ProseMirrorDocument(), permissions: nil),
+            scope: scope
+        )
+
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
+        let cached = try #require(loadedPage)
+        #expect(cached.permissions == nil)
+    }
+
+    @Test func savingLocalEditableDraftPreservesRemoteUpdatedAtBaseline() throws {
+        let repository = makeRepository()
+        let remoteUpdatedAt = try Date("2026-06-28T08:00:00Z", strategy: .iso8601)
+
+        try repository.saveEditablePage(
+            editablePage(
+                content: ProseMirrorDocument(),
+                updatedAt: remoteUpdatedAt
+            ),
+            scope: scope
+        )
+        let updatedPage = try repository.saveLocalEditableDraft(
+            pageId: "page-1",
+            title: "Queued title",
+            document: ProseMirrorDocument(content: [
+                ProseMirrorNode(type: "paragraph", text: "Queued body")
+            ]),
+            scope: scope
+        )
+
+        #expect(updatedPage.updatedAt == remoteUpdatedAt)
+    }
+
     @Test func savingUnchangedHTMLPageReusesCachedPageAndAttachmentRows() throws {
         let (repository, context) = makeRepositoryAndContext()
         let page = htmlPage(title: "Roadmap")
@@ -168,7 +204,11 @@ struct CacheRepositoryEditablePageTests {
         return try context.fetch(descriptor)
     }
 
-    private func editablePage(content: ProseMirrorDocument?) -> DocmostEditablePage {
+    private func editablePage(
+        content: ProseMirrorDocument?,
+        updatedAt: Date? = nil,
+        permissions: DocmostPagePermissions? = DocmostPagePermissions(canEdit: true, hasRestriction: false)
+    ) -> DocmostEditablePage {
         DocmostEditablePage(
             id: "page-1",
             slugId: "roadmap",
@@ -176,8 +216,8 @@ struct CacheRepositoryEditablePageTests {
             content: content,
             icon: nil,
             spaceId: "space-1",
-            updatedAt: nil,
-            permissions: DocmostPagePermissions(canEdit: true, hasRestriction: false),
+            updatedAt: updatedAt,
+            permissions: permissions,
             lastUpdatedBy: nil
         )
     }
