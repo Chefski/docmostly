@@ -15,14 +15,7 @@ extension NativeEditorMarkdownParser {
 
             let contentStart = openRange.upperBound
             guard let closeRange = remaining[contentStart...].range(of: inlineDelimiter.value) else {
-                appendMarkdownText(
-                    String(remaining),
-                    to: &result,
-                    usesFoundationMarkdownParser: shouldUseFoundationMarkdownParser(
-                        for: String(remaining),
-                        after: result
-                    )
-                )
+                appendMarkdownText(String(remaining[openRange.lowerBound...]), to: &result)
                 return result
             }
 
@@ -33,7 +26,7 @@ extension NativeEditorMarkdownParser {
                 in: remaining
             ) else {
                 appendMarkdownText(
-                    String(remaining[..<openRange.upperBound]),
+                    String(remaining[openRange.lowerBound..<openRange.upperBound]),
                     to: &result,
                     usesFoundationMarkdownParser: false
                 )
@@ -43,7 +36,7 @@ extension NativeEditorMarkdownParser {
 
             let mathText = String(remaining[contentStart..<closeRange.lowerBound])
             guard mathText.isEmpty == false else {
-                appendMarkdownText(String(remaining[..<closeRange.upperBound]), to: &result)
+                appendMarkdownText(String(remaining[openRange.lowerBound..<closeRange.upperBound]), to: &result)
                 remaining = remaining[closeRange.upperBound...]
                 continue
             }
