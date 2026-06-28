@@ -14,11 +14,16 @@ nonisolated final class OfflineMutationQueue {
     func enqueue(_ payload: OfflineMutationPayload, scope: CacheScope) throws -> OfflineMutationRecord {
         let replacementOrder = try removeCoalescedMutation(for: payload, scope: scope)
         let payloadData = try encoder.encode(payload)
+        let replayOrder = if let replacementOrder {
+            replacementOrder
+        } else {
+            try nextReplayOrder(scope: scope)
+        }
         let mutation = QueuedOfflineMutation(
             payload: payload,
             scope: scope,
             payloadData: payloadData,
-            replayOrder: replacementOrder ?? nextReplayOrder(scope: scope)
+            replayOrder: replayOrder
         )
         context.insert(mutation)
         try context.save()

@@ -87,7 +87,7 @@ final class CachedPage {
             true
         }
 
-        id == page.id &&
+        return id == page.id &&
             slugId == page.slugId &&
             title == page.title &&
             self.htmlContent == htmlContent &&
