@@ -113,6 +113,8 @@ final class NativeRichEditorViewModel {
     }
 
     var filteredSlashCommands: [NativeEditorCommand] {
+        guard let slashCommandQuery = activeSlashCommandQuery else { return [] }
+
         let matches = NativeEditorCommand.allCases.compactMap { command in
             command.matchPriority(query: slashCommandQuery).map { priority in
                 (command: command, priority: priority)
