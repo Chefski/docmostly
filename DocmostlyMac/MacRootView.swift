@@ -45,21 +45,10 @@ struct MacRootView: View {
                 .environment(appState)
             }
             .sheet(isPresented: $commandController.isPageCreationPresented) {
-                quickPageCreationSheet
-            }
-    }
-
-    @ViewBuilder
-    private var quickPageCreationSheet: some View {
-        if let selectedSpace {
-            PageCreationSheet(
-                request: PageCreationRequest(parent: nil, spaceName: selectedSpace.name),
-                create: createRootPage
-            )
-            .frame(minWidth: 420, minHeight: 260)
-        } else {
-            ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
-                .frame(minWidth: 420, minHeight: 260)
+                MacQuickPageCreationSheet(
+                    selectedSpace: selectedSpace,
+                    createRootPage: createRootPage
+                )
         }
     }
 
@@ -204,5 +193,23 @@ struct MacRootView: View {
             appState: appState,
             modelContainer: modelContainer
         )
+    }
+}
+
+private struct MacQuickPageCreationSheet: View {
+    let selectedSpace: DocmostSpace?
+    let createRootPage: (String) async -> String?
+
+    var body: some View {
+        if let selectedSpace {
+            PageCreationSheet(
+                request: PageCreationRequest(parent: nil, spaceName: selectedSpace.name),
+                create: createRootPage
+            )
+            .frame(minWidth: 420, minHeight: 260)
+        } else {
+            ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
+                .frame(minWidth: 420, minHeight: 260)
+        }
     }
 }

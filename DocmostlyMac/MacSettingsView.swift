@@ -44,7 +44,7 @@ final class MacSettingsNavigation {
 
 struct MacSettingsView: View {
     @State private var navigation = MacSettingsNavigation.shared
-    @State private var navigationHistory: [MacSettingsTab] = [.workspace]
+    @State private var navigationHistory: [MacSettingsTab] = [MacSettingsNavigation.shared.selectedTab ?? .workspace]
     @State private var historyIndex = 0
 
     private var activeTab: MacSettingsTab {

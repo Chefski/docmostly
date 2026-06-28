@@ -1,10 +1,11 @@
+import Foundation
 import Testing
 @testable import DocmostlyMac
 
 @MainActor
 struct MacPageWindowRouteTests {
     @Test func selectedPageCreatesAWindowRouteWithCurrentSpaceContext() {
-        let state = AppState()
+        let state = makeAppState()
         state.selectPage(id: "page-slug", spaceID: "space-1", revealSpaceInSidebar: true)
 
         let route = MacPageWindowRoute.selectedPageRoute(from: state)
@@ -14,9 +15,16 @@ struct MacPageWindowRouteTests {
     }
 
     @Test func routeIsUnavailableWithoutASelectedPage() {
-        let state = AppState()
+        let state = makeAppState()
         state.selectSpace(id: "space-1")
 
         #expect(MacPageWindowRoute.selectedPageRoute(from: state) == nil)
+    }
+
+    private func makeAppState() -> AppState {
+        let suiteName = "Docmostly.MacPageWindowRouteTests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName) ?? .standard
+        userDefaults.removePersistentDomain(forName: suiteName)
+        return AppState(settingsStore: LocalSettingsStore(userDefaults: userDefaults))
     }
 }

@@ -34,6 +34,7 @@ struct PageReaderView: View {
     @FocusState var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
+    let initialTitle: String? = nil
 
     var body: some View {
         ScrollView {
@@ -71,7 +72,7 @@ struct PageReaderView: View {
         }
         .scrollPosition($scrollPosition)
         .safeAreaPadding(.bottom, 72)
-        .navigationTitle(editorViewModel?.title.isEmpty == false ? editorViewModel?.title ?? "Page" : "Page")
+        .navigationTitle(pageNavigationTitle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if let editorViewModel, editorViewModel.errorMessage == nil {

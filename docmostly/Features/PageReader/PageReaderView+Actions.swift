@@ -243,6 +243,14 @@ extension PageReaderView {
             .appending(path: pageSlug)
     }
 
+    var pageNavigationTitle: String {
+        if let title = editorViewModel?.title, title.isEmpty == false {
+            return title
+        }
+
+        return initialTitle ?? "Page"
+    }
+
     var currentSpaceSlug: String? {
         guard let editorViewModel else { return nil }
 

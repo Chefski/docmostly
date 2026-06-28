@@ -29,7 +29,7 @@ struct DocmostlyMacCommands: Commands {
         }
 
         CommandMenu("Navigate") {
-            Button("Command Palette", systemImage: "command", action: commandController.presentCommandPalette)
+            Button("Command Palette", systemImage: "command", action: presentCommandPalette)
                 .keyboardShortcut("k", modifiers: .command)
 
             Divider()
@@ -93,9 +93,20 @@ struct DocmostlyMacCommands: Commands {
         return appState.spaces.first
     }
 
+    private func presentCommandPalette() {
+        openWindow(id: "main")
+        Task { @MainActor in
+            await Task.yield()
+            commandController.presentCommandPalette()
+        }
+    }
+
     private func presentPageCreation() {
         openWindow(id: "main")
-        commandController.presentPageCreation()
+        Task { @MainActor in
+            await Task.yield()
+            commandController.presentPageCreation()
+        }
     }
 
     private func showSettings() {
