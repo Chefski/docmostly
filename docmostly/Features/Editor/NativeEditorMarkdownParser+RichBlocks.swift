@@ -21,6 +21,10 @@ extension NativeEditorMarkdownParser {
             return diagramBlock
         }
 
+        if let structuralBlock = docmostStructuralHTMLBlock(in: lines, startingAt: index) {
+            return structuralBlock
+        }
+
         if let columnsBlock = columnsHTMLBlock(in: lines, startingAt: index) {
             return columnsBlock
         }
@@ -64,6 +68,10 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func structuralMarkdownLine(from block: NativeEditorBlock) -> String? {
+        if let structuralHTML = docmostStructuralHTMLMarkdown(from: block) {
+            return structuralHTML
+        }
+
         switch block.kind {
         case .callout(let callout):
             calloutMarkdown(from: callout)
@@ -73,12 +81,6 @@ extension NativeEditorMarkdownParser {
             #"<div data-type="pageBreak" class="page-break"></div>"#
         case .columns(let columns):
             columnsMarkdown(from: columns)
-        case .subpages:
-            "<!-- Docmost subpages block -->"
-        case .transclusionSource(let source):
-            transclusionSourceMarkdown(from: source)
-        case .transclusionReference(let reference):
-            transclusionReferenceMarkdown(from: reference)
         default:
             nil
         }
@@ -393,21 +395,6 @@ extension NativeEditorMarkdownParser {
 
         </details>
         """
-    }
-
-    private static func transclusionSourceMarkdown(from source: NativeEditorTransclusionSourceBlock) -> String {
-        if let identifier = source.identifier, identifier.isEmpty == false {
-            return "<!-- Docmost synced block: \(identifier) -->\n\(source.previewText.trimmedMarkdownBlockText)"
-        }
-
-        return source.previewText.trimmedMarkdownBlockText
-    }
-
-    private static func transclusionReferenceMarkdown(
-        from reference: NativeEditorTransclusionReferenceBlock
-    ) -> String {
-        let identifier = reference.transclusionID ?? reference.sourcePageID ?? "unknown"
-        return "<!-- Docmost synced block reference: \(identifier) -->"
     }
 
     private static func embedMarkdown(from embed: NativeEditorEmbedBlock) -> String {
