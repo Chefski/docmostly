@@ -200,7 +200,7 @@ enum NativeEditorMarkdownParser {
             appendMarkdownText(
                 String(remaining[..<openRange.lowerBound]),
                 to: &result,
-                parsesInlineMarkdown: false
+                usesFoundationMarkdownParser: false
             )
 
             let contentStart = openRange.upperBound
@@ -220,7 +220,7 @@ enum NativeEditorMarkdownParser {
             remaining = remaining[closeRange.upperBound...]
         }
 
-        appendMarkdownText(String(remaining), to: &result, parsesInlineMarkdown: result.characters.isEmpty)
+        appendMarkdownText(String(remaining), to: &result, usesFoundationMarkdownParser: result.characters.isEmpty)
         return result
     }
 

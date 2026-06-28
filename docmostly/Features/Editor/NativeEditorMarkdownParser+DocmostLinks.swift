@@ -16,7 +16,7 @@ extension NativeEditorMarkdownParser {
     static func appendMarkdownText(
         _ markdown: String,
         to result: inout AttributedString,
-        parsesInlineMarkdown: Bool = true
+        usesFoundationMarkdownParser: Bool = true
     ) {
         guard markdown.isEmpty == false else { return }
 
@@ -26,7 +26,7 @@ extension NativeEditorMarkdownParser {
             appendMarkdownTextWithBareDocmostPageLinks(
                 String(remaining[..<link.range.lowerBound]),
                 to: &result,
-                parsesInlineMarkdown: false
+                usesFoundationMarkdownParser: false
             )
             appendMention(label: link.label, pageLink: link.pageLink, to: &result)
             didAppendAtom = true
@@ -36,7 +36,7 @@ extension NativeEditorMarkdownParser {
         appendMarkdownTextWithBareDocmostPageLinks(
             String(remaining),
             to: &result,
-            parsesInlineMarkdown: parsesInlineMarkdown && didAppendAtom == false
+            usesFoundationMarkdownParser: usesFoundationMarkdownParser && didAppendAtom == false
         )
     }
 
@@ -53,7 +53,7 @@ extension NativeEditorMarkdownParser {
     private static func appendMarkdownTextWithBareDocmostPageLinks(
         _ markdown: String,
         to result: inout AttributedString,
-        parsesInlineMarkdown: Bool
+        usesFoundationMarkdownParser: Bool
     ) {
         guard markdown.isEmpty == false else { return }
 
@@ -63,7 +63,7 @@ extension NativeEditorMarkdownParser {
             appendPlainMarkdownText(
                 String(remaining[..<link.range.lowerBound]),
                 to: &result,
-                parsesInlineMarkdown: false
+                usesFoundationMarkdownParser: false
             )
             appendMention(label: link.label, pageLink: link.pageLink, to: &result)
             didAppendAtom = true
@@ -73,20 +73,20 @@ extension NativeEditorMarkdownParser {
         appendPlainMarkdownText(
             String(remaining),
             to: &result,
-            parsesInlineMarkdown: parsesInlineMarkdown && didAppendAtom == false
+            usesFoundationMarkdownParser: usesFoundationMarkdownParser && didAppendAtom == false
         )
     }
 
     private static func appendPlainMarkdownText(
         _ markdown: String,
         to result: inout AttributedString,
-        parsesInlineMarkdown: Bool
+        usesFoundationMarkdownParser: Bool
     ) {
         guard markdown.isEmpty == false else { return }
-        if parsesInlineMarkdown {
+        if usesFoundationMarkdownParser {
             result += (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
         } else {
-            result += AttributedString(markdown)
+            result += attributedInlineMarkdown(from: markdown)
         }
     }
 
