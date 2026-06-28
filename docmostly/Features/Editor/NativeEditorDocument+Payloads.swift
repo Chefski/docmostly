@@ -222,7 +222,7 @@ nonisolated extension NativeEditorDocument {
         case .string(let width):
             Double(width)
         case .bool, .object, .array, .null:
-            nil
+            Optional<Double>.none
         }
     }
 
