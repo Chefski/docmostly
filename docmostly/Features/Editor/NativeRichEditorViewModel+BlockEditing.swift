@@ -22,8 +22,9 @@ extension NativeRichEditorViewModel {
                 return
             }
 
+            let isReplacingSlashCommand = activeSlashCommandQuery != nil
             document.blocks[index].kind = command.blockKind
-            if activeSlashCommandQuery != nil {
+            if isReplacingSlashCommand {
                 document.blocks[index].text = AttributedString("")
                 document.blocks[index].selection = AttributedTextSelection()
             }
