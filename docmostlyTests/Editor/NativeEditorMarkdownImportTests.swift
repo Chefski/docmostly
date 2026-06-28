@@ -226,6 +226,48 @@ struct NativeEditorMarkdownImportTests {
         #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
     }
 
+    @Test func singleLineDocmostDiagramHTMLImportsAsNativeDiagramBlock() throws {
+        let source = "/api/files/drawio-1/diagram.drawio.svg"
+        let markdown = singleLineDocmostDiagramHTML(
+            type: "drawio",
+            source: source,
+            title: "System map",
+            alternativeText: "System diagram",
+            attachmentID: "drawio-1",
+            width: "640"
+        )
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .drawio(let drawio) = block.kind else {
+            Issue.record("Expected compact Docmost draw.io HTML to import as a native draw.io block.")
+            return
+        }
+
+        #expect(drawio.source == source)
+        #expect(drawio.title == "System map")
+        #expect(drawio.alternativeText == "System diagram")
+        #expect(drawio.attachmentID == "drawio-1")
+        #expect(drawio.width == "640")
+        #expect(block.rawNode?.type == "drawio")
+        #expect(block.rawNode?.attrs?["src"] == .string(source))
+    }
+
+    @Test func longerHTMLTagNamesDoNotImportAsDocmostMediaBlocks() throws {
+        let imageLikeBlock = try #require(
+            NativeEditorMarkdownParser.blocks(from: #"<imgproxy src="/files/hero.png">"#).first
+        )
+        let diagramLikeBlock = try #require(
+            NativeEditorMarkdownParser.blocks(
+                from: #"<divergent data-type="drawio" data-src="/files/map.svg"><img src="/files/map.svg"></divergent>"#
+            ).first
+        )
+
+        #expect(imageLikeBlock.kind == .paragraph)
+        #expect(String(imageLikeBlock.text.characters) == #"<imgproxy src="/files/hero.png">"#)
+        #expect(diagramLikeBlock.kind == .paragraph)
+        #expect(String(diagramLikeBlock.text.characters).contains("<divergent"))
+    }
+
     @Test func docmostIframeMarkdownLinksImportAsEmbedBlocks() throws {
         let source = "https://player.example.com/embed/demo"
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[\(source)](\(source))").first)
@@ -284,6 +326,31 @@ struct NativeEditorMarkdownImportTests {
         \(imageTag)
         </div>
         """
+    }
+
+    private func singleLineDocmostDiagramHTML(
+        type: String,
+        source: String,
+        title: String,
+        alternativeText: String,
+        attachmentID: String,
+        width: String? = nil
+    ) -> String {
+        let openingTag = htmlTag("div", attributes: [
+            ("data-type", type),
+            ("data-src", source),
+            ("data-title", title),
+            ("data-alt", alternativeText),
+            ("data-width", width),
+            ("data-attachment-id", attachmentID)
+        ])
+        let imageTag = htmlTag("img", attributes: [
+            ("src", source),
+            ("alt", alternativeText),
+            ("width", width)
+        ])
+
+        return "\(openingTag)\(imageTag)</div>"
     }
 
     private func htmlTag(_ name: String, attributes: [(String, String?)]) -> String {
