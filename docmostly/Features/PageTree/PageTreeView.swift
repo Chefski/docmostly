@@ -24,6 +24,7 @@ struct PageTreeView: View {
                     isSelected: appState.selectedPageID == visibleNode.node.slugId,
                     toggle: toggleNode,
                     openInDetailColumn: openInDetailColumn,
+                    openInNewWindow: nil,
                     movePage: movePage,
                     createChild: beginCreateChild,
                     duplicate: beginDuplicate,

@@ -78,12 +78,21 @@ extension AppState {
 
     func loadFavoriteIds(type: FavoriteType, spaceId: String? = nil) async throws -> [String] {
         guard let apiClient else {
-            throw APIError.connectionFailed("Favorites require a network connection.")
+            return Array(favoriteIDsByType[type] ?? [])
         }
 
-        let favoriteIds: [String] = try await apiClient.send(.favoriteIds(type: type, spaceId: spaceId))
-        isOffline = false
-        return favoriteIds
+        do {
+            let favoriteIds: [String] = try await apiClient.send(.favoriteIds(type: type, spaceId: spaceId))
+            favoriteIDsByType[type] = Set(favoriteIds)
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return favoriteIds
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return Array(favoriteIDsByType[type] ?? [])
+        }
     }
 
     func addFavorite(
@@ -93,16 +102,38 @@ extension AppState {
         templateId: String? = nil
     ) async throws {
         guard let apiClient else {
-            throw APIError.connectionFailed("Favorites require a network connection.")
+            try await queueFavorite(
+                isFavorite: true,
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            )
+            return
         }
 
-        try await apiClient.sendVoid(.addFavorite(
-            type: type,
-            pageId: pageId,
-            spaceId: spaceId,
-            templateId: templateId
-        ))
-        isOffline = false
+        do {
+            try await apiClient.sendVoid(.addFavorite(
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            ))
+            setProjectedFavorite(type: type, pageId: pageId, spaceId: spaceId, templateId: templateId, isFavorite: true)
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            try await queueFavorite(
+                isFavorite: true,
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            )
+        }
     }
 
     func removeFavorite(
@@ -112,16 +143,44 @@ extension AppState {
         templateId: String? = nil
     ) async throws {
         guard let apiClient else {
-            throw APIError.connectionFailed("Favorites require a network connection.")
+            try await queueFavorite(
+                isFavorite: false,
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            )
+            return
         }
 
-        try await apiClient.sendVoid(.removeFavorite(
-            type: type,
-            pageId: pageId,
-            spaceId: spaceId,
-            templateId: templateId
-        ))
-        isOffline = false
+        do {
+            try await apiClient.sendVoid(.removeFavorite(
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            ))
+            setProjectedFavorite(
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId,
+                isFavorite: false
+            )
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            try await queueFavorite(
+                isFavorite: false,
+                type: type,
+                pageId: pageId,
+                spaceId: spaceId,
+                templateId: templateId
+            )
+        }
     }
 
     func loadNotifications(
@@ -172,12 +231,21 @@ extension AppState {
 
     func loadPageLabels(pageId: String) async throws -> [DocmostLabel] {
         guard let apiClient else {
-            throw APIError.connectionFailed("Labels require a network connection.")
+            return pageLabelsByID[pageId] ?? []
         }
 
-        let labels: [DocmostLabel] = try await apiClient.send(.pageLabels(pageId: pageId))
-        isOffline = false
-        return labels
+        do {
+            let labels: [DocmostLabel] = try await apiClient.send(.pageLabels(pageId: pageId))
+            pageLabelsByID[pageId] = labels
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return labels
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return pageLabelsByID[pageId] ?? []
+        }
     }
 
     func loadWorkspaceLabels(
@@ -202,21 +270,40 @@ extension AppState {
 
     func addPageLabels(pageId: String, names: [String]) async throws -> [DocmostLabel] {
         guard let apiClient else {
-            throw APIError.connectionFailed("Labels require a network connection.")
+            return try await queuePageLabels(pageId: pageId, names: names)
         }
 
-        let labels: [DocmostLabel] = try await apiClient.send(.addPageLabels(pageId: pageId, names: names))
-        isOffline = false
-        return labels
+        do {
+            let labels: [DocmostLabel] = try await apiClient.send(.addPageLabels(pageId: pageId, names: names))
+            pageLabelsByID[pageId] = labels
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return labels
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queuePageLabels(pageId: pageId, names: names)
+        }
     }
 
     func removePageLabel(pageId: String, labelId: String) async throws {
         guard let apiClient else {
-            throw APIError.connectionFailed("Labels require a network connection.")
+            try await queueRemovePageLabel(pageId: pageId, labelId: labelId)
+            return
         }
 
-        try await apiClient.sendVoid(.removePageLabel(pageId: pageId, labelId: labelId))
-        isOffline = false
+        do {
+            try await apiClient.sendVoid(.removePageLabel(pageId: pageId, labelId: labelId))
+            pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            try await queueRemovePageLabel(pageId: pageId, labelId: labelId)
+        }
     }
 
     func loadLabelPages(
@@ -245,32 +332,59 @@ extension AppState {
 
     func watchPage(pageId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Watch status requires a network connection.")
+            return try await queuePageWatch(pageId: pageId, watching: true)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.watchPage(pageId: pageId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.watchPage(pageId: pageId))
+            pageWatchStatusByID[pageId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queuePageWatch(pageId: pageId, watching: true)
+        }
     }
 
     func unwatchPage(pageId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Watch status requires a network connection.")
+            return try await queuePageWatch(pageId: pageId, watching: false)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.unwatchPage(pageId: pageId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.unwatchPage(pageId: pageId))
+            pageWatchStatusByID[pageId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queuePageWatch(pageId: pageId, watching: false)
+        }
     }
 
     func loadPageWatchStatus(pageId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Watch status requires a network connection.")
+            return WatchStatusResponse(watching: pageWatchStatusByID[pageId] ?? false)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.pageWatchStatus(pageId: pageId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.pageWatchStatus(pageId: pageId))
+            pageWatchStatusByID[pageId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return WatchStatusResponse(watching: pageWatchStatusByID[pageId] ?? false)
+        }
     }
 
     func loadWatchedSpaceIds() async throws -> PaginatedResponse<String> {
@@ -285,32 +399,135 @@ extension AppState {
 
     func watchSpace(spaceId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Space watch status requires a network connection.")
+            return try await queueSpaceWatch(spaceId: spaceId, watching: true)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.watchSpace(spaceId: spaceId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.watchSpace(spaceId: spaceId))
+            spaceWatchStatusByID[spaceId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queueSpaceWatch(spaceId: spaceId, watching: true)
+        }
     }
 
     func unwatchSpace(spaceId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Space watch status requires a network connection.")
+            return try await queueSpaceWatch(spaceId: spaceId, watching: false)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.unwatchSpace(spaceId: spaceId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.unwatchSpace(spaceId: spaceId))
+            spaceWatchStatusByID[spaceId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queueSpaceWatch(spaceId: spaceId, watching: false)
+        }
     }
 
     func loadSpaceWatchStatus(spaceId: String) async throws -> WatchStatusResponse {
         guard let apiClient else {
-            throw APIError.connectionFailed("Space watch status requires a network connection.")
+            return WatchStatusResponse(watching: spaceWatchStatusByID[spaceId] ?? false)
         }
 
-        let response: WatchStatusResponse = try await apiClient.send(.spaceWatchStatus(spaceId: spaceId))
-        isOffline = false
-        return response
+        do {
+            let response: WatchStatusResponse = try await apiClient.send(.spaceWatchStatus(spaceId: spaceId))
+            spaceWatchStatusByID[spaceId] = response.watching
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return response
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return WatchStatusResponse(watching: spaceWatchStatusByID[spaceId] ?? false)
+        }
     }
 
+    private func queueFavorite(
+        isFavorite: Bool,
+        type: FavoriteType,
+        pageId: String?,
+        spaceId: String?,
+        templateId: String?
+    ) async throws {
+        let payload: OfflineMutationPayload = if isFavorite {
+            .addFavorite(type: type, pageId: pageId, spaceId: spaceId, templateId: templateId)
+        } else {
+            .removeFavorite(type: type, pageId: pageId, spaceId: spaceId, templateId: templateId)
+        }
+        try await queueOfflineMutation(payload)
+        setProjectedFavorite(
+            type: type,
+            pageId: pageId,
+            spaceId: spaceId,
+            templateId: templateId,
+            isFavorite: isFavorite
+        )
+    }
+
+    private func queuePageLabels(pageId: String, names: [String]) async throws -> [DocmostLabel] {
+        let existingLabels = pageLabelsByID[pageId] ?? []
+        let existingNames = Set(existingLabels.map(\.name))
+        let offlineLabels = names
+            .filter { existingNames.contains($0) == false }
+            .map { OfflinePageLabel(pageId: pageId, name: $0) }
+
+        guard offlineLabels.isEmpty == false else {
+            return existingLabels
+        }
+
+        try await queueOfflineMutation(.addPageLabels(pageId: pageId, labels: offlineLabels))
+
+        let now = Date.now
+        let localLabels = offlineLabels
+            .map { label in
+                DocmostLabel(
+                    id: label.id,
+                    name: label.name,
+                    type: .page,
+                    workspaceId: currentUser?.workspace.id,
+                    createdAt: now,
+                    updatedAt: now
+                )
+            }
+        let labels = existingLabels + localLabels
+        pageLabelsByID[pageId] = labels
+        return labels
+    }
+
+    private func queueRemovePageLabel(pageId: String, labelId: String) async throws {
+        if labelId.hasPrefix("offline-label-") {
+            try await removePendingOfflineLabelProjection(pageId: pageId, labelId: labelId)
+            pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+            return
+        }
+
+        try await queueOfflineMutation(.removePageLabel(pageId: pageId, labelId: labelId))
+        pageLabelsByID[pageId]?.removeAll { $0.id == labelId }
+    }
+
+    private func queuePageWatch(pageId: String, watching: Bool) async throws -> WatchStatusResponse {
+        let payload: OfflineMutationPayload = watching ? .watchPage(pageId: pageId) : .unwatchPage(pageId: pageId)
+        try await queueOfflineMutation(payload)
+        pageWatchStatusByID[pageId] = watching
+        return WatchStatusResponse(watching: watching)
+    }
+
+    private func queueSpaceWatch(spaceId: String, watching: Bool) async throws -> WatchStatusResponse {
+        let payload: OfflineMutationPayload = watching ? .watchSpace(spaceId: spaceId) : .unwatchSpace(spaceId: spaceId)
+        try await queueOfflineMutation(payload)
+        spaceWatchStatusByID[spaceId] = watching
+        return WatchStatusResponse(watching: watching)
+    }
 }

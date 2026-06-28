@@ -46,24 +46,18 @@ struct PageReaderCommentsPanelView: View {
             }
             .scrollIndicators(.hidden)
 
-            if appState.isOffline {
-                Text("Comments are unavailable offline.")
+            TextField("Add a page comment", text: $viewModel.draftComment, axis: .vertical)
+                .lineLimit(3...)
+                .textFieldStyle(.roundedBorder)
+
+            Button("Add Comment", systemImage: "text.bubble", action: postComment)
+                .buttonStyle(.borderedProminent)
+                .disabled(canPostComment == false)
+
+            if let errorMessage = viewModel.commentErrorMessage {
+                Text(errorMessage)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                TextField("Add a page comment", text: $viewModel.draftComment, axis: .vertical)
-                    .lineLimit(3...)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Add Comment", systemImage: "text.bubble", action: postComment)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(canPostComment == false)
-
-                if let errorMessage = viewModel.commentErrorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(DocmostlyTheme.destructive)
-                }
+                    .foregroundStyle(DocmostlyTheme.destructive)
             }
         }
     }
