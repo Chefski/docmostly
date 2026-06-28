@@ -25,6 +25,47 @@ struct NativeRichEditorStructuralBlockTests {
         #expect(node.content?[2].content?.first?.content?.first?.text == "Ship")
     }
 
+    @Test func columnsNodePadsTextsAndWidthsToColumnCount() {
+        let columns = NativeEditorColumnsBlock(
+            layout: "three_equal",
+            widthMode: "normal",
+            columnCount: 3,
+            previewText: "Plan",
+            columnTexts: ["Plan"],
+            columnWidths: [2]
+        )
+        let node = NativeEditorRichBlockNodeFactory.columnsNode(from: columns)
+
+        #expect(node.content?.count == 3)
+        #expect(node.content?[0].attrs?["width"] == .int(2))
+        #expect(node.content?[1].attrs?["width"] == .int(1))
+        #expect(node.content?[2].attrs?["width"] == .int(1))
+        #expect(node.content?[0].content?.first?.content?.first?.text == "Plan")
+        #expect(node.content?[1].content?.first?.content?.first?.text == nil)
+        #expect(node.content?[2].content?.first?.content?.first?.text == nil)
+    }
+
+    @Test func columnsBlockEqualityNormalizesMissingWidths() {
+        let columnsWithoutWidths = NativeEditorColumnsBlock(
+            layout: "three_equal",
+            widthMode: "normal",
+            columnCount: 3,
+            previewText: "Plan",
+            columnTexts: ["Plan"]
+        )
+        let columnsWithNilWidths = NativeEditorColumnsBlock(
+            layout: "three_equal",
+            widthMode: "normal",
+            columnCount: 3,
+            previewText: "Plan",
+            columnTexts: ["Plan"],
+            columnWidths: [nil, nil, nil]
+        )
+
+        #expect(columnsWithoutWidths == columnsWithNilWidths)
+        #expect(Set([columnsWithoutWidths, columnsWithNilWidths]).count == 1)
+    }
+
     @Test func updatesSyncedBlockIdentifiers() {
         let viewModel = structuralBlockViewModel()
         let sourceID = viewModel.document.blocks[1].id

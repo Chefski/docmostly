@@ -87,6 +87,37 @@ struct NativeEditorRichMarkdownExportTests {
         """)
     }
 
+    @Test func documentMarkdownConversionPadsColumnsToColumnCount() {
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .columns(NativeEditorColumnsBlock(
+                    layout: "three_equal",
+                    widthMode: "normal",
+                    columnCount: 3,
+                    previewText: "Plan",
+                    columnTexts: ["Plan"],
+                    columnWidths: [2]
+                )),
+                text: AttributedString("Plan"),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == """
+        <div data-type="columns" data-layout="three_equal">
+        <div data-type="column" data-width="2" style="flex: 2">
+        Plan
+        </div>
+        <div data-type="column" data-width="1" style="flex: 1">
+
+        </div>
+        <div data-type="column" data-width="1" style="flex: 1">
+
+        </div>
+        </div>
+        """)
+    }
+
     @Test func documentMarkdownConversionPreservesDocmostDiagramHTMLShape() {
         let drawioSource = "/api/files/drawio-1/diagram.drawio.svg"
         let excalidrawSource = "/api/files/excalidraw-1/sketch.png"
