@@ -102,6 +102,22 @@ struct NativeEditorMarkdownImportTests {
         #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
     }
 
+    @Test func docmostIframeMarkdownLinksImportAsEmbedBlocks() throws {
+        let source = "https://player.example.com/embed/demo"
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: "[\(source)](\(source))").first)
+
+        guard case .embed(let embed) = block.kind else {
+            Issue.record("Expected Docmost iframe Markdown link to import as a native embed block.")
+            return
+        }
+
+        #expect(embed.source == source)
+        #expect(embed.provider == "iframe")
+        #expect(block.rawNode?.type == "embed")
+        #expect(block.rawNode?.attrs?["src"] == .string(source))
+        #expect(block.rawNode?.attrs?["provider"] == .string("iframe"))
+    }
+
     @Test func genericMarkdownLinksRemainEditableParagraphText() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[Example](https://example.com)").first)
 
