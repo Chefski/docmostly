@@ -128,7 +128,6 @@ nonisolated extension StoredHTTPCookie {
         name == other.name
             && normalizedDomain == other.normalizedDomain
             && normalizedPath == other.normalizedPath
-            && isHostOnly == other.isHostOnly
     }
 
     private var normalizedDomain: String {

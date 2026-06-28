@@ -134,17 +134,8 @@ struct MacPageWindowView: View {
     }
 
     private var selectedSpace: DocmostSpace? {
-        if let spaceID = route.spaceID,
-           let space = appState.spaces.first(where: { $0.id == spaceID }) {
-            return space
-        }
-
-        if let selectedSpaceID = appState.selectedSpaceID,
-           let space = appState.spaces.first(where: { $0.id == selectedSpaceID }) {
-            return space
-        }
-
-        return appState.spaces.first
+        guard let spaceID = route.spaceID else { return nil }
+        return appState.spaces.first { $0.id == spaceID }
     }
 
     private var canCreatePage: Bool {

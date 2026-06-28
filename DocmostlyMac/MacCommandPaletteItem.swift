@@ -1,6 +1,6 @@
 import Foundation
 
-struct MacCommandPaletteItem: Identifiable {
+nonisolated struct MacCommandPaletteItem: Identifiable {
     let id: String
     let title: String
     let subtitle: String?

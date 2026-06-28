@@ -53,7 +53,7 @@ struct SessionCookieJarTests {
         let subdomainCookies = await jar.cookies(for: subdomainURL)
         let siblingHeader = await jar.cookieHeader(for: siblingURL)
 
-        #expect(subdomainCookies.isEmpty)
+        #expect(subdomainCookies.map(\.name) == ["domain"])
         #expect(siblingHeader == "domain=domain-value")
     }
 
