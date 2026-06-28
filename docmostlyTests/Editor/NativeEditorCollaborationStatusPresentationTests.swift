@@ -4,25 +4,49 @@ import Testing
 
 @MainActor
 struct NativeEditorCollabStatusTests {
-    @Test func unsupportedSyncStatusTakesPriorityOverReadOnlyEditingState() {
+    @Test func failedAuthStatusTakesPriorityOverReadOnlyEditingState() {
         let presentation = NativeEditorCollabStatusPresentation(
-            realtimeStatus: .unsupported("Unsupported collaboration permission scope."),
+            realtimeStatus: .authenticationFailed("Invalid collab token"),
             canEdit: false,
             activeCollaborators: [],
             pendingRemoteUpdate: nil
         )
 
-        #expect(presentation.title == "Limited live sync")
+        #expect(presentation.title == "Failed auth")
     }
 
-    @Test func unsupportedSyncIconTakesPriorityOverReadOnlyEditingState() {
+    @Test func failedAuthIconTakesPriorityOverReadOnlyEditingState() {
         let presentation = NativeEditorCollabStatusPresentation(
-            realtimeStatus: .unsupported("Unsupported collaboration permission scope."),
+            realtimeStatus: .authenticationFailed("Invalid collab token"),
             canEdit: false,
             activeCollaborators: [],
             pendingRemoteUpdate: nil
         )
 
-        #expect(presentation.imageName == "point.3.connected.trianglepath.dotted")
+        #expect(presentation.imageName == "person.crop.circle.badge.exclamationmark")
+    }
+
+    @Test func reconnectingStatusUsesExplicitCopy() {
+        let presentation = NativeEditorCollabStatusPresentation(
+            realtimeStatus: .connecting,
+            canEdit: true,
+            activeCollaborators: [],
+            pendingRemoteUpdate: nil
+        )
+
+        #expect(presentation.title == "Reconnecting")
+    }
+
+    @Test func failureStatusTakesPriorityOverPresenceCopy() {
+        let presentation = NativeEditorCollabStatusPresentation(
+            realtimeStatus: .failed("Native CRDT runtime is unavailable."),
+            canEdit: false,
+            activeCollaborators: [
+                NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB")
+            ],
+            pendingRemoteUpdate: nil
+        )
+
+        #expect(presentation.title == "Sync failed")
     }
 }

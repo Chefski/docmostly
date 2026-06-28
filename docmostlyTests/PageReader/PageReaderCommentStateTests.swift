@@ -88,12 +88,12 @@ struct PageReaderCommentStateTests {
         #expect(editorViewModel.isDirty == false)
     }
 
-    @Test func inlineCommentCreatedNeedsSnapshotRefreshWithoutCRDTEngine() throws {
+    @Test func inlineCommentCreatedDoesNotTriggerDocumentSnapshotRefreshWithoutCRDTEngine() throws {
         let editorViewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         let inlineComment = try comment(id: "comment-1", text: "Inline", resolvedAt: nil, type: "inline")
         let pageComment = try comment(id: "comment-2", text: "Page", resolvedAt: nil, type: "page")
 
-        #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: inlineComment) == true)
+        #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: inlineComment) == false)
         #expect(editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: pageComment) == false)
     }
 

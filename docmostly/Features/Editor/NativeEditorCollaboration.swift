@@ -5,18 +5,8 @@ enum NativeEditorRealtimeStatus: Equatable, Sendable {
     case connecting
     case connected
     case conflict
+    case authenticationFailed(String)
     case failed(String)
-    case unsupported(String)
-}
-
-extension NativeEditorRealtimeStatus {
-    var isUnsupported: Bool {
-        if case .unsupported = self {
-            return true
-        }
-
-        return false
-    }
 }
 
 struct NativeEditorRemoteUpdate: Equatable, Sendable {

@@ -344,27 +344,6 @@ extension PageReaderView {
         }
     }
 
-    func monitorRemotePageChanges() async {
-        guard let editorViewModel else { return }
-        guard editorViewModel.usesCRDTDocumentEngine == false else { return }
-
-        while Task.isCancelled == false {
-            guard editorViewModel.usesCRDTDocumentEngine == false else { return }
-
-            do {
-                try await Task.sleep(for: PageReaderFallbackRefreshPolicy.refreshDelay)
-                guard Task.isCancelled == false else { return }
-
-                let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
-                editorViewModel.handleRemotePageSnapshot(page)
-            } catch {
-                guard Task.isCancelled == false else { return }
-                editorViewModel.realtimeStatus = .failed(error.localizedDescription)
-                try? await Task.sleep(for: PageReaderFallbackRefreshPolicy.failureRetryDelay)
-            }
-        }
-    }
-
     func beginInlineComment() {
         guard let context = editorViewModel?.activeInlineCommentContext else {
             inlineCommentErrorMessage = NativeEditorInlineCommentCreationError.noSelection.localizedDescription
@@ -432,9 +411,4 @@ extension PageReaderView {
             _ = await editorViewModel.save(appState: appState)
         }
     }
-}
-
-private enum PageReaderFallbackRefreshPolicy {
-    static let refreshDelay: Duration = .seconds(120)
-    static let failureRetryDelay: Duration = .seconds(180)
 }

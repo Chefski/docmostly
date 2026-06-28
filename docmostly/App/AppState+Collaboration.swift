@@ -51,6 +51,7 @@ enum NativeEditorCRDTDocumentEngineAttachment {
                 title: title,
                 document: document
             ) else {
+                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
                 return
             }
 
@@ -59,7 +60,7 @@ enum NativeEditorCRDTDocumentEngineAttachment {
         } catch is CancellationError {
             return
         } catch {
-            editorViewModel.realtimeStatus = .unsupported(error.localizedDescription)
+            editorViewModel.markCollaborationUnavailable(error.localizedDescription)
         }
     }
 }

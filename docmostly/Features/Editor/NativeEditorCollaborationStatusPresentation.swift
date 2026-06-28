@@ -7,21 +7,20 @@ struct NativeEditorCollabStatusPresentation {
     let pendingRemoteUpdate: NativeEditorRemoteUpdate?
 
     var title: String {
-        if let editingTitle = NativeEditorPresenceStatusText.editingTitle(for: presenceCollaborators) {
-            return editingTitle
-        }
-
         switch realtimeStatus {
+        case .connected:
+            if let editingTitle = NativeEditorPresenceStatusText.editingTitle(for: presenceCollaborators) {
+                return editingTitle
+            }
+            return canEdit ? "Live" : "Read-only"
         case .connecting:
-            return "Connecting"
+            return "Reconnecting"
         case .conflict:
             return "Remote update"
+        case .authenticationFailed:
+            return "Failed auth"
         case .failed:
-            return "Sync issue"
-        case .unsupported:
-            return "Limited live sync"
-        case .connected:
-            return canEdit ? "Live" : "Read-only"
+            return "Sync failed"
         case .disconnected:
             return canEdit ? "Offline" : "Read-only"
         }
@@ -35,10 +34,10 @@ struct NativeEditorCollabStatusPresentation {
             "arrow.triangle.2.circlepath"
         case .conflict:
             "exclamationmark.triangle"
+        case .authenticationFailed:
+            "person.crop.circle.badge.exclamationmark"
         case .failed:
             "wifi.exclamationmark"
-        case .unsupported:
-            "point.3.connected.trianglepath.dotted"
         case .disconnected:
             canEdit ? "wifi.slash" : "lock"
         }
@@ -50,7 +49,7 @@ struct NativeEditorCollabStatusPresentation {
             hasCollaborators || pendingRemoteUpdate != nil || canEdit == false
         case .connected:
             hasCollaborators || pendingRemoteUpdate != nil || canEdit == false
-        case .connecting, .conflict, .failed, .unsupported:
+        case .connecting, .conflict, .authenticationFailed, .failed:
             true
         }
     }

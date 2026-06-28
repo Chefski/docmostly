@@ -67,9 +67,9 @@ struct NativeEditorCollaborationStatusView: View {
             .green
         case .conflict:
             .orange
-        case .failed:
+        case .authenticationFailed, .failed:
             .red
-        case .connecting, .unsupported, .disconnected:
+        case .connecting, .disconnected:
             .secondary
         }
     }

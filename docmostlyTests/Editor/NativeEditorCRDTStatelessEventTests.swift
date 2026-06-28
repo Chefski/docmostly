@@ -46,7 +46,7 @@ struct NativeCRDTStatelessEventTests {
         #expect(viewModel.activeCollaborators.last?.source == .recentEditor)
     }
 
-    @Test func pageUpdatedEventNeedsSnapshotRefreshWithoutCRDTEngine() {
+    @Test func pageUpdatedEventIsNotDocumentHandledWithoutCRDTEngine() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
         let event = NativeEditorCollaborationStatelessEvent(
             type: "page.updated",
@@ -58,6 +58,33 @@ struct NativeCRDTStatelessEventTests {
         let handled = viewModel.handleCRDTBackedPageUpdated(event)
 
         #expect(handled == false)
+    }
+
+    @Test func realtimePageUpdatedWithoutCRDTEngineDisablesEditingInsteadOfReloadingSnapshot() async {
+        let view = PageReaderView(pageID: "page-1")
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Local")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Local body"), alignment: .left)
+        ])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+
+        await view.handleRealtimeEvent(
+            .pageUpdated(NativeEditorRealtimePageUpdatedEvent(
+                pageID: "page-1",
+                spaceID: "space-1",
+                title: "Remote",
+                slugID: "remote",
+                updatedAt: Date(timeIntervalSince1970: 20),
+                lastUpdatedBy: nil
+            )),
+            editorViewModel: viewModel
+        )
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.title == "Local")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local body")
+        #expect(viewModel.realtimeStatus == .failed("Native CRDT runtime is unavailable."))
     }
 
     @Test func crdtBackedPageUpdatedEventIgnoresStaleMetadata() {

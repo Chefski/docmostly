@@ -291,10 +291,6 @@ struct PageReaderView: View {
         }
         .task(id: realtimePageID) {
             guard realtimePageID != nil else { return }
-            await monitorRemotePageChanges()
-        }
-        .task(id: realtimePageID) {
-            guard realtimePageID != nil else { return }
             await monitorRealtimeEvents()
         }
         .task(id: realtimePageID) {

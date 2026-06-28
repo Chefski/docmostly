@@ -55,20 +55,13 @@ extension PageReaderView {
     ) async {
         switch event {
         case .pageUpdated(let event) where event.pageID == editorViewModel.currentPageID:
-            if editorViewModel.handleCRDTBackedPageUpdated(event) == false {
-                await refreshRemotePageSnapshot(
-                    editorViewModel: editorViewModel,
-                    lastUpdatedBy: event.lastUpdatedBy
-                )
+            if editorViewModel.usesCRDTDocumentEngine {
+                _ = editorViewModel.handleCRDTBackedPageUpdated(event)
+            } else {
+                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
             }
         case .commentCreated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyCreatedComment(event.comment)
-            if editorViewModel.needsRemoteSnapshotRefresh(forCreatedComment: event.comment) {
-                await refreshRemotePageSnapshot(
-                    editorViewModel: editorViewModel,
-                    lastUpdatedBy: pagePerson(from: event.comment.creator)
-                )
-            }
         case .commentUpdated(let event) where event.pageID == editorViewModel.currentPageID:
             viewModel.applyUpdatedComment(event.comment)
             editorViewModel.setInlineCommentResolved(
@@ -112,22 +105,5 @@ extension PageReaderView {
         if editorViewModel.realtimeStatus != .conflict {
             editorViewModel.realtimeStatus = .connecting
         }
-    }
-
-    func refreshRemotePageSnapshot(
-        editorViewModel: NativeRichEditorViewModel,
-        lastUpdatedBy: DocmostPagePerson? = nil
-    ) async {
-        do {
-            let page = try await appState.loadEditablePage(idOrSlugId: editorViewModel.currentPageID)
-            editorViewModel.handleRemotePageSnapshot(page, lastUpdatedBy: lastUpdatedBy)
-        } catch {
-            editorViewModel.realtimeStatus = .failed(error.localizedDescription)
-        }
-    }
-
-    private func pagePerson(from user: DocmostUser?) -> DocmostPagePerson? {
-        guard let user else { return nil }
-        return DocmostPagePerson(id: user.id, name: user.name, avatarUrl: user.avatarUrl)
     }
 }

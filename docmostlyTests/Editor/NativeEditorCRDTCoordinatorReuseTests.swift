@@ -69,7 +69,7 @@ struct CRDTEngineAttachmentTests {
         #expect(frame.message == .sync(.stepOne(Data([42]))))
     }
 
-    @Test func crdtAttachmentReportsFactoryFailureAsUnsupportedStatus() async {
+    @Test func crdtAttachmentReportsFactoryFailureAsCollaborationFailure() async {
         let appState = AppState(crdtDocumentEngineFactory: ThrowingCRDTDocumentEngineFactory())
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
@@ -80,7 +80,8 @@ struct CRDTEngineAttachmentTests {
 
         #expect(viewModel.usesCRDTDocumentEngine == false)
         #expect(viewModel.collaborationSession().syncDriver == nil)
-        #expect(viewModel.realtimeStatus == .unsupported("Factory failed."))
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.realtimeStatus == .failed("Factory failed."))
     }
 
     @Test func crdtAttachmentDoesNotConfigureEngineAfterCancellation() async {

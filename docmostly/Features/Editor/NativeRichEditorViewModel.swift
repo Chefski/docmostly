@@ -276,6 +276,32 @@ final class NativeRichEditorViewModel {
         updateEditAccess()
     }
 
+    func markCollaborationUnavailable(_ message: String) {
+        collaborationAllowsEditing = false
+        pendingRemotePage = nil
+        pendingRemoteUpdate = nil
+        activeCollaborators = []
+        remoteCursors = []
+        resolvedRemoteCursors = []
+        updateEditAccess()
+        if realtimeStatus != .conflict {
+            realtimeStatus = .failed(message)
+        }
+    }
+
+    func markCollaborationAuthenticationFailed(_ message: String) {
+        collaborationAllowsEditing = false
+        pendingRemotePage = nil
+        pendingRemoteUpdate = nil
+        activeCollaborators = []
+        remoteCursors = []
+        resolvedRemoteCursors = []
+        updateEditAccess()
+        if realtimeStatus != .conflict {
+            realtimeStatus = .authenticationFailed(message)
+        }
+    }
+
     func handleRemotePageDeleted() {
         let message = "This page was deleted in Docmost."
         pageAllowsEditing = false

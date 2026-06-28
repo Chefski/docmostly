@@ -43,8 +43,7 @@ extension NativeRichEditorViewModel {
     }
 
     func needsRemoteSnapshotRefresh(forCreatedComment comment: DocmostComment) -> Bool {
-        guard usesCRDTDocumentEngine == false else { return false }
-        return comment.type == DocmostCommentType.inline.rawValue
+        false
     }
 
     func acceptPendingRemoteUpdate() {
@@ -188,7 +187,10 @@ extension NativeRichEditorViewModel {
         }
         resolvedRemoteCursors = []
 
-        if realtimeStatus != .conflict, realtimeStatus.isUnsupported == false {
+        switch realtimeStatus {
+        case .conflict, .authenticationFailed, .failed:
+            break
+        case .connected, .connecting, .disconnected:
             realtimeStatus = .connected
         }
     }

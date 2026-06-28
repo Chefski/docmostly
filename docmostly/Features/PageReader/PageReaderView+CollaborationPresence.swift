@@ -18,50 +18,21 @@ extension PageReaderView {
         var authenticationRetry = NativeEditorCollabAuthRetry()
 
         while Task.isCancelled == false {
-            do {
-                markCollaborationPresenceConnecting(editorViewModel)
-                let url = try appState.collaborationWebSocketURL()
-                guard let token = try await appState.loadCollaborationToken().token else {
-                    throw APIError.connectionFailed("Realtime collaboration token is missing.")
-                }
-                let collaborationSession = editorViewModel.collaborationSession()
-
-                let events = await collaborationPresenceClient.events(
-                    url: url,
-                    token: token,
-                    documentName: collaborationSession.documentName,
-                    user: appState.currentUser?.user,
-                    syncDriver: collaborationSession.syncDriver,
-                    localAwarenessCursor: collaborationSession.localAwarenessCursor,
-                    localAwarenessUpdates: collaborationSession.localAwarenessUpdates
-                )
-
-                for try await event in events {
-                    guard Task.isCancelled == false else { return }
-                    if case .authenticated = event {
-                        reconnectPolicy.reset()
-                        authenticationRetry.markAuthenticated()
-                    }
-                    await handleCollaborationPresenceEvent(event, editorViewModel: editorViewModel)
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                guard Task.isCancelled == false else { return }
-
-                if authenticationRetry.shouldRetryImmediately(after: error) {
-                    reconnectPolicy.reset()
-                    markCollaborationPresenceConnecting(editorViewModel)
-                    continue
-                }
-
-                markCollaborationPresenceUnsupported(editorViewModel, message: error.localizedDescription)
-            }
-
-            await waitBeforeCollaborationPresenceReconnect(
+            switch await runCollaborationPresenceConnection(
                 editorViewModel: editorViewModel,
-                reconnectPolicy: &reconnectPolicy
-            )
+                reconnectPolicy: &reconnectPolicy,
+                authenticationRetry: &authenticationRetry
+            ) {
+            case .retryImmediately:
+                continue
+            case .stop:
+                return
+            case .reconnectLater:
+                await waitBeforeCollaborationPresenceReconnect(
+                    editorViewModel: editorViewModel,
+                    reconnectPolicy: &reconnectPolicy
+                )
+            }
         }
     }
 
@@ -73,12 +44,9 @@ extension PageReaderView {
         case .authenticated(let scope):
             editorViewModel.applyCollaborationAuthenticationScope(scope)
             if scope == .unknown {
-                markCollaborationPresenceUnsupported(
-                    editorViewModel,
-                    message: "Unsupported collaboration permission scope."
-                )
+                editorViewModel.markCollaborationUnavailable("Unsupported collaboration permission scope.")
             } else if editorViewModel.usesCRDTDocumentEngine == false {
-                markCollaborationPresenceLimited(editorViewModel)
+                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
             } else {
                 markCollaborationPresenceConnected(editorViewModel)
             }
@@ -86,13 +54,15 @@ extension PageReaderView {
             editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
             await editorViewModel.refreshResolvedRemoteCursors()
         case .stateless(let event) where event.type == NativeEditorCollaborationDocument.statelessPageUpdatedType:
-            if editorViewModel.handleCRDTBackedPageUpdated(event) == false {
-                await refreshRemotePageSnapshot(editorViewModel: editorViewModel, lastUpdatedBy: event.lastUpdatedBy)
+            if editorViewModel.usesCRDTDocumentEngine {
+                _ = editorViewModel.handleCRDTBackedPageUpdated(event)
+            } else {
+                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
             }
         case .syncStatus(let isSynced):
             editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
             if isSynced, editorViewModel.usesCRDTDocumentEngine == false {
-                markCollaborationPresenceLimited(editorViewModel)
+                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
             }
         case .stateless:
             break
@@ -112,20 +82,104 @@ extension PageReaderView {
         }
     }
 
-    private func markCollaborationPresenceUnsupported(
+    private func markCollaborationPresenceAuthenticationFailed(
         _ editorViewModel: NativeRichEditorViewModel,
         message: String
     ) {
+        editorViewModel.markCollaborationAuthenticationFailed(message)
+    }
+
+    private func markCollaborationPresenceFailed(
+        _ editorViewModel: NativeRichEditorViewModel,
+        error: any Error
+    ) {
         editorViewModel.clearCollaborationPresence()
+
+        if isConnectionFailure(error) {
+            if editorViewModel.realtimeStatus != .conflict {
+                editorViewModel.realtimeStatus = .disconnected
+            }
+            return
+        }
+
         if editorViewModel.realtimeStatus != .conflict {
-            editorViewModel.realtimeStatus = .unsupported(message)
+            editorViewModel.realtimeStatus = .failed(error.localizedDescription)
         }
     }
 
-    private func markCollaborationPresenceLimited(_ editorViewModel: NativeRichEditorViewModel) {
-        if editorViewModel.realtimeStatus != .conflict {
-            editorViewModel.realtimeStatus = .unsupported("Native CRDT runtime is unavailable.")
+    private func handleCollaborationPresenceFailure(
+        _ error: any Error,
+        editorViewModel: NativeRichEditorViewModel,
+        reconnectPolicy: inout NativeEditorRealtimeReconnectPolicy,
+        authenticationRetry: inout NativeEditorCollabAuthRetry
+    ) -> CollaborationPresenceLoopAction {
+        if authenticationRetry.shouldRetryImmediately(after: error) {
+            reconnectPolicy.reset()
+            markCollaborationPresenceConnecting(editorViewModel)
+            return .retryImmediately
         }
+
+        if isCollaborationAuthenticationFailure(error) {
+            markCollaborationPresenceAuthenticationFailed(
+                editorViewModel,
+                message: error.localizedDescription
+            )
+            return .stop
+        }
+
+        markCollaborationPresenceFailed(editorViewModel, error: error)
+        return .reconnectLater
+    }
+
+    private func runCollaborationPresenceConnection(
+        editorViewModel: NativeRichEditorViewModel,
+        reconnectPolicy: inout NativeEditorRealtimeReconnectPolicy,
+        authenticationRetry: inout NativeEditorCollabAuthRetry
+    ) async -> CollaborationPresenceLoopAction {
+        do {
+            markCollaborationPresenceConnecting(editorViewModel)
+            let events = try await collaborationPresenceEvents(editorViewModel: editorViewModel)
+
+            for try await event in events {
+                try Task.checkCancellation()
+                if case .authenticated = event {
+                    reconnectPolicy.reset()
+                    authenticationRetry.markAuthenticated()
+                }
+                await handleCollaborationPresenceEvent(event, editorViewModel: editorViewModel)
+            }
+        } catch is CancellationError {
+            return .stop
+        } catch {
+            return handleCollaborationPresenceFailure(
+                error,
+                editorViewModel: editorViewModel,
+                reconnectPolicy: &reconnectPolicy,
+                authenticationRetry: &authenticationRetry
+            )
+        }
+
+        return .reconnectLater
+    }
+
+    private func collaborationPresenceEvents(
+        editorViewModel: NativeRichEditorViewModel
+    ) async throws -> AsyncThrowingStream<NativeEditorCollaborationEvent, any Error> {
+        let url = try appState.collaborationWebSocketURL()
+        guard let token = try await appState.loadCollaborationToken().token else {
+            throw APIError.connectionFailed("Realtime collaboration token is missing.")
+        }
+        let collaborationSession = editorViewModel.collaborationSession()
+
+        return await collaborationPresenceClient.events(
+            url: url,
+            token: token,
+            documentName: collaborationSession.documentName,
+            user: appState.currentUser?.user,
+            syncDriver: collaborationSession.syncDriver,
+            localAwarenessCursor: collaborationSession.localAwarenessCursor,
+            localAwarenessUpdates: collaborationSession.localAwarenessUpdates
+        )
     }
 
     private func waitBeforeCollaborationPresenceReconnect(
@@ -136,4 +190,40 @@ extension PageReaderView {
         try? await Task.sleep(for: .seconds(delaySeconds))
         markCollaborationPresenceConnecting(editorViewModel)
     }
+
+    private func isCollaborationAuthenticationFailure(_ error: any Error) -> Bool {
+        if error is NativeEditorCollabAuthFailure {
+            return true
+        }
+
+        guard let apiError = error as? APIError else { return false }
+        switch apiError {
+        case .httpStatus(let status, _):
+            return status == 401 || status == 403
+        case .connectionFailed(let message):
+            return message.localizedStandardContains("token")
+        case .invalidResponse, .missingData, .decodingFailed, .responseTooLarge:
+            return false
+        }
+    }
+
+    private func isConnectionFailure(_ error: any Error) -> Bool {
+        if error is URLError {
+            return true
+        }
+
+        guard let apiError = error as? APIError else { return false }
+        switch apiError {
+        case .connectionFailed:
+            return true
+        case .invalidResponse, .httpStatus, .missingData, .decodingFailed, .responseTooLarge:
+            return false
+        }
+    }
+}
+
+private enum CollaborationPresenceLoopAction {
+    case retryImmediately
+    case reconnectLater
+    case stop
 }
