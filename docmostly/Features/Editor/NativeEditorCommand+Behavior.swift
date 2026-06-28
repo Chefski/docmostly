@@ -150,12 +150,25 @@ extension NativeEditorCommand {
 
 private extension String {
     func localizedStandardContainsAtWordStart(_ query: String) -> Bool {
-        guard let range = localizedStandardRange(of: query) else { return false }
-        guard range.lowerBound != startIndex else { return true }
+        guard query.isEmpty == false else { return true }
 
-        let previousIndex = index(before: range.lowerBound)
-        let previousCharacter = self[previousIndex]
-        return previousCharacter.isWhitespace || previousCharacter.isPunctuation
+        var searchStart = startIndex
+        while searchStart < endIndex {
+            let searchText = self[searchStart..<endIndex]
+            guard let range = searchText.localizedStandardRange(of: query) else { return false }
+            if range.lowerBound == startIndex {
+                return true
+            }
+
+            let previousIndex = index(before: range.lowerBound)
+            let previousCharacter = self[previousIndex]
+            if previousCharacter.isWhitespace || previousCharacter.isPunctuation {
+                return true
+            }
+            searchStart = range.upperBound
+        }
+
+        return false
     }
 
     func fuzzyMatchesSlashCommandQuery(_ query: String) -> Bool {
