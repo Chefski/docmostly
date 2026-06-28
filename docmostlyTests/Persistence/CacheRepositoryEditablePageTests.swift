@@ -28,14 +28,14 @@ struct CacheRepositoryEditablePageTests {
         #expect(cached.content == document)
     }
 
-    @Test func cachedEditablePagesAreReadOnly() throws {
+    @Test func cachedEditablePagesPreserveEditPermissionsForOfflineEditing() throws {
         let repository = makeRepository()
 
         try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()), scope: scope)
 
         let loadedPage = try repository.loadEditablePage(idOrSlugId: "roadmap", scope: scope)
         let cached = try #require(loadedPage)
-        #expect(cached.permissions?.canEdit == false)
+        #expect(cached.permissions?.canEdit == true)
     }
 
     @Test func savingHTMLPageDoesNotDiscardCachedNativeDocument() throws {
@@ -57,7 +57,31 @@ struct CacheRepositoryEditablePageTests {
         let cached = try #require(loadedPage)
         #expect(cached.title == "Roadmap updated")
         #expect(cached.content == document)
-        #expect(cached.permissions?.canEdit == false)
+        #expect(cached.permissions?.canEdit == true)
+    }
+
+    @Test func savingLocalEditableDraftPreservesCachedPageIdentityAndPermissions() throws {
+        let repository = makeRepository()
+        let draft = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(type: "text", text: "Queued body")
+            ])
+        ])
+
+        try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()), scope: scope)
+        let updatedPage = try repository.saveLocalEditableDraft(
+            pageId: "page-1",
+            title: "Queued title",
+            document: draft,
+            scope: scope
+        )
+
+        #expect(updatedPage.id == "page-1")
+        #expect(updatedPage.slugId == "roadmap")
+        #expect(updatedPage.spaceId == "space-1")
+        #expect(updatedPage.title == "Queued title")
+        #expect(updatedPage.content == draft)
+        #expect(updatedPage.permissions?.canEdit == true)
     }
 
     @Test func savingUnchangedHTMLPageReusesCachedPageAndAttachmentRows() throws {

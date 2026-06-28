@@ -196,6 +196,24 @@ nonisolated final class CacheRepository {
         try loadPage(idOrSlugId: idOrSlugId, scope: scope)?.asEditablePage()
     }
 
+    func saveLocalEditableDraft(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        scope: CacheScope
+    ) throws -> DocmostEditablePage {
+        guard let cachedPage = try loadPage(idOrSlugId: pageId, scope: scope) else {
+            throw APIError.connectionFailed("This page is not cached for offline editing.")
+        }
+
+        cachedPage.updateLocalDraft(title: title, document: document)
+        try saveIfNeeded(true)
+        guard let page = try cachedPage.asEditablePage() else {
+            throw APIError.connectionFailed("This page is not cached for offline editing.")
+        }
+        return page
+    }
+
     func loadPageSnapshot(idOrSlugId: String, scope: CacheScope) throws -> CachedPageSnapshot? {
         try loadPage(idOrSlugId: idOrSlugId, scope: scope)?.snapshot()
     }
