@@ -30,6 +30,12 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if let paragraph = paragraphBlock(in: lines, startingAt: index) {
+                blocks.append(paragraph.block)
+                index = paragraph.endIndex
+                continue
+            }
+
             if let block = block(from: lines[index]) {
                 blocks.append(block)
             }
@@ -37,6 +43,48 @@ enum NativeEditorMarkdownParser {
         }
 
         return blocks.isEmpty ? [NativeEditorDocument.emptyBlock()] : blocks
+    }
+
+    private static func paragraphBlock(
+        in lines: [String],
+        startingAt index: Array<String>.Index
+    ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
+        var paragraphLines: [String] = []
+        var currentIndex = index
+
+        while currentIndex < lines.endIndex,
+              let text = paragraphLineText(in: lines, startingAt: currentIndex) {
+            paragraphLines.append(text)
+            currentIndex = lines.index(after: currentIndex)
+        }
+
+        guard paragraphLines.count > 1 else { return nil }
+
+        return (
+            NativeEditorBlock(
+                kind: .paragraph,
+                text: inlineText(from: paragraphLines.joined(separator: "\n")),
+                alignment: .left
+            ),
+            currentIndex
+        )
+    }
+
+    private static func paragraphLineText(
+        in lines: [String],
+        startingAt index: Array<String>.Index
+    ) -> String? {
+        guard
+            fencedCodeBlock(in: lines, startingAt: index) == nil,
+            richBlock(in: lines, startingAt: index) == nil,
+            tableBlock(in: lines, startingAt: index) == nil,
+            let block = block(from: lines[index]),
+            block.kind == .paragraph
+        else {
+            return nil
+        }
+
+        return String(block.text.characters)
     }
 
     static func inputRule(from text: String) -> NativeEditorMarkdownInputRule? {
