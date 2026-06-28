@@ -25,7 +25,9 @@ extension NativeEditorCommand {
     func matchPriority(query: String) -> Int? {
         guard query.isEmpty == false else { return 0 }
 
-        if title.localizedStandardContains(query) || rawValue.localizedStandardContains(query) {
+        if title.localizedStandardContains(query)
+            || rawValue.localizedStandardContains(query)
+            || title.fuzzyMatchesSlashCommandQuery(query) {
             return 0
         }
 
@@ -137,5 +139,22 @@ extension NativeEditorCommand {
         case .emoji:
             ["icon", "smiley", "emoticon", "symbol", "reaction"]
         }
+    }
+}
+
+private extension String {
+    func fuzzyMatchesSlashCommandQuery(_ query: String) -> Bool {
+        let normalizedQuery = query.lowercased()
+        guard normalizedQuery.isEmpty == false else { return true }
+
+        var queryIndex = normalizedQuery.startIndex
+        for character in lowercased() where character == normalizedQuery[queryIndex] {
+            queryIndex = normalizedQuery.index(after: queryIndex)
+            if queryIndex == normalizedQuery.endIndex {
+                return true
+            }
+        }
+
+        return false
     }
 }

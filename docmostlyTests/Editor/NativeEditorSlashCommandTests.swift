@@ -44,6 +44,19 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func slashCommandFilteringUsesDocmostFuzzyTitleMatching() {
+        let expectations = [
+            SlashCommandFilterExpectation(query: "tdl", title: "To-do List"),
+            SlashCommandFilterExpectation(query: "nb", title: "Numbered List"),
+            SlashCommandFilterExpectation(query: "pgb", title: "Page Break")
+        ]
+
+        for expectation in expectations {
+            let titles = slashCommandTitles(for: expectation.query)
+            #expect(titles.contains(expectation.title))
+        }
+    }
+
     @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
