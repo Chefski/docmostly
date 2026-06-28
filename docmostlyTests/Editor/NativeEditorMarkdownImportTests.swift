@@ -119,6 +119,15 @@ struct NativeEditorMarkdownImportTests {
         #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
     }
 
+    @Test func docmostPageBreakHTMLImportsAsNativePageBreakBlock() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: #"<div data-type="pageBreak" class="page-break"></div>"#
+        ).first)
+
+        #expect(block.kind == .pageBreak)
+        #expect(block.rawNode?.type == "pageBreak")
+    }
+
     @Test func docmostIframeMarkdownLinksImportAsEmbedBlocks() throws {
         let source = "https://player.example.com/embed/demo"
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[\(source)](\(source))").first)

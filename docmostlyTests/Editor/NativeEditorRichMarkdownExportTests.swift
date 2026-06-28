@@ -45,6 +45,18 @@ struct NativeEditorRichMarkdownExportTests {
         #expect(viewModel.markdownForDocument() == #"![Architecture](/files/image.png "System diagram")"#)
     }
 
+    @Test func documentMarkdownConversionPreservesDocmostPageBreakHTMLShape() {
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .pageBreak,
+                text: AttributedString("Page break"),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == #"<div data-type="pageBreak" class="page-break"></div>"#)
+    }
+
     @Test func documentMarkdownConversionPreservesRichBlockMeaning() {
         let viewModel = configuredViewModel(blocks: richMarkdownFixtureBlocks())
 
