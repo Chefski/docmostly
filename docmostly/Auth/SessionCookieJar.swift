@@ -30,6 +30,9 @@ actor SessionCookieJar {
             for: requestURL
         )
         let setCookieHeaders = Self.setCookieHeaderValues(from: response)
+        for header in setCookieHeaders {
+            removeDeletedCookie(from: header, requestURL: requestURL)
+        }
         for cookie in responseCookies {
             upsert(StoredHTTPCookie(
                 cookie: cookie,
@@ -53,6 +56,62 @@ actor SessionCookieJar {
         if cookie.isExpired == false {
             storedCookies.append(cookie)
         }
+    }
+
+    private func removeDeletedCookie(from header: String, requestURL: URL) {
+        let parts = header
+            .split(separator: ";", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard
+            let nameValue = parts.first,
+            let separatorIndex = nameValue.firstIndex(of: "=")
+        else {
+            return
+        }
+
+        let name = String(nameValue[..<separatorIndex])
+        let valueStart = nameValue.index(after: separatorIndex)
+        let value = String(nameValue[valueStart...])
+        guard value.isEmpty else { return }
+
+        var domain = requestURL.host?.lowercased() ?? ""
+        var path = "/"
+        var isHostOnly = true
+        var deletesCookie = false
+
+        for attribute in parts.dropFirst() {
+            let keyValue = attribute.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            let key = keyValue.first?.lowercased() ?? ""
+            let value = keyValue.count > 1 ? String(keyValue[1]) : ""
+
+            switch key {
+            case "domain":
+                domain = value.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+                isHostOnly = false
+            case "path":
+                path = value.isEmpty ? "/" : value
+            case "max-age":
+                deletesCookie = deletesCookie || value == "0" || value.hasPrefix("-")
+            case "expires":
+                deletesCookie = deletesCookie || value.localizedStandardContains("1970")
+            default:
+                continue
+            }
+        }
+
+        guard deletesCookie else { return }
+
+        let expiredCookie = StoredHTTPCookie(
+            name: name,
+            value: value,
+            domain: domain,
+            path: path,
+            expiresAt: .distantPast,
+            isSecure: false,
+            isHTTPOnly: false,
+            isHostOnly: isHostOnly
+        )
+        storedCookies.removeAll { $0.hasSameIdentity(as: expiredCookie) }
     }
 
     private func removeExpiredCookies() {
