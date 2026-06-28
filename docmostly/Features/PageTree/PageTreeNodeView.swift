@@ -7,6 +7,7 @@ struct PageTreeNodeView: View {
     let isSelected: Bool
     let toggle: (PageTreeNode) -> Void
     let openInDetailColumn: (PageTreeNode) -> Void
+    let openInNewWindow: ((PageTreeNode) -> Void)?
     let movePage: (String, PageTreeDropOperation) -> Void
     let createChild: (PageTreeNode) -> Void
     let duplicate: (PageTreeNode) -> Void
@@ -45,6 +46,16 @@ struct PageTreeNodeView: View {
             .draggable(node.id)
             .dropDestination(for: String.self, action: handleDrop)
             .contextMenu {
+                #if os(macOS)
+                if let openInNewWindow {
+                    Button("Open in New Window", systemImage: "macwindow") {
+                        openInNewWindow(node)
+                    }
+
+                    Divider()
+                }
+                #endif
+
                 Button("New subpage", systemImage: "plus") {
                     createChild(node)
                 }
