@@ -13,6 +13,11 @@ extension NativeEditorMarkdownParser {
         var pageLink: DocmostPageLink
     }
 
+    private struct DocmostMentionHTML {
+        var range: Range<String.Index>
+        var mention: NativeEditorMention
+    }
+
     static func appendMarkdownText(
         _ markdown: String,
         to result: inout AttributedString,
@@ -22,6 +27,17 @@ extension NativeEditorMarkdownParser {
 
         var remaining = markdown[...]
         var didAppendAtom = false
+        while let htmlMention = nextDocmostMentionHTML(in: remaining) {
+            appendMarkdownText(
+                String(remaining[..<htmlMention.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
+            appendMention(htmlMention.mention, to: &result)
+            didAppendAtom = true
+            remaining = remaining[htmlMention.range.upperBound...]
+        }
+
         while let link = nextDocmostPageMarkdownLink(in: remaining) {
             appendMarkdownTextWithBareDocmostPageLinks(
                 String(remaining[..<link.range.lowerBound]),
@@ -41,13 +57,49 @@ extension NativeEditorMarkdownParser {
     }
 
     static func mentionMarkdown(from mention: NativeEditorMention, fallbackText: String) -> String {
-        guard mention.entityType == "page", let slugID = mention.slugID, slugID.isEmpty == false else {
-            return fallbackText
+        guard mention.entityType == "page" else {
+            if mention.entityType == nil {
+                return fallbackText
+            }
+            return mentionHTMLMarkdown(from: mention, fallbackText: fallbackText)
+        }
+
+        guard let slugID = mention.slugID, slugID.isEmpty == false else {
+            return mentionHTMLMarkdown(from: mention, fallbackText: fallbackText)
         }
 
         let label = escapedMarkdownLinkText(mention.label ?? fallbackText)
         let anchor = mention.anchorID.map { "#\($0)" } ?? ""
         return "[\(label)](/p/\(slugID)\(anchor))"
+    }
+
+    private static func mentionHTMLMarkdown(from mention: NativeEditorMention, fallbackText: String) -> String {
+        let attrs: [(String, String?)] = [
+            ("data-type", "mention"),
+            ("data-id", mention.identifier),
+            ("data-label", mention.label),
+            ("data-entity-type", mention.entityType),
+            ("data-entity-id", mention.entityID),
+            ("data-slug-id", mention.slugID),
+            ("data-creator-id", mention.creatorID),
+            ("data-anchor-id", mention.anchorID)
+        ]
+        let attrText = attrs.compactMap { name, value in
+            value.nonEmpty.map { "\(name)=\"\(escapedMentionHTMLAttribute($0))\"" }
+        }.joined(separator: " ")
+
+        let displayText = mentionHTMLDisplayText(from: mention, fallbackText: fallbackText)
+        return "<span \(attrText)>\(escapedMentionHTMLText(displayText))</span>"
+    }
+
+    private static func mentionHTMLDisplayText(from mention: NativeEditorMention, fallbackText: String) -> String {
+        if mention.entityType == "user" {
+            let label = mention.label ?? fallbackText.removingMentionTrigger.nonEmpty ?? mention.entityID
+                ?? mention.identifier ?? "Mention"
+            return "@\(label)"
+        }
+
+        return mention.label ?? fallbackText.nonEmpty ?? mention.entityID ?? mention.identifier ?? "Mention"
     }
 
     private static func appendMarkdownTextWithBareDocmostPageLinks(
@@ -109,6 +161,12 @@ extension NativeEditorMarkdownParser {
         result += segment
     }
 
+    private static func appendMention(_ mention: NativeEditorMention, to result: inout AttributedString) {
+        var segment = AttributedString(mention.displayText)
+        segment[NativeEditorMentionAttribute.self] = mention
+        result += segment
+    }
+
     private static func plainMarkdownText(from markdown: String) -> String {
         let attributedText = (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
         return String(attributedText.characters)
@@ -150,6 +208,129 @@ extension NativeEditorMarkdownParser {
         }
 
         return nil
+    }
+
+    private static func nextDocmostMentionHTML(in markdown: Substring) -> DocmostMentionHTML? {
+        var searchStart = markdown.startIndex
+
+        while searchStart < markdown.endIndex,
+              let openRange = markdown[searchStart...].range(of: "<span", options: .caseInsensitive) {
+            guard let openTagEnd = markdown[openRange.upperBound...].firstIndex(of: ">") else {
+                return nil
+            }
+
+            let openingTag = String(markdown[openRange.lowerBound...openTagEnd])
+            let attrs = mentionHTMLAttributes(from: openingTag)
+            guard attrs["data-type"] == "mention" else {
+                searchStart = markdown.index(after: openRange.lowerBound)
+                continue
+            }
+
+            let contentStart = markdown.index(after: openTagEnd)
+            guard let closeRange = markdown[contentStart...].range(of: "</span>", options: .caseInsensitive) else {
+                return nil
+            }
+
+            let body = String(markdown[contentStart..<closeRange.lowerBound])
+            return DocmostMentionHTML(
+                range: openRange.lowerBound..<closeRange.upperBound,
+                mention: mention(from: attrs, fallbackHTMLText: body)
+            )
+        }
+
+        return nil
+    }
+
+    private static func mention(from attrs: [String: String], fallbackHTMLText: String) -> NativeEditorMention {
+        let entityType = attrs["data-entity-type"]?.nonEmpty
+        let fallbackLabel = unescapedMentionHTMLText(fallbackHTMLText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .removingMentionTrigger
+
+        return NativeEditorMention(
+            identifier: attrs["data-id"]?.nonEmpty,
+            label: attrs["data-label"]?.nonEmpty ?? fallbackLabel.nonEmpty,
+            entityType: entityType,
+            entityID: attrs["data-entity-id"]?.nonEmpty,
+            slugID: attrs["data-slug-id"]?.nonEmpty,
+            creatorID: attrs["data-creator-id"]?.nonEmpty,
+            anchorID: attrs["data-anchor-id"]?.nonEmpty
+        )
+    }
+
+    private static func mentionHTMLAttributes(from openingTag: String) -> [String: String] {
+        var attrs = [String: String]()
+        var index = openingTag.startIndex
+
+        while index < openingTag.endIndex {
+            guard let nameRange = nextMentionHTMLAttributeNameRange(in: openingTag, startingAt: index) else {
+                break
+            }
+
+            index = nameRange.upperBound
+            skipMentionHTMLWhitespace(in: openingTag, index: &index)
+            guard index < openingTag.endIndex, openingTag[index] == "=" else {
+                continue
+            }
+
+            index = openingTag.index(after: index)
+            skipMentionHTMLWhitespace(in: openingTag, index: &index)
+            let value = mentionHTMLAttributeValue(in: openingTag, startingAt: &index)
+            attrs[String(openingTag[nameRange]).lowercased()] = unescapedMentionHTMLText(value)
+        }
+
+        return attrs
+    }
+
+    private static func nextMentionHTMLAttributeNameRange(
+        in text: String,
+        startingAt index: String.Index
+    ) -> Range<String.Index>? {
+        var nameStart = index
+        while nameStart < text.endIndex, text[nameStart].isMentionHTMLAttributeNameCharacter == false {
+            nameStart = text.index(after: nameStart)
+        }
+
+        guard nameStart < text.endIndex else { return nil }
+
+        var nameEnd = nameStart
+        while nameEnd < text.endIndex, text[nameEnd].isMentionHTMLAttributeNameCharacter {
+            nameEnd = text.index(after: nameEnd)
+        }
+
+        return nameStart..<nameEnd
+    }
+
+    private static func mentionHTMLAttributeValue(
+        in text: String,
+        startingAt index: inout String.Index
+    ) -> String {
+        guard index < text.endIndex else { return "" }
+
+        if text[index] == "\"" || text[index] == "'" {
+            let quote = text[index]
+            let valueStart = text.index(after: index)
+            guard let valueEnd = text[valueStart...].firstIndex(of: quote) else {
+                index = text.endIndex
+                return String(text[valueStart...])
+            }
+
+            index = text.index(after: valueEnd)
+            return String(text[valueStart..<valueEnd])
+        }
+
+        let valueStart = index
+        while index < text.endIndex, text[index].isWhitespace == false, text[index] != ">" {
+            index = text.index(after: index)
+        }
+
+        return String(text[valueStart..<index])
+    }
+
+    private static func skipMentionHTMLWhitespace(in text: String, index: inout String.Index) {
+        while index < text.endIndex, text[index].isWhitespace {
+            index = text.index(after: index)
+        }
     }
 
     private static func nextBareDocmostPageLink(in markdown: Substring) -> DocmostMarkdownLink? {
@@ -283,6 +464,25 @@ extension NativeEditorMarkdownParser {
             .replacing("[", with: "\\[")
             .replacing("]", with: "\\]")
     }
+
+    private static func escapedMentionHTMLAttribute(_ text: String) -> String {
+        escapedMentionHTMLText(text).replacing("\"", with: "&quot;")
+    }
+
+    private static func escapedMentionHTMLText(_ text: String) -> String {
+        text
+            .replacing("&", with: "&amp;")
+            .replacing("<", with: "&lt;")
+            .replacing(">", with: "&gt;")
+    }
+
+    private static func unescapedMentionHTMLText(_ text: String) -> String {
+        text
+            .replacing("&quot;", with: "\"")
+            .replacing("&lt;", with: "<")
+            .replacing("&gt;", with: ">")
+            .replacing("&amp;", with: "&")
+    }
 }
 
 private extension Character {
@@ -293,5 +493,30 @@ private extension Character {
         default:
             false
         }
+    }
+
+    var isMentionHTMLAttributeNameCharacter: Bool {
+        isLetter || isNumber || self == "-" || self == "_" || self == ":"
+    }
+}
+
+private extension Optional where Wrapped == String {
+    var nonEmpty: String? {
+        switch self {
+        case .some(let value):
+            value.nonEmpty
+        case .none:
+            nil
+        }
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
+
+    var removingMentionTrigger: String {
+        hasPrefix("@") ? String(dropFirst()) : self
     }
 }
