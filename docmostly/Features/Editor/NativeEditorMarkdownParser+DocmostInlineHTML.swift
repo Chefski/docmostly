@@ -82,8 +82,12 @@ extension NativeEditorMarkdownParser {
 
         while searchStart < markdown.endIndex,
               let closeRange = markdown[searchStart...].range(of: "</span>", options: .caseInsensitive) {
-            if let nestedOpenRange = markdown[searchStart...].range(of: "<span", options: .caseInsensitive),
-               nestedOpenRange.lowerBound < closeRange.lowerBound {
+            if let nestedOpenRange = nextOpeningSpanRange(
+                in: markdown,
+                startingAt: searchStart,
+                before: closeRange.lowerBound,
+                bodyStart: bodyStart
+            ) {
                 depth += 1
                 searchStart = nestedOpenRange.upperBound
                 continue
@@ -97,6 +101,69 @@ extension NativeEditorMarkdownParser {
         }
 
         return nil
+    }
+
+    private static func nextOpeningSpanRange(
+        in markdown: Substring,
+        startingAt searchStart: String.Index,
+        before upperBound: String.Index,
+        bodyStart: String.Index
+    ) -> Range<String.Index>? {
+        var currentSearchStart = searchStart
+
+        while currentSearchStart < upperBound,
+              let openRange = markdown[currentSearchStart..<upperBound].range(of: "<span", options: .caseInsensitive) {
+            if isInsideMarkdownCodeSpan(openRange.lowerBound, in: markdown, bodyStart: bodyStart) {
+                currentSearchStart = openRange.upperBound
+                continue
+            }
+
+            let nameStart = markdown.index(after: openRange.lowerBound)
+            let nameEnd = htmlTagNameEnd(in: markdown, startingAt: nameStart)
+            let name = String(markdown[nameStart..<nameEnd])
+            guard name.localizedCaseInsensitiveCompare("span") == .orderedSame,
+                  isHTMLTagBoundary(at: nameEnd, in: markdown),
+                  let closeIndex = htmlOpeningTagCloseIndex(in: markdown, startingAt: nameEnd) else {
+                currentSearchStart = openRange.upperBound
+                continue
+            }
+
+            return openRange.lowerBound..<markdown.index(after: closeIndex)
+        }
+
+        return nil
+    }
+
+    private static func isInsideMarkdownCodeSpan(
+        _ index: String.Index,
+        in markdown: Substring,
+        bodyStart: String.Index
+    ) -> Bool {
+        var activeBacktickRunLength: Int?
+        var currentIndex = bodyStart
+
+        while currentIndex < index {
+            guard markdown[currentIndex] == "`" else {
+                currentIndex = markdown.index(after: currentIndex)
+                continue
+            }
+
+            var runLength = 0
+            while currentIndex < index, markdown[currentIndex] == "`" {
+                runLength += 1
+                currentIndex = markdown.index(after: currentIndex)
+            }
+
+            if let activeLength = activeBacktickRunLength {
+                if activeLength == runLength {
+                    activeBacktickRunLength = nil
+                }
+            } else {
+                activeBacktickRunLength = runLength
+            }
+        }
+
+        return activeBacktickRunLength != nil
     }
 
     private static func openingHTMLTagRange(in text: String, tagName: String) -> Range<String.Index>? {
@@ -114,7 +181,7 @@ extension NativeEditorMarkdownParser {
             let name = String(text[nameStart..<nameEnd])
             guard name.localizedCaseInsensitiveCompare(tagName) == .orderedSame,
                   isHTMLTagBoundary(at: nameEnd, in: text),
-                  let closeIndex = text[nameEnd...].firstIndex(of: ">") else {
+                  let closeIndex = htmlOpeningTagCloseIndex(in: text, startingAt: nameEnd) else {
                 searchStart = nameEnd
                 continue
             }
@@ -133,8 +200,64 @@ extension NativeEditorMarkdownParser {
         return currentIndex
     }
 
+    private static func htmlTagNameEnd(in text: Substring, startingAt index: String.Index) -> String.Index {
+        var currentIndex = index
+        while currentIndex < text.endIndex, text[currentIndex].isDocmostHTMLTagNameChar {
+            currentIndex = text.index(after: currentIndex)
+        }
+        return currentIndex
+    }
+
     private static func isHTMLTagBoundary(at index: String.Index, in text: String) -> Bool {
         index == text.endIndex || text[index].isWhitespace || text[index] == ">" || text[index] == "/"
+    }
+
+    private static func isHTMLTagBoundary(at index: String.Index, in text: Substring) -> Bool {
+        index == text.endIndex || text[index].isWhitespace || text[index] == ">" || text[index] == "/"
+    }
+
+    private static func htmlOpeningTagCloseIndex(in text: String, startingAt index: String.Index) -> String.Index? {
+        var currentIndex = index
+        var quote: Character?
+
+        while currentIndex < text.endIndex {
+            let character = text[currentIndex]
+            if let activeQuote = quote {
+                if character == activeQuote {
+                    quote = nil
+                }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == ">" {
+                return currentIndex
+            }
+
+            currentIndex = text.index(after: currentIndex)
+        }
+
+        return nil
+    }
+
+    private static func htmlOpeningTagCloseIndex(in text: Substring, startingAt index: String.Index) -> String.Index? {
+        var currentIndex = index
+        var quote: Character?
+
+        while currentIndex < text.endIndex {
+            let character = text[currentIndex]
+            if let activeQuote = quote {
+                if character == activeQuote {
+                    quote = nil
+                }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == ">" {
+                return currentIndex
+            }
+
+            currentIndex = text.index(after: currentIndex)
+        }
+
+        return nil
     }
 
     static func escapedInlineHTMLAttribute(_ text: String) -> String {

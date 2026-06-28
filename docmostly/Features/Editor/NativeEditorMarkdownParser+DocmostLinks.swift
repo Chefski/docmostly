@@ -342,13 +342,22 @@ extension NativeEditorMarkdownParser {
                 range: openRange.lowerBound..<closeRange.upperBound,
                 comment: NativeEditorInlineCommentMark(
                     commentID: commentID,
-                    isResolved: attrs["data-resolved"] != nil
+                    isResolved: docmostCommentResolved(from: attrs["data-resolved"])
                 ),
                 bodyMarkdown: String(markdown[contentStart..<closeRange.lowerBound])
             )
         }
 
         return nil
+    }
+
+    private static func docmostCommentResolved(from value: String?) -> Bool {
+        guard let value else { return false }
+
+        let normalizedValue = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalizedValue.isEmpty == false else { return true }
+
+        return normalizedValue != "false" && normalizedValue != "0"
     }
 
     private static func mention(from attrs: [String: String], fallbackHTMLText: String) -> NativeEditorMention {
