@@ -76,7 +76,7 @@ nonisolated extension CodingUserInfoKey {
     static let proseMirrorDecodingBudget = CodingUserInfoKey(rawValue: "proseMirrorDecodingBudget")!
 }
 
-final class ProseMirrorDecodingBudget {
+nonisolated final class ProseMirrorDecodingBudget {
     private var nodeCount = 0
 
     func consumeNode(decoder: Decoder) throws {
