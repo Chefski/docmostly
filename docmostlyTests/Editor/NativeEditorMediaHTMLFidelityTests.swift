@@ -56,7 +56,7 @@ struct NativeEditorMediaHTMLFidelityTests {
         NativeEditorMediaBlock(
             source: "/api/files/image-1/Hero.png",
             alternativeText: "Hero",
-            title: nil,
+            title: "Launch hero",
             attachmentID: "image-1",
             sizeInBytes: 2_048,
             width: "640",
@@ -150,6 +150,7 @@ struct NativeEditorMediaHTMLFidelityTests {
         htmlTag("img", attributes: [
             ("src", "/api/files/image-1/Hero.png"),
             ("alt", "Hero"),
+            ("title", "Launch hero"),
             ("width", "640"),
             ("height", "360"),
             ("data-align", "center"),
@@ -322,6 +323,7 @@ struct NativeEditorMediaHTMLFidelityTests {
 
         #expect(image.source == "/api/files/image-1/Hero.png")
         #expect(image.alternativeText == "Hero")
+        #expect(image.title == "Launch hero")
         #expect(image.attachmentID == "image-1")
         #expect(image.sizeInBytes == 2_048)
         #expect(image.width == "640")
@@ -329,6 +331,7 @@ struct NativeEditorMediaHTMLFidelityTests {
         #expect(image.aspectRatio == "1.7777778")
         #expect(image.alignment == "center")
         #expect(block.rawNode?.type == "image")
+        #expect(block.rawNode?.attrs?["title"] == .string("Launch hero"))
         #expect(block.rawNode?.attrs?["width"] == .int(640))
     }
 
