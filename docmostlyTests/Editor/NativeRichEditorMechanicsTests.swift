@@ -98,6 +98,19 @@ struct NativeRichEditorMechanicsTests {
         #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
     }
 
+    @Test func markdownImportSupportsDocmostDetailsShortcutAfterLineTrimming() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: ":::details ").first)
+
+        guard case .details(let details) = block.kind else {
+            Issue.record("Expected imported Docmost details shortcut to create a native details block.")
+            return
+        }
+
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(block.rawNode?.type == "details")
+    }
+
     @Test func markdownInputRuleSupportsDocmostDefaultCalloutShortcut() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
         let viewModel = configuredViewModel(blocks: [block])
