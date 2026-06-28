@@ -98,6 +98,25 @@ struct DocmostAPIClientCookieTests {
         }
     }
 
+    @Test func successfulResponsesWithInvalidPayloadsThrowDecodingFailures() async throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let loader = CapturingHTTPDataLoader(responses: [
+            try loaderResponse(
+                url: baseURL.appending(path: "api/users/me"),
+                data: Data(#"{"data":{},"success":true,"status":200}"#.utf8)
+            )
+        ])
+        let client = DocmostAPIClient(baseURL: baseURL, loader: loader)
+
+        do {
+            let _: CurrentUserResponse = try await client.send(.currentUser)
+            Issue.record("Expected a decoding failure")
+        } catch APIError.decodingFailed(_) {
+        } catch {
+            Issue.record("Expected decoding failure, got \(error)")
+        }
+    }
+
     private func cookie(name: String, value: String, domain: String, path: String) -> StoredHTTPCookie {
         StoredHTTPCookie(
             name: name,

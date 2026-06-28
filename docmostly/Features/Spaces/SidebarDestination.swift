@@ -1,6 +1,6 @@
 import Foundation
 
-enum SidebarDestination: Hashable, Sendable {
+nonisolated enum SidebarDestination: Hashable, Sendable {
     case favorites
     case notifications
     case search

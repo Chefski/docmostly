@@ -1,57 +1,66 @@
-import SwiftUI
 import SwiftData
-import Observation
+import SwiftUI
 
-struct MacRootView: View {
+struct MacPageWindowView: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
     @Environment(MacDesktopCommandController.self) private var commandController
     @State private var isCommandPalettePresented = false
     @State private var isPageCreationPresented = false
+    @State private var loadedPageID: String?
+    @State private var loadedPageSpaceID: String?
+    @State private var loadedPageTitle: String?
 
+    let route: MacPageWindowRoute
     let modelContainer: ModelContainer?
 
-    init(modelContainer: ModelContainer? = nil) {
+    init(route: MacPageWindowRoute, modelContainer: ModelContainer? = nil) {
+        self.route = route
         self.modelContainer = modelContainer
     }
 
     var body: some View {
-        RootView(modelContainer: modelContainer)
-            .tint(.primary)
-            .toolbar {
-                if appState.phase == .authenticated {
-                    ToolbarItemGroup {
-                        Button("New Page", systemImage: "doc.badge.plus") {
-                            presentPageCreation()
-                        }
-                        .disabled(canCreatePage == false)
-
-                        Button("Command Palette", systemImage: "command") {
-                            presentCommandPalette()
-                        }
-
-                        Button("Search", systemImage: "magnifyingglass") {
-                            appState.selectSidebarUtilityDestination(.search)
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $isCommandPalettePresented) {
-                MacCommandPaletteView(
-                    items: commandPaletteItems,
-                    openSearchResult: openSearchResult,
-                    openSearchResultInNewWindow: openSearchResultInNewWindow
+        NavigationStack {
+            switch appState.phase {
+            case .restoring:
+                LoadingStateView(title: "Restoring session")
+            case .needsServer, .unauthenticated:
+                ContentUnavailableView(
+                    "Sign In Required",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("Open the main window to sign in.")
                 )
-                .environment(appState)
-            }
-            .sheet(isPresented: $isPageCreationPresented) {
-                MacQuickPageCreationSheet(
-                    selectedSpace: selectedSpace,
-                    createRootPage: createRootPage
+            case .authenticated:
+                PageReaderView(
+                    pageID: route.pageID,
+                    initialTitle: route.displayTitle,
+                    pageLoaded: updateLoadedPageContext
                 )
             }
-            .focusedValue(\.macDesktopCommandActions, focusedCommandActions)
         }
+        .frame(minWidth: 760, minHeight: 560)
+        .sheet(isPresented: $isCommandPalettePresented) {
+            MacCommandPaletteView(
+                items: commandPaletteItems,
+                openSearchResult: openSearchResult,
+                openSearchResultInNewWindow: openSearchResultInNewWindow
+            )
+            .environment(appState)
+        }
+        .sheet(isPresented: $isPageCreationPresented) {
+            MacQuickPageCreationSheet(
+                selectedSpace: selectedSpace,
+                createRootPage: createRootPage
+            )
+        }
+        .task {
+            appState.configure(modelContext: modelContext, modelContainer: modelContainer)
+            await appState.restoreIfNeeded()
+        }
+        .focusedValue(\.macDesktopCommandActions, focusedCommandActions)
+        .focusedValue(\.macFocusedPageRoute, route)
+    }
 
     private var commandPaletteItems: [MacCommandPaletteItem] {
         [
@@ -66,7 +75,7 @@ struct MacRootView: View {
             },
             MacCommandPaletteItem(
                 title: "Open Current Page in New Window",
-                subtitle: nil,
+                subtitle: route.displayTitle,
                 systemImage: "macwindow.on.rectangle",
                 keywords: ["separate", "desktop"],
                 isEnabled: selectedPageRoute != nil
@@ -79,7 +88,7 @@ struct MacRootView: View {
                 systemImage: "magnifyingglass",
                 keywords: ["find", "pages"]
             ) {
-                appState.selectSidebarUtilityDestination(.search)
+                selectSidebarDestination(.search)
             },
             MacCommandPaletteItem(
                 title: "Favorites",
@@ -88,7 +97,7 @@ struct MacRootView: View {
                 keywords: ["starred"],
                 isEnabled: appState.phase == .authenticated
             ) {
-                appState.selectSidebarUtilityDestination(.favorites)
+                selectSidebarDestination(.favorites)
             },
             MacCommandPaletteItem(
                 title: "Notifications",
@@ -97,7 +106,7 @@ struct MacRootView: View {
                 keywords: ["inbox", "updates"],
                 isEnabled: appState.phase == .authenticated
             ) {
-                appState.selectSidebarUtilityDestination(.notifications)
+                selectSidebarDestination(.notifications)
             },
             MacCommandPaletteItem(
                 title: "Space Settings",
@@ -106,7 +115,7 @@ struct MacRootView: View {
                 keywords: ["permissions", "members"],
                 isEnabled: appState.phase == .authenticated
             ) {
-                appState.selectSidebarUtilityDestination(.settings)
+                selectSidebarDestination(.settings)
             },
             MacCommandPaletteItem(
                 title: "Refresh Spaces",
@@ -133,20 +142,12 @@ struct MacRootView: View {
     }
 
     private var selectedSpace: DocmostSpace? {
-        if let selectedSpaceID = appState.selectedSpaceID,
-           let space = appState.spaces.first(where: { $0.id == selectedSpaceID }) {
-            return space
-        }
-
-        return appState.spaces.first
+        guard let spaceID = loadedPageSpaceID ?? route.spaceID else { return nil }
+        return appState.spaces.first { $0.id == spaceID }
     }
 
     private var canCreatePage: Bool {
         appState.phase == .authenticated && appState.isOffline == false && selectedSpace != nil
-    }
-
-    private var selectedPageRoute: MacPageWindowRoute? {
-        MacPageWindowRoute.selectedPageRoute(from: appState)
     }
 
     private var focusedCommandActions: MacDesktopCommandActions {
@@ -160,12 +161,28 @@ struct MacRootView: View {
         )
     }
 
+    private var selectedPageRoute: MacPageWindowRoute? {
+        guard let selectedSpace else { return nil }
+
+        return MacPageWindowRoute(
+            pageID: loadedPageID ?? route.pageID,
+            spaceID: selectedSpace.id,
+            title: loadedPageTitle ?? route.title
+        )
+    }
+
     private func presentCommandPalette() {
         isCommandPalettePresented = true
     }
 
     private func presentPageCreation() {
         isPageCreationPresented = true
+    }
+
+    private func updateLoadedPageContext(pageID: String, spaceID: String, title: String) {
+        loadedPageID = pageID
+        loadedPageSpaceID = spaceID
+        loadedPageTitle = title
     }
 
     private func createRootPage(title: String) async -> String? {
@@ -180,8 +197,12 @@ struct MacRootView: View {
                 spaceId: selectedSpace.id,
                 title: trimmedTitle.isEmpty ? nil : trimmedTitle
             )
-            appState.selectPage(id: page.slugId, spaceID: page.spaceId, revealSpaceInSidebar: true)
             commandController.requestSidebarReload()
+            openWindow(value: MacPageWindowRoute(
+                pageID: page.slugId,
+                spaceID: page.spaceId,
+                title: page.title
+            ))
             return nil
         } catch {
             return error.localizedDescription
@@ -190,6 +211,7 @@ struct MacRootView: View {
 
     private func openSearchResult(_ result: DocmostSearchResult) {
         appState.selectPage(id: result.slugId, spaceID: result.space.id, revealSpaceInSidebar: true)
+        openWindow(id: "main")
     }
 
     private func openSearchResultInNewWindow(_ result: DocmostSearchResult) {
@@ -207,6 +229,7 @@ struct MacRootView: View {
 
     private func selectSidebarDestination(_ destination: SidebarDestination) {
         appState.selectSidebarUtilityDestination(destination)
+        openWindow(id: "main")
     }
 
     private func showSettings() {
@@ -216,23 +239,5 @@ struct MacRootView: View {
             appState: appState,
             modelContainer: modelContainer
         )
-    }
-}
-
-struct MacQuickPageCreationSheet: View {
-    let selectedSpace: DocmostSpace?
-    let createRootPage: (String) async -> String?
-
-    var body: some View {
-        if let selectedSpace {
-            PageCreationSheet(
-                request: PageCreationRequest(parent: nil, spaceName: selectedSpace.name),
-                create: createRootPage
-            )
-            .frame(minWidth: 420, minHeight: 260)
-        } else {
-            ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
-                .frame(minWidth: 420, minHeight: 260)
-        }
     }
 }

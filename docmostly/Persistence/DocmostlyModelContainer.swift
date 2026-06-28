@@ -6,7 +6,8 @@ enum DocmostlyModelContainer {
             CachedSpace.self,
             CachedPageTreeItem.self,
             CachedPage.self,
-            CachedAttachment.self
+            CachedAttachment.self,
+            QueuedOfflineMutation.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isStoredInMemoryOnly)
 
