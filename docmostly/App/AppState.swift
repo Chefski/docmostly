@@ -29,6 +29,7 @@ final class AppState {
     @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
     @ObservationIgnored var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
+    @ObservationIgnored private var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Void, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
@@ -501,5 +502,24 @@ final class AppState {
             throw APIError.connectionFailed(message)
         }
         return cacheScope
+    }
+}
+
+extension AppState {
+    func restoreIfNeeded() async {
+        if let restoreTask {
+            await restoreTask.value
+            return
+        }
+
+        guard phase == .restoring else { return }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.restore()
+        }
+        restoreTask = task
+        await task.value
+        restoreTask = nil
     }
 }
