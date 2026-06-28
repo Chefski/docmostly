@@ -370,6 +370,7 @@ extension NativeEditorMarkdownParser {
         htmlTag("img", attributes: [
             ("src", media.source),
             ("alt", media.alternativeText),
+            ("title", media.title),
             ("width", media.width),
             ("height", media.height),
             ("data-align", media.alignment),
