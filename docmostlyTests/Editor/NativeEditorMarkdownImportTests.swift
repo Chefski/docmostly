@@ -4,6 +4,23 @@ import Testing
 
 @MainActor
 struct NativeEditorMarkdownImportTests {
+    @Test func markdownSingleNewlinesImportAsHardBreaksInsideParagraph() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: """
+        Line one
+        Line two
+        """)
+
+        #expect(blocks.count == 1)
+        let block = try #require(blocks.first)
+        #expect(block.kind == .paragraph)
+        #expect(String(block.text.characters) == "Line one\nLine two")
+
+        let node = NativeEditorDocument.node(from: block)
+        #expect(node.content?.map(\.type) == ["text", "hardBreak", "text"])
+        #expect(node.content?.first?.text == "Line one")
+        #expect(node.content?.last?.text == "Line two")
+    }
+
     @Test func markdownLinksImportAsNativeMediaAndAttachmentBlocks() throws {
         let blocks = NativeEditorMarkdownParser.blocks(from: """
         [Launch demo.mp4](/files/demo.mp4)
