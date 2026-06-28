@@ -86,6 +86,7 @@ extension NativeRichEditorViewModel {
         if applyingInputRules {
             applyMarkdownInputRuleIfNeeded()
             applySmartTypographyIfNeeded()
+            applyInlineMarkdownInputRuleIfNeeded()
         }
 
         let after = makeHistorySnapshot()

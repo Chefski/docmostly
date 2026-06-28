@@ -152,6 +152,28 @@ struct NativeRichEditorMechanicsTests {
         #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["text"] == .string("E = mc^2"))
     }
 
+    @Test func markdownInputRuleSupportsDocmostInlineMathShortcut() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Area $$A = pi r^2$$")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Area A = pi r^2")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.map(\.type) == ["text", "mathInline"])
+        #expect(inlineNodes[0].text == "Area ")
+        #expect(inlineNodes[1].attrs?["text"] == .string("A = pi r^2"))
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])

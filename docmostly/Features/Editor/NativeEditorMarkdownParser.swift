@@ -276,12 +276,47 @@ enum NativeEditorMarkdownParser {
         return result
     }
 
+    static func inlineMathInputRuleText(from text: String) -> AttributedString? {
+        guard let shortcut = trailingInlineMathShortcut(in: text) else { return nil }
+
+        var result = AttributedString(String(text[..<shortcut.openingRange.lowerBound]))
+        appendInlineMath(shortcut.text, to: &result)
+        return result
+    }
+
     private static func appendInlineMath(_ text: String, to result: inout AttributedString) {
         let math = NativeEditorMathInline(text: text)
         var segment = AttributedString(text)
         segment[NativeEditorMathInlineAttribute.self] = math
         segment.inlinePresentationIntent = .code
         result += segment
+    }
+
+    private static func trailingInlineMathShortcut(
+        in text: String
+    ) -> (openingRange: Range<String.Index>, text: String)? {
+        guard text.hasSuffix("$$") else { return nil }
+
+        let closingStart = text.index(text.endIndex, offsetBy: -2)
+        guard
+            let openingRange = text.range(
+                of: "$$",
+                options: .backwards,
+                range: text.startIndex..<closingStart
+            )
+        else {
+            return nil
+        }
+
+        let mathText = String(text[openingRange.upperBound..<closingStart])
+        guard mathText.isEmpty == false, mathText.contains("$") == false else { return nil }
+
+        if openingRange.lowerBound > text.startIndex {
+            let previousIndex = text.index(before: openingRange.lowerBound)
+            guard text[previousIndex].isWhitespace else { return nil }
+        }
+
+        return (openingRange, mathText)
     }
 
     private static func nextInlineMathDelimiter(

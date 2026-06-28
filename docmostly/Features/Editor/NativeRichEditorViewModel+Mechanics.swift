@@ -76,6 +76,21 @@ extension NativeRichEditorViewModel {
         document.blocks[index].selection = AttributedTextSelection()
     }
 
+    func applyInlineMarkdownInputRuleIfNeeded() {
+        guard
+            let index = activeBlockIndex,
+            document.blocks[index].kind.allowsInlineMarkdownInputRules,
+            let attributedText = NativeEditorMarkdownParser.inlineMathInputRuleText(
+                from: String(document.blocks[index].text.characters)
+            )
+        else {
+            return
+        }
+
+        document.blocks[index].text = attributedText
+        document.blocks[index].selection = AttributedTextSelection()
+    }
+
     func applySmartTypographyIfNeeded() {
         guard let index = activeBlockIndex, document.blocks[index].kind.allowsSmartTypography else { return }
 
@@ -123,6 +138,15 @@ private extension NativeEditorBlockKind {
             false
         default:
             true
+        }
+    }
+
+    var allowsInlineMarkdownInputRules: Bool {
+        switch self {
+        case .codeBlock:
+            false
+        default:
+            isEditable
         }
     }
 }
