@@ -87,6 +87,69 @@ struct NativeEditorRichMarkdownExportTests {
         """)
     }
 
+    @Test func documentMarkdownConversionPreservesDocmostDiagramHTMLShape() {
+        let drawioSource = "/api/files/drawio-1/diagram.drawio.svg"
+        let excalidrawSource = "/api/files/excalidraw-1/sketch.png"
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .drawio(NativeEditorDiagramBlock(
+                    source: drawioSource,
+                    title: "System map",
+                    alternativeText: "System diagram",
+                    attachmentID: "drawio-1",
+                    sizeInBytes: 2_048,
+                    width: "640",
+                    height: "360",
+                    aspectRatio: "1.7777778",
+                    alignment: "center"
+                )),
+                text: AttributedString("System map"),
+                alignment: .left
+            ),
+            NativeEditorBlock(
+                kind: .excalidraw(NativeEditorDiagramBlock(
+                    source: excalidrawSource,
+                    title: "Sketch",
+                    alternativeText: "Whiteboard sketch",
+                    attachmentID: "excalidraw-1",
+                    sizeInBytes: nil,
+                    width: "75%",
+                    height: nil,
+                    aspectRatio: nil,
+                    alignment: "right"
+                )),
+                text: AttributedString("Sketch"),
+                alignment: .left
+            )
+        ])
+
+        let expected = [
+            docmostDiagramHTML(
+                type: "drawio",
+                source: drawioSource,
+                title: "System map",
+                alternativeText: "System diagram",
+                attachmentID: "drawio-1",
+                size: "2048",
+                width: "640",
+                height: "360",
+                aspectRatio: "1.7777778",
+                alignment: "center"
+            ),
+            docmostDiagramHTML(
+                type: "excalidraw",
+                source: excalidrawSource,
+                title: "Sketch",
+                alternativeText: "Whiteboard sketch",
+                attachmentID: "excalidraw-1",
+                width: "75%",
+                alignment: "right"
+            )
+        ].joined(separator: "\n")
+
+        #expect(viewModel.markdownForDocument() == expected)
+    }
+
     @Test func documentMarkdownConversionPreservesRichBlockMeaning() {
         let viewModel = configuredViewModel(blocks: richMarkdownFixtureBlocks())
 
@@ -118,6 +181,50 @@ struct NativeEditorRichMarkdownExportTests {
         viewModel.document = NativeEditorDocument(blocks: blocks)
         viewModel.resetEditingHistory()
         return viewModel
+    }
+
+    private func docmostDiagramHTML(
+        type: String,
+        source: String,
+        title: String,
+        alternativeText: String,
+        attachmentID: String,
+        size: String? = nil,
+        width: String? = nil,
+        height: String? = nil,
+        aspectRatio: String? = nil,
+        alignment: String? = nil
+    ) -> String {
+        let openingTag = htmlTag("div", attributes: [
+            ("data-type", type),
+            ("data-src", source),
+            ("data-title", title),
+            ("data-alt", alternativeText),
+            ("data-width", width),
+            ("data-height", height),
+            ("data-size", size),
+            ("data-aspect-ratio", aspectRatio),
+            ("data-align", alignment),
+            ("data-attachment-id", attachmentID)
+        ])
+        let imageTag = htmlTag("img", attributes: [
+            ("src", source),
+            ("alt", alternativeText),
+            ("width", width)
+        ])
+
+        return """
+        \(openingTag)
+        \(imageTag)
+        </div>
+        """
+    }
+
+    private func htmlTag(_ name: String, attributes: [(String, String?)]) -> String {
+        let attributeText = attributes.compactMap { key, value -> String? in
+            value.map { #"\#(key)="\#($0)""# }
+        }.joined(separator: " ")
+        return "<\(name) \(attributeText)>"
     }
 
     private func richMarkdownFixtureBlocks() -> [NativeEditorBlock] {

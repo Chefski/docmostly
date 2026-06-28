@@ -168,6 +168,64 @@ struct NativeEditorMarkdownImportTests {
         #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
     }
 
+    @Test func docmostDiagramHTMLImportsAsNativeDiagramBlocks() throws {
+        let drawioSource = "/api/files/drawio-1/diagram.drawio.svg"
+        let excalidrawSource = "/api/files/excalidraw-1/sketch.png"
+        let markdown = [
+            docmostDiagramHTML(
+                type: "drawio",
+                source: drawioSource,
+                title: "System map",
+                alternativeText: "System diagram",
+                attachmentID: "drawio-1",
+                size: "2048",
+                width: "640",
+                height: "360",
+                aspectRatio: "1.7777778",
+                alignment: "center"
+            ),
+            docmostDiagramHTML(
+                type: "excalidraw",
+                source: excalidrawSource,
+                title: "Sketch",
+                alternativeText: "Whiteboard sketch",
+                attachmentID: "excalidraw-1",
+                width: "75%",
+                alignment: "right"
+            )
+        ].joined(separator: "\n")
+        let blocks = NativeEditorMarkdownParser.blocks(from: markdown)
+
+        try #require(blocks.count == 2)
+        guard case .drawio(let drawio) = blocks[0].kind else {
+            Issue.record("Expected Docmost draw.io HTML to import as a native draw.io block.")
+            return
+        }
+        guard case .excalidraw(let excalidraw) = blocks[1].kind else {
+            Issue.record("Expected Docmost Excalidraw HTML to import as a native Excalidraw block.")
+            return
+        }
+
+        #expect(drawio.source == drawioSource)
+        #expect(drawio.title == "System map")
+        #expect(drawio.alternativeText == "System diagram")
+        #expect(drawio.attachmentID == "drawio-1")
+        #expect(drawio.sizeInBytes == 2_048)
+        #expect(drawio.width == "640")
+        #expect(drawio.height == "360")
+        #expect(drawio.aspectRatio == "1.7777778")
+        #expect(drawio.alignment == "center")
+        #expect(blocks[0].rawNode?.type == "drawio")
+        #expect(blocks[0].rawNode?.attrs?["src"] == .string(drawioSource))
+        #expect(blocks[0].rawNode?.attrs?["width"] == .int(640))
+        #expect(blocks[0].rawNode?.attrs?["attachmentId"] == .string("drawio-1"))
+        #expect(excalidraw.source == excalidrawSource)
+        #expect(excalidraw.width == "75%")
+        #expect(blocks[1].rawNode?.type == "excalidraw")
+        #expect(blocks[1].rawNode?.attrs?["width"] == .string("75%"))
+        #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
+    }
+
     @Test func docmostIframeMarkdownLinksImportAsEmbedBlocks() throws {
         let source = "https://player.example.com/embed/demo"
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[\(source)](\(source))").first)
@@ -189,5 +247,49 @@ struct NativeEditorMarkdownImportTests {
 
         #expect(block.kind == .paragraph)
         #expect(String(block.text.characters) == "Example")
+    }
+
+    private func docmostDiagramHTML(
+        type: String,
+        source: String,
+        title: String,
+        alternativeText: String,
+        attachmentID: String,
+        size: String? = nil,
+        width: String? = nil,
+        height: String? = nil,
+        aspectRatio: String? = nil,
+        alignment: String? = nil
+    ) -> String {
+        let openingTag = htmlTag("div", attributes: [
+            ("data-type", type),
+            ("data-src", source),
+            ("data-title", title),
+            ("data-alt", alternativeText),
+            ("data-width", width),
+            ("data-height", height),
+            ("data-size", size),
+            ("data-aspect-ratio", aspectRatio),
+            ("data-align", alignment),
+            ("data-attachment-id", attachmentID)
+        ])
+        let imageTag = htmlTag("img", attributes: [
+            ("src", source),
+            ("alt", alternativeText),
+            ("width", width)
+        ])
+
+        return """
+        \(openingTag)
+        \(imageTag)
+        </div>
+        """
+    }
+
+    private func htmlTag(_ name: String, attributes: [(String, String?)]) -> String {
+        let attributeText = attributes.compactMap { key, value -> String? in
+            value.map { #"\#(key)="\#($0)""# }
+        }.joined(separator: " ")
+        return "<\(name) \(attributeText)>"
     }
 }
