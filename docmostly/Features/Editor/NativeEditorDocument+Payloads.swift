@@ -161,17 +161,17 @@ nonisolated extension NativeEditorDocument {
             .filter { cellTypes.contains($0.type) }
             .prefix(NativeEditorTable.maximumColumnCount)
             .map { cell in
-            let columnWidths = tableColumnWidths(from: cell.attrs)
-            NativeEditorTableCell(
-                plainText: plainText(in: cell.content ?? []),
-                isHeader: cell.type == "tableHeader",
-                backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
-                columnWidth: columnWidths.first,
-                columnSpan: normalizedTableSpan(cell.attrs?["colspan"]?.intValue),
-                rowSpan: normalizedTableSpan(cell.attrs?["rowspan"]?.intValue),
-                columnWidths: columnWidths
-            )
-        }
+                let columnWidths = tableColumnWidths(from: cell.attrs)
+                return NativeEditorTableCell(
+                    plainText: plainText(in: cell.content ?? []),
+                    isHeader: cell.type == "tableHeader",
+                    backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
+                    columnWidth: columnWidths.first,
+                    columnSpan: normalizedTableSpan(cell.attrs?["colspan"]?.intValue),
+                    rowSpan: normalizedTableSpan(cell.attrs?["rowspan"]?.intValue),
+                    columnWidths: columnWidths
+                )
+            }
     }
 
     private static func tableColumnWidths(from attrs: [String: ProseMirrorJSONValue]?) -> [Int] {
