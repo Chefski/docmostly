@@ -34,7 +34,7 @@ struct PageReaderView: View {
     @FocusState var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
-    let initialTitle: String? = nil
+    let initialTitle: String?
 
     init(pageID: String, initialTitle: String? = nil) {
         self.pageID = pageID
