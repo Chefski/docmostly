@@ -57,6 +57,20 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func slashCommandMenuIsDisabledInsideCodeBlocks() {
+        let block = NativeEditorBlock(
+            kind: .codeBlock(language: nil),
+            text: AttributedString("/table"),
+            alignment: .left
+        )
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        #expect(viewModel.isShowingSlashCommands == false)
+        #expect(viewModel.filteredSlashCommands.isEmpty)
+    }
+
     @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
