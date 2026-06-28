@@ -2,7 +2,9 @@ import SwiftUI
 
 #if os(macOS)
 struct MacWorkspaceSidebarView: View {
+    @Environment(\.openWindow) private var openWindow
     @Environment(AppState.self) private var appState
+    @Environment(MacDesktopCommandController.self) private var commandController
     @State private var viewModel = PageTreeViewModel()
     @State private var creationRequest: PageCreationRequest?
     @State private var moveRequest: PageTreeNode?
@@ -22,8 +24,7 @@ struct MacWorkspaceSidebarView: View {
                     MacSidebarActionRow(
                         title: "Overview",
                         systemImage: "house",
-                        isSelected: appState.selectedSidebarDestination == .space(selectedSpace.id)
-                            && appState.selectedPageID == nil
+                        isSelected: selectionState.isOverviewSelected(spaceID: selectedSpace.id)
                     ) {
                         appState.selectSpace(id: selectedSpace.id)
                     }
@@ -31,7 +32,7 @@ struct MacWorkspaceSidebarView: View {
                     MacSidebarActionRow(
                         title: "Search",
                         systemImage: "magnifyingglass",
-                        isSelected: appState.selectedSidebarDestination == .search && appState.selectedPageID == nil
+                        isSelected: selectionState.isUtilitySelected(.search)
                     ) {
                         appState.selectSidebarUtilityDestination(.search)
                     }
@@ -39,7 +40,7 @@ struct MacWorkspaceSidebarView: View {
                     MacSidebarActionRow(
                         title: "Space settings",
                         systemImage: "gearshape",
-                        isSelected: appState.selectedSidebarDestination == .settings && appState.selectedPageID == nil
+                        isSelected: selectionState.isUtilitySelected(.settings)
                     ) {
                         appState.selectSidebarUtilityDestination(.settings)
                     }
@@ -71,9 +72,13 @@ struct MacWorkspaceSidebarView: View {
                             node: visibleNode.node,
                             depth: visibleNode.depth,
                             isExpanded: visibleNode.isExpanded,
-                            isSelected: appState.selectedPageID == visibleNode.node.slugId,
+                            isSelected: selectionState.isPageSelected(
+                                slugID: visibleNode.node.slugId,
+                                spaceID: visibleNode.node.spaceId
+                            ),
                             toggle: toggleNode,
                             openInDetailColumn: openInDetailColumn,
+                            openInNewWindow: openInNewWindow,
                             movePage: movePage,
                             createChild: beginCreateChild,
                             duplicate: beginDuplicate,
@@ -108,6 +113,11 @@ struct MacWorkspaceSidebarView: View {
         .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
         .task(id: selectedSpace?.id) {
             await loadSelectedSpacePages()
+        }
+        .onChange(of: commandController.sidebarReloadRequestID) { _, _ in
+            Task {
+                await loadSelectedSpacePages()
+            }
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
@@ -150,6 +160,13 @@ struct MacWorkspaceSidebarView: View {
         }
 
         return appState.spaces.first
+    }
+
+    private var selectionState: MacSidebarSelectionState {
+        MacSidebarSelectionState(
+            destination: appState.selectedSidebarDestination,
+            selectedPageID: appState.selectedPageID
+        )
     }
 
     private func loadSelectedSpacePages() async {
@@ -205,6 +222,14 @@ struct MacWorkspaceSidebarView: View {
 
     private func openInDetailColumn(_ node: PageTreeNode) {
         appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
+    }
+
+    private func openInNewWindow(_ node: PageTreeNode) {
+        openWindow(value: MacPageWindowRoute(
+            pageID: node.slugId,
+            spaceID: node.spaceId,
+            title: node.title
+        ))
     }
 
     private func movePage(sourceID: String, operation: PageTreeDropOperation) {

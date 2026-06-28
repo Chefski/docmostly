@@ -39,6 +39,40 @@ nonisolated struct DocmostComment: Decodable, Identifiable, Hashable, Sendable {
         case resolvedBy
     }
 
+    init(
+        id: String,
+        content: String?,
+        selection: String?,
+        type: String?,
+        creatorId: String,
+        pageId: String,
+        parentCommentId: String? = nil,
+        resolvedById: String? = nil,
+        resolvedAt: Date? = nil,
+        workspaceId: String? = nil,
+        createdAt: Date? = nil,
+        editedAt: Date? = nil,
+        deletedAt: Date? = nil,
+        creator: DocmostUser? = nil,
+        resolvedBy: DocmostUser? = nil
+    ) {
+        self.id = id
+        self.content = content
+        self.selection = selection
+        self.type = type
+        self.creatorId = creatorId
+        self.pageId = pageId
+        self.parentCommentId = parentCommentId
+        self.resolvedById = resolvedById
+        self.resolvedAt = resolvedAt
+        self.workspaceId = workspaceId
+        self.createdAt = createdAt
+        self.editedAt = editedAt
+        self.deletedAt = deletedAt
+        self.creator = creator
+        self.resolvedBy = resolvedBy
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 

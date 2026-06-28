@@ -31,7 +31,7 @@ struct RootView: View {
             guard CommandLine.arguments.contains("-MainShellPreview") == false else { return }
             #endif
             appState.configure(modelContext: modelContext, modelContainer: modelContainer)
-            await appState.restore()
+            await appState.restoreIfNeeded()
         }
     }
 

@@ -45,25 +45,63 @@ extension AppState {
     }
 
     func movePage(_ payload: PageTreeMovePayload) async throws {
-        guard let apiClient else {
-            throw APIError.connectionFailed("Moving pages requires a network connection.")
-        }
-
-        try await apiClient.sendVoid(.movePage(
+        let offlinePayload = OfflineMutationPayload.movePage(
             pageId: payload.pageId,
             parentPageId: payload.parentPageId,
             position: payload.position
-        ))
-        isOffline = false
+        )
+
+        guard let apiClient else {
+            try await queueOfflineMutation(offlinePayload)
+            return
+        }
+
+        guard pendingOfflineMutationCount == 0 else {
+            try await queueOfflineMutation(offlinePayload)
+            scheduleOfflineQueueReconciliation()
+            return
+        }
+
+        do {
+            try await apiClient.sendVoid(.movePage(
+                pageId: payload.pageId,
+                parentPageId: payload.parentPageId,
+                position: payload.position
+            ))
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            try await queueOfflineMutation(offlinePayload)
+        }
     }
 
     func movePageToSpace(pageId: String, spaceId: String) async throws {
+        let offlinePayload = OfflineMutationPayload.movePageToSpace(pageId: pageId, spaceId: spaceId)
+
         guard let apiClient else {
-            throw APIError.connectionFailed("Moving pages requires a network connection.")
+            try await queueOfflineMutation(offlinePayload)
+            return
         }
 
-        try await apiClient.sendVoid(.movePageToSpace(pageId: pageId, spaceId: spaceId))
-        isOffline = false
+        guard pendingOfflineMutationCount == 0 else {
+            try await queueOfflineMutation(offlinePayload)
+            scheduleOfflineQueueReconciliation()
+            return
+        }
+
+        do {
+            try await apiClient.sendVoid(.movePageToSpace(pageId: pageId, spaceId: spaceId))
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            try await queueOfflineMutation(offlinePayload)
+        }
     }
 
     func duplicatePage(pageId: String, spaceId: String? = nil) async throws -> DocmostPage {
