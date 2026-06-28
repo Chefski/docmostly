@@ -26,6 +26,17 @@ struct NativeEditorMediaHTMLFidelityTests {
         #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
     }
 
+    @Test func importsCompactDocmostMediaAndEmbedHTMLAsTypedNativeBlocks() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: compactDocmostHTMLMarkdown())
+
+        try #require(blocks.count == 5)
+        verifyVideo(blocks[0])
+        verifyAudio(blocks[1])
+        verifyPDF(blocks[2])
+        verifyAttachment(blocks[3])
+        verifyEmbed(blocks[4])
+    }
+
     private func nativeBlocks() -> [NativeEditorBlock] {
         [
             NativeEditorBlock(kind: .image(imageBlock()), text: AttributedString("Hero"), alignment: .left),
@@ -125,6 +136,16 @@ struct NativeEditorMediaHTMLFidelityTests {
         ].joined(separator: "\n")
     }
 
+    private func compactDocmostHTMLMarkdown() -> String {
+        [
+            compactVideoHTML(),
+            compactAudioHTML(),
+            compactPDFHTML(),
+            compactAttachmentHTML(),
+            compactEmbedHTML()
+        ].joined(separator: "\n")
+    }
+
     private func imageHTML() -> String {
         htmlTag("img", attributes: [
             ("src", "/api/files/image-1/Hero.png"),
@@ -146,6 +167,13 @@ struct NativeEditorMediaHTMLFidelityTests {
         """
     }
 
+    private func compactVideoHTML() -> String {
+        [
+            htmlTag("video", attributes: compactVideoAttributes()),
+            #"<source src="/api/files/video-1/Demo.mp4"></video>"#
+        ].joined()
+    }
+
     private func videoAttributes() -> [(String, String?)] {
         [
             ("controls", "true"),
@@ -160,12 +188,23 @@ struct NativeEditorMediaHTMLFidelityTests {
         ]
     }
 
+    private func compactVideoAttributes() -> [(String, String?)] {
+        videoAttributes().filter { key, _ in key != "src" }
+    }
+
     private func audioHTML() -> String {
         """
         \(htmlTag("audio", attributes: audioAttributes()))
         <source src="/api/files/audio-1/Briefing.m4a">
         </audio>
         """
+    }
+
+    private func compactAudioHTML() -> String {
+        [
+            htmlTag("audio", attributes: compactAudioAttributes()),
+            #"<source src="/api/files/audio-1/Briefing.m4a"></audio>"#
+        ].joined()
     }
 
     private func audioAttributes() -> [(String, String?)] {
@@ -178,12 +217,23 @@ struct NativeEditorMediaHTMLFidelityTests {
         ]
     }
 
+    private func compactAudioAttributes() -> [(String, String?)] {
+        audioAttributes().filter { key, _ in key != "src" }
+    }
+
     private func pdfHTML() -> String {
         """
         \(htmlTag("div", attributes: pdfContainerAttributes()))
         <iframe src="/api/files/pdf-1/Spec.pdf" width="800" height="600"></iframe>
         </div>
         """
+    }
+
+    private func compactPDFHTML() -> String {
+        [
+            htmlTag("div", attributes: compactPDFContainerAttributes()),
+            #"<iframe src="/api/files/pdf-1/Spec.pdf" width="800" height="600"></iframe></div>"#
+        ].joined()
     }
 
     private func pdfContainerAttributes() -> [(String, String?)] {
@@ -198,12 +248,24 @@ struct NativeEditorMediaHTMLFidelityTests {
         ]
     }
 
+    private func compactPDFContainerAttributes() -> [(String, String?)] {
+        pdfContainerAttributes().filter { key, _ in key != "src" }
+    }
+
     private func attachmentHTML() -> String {
         """
         \(htmlTag("div", attributes: attachmentContainerAttributes()))
         <a href="/api/files/file-1/Archive.zip" class="attachment" target="blank">Archive.zip</a>
         </div>
         """
+    }
+
+    private func compactAttachmentHTML() -> String {
+        [
+            htmlTag("div", attributes: compactAttachmentContainerAttributes()),
+            #"<a href="/api/files/file-1/Archive.zip" class="attachment" target="blank">"#,
+            "Archive.zip</a></div>"
+        ].joined()
     }
 
     private func attachmentContainerAttributes() -> [(String, String?)] {
@@ -217,12 +279,24 @@ struct NativeEditorMediaHTMLFidelityTests {
         ]
     }
 
+    private func compactAttachmentContainerAttributes() -> [(String, String?)] {
+        attachmentContainerAttributes().filter { key, _ in key != "data-attachment-url" }
+    }
+
     private func embedHTML() -> String {
         """
         \(htmlTag("div", attributes: embedContainerAttributes()))
         <a href="https://www.figma.com/file/demo" target="blank">https://www.figma.com/file/demo</a>
         </div>
         """
+    }
+
+    private func compactEmbedHTML() -> String {
+        [
+            htmlTag("div", attributes: compactEmbedContainerAttributes()),
+            #"<a href="https://www.figma.com/file/demo" target="blank">"#,
+            "https://www.figma.com/file/demo</a></div>"
+        ].joined()
     }
 
     private func embedContainerAttributes() -> [(String, String?)] {
@@ -234,6 +308,10 @@ struct NativeEditorMediaHTMLFidelityTests {
             ("data-width", "800"),
             ("data-height", "600")
         ]
+    }
+
+    private func compactEmbedContainerAttributes() -> [(String, String?)] {
+        embedContainerAttributes().filter { key, _ in key != "data-src" }
     }
 
     private func verifyImage(_ block: NativeEditorBlock) {
