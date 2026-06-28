@@ -536,12 +536,6 @@ extension NativeEditorMarkdownParser {
         return attributeText.isEmpty ? "<\(name)>" : "<\(name) \(attributeText)>"
     }
 
-    private static func escapedInlineHTMLText(_ text: String) -> String {
-        text.replacing("&", with: "&amp;")
-            .replacing("<", with: "&lt;")
-            .replacing(">", with: "&gt;")
-    }
-
     private static func htmlTagAttributes(from line: String, tagName: String) -> [String: String]? {
         let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedLine.lowercased().hasPrefix("<\(tagName.lowercased())") else { return nil }
