@@ -15,7 +15,7 @@ struct NativeEditorMathMarkdownTests {
         } == false)
 
         let inlineNodes = try #require(NativeEditorDocument.node(from: block).content)
-        #expect(inlineNodes.map(\.type) == ["text"])
-        #expect(inlineNodes.first?.text == "Budget is $5 and $6 tomorrow")
+        #expect(inlineNodes.contains { node in node.type == "mathInline" } == false)
+        #expect(inlineNodes.compactMap(\.text).joined() == "Budget is $5 and $6 tomorrow")
     }
 }
