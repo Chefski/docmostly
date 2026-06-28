@@ -5,6 +5,7 @@ nonisolated enum APIError: Error, LocalizedError, Equatable {
     case httpStatus(Int, String?)
     case missingData
     case connectionFailed(String)
+    case decodingFailed(String)
     case responseTooLarge
 
     var errorDescription: String? {
@@ -17,6 +18,8 @@ nonisolated enum APIError: Error, LocalizedError, Equatable {
             "The server response did not include expected data."
         case .connectionFailed(let message):
             message
+        case .decodingFailed(let message):
+            "The server response could not be decoded: \(message)"
         case .responseTooLarge:
             "The server response is too large."
         }

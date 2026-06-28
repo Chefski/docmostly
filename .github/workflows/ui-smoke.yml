@@ -1,0 +1,47 @@
+name: UI Smoke
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ui-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-ui-smoke:
+    name: iOS UI smoke
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project docmostly.xcodeproj \
+            -scheme docmostlyUITests \
+            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO
+
+  macos-ui-smoke:
+    name: macOS UI smoke
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project docmostly.xcodeproj \
+            -scheme DocmostlyMacUITests \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO

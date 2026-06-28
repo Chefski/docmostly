@@ -4,6 +4,7 @@ import SwiftData
 
 @MainActor
 @Observable
+// swiftlint:disable:next type_body_length
 final class AppState {
     var phase: AppPhase = .restoring
     var serverURLString: String
@@ -15,19 +16,29 @@ final class AppState {
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
+    var pendingOfflineMutationCount = 0
 
     @ObservationIgnored private let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
-    @ObservationIgnored private var cacheRepository: CacheRepository?
+    @ObservationIgnored var cacheRepository: CacheRepository?
     @ObservationIgnored private var cacheReader: CacheReadRepository?
-    @ObservationIgnored private var cacheWriter: CacheWriteRepository?
-    @ObservationIgnored private var cacheScope: CacheScope?
+    @ObservationIgnored var cacheWriter: CacheWriteRepository?
+    @ObservationIgnored var offlineQueue: OfflineMutationQueue?
+    @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
+    @ObservationIgnored var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
+    @ObservationIgnored private var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Void, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
+    @ObservationIgnored var offlineReplayTask: Task<Void, Never>?
+    @ObservationIgnored var pageCommentsByID: [String: [DocmostComment]] = [:]
+    @ObservationIgnored var pageLabelsByID: [String: [DocmostLabel]] = [:]
+    @ObservationIgnored var favoriteIDsByType: [FavoriteType: Set<String>] = [:]
+    @ObservationIgnored var pageWatchStatusByID: [String: Bool] = [:]
+    @ObservationIgnored var spaceWatchStatusByID: [String: Bool] = [:]
 
     init(
         settingsStore: LocalSettingsStore? = nil,
@@ -59,6 +70,12 @@ final class AppState {
         if cacheWriter == nil, let modelContainer {
             cacheWriter = CacheWriteRepository(modelContainer: modelContainer)
         }
+        if offlineQueue == nil {
+            offlineQueue = OfflineMutationQueue(context: modelContext)
+        }
+        if offlineQueueRepository == nil, let modelContainer {
+            offlineQueueRepository = OfflineMutationQueueRepository(modelContainer: modelContainer)
+        }
     }
 
     #if DEBUG
@@ -67,7 +84,7 @@ final class AppState {
     }
     #endif
 
-    private func scheduleCacheWrite(_ operation: CacheWriteOperation) {
+    func scheduleCacheWrite(_ operation: CacheWriteOperation) {
         pendingCacheWrites.append(operation)
         cacheWriteTask?.cancel()
         cacheWriteTask = Task(priority: .utility) { [weak self] in
@@ -160,9 +177,12 @@ final class AppState {
         settingsStore.saveServerURLString(serverURLString)
         savedServerURLStrings = settingsStore.loadSavedServerURLStrings()
         cancelScheduledCacheWrites()
+        cancelOfflineReplay()
         apiClient = client
         currentUser = nil
         cacheScope = nil
+        pendingOfflineMutationCount = 0
+        clearOfflineProjections()
         phase = .unauthenticated
         isOffline = false
     }
@@ -186,8 +206,11 @@ final class AppState {
     func logout() async {
         try? await authService.logout(client: apiClient)
         cancelScheduledCacheWrites()
+        cancelOfflineReplay()
         currentUser = nil
         cacheScope = nil
+        pendingOfflineMutationCount = 0
+        clearOfflineProjections()
         spaces = []
         resetNavigationSelection()
         phase = .unauthenticated
@@ -222,6 +245,8 @@ final class AppState {
             if let cacheScope {
                 scheduleCacheWrite(.saveSpaces(response.items, cacheScope))
             }
+            await refreshOfflineMutationCount()
+            scheduleOfflineQueueReconciliation()
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
@@ -308,18 +333,34 @@ final class AppState {
 
     func updatePage(pageId: String, title: String, document: ProseMirrorDocument) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            throw APIError.connectionFailed("Editing requires a network connection.")
+            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
         }
 
-        let page: DocmostEditablePage = try await apiClient.send(.updatePage(
-            pageId: pageId,
-            title: title,
-            content: document,
-            format: .json,
-            operation: .replace
-        ))
-        isOffline = false
-        return page
+        do {
+            let page: DocmostEditablePage = try await apiClient.send(.updatePage(
+                pageId: pageId,
+                title: title,
+                content: document,
+                format: .json,
+                operation: .replace
+            ))
+            isOffline = false
+            if let cacheScope {
+                scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
+            }
+            do {
+                try await clearPendingPageUpdate(pageId: pageId, title: title, document: document)
+                scheduleOfflineQueueReconciliation()
+            } catch {
+                statusMessage = error.localizedDescription
+            }
+            return page
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
+        }
     }
 
     func search(query: String, spaceId: String?) async throws -> [DocmostSearchResult] {
@@ -451,12 +492,34 @@ final class AppState {
         }
 
         cacheScope = CacheScope(serverBaseURL: apiClient.baseURL, userID: currentUser.user.id)
+        Task { [weak self] in
+            await self?.refreshOfflineMutationCount()
+        }
     }
 
-    private func requireCacheScope(message: String) throws -> CacheScope {
+    func requireCacheScope(message: String) throws -> CacheScope {
         guard let cacheScope else {
             throw APIError.connectionFailed(message)
         }
         return cacheScope
+    }
+}
+
+extension AppState {
+    func restoreIfNeeded() async {
+        if let restoreTask {
+            await restoreTask.value
+            return
+        }
+
+        guard phase == .restoring else { return }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.restore()
+        }
+        restoreTask = task
+        await task.value
+        restoreTask = nil
     }
 }
