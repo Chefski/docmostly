@@ -193,19 +193,17 @@ struct NativeEditorRichMarkdownExportTests {
         :::warning
         Check migration plan
         :::
-        <details>
-        <summary>Release checklist</summary>
-
+        <details open="">
+        <summary data-type="detailsSummary">Release checklist</summary>
+        <div data-type="detailsContent">
         Ship native editor
-
+        </div>
         </details>
         <div data-type="pageBreak" class="page-break"></div>
         <div data-type="embed" data-src="https://example.com" data-provider="Example">
         <a href="https://example.com" target="blank">https://example.com</a>
         </div>
-        $$
-        E = mc^2
-        $$
+        <div data-type="mathBlock" data-katex="true">E = mc^2</div>
         """)
     }
 

@@ -21,6 +21,10 @@ extension NativeEditorMarkdownParser {
             return diagramBlock
         }
 
+        if let containerBlock = docmostContainerHTMLBlock(in: lines, startingAt: index) {
+            return containerBlock
+        }
+
         if let structuralBlock = docmostStructuralHTMLBlock(in: lines, startingAt: index) {
             return structuralBlock
         }
@@ -40,6 +44,10 @@ extension NativeEditorMarkdownParser {
     static func richMarkdownLine(from block: NativeEditorBlock) -> String? {
         if let mediaMarkdown = mediaMarkdownLine(from: block) {
             return mediaMarkdown
+        }
+
+        if let containerMarkdown = docmostContainerHTMLMarkdown(from: block) {
+            return containerMarkdown
         }
 
         if let structuralMarkdown = structuralMarkdownLine(from: block) {
