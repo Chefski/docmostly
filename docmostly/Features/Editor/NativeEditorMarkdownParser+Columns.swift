@@ -46,7 +46,7 @@ extension NativeEditorMarkdownParser {
             ? ""
             : #" data-width-mode="\#(escapedInlineHTMLAttribute(widthMode))""#
         let layout = escapedInlineHTMLAttribute(columns.layout)
-        let openingTag = #"<div data-type="columns" data-layout="\#(layout)\#(widthModeAttribute)>"#
+        let openingTag = #"<div data-type="columns" data-layout="\#(layout)"\#(widthModeAttribute)>"#
         let columnMarkup = zip(columnTexts, columnWidths).map { text, width in
             columnMarkdown(text: text, width: width ?? 1)
         }.joined(separator: "\n")
@@ -138,8 +138,9 @@ extension NativeEditorMarkdownParser {
         let lowercasedLine = trimmedLine.lowercased()
         if lowercasedLine.hasPrefix("<p"), lowercasedLine.hasSuffix("</p>"),
            let openingEnd = trimmedLine.firstIndex(of: ">"),
-           let closingStart = lowercasedLine.range(of: "</p>", options: .backwards)?.lowerBound {
-            return unescapedInlineHTMLText(String(trimmedLine[trimmedLine.index(after: openingEnd)..<closingStart]))
+           let closingRange = trimmedLine.range(of: "</p>", options: [.caseInsensitive, .backwards]) {
+            let contentStart = trimmedLine.index(after: openingEnd)
+            return unescapedInlineHTMLText(String(trimmedLine[contentStart..<closingRange.lowerBound]))
         }
 
         return unescapedInlineHTMLText(trimmedLine)
