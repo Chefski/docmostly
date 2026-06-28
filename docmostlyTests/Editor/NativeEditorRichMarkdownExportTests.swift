@@ -200,7 +200,9 @@ struct NativeEditorRichMarkdownExportTests {
 
         </details>
         <div data-type="pageBreak" class="page-break"></div>
-        [Example](https://example.com)
+        <div data-type="embed" data-src="https://example.com" data-provider="Example">
+        <a href="https://example.com" target="blank">https://example.com</a>
+        </div>
         $$
         E = mc^2
         $$
