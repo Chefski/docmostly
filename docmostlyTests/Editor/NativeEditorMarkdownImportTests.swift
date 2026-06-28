@@ -128,6 +128,15 @@ struct NativeEditorMarkdownImportTests {
         #expect(block.rawNode?.type == "pageBreak")
     }
 
+    @Test func legacyPageBreakHTMLImportsAsNativePageBreakBlock() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: #"<div style="page-break-after: always;"></div>"#
+        ).first)
+
+        #expect(block.kind == .pageBreak)
+        #expect(block.rawNode?.type == "pageBreak")
+    }
+
     @Test func docmostColumnsHTMLImportsAsNativeColumnsBlock() throws {
         let markdown = """
         <div data-type="columns" data-layout="two_left_sidebar" data-width-mode="wide">

@@ -4,10 +4,7 @@ extension NativeEditorMarkdownParser {
     static func pageBreakHTMLBlock(from line: String) -> NativeEditorBlock? {
         let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowercasedLine = trimmedLine.lowercased()
-        guard
-            lowercasedLine.hasPrefix("<div"),
-            lowercasedLine.contains("data-type")
-        else {
+        guard lowercasedLine.hasPrefix("<div") else {
             return nil
         }
 
@@ -20,7 +17,7 @@ extension NativeEditorMarkdownParser {
 
         let openingTag = String(trimmedLine[trimmedLine.startIndex..<tagEnd])
         let attributes = docmostInlineHTMLAttributes(from: openingTag)
-        guard attributes["data-type"]?.localizedCaseInsensitiveCompare("pageBreak") == .orderedSame else {
+        guard isPageBreakHTML(attributes: attributes) else {
             return nil
         }
 
@@ -30,5 +27,14 @@ extension NativeEditorMarkdownParser {
             alignment: .left,
             rawNode: ProseMirrorNode(type: "pageBreak")
         )
+    }
+
+    private static func isPageBreakHTML(attributes: [String: String]) -> Bool {
+        if attributes["data-type"]?.localizedCaseInsensitiveCompare("pageBreak") == .orderedSame {
+            return true
+        }
+
+        let style = attributes["style"]?.lowercased() ?? ""
+        return style.contains("page-break-after") && style.contains("always")
     }
 }
