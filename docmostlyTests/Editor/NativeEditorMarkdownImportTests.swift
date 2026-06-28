@@ -103,6 +103,37 @@ struct NativeEditorMarkdownImportTests {
         #expect(blocks[3].rawNode?.attrs?["attachmentId"] == .string("file-1"))
     }
 
+    @Test func oneSegmentFilesRoutesDoNotImportAttachmentIDs() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: """
+        ![Manual](/api/files/manual.png)
+        [Spec.pdf](/api/files/manual.pdf)
+        [Archive.zip](/api/files/archive.zip)
+        """)
+
+        try #require(blocks.count == 3)
+
+        guard case .image(let image) = blocks[0].kind else {
+            Issue.record("Expected image Markdown to import as an image block.")
+            return
+        }
+        #expect(image.attachmentID == nil)
+        #expect(blocks[0].rawNode?.attrs?["attachmentId"] == nil)
+
+        guard case .pdf(let pdf) = blocks[1].kind else {
+            Issue.record("Expected PDF Markdown to import as a PDF block.")
+            return
+        }
+        #expect(pdf.attachmentID == nil)
+        #expect(blocks[1].rawNode?.attrs?["attachmentId"] == nil)
+
+        guard case .attachment(let attachment) = blocks[2].kind else {
+            Issue.record("Expected file Markdown to import as an attachment block.")
+            return
+        }
+        #expect(attachment.attachmentID == nil)
+        #expect(blocks[2].rawNode?.attrs?["attachmentId"] == nil)
+    }
+
     @Test func markdownImageTitleImportsAsNativeMediaTitle() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(
             from: #"![Architecture](/files/image.png "System diagram")"#
