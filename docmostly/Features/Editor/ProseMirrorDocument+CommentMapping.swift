@@ -13,7 +13,7 @@ nonisolated extension ProseMirrorDocument {
     }
 }
 
-private extension [ProseMirrorNode] {
+private nonisolated extension [ProseMirrorNode] {
     func replacingCommentID(_ localID: String, with serverID: String) -> (nodes: [ProseMirrorNode], didReplace: Bool) {
         var didReplace = false
         let nodes = map { node in
@@ -25,7 +25,7 @@ private extension [ProseMirrorNode] {
     }
 }
 
-private extension ProseMirrorNode {
+private nonisolated extension ProseMirrorNode {
     func replacingCommentID(_ localID: String, with serverID: String) -> (node: ProseMirrorNode, didReplace: Bool) {
         var copy = self
         var didReplace = false
@@ -46,7 +46,7 @@ private extension ProseMirrorNode {
     }
 }
 
-private extension [ProseMirrorMark] {
+private nonisolated extension [ProseMirrorMark] {
     func replacingCommentID(_ localID: String, with serverID: String) -> (marks: [ProseMirrorMark], didReplace: Bool) {
         var didReplace = false
         let marks = map { mark in
