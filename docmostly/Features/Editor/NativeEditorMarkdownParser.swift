@@ -18,6 +18,12 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if let richBlock = richBlock(in: lines, startingAt: index) {
+                blocks.append(richBlock.block)
+                index = richBlock.endIndex
+                continue
+            }
+
             if let table = tableBlock(in: lines, startingAt: index) {
                 blocks.append(table.block)
                 index = table.endIndex
@@ -34,6 +40,10 @@ enum NativeEditorMarkdownParser {
     }
 
     static func inputRule(from text: String) -> NativeEditorMarkdownInputRule? {
+        if isDivider(text.trimmingCharacters(in: .whitespaces)) {
+            return NativeEditorMarkdownInputRule(kind: .divider, text: "Divider")
+        }
+
         if let codeRule = codeInputRule(from: text) {
             return codeRule
         }
@@ -49,6 +59,10 @@ enum NativeEditorMarkdownParser {
         let indentLevel = listIndentLevel(from: line)
         let trimmedLine = line.trimmingCharacters(in: .whitespaces)
         guard trimmedLine.isEmpty == false else { return nil }
+
+        if let richBlock = singleLineRichBlock(from: trimmedLine) {
+            return richBlock
+        }
 
         if isDivider(trimmedLine) {
             return NativeEditorBlock(kind: .divider, text: AttributedString("Divider"), alignment: .left)
@@ -122,6 +136,7 @@ enum NativeEditorMarkdownParser {
 
     private static func simpleInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
         let rules: [(String, NativeEditorBlockKind)] = [
+            ("### ", .heading(level: 3)),
             ("## ", .heading(level: 2)),
             ("# ", .heading(level: 1)),
             ("- ", .bulletListItem),
@@ -177,12 +192,67 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func inlineText(from markdown: String) -> AttributedString {
-        (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+        var result = AttributedString("")
+        var remaining = markdown[...]
+
+        while let inlineDelimiter = nextInlineMathDelimiter(in: remaining) {
+            let openRange = inlineDelimiter.range
+            appendMarkdownText(
+                String(remaining[..<openRange.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
+
+            let contentStart = openRange.upperBound
+            guard let closeRange = remaining[contentStart...].range(of: inlineDelimiter.value) else {
+                appendMarkdownText(String(remaining[openRange.lowerBound...]), to: &result)
+                return result
+            }
+
+            let mathText = String(remaining[contentStart..<closeRange.lowerBound])
+            guard mathText.isEmpty == false else {
+                appendMarkdownText(String(remaining[..<closeRange.upperBound]), to: &result)
+                remaining = remaining[closeRange.upperBound...]
+                continue
+            }
+
+            appendInlineMath(mathText, to: &result)
+            remaining = remaining[closeRange.upperBound...]
+        }
+
+        appendMarkdownText(String(remaining), to: &result, usesFoundationMarkdownParser: result.characters.isEmpty)
+        return result
+    }
+
+    private static func appendInlineMath(_ text: String, to result: inout AttributedString) {
+        let math = NativeEditorMathInline(text: text)
+        var segment = AttributedString(text)
+        segment[NativeEditorMathInlineAttribute.self] = math
+        segment.inlinePresentationIntent = .code
+        result += segment
+    }
+
+    private static func nextInlineMathDelimiter(
+        in markdown: Substring
+    ) -> (range: Range<String.Index>, value: String)? {
+        let singleDollarRange = markdown.range(of: "$")
+        let doubleDollarRange = markdown.range(of: "$$")
+
+        if let doubleDollarRange, doubleDollarRange.lowerBound == singleDollarRange?.lowerBound {
+            return (doubleDollarRange, "$$")
+        }
+
+        if let singleDollarRange {
+            return (singleDollarRange, "$")
+        }
+
+        return nil
     }
 
     private static func markdownLine(from block: NativeEditorBlock) -> String {
         let indent = String(repeating: "  ", count: block.indentLevel)
-        let text = String(block.text.characters)
+        let plainText = String(block.text.characters)
+        let text = inlineMarkdown(from: block.text)
 
         switch block.kind {
         case .heading(let level):
@@ -196,13 +266,13 @@ enum NativeEditorMarkdownParser {
         case .blockquote:
             return "> \(text)"
         case .codeBlock(let language):
-            return codeMarkdown(language: language, text: text)
+            return codeMarkdown(language: language, text: plainText)
         case .divider:
             return "---"
         case .table(let table):
             return tableMarkdown(from: table)
         default:
-            return text
+            return richMarkdownLine(from: block) ?? text
         }
     }
 
@@ -233,6 +303,23 @@ enum NativeEditorMarkdownParser {
         }
 
         return min(columns / 2, 8)
+    }
+
+    private static func inlineMarkdown(from text: AttributedString) -> String {
+        var output = ""
+
+        for run in text.runs {
+            let runText = String(text[run.range].characters)
+            if let math = run[NativeEditorMathInlineAttribute.self] {
+                output += "$\(math.text.replacing("$", with: "\\$"))$"
+            } else if let mention = run[NativeEditorMentionAttribute.self] {
+                output += mentionMarkdown(from: mention, fallbackText: runText)
+            } else {
+                output += inlineRunMarkdown(from: run, text: runText)
+            }
+        }
+
+        return output
     }
 }
 

@@ -126,6 +126,7 @@ enum NativeEditorRichBlockFixtures {
               "attrs": {
                 "src": "/files/video.mp4",
                 "alt": "Demo",
+                "title": "Launch demo.mp4",
                 "attachmentId": "video-1",
                 "size": 4096,
                 "align": "left"

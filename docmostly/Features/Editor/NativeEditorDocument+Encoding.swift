@@ -233,6 +233,8 @@ nonisolated extension NativeEditorDocument {
             NativeEditorRichBlockNodeFactory.transclusionSourceNode(from: source)
         case .transclusionReference(let reference):
             NativeEditorRichBlockNodeFactory.transclusionReferenceNode(from: reference)
+        case .base(let base):
+            NativeEditorRichBlockNodeFactory.baseNode(from: base)
         default:
             nil
         }
@@ -240,14 +242,14 @@ nonisolated extension NativeEditorDocument {
 
     private static func embeddedFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode {
         switch block.kind {
-        case .embed:
-            ProseMirrorNode(type: "embed")
-        case .drawio:
-            ProseMirrorNode(type: "drawio")
-        case .excalidraw:
-            ProseMirrorNode(type: "excalidraw")
-        case .mathBlock:
-            ProseMirrorNode(type: "mathBlock")
+        case .embed(let embed):
+            NativeEditorRichBlockNodeFactory.embedNode(from: embed)
+        case .drawio(let diagram):
+            NativeEditorRichBlockNodeFactory.diagramNode(from: diagram, type: "drawio")
+        case .excalidraw(let diagram):
+            NativeEditorRichBlockNodeFactory.diagramNode(from: diagram, type: "excalidraw")
+        case .mathBlock(let math):
+            NativeEditorRichBlockNodeFactory.mathBlockNode(from: math)
         case .unsupported:
             textContainerNode(type: "paragraph", block: block)
         default:
@@ -279,12 +281,54 @@ nonisolated extension NativeEditorDocument {
         from run: AttributedString.Runs.Run,
         in attributedText: AttributedString
     ) -> [ProseMirrorNode] {
-        if let atomNode = inlineAtomNode(from: run) {
-            return [atomNode]
+        let runText = String(attributedText.characters[run.range])
+
+        if let atom = inlineAtom(from: run) {
+            return inlineNodes(from: atom, runText: runText, run: run)
         }
 
-        let runText = String(attributedText.characters[run.range])
-        let components = runText.split(separator: "\n", omittingEmptySubsequences: false)
+        return textNodes(from: runText, marks: marks(from: run))
+    }
+
+    private struct InlineAtomEncoding {
+        var displayText: String
+        var node: ProseMirrorNode
+        var presentationMarkType: String?
+
+        init(
+            displayText: String,
+            node: ProseMirrorNode,
+            presentationMarkType: String? = nil
+        ) {
+            self.displayText = displayText
+            self.node = node
+            self.presentationMarkType = presentationMarkType
+        }
+    }
+
+    private static func inlineNodes(
+        from atom: InlineAtomEncoding,
+        runText: String,
+        run: AttributedString.Runs.Run
+    ) -> [ProseMirrorNode] {
+        guard
+            runText != atom.displayText,
+            atom.displayText.isEmpty == false,
+            let atomRange = runText.range(of: atom.displayText)
+        else {
+            return [atom.node]
+        }
+
+        let prefix = String(runText[..<atomRange.lowerBound])
+        let suffix = String(runText[atomRange.upperBound...])
+        let textMarks = marksForTextSurroundingAtom(from: run, atom: atom)
+        return textNodes(from: prefix, marks: textMarks) +
+            [atom.node] +
+            textNodes(from: suffix, marks: textMarks)
+    }
+
+    private static func textNodes(from text: String, marks: [ProseMirrorMark]?) -> [ProseMirrorNode] {
+        let components = text.split(separator: "\n", omittingEmptySubsequences: false)
         var nodes: [ProseMirrorNode] = []
 
         for offset in components.indices {
@@ -294,26 +338,50 @@ nonisolated extension NativeEditorDocument {
 
             let value = String(components[offset])
             guard value.isEmpty == false else { continue }
-            nodes.append(ProseMirrorNode(type: "text", marks: marks(from: run), text: value))
+            nodes.append(ProseMirrorNode(type: "text", marks: marks, text: value))
         }
 
         return nodes
     }
 
-    private static func inlineAtomNode(from run: AttributedString.Runs.Run) -> ProseMirrorNode? {
+    private static func inlineAtom(from run: AttributedString.Runs.Run) -> InlineAtomEncoding? {
         if let mention = run[NativeEditorMentionAttribute.self] {
-            return ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+            return InlineAtomEncoding(
+                displayText: mention.displayText,
+                node: ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+            )
         }
 
         if let status = run[NativeEditorStatusAttribute.self] {
-            return ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
+            return InlineAtomEncoding(
+                displayText: status.text,
+                node: ProseMirrorNode(type: "status", attrs: statusAttrs(from: status)),
+                presentationMarkType: "bold"
+            )
         }
 
         if let math = run[NativeEditorMathInlineAttribute.self] {
-            return ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+            return InlineAtomEncoding(
+                displayText: math.text,
+                node: ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)]),
+                presentationMarkType: "code"
+            )
         }
 
         return nil
+    }
+
+    private static func marksForTextSurroundingAtom(
+        from run: AttributedString.Runs.Run,
+        atom: InlineAtomEncoding
+    ) -> [ProseMirrorMark]? {
+        guard var marks = marks(from: run) else { return nil }
+
+        if let presentationMarkType = atom.presentationMarkType {
+            marks.removeAll { $0.type == presentationMarkType }
+        }
+
+        return marks.isEmpty ? nil : marks
     }
 
     private static func inlineNode(from item: NativeEditorInlineContent) -> ProseMirrorNode {

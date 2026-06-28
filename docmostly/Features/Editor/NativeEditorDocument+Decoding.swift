@@ -204,6 +204,8 @@ nonisolated extension NativeEditorDocument {
             richBlock(kind: .transclusionSource(transclusionSourceBlock(from: node)), node: node)
         case "transclusionReference":
             richBlock(kind: .transclusionReference(transclusionReferenceBlock(from: node)), node: node)
+        case "base":
+            richBlock(kind: .base(baseBlock(from: node)), node: node)
         default:
             nil
         }

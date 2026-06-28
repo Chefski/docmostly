@@ -166,9 +166,13 @@ nonisolated extension NativeEditorDocument {
         case .superscript:
             text.baselineOffset = 4
         case .comment(let commentID, let isResolved):
-            text[NativeEditorCommentIDAttribute.self] = commentID
-            text[NativeEditorCommentResolvedAttribute.self] = isResolved
-            text.backgroundColor = .yellow.opacity(0.28)
+            text.addNativeEditorInlineComment(NativeEditorInlineCommentMark(
+                commentID: commentID,
+                isResolved: isResolved
+            ))
+            text.backgroundColor = text.nativeEditorInlineComments.contains { $0.isResolved == false }
+                ? .yellow.opacity(0.28)
+                : .gray.opacity(0.16)
         case .bold, .italic, .strikethrough, .code, .unknown:
             return
         }

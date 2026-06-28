@@ -17,6 +17,7 @@ nonisolated extension NativeEditorDocument {
         NativeEditorMediaBlock(
             source: node.attrs?["src"]?.stringValue,
             alternativeText: node.attrs?["alt"]?.stringValue,
+            title: node.attrs?["title"]?.stringValue,
             attachmentID: node.attrs?["attachmentId"]?.stringValue,
             sizeInBytes: node.attrs?["size"]?.intValue,
             width: node.attrs?["width"]?.displayString,
@@ -97,6 +98,15 @@ nonisolated extension NativeEditorDocument {
         )
     }
 
+    static func baseBlock(from node: ProseMirrorNode) -> NativeEditorBaseBlock {
+        let pageID = node.attrs?["pageId"]?.stringValue
+        return NativeEditorBaseBlock(
+            pageID: pageID,
+            pendingKey: node.attrs?["pendingKey"]?.stringValue,
+            previewText: "Base"
+        )
+    }
+
     static func embedBlock(from node: ProseMirrorNode) -> NativeEditorEmbedBlock {
         NativeEditorEmbedBlock(
             source: node.attrs?["src"]?.stringValue,
@@ -151,26 +161,34 @@ nonisolated extension NativeEditorDocument {
             .filter { cellTypes.contains($0.type) }
             .prefix(NativeEditorTable.maximumColumnCount)
             .map { cell in
-            NativeEditorTableCell(
-                plainText: plainText(in: cell.content ?? []),
-                isHeader: cell.type == "tableHeader",
-                backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
-                columnWidth: tableColumnWidth(from: cell.attrs)
-            )
-        }
+                let columnWidths = tableColumnWidths(from: cell.attrs)
+                return NativeEditorTableCell(
+                    plainText: plainText(in: cell.content ?? []),
+                    isHeader: cell.type == "tableHeader",
+                    backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
+                    columnWidth: columnWidths.first,
+                    columnSpan: normalizedTableSpan(cell.attrs?["colspan"]?.intValue),
+                    rowSpan: normalizedTableSpan(cell.attrs?["rowspan"]?.intValue),
+                    columnWidths: columnWidths
+                )
+            }
     }
 
-    private static func tableColumnWidth(from attrs: [String: ProseMirrorJSONValue]?) -> Int? {
+    private static func tableColumnWidths(from attrs: [String: ProseMirrorJSONValue]?) -> [Int] {
         guard let value = attrs?["colwidth"] ?? attrs?["colWidth"] else {
-            return nil
+            return []
         }
 
         switch value {
         case .array(let values):
-            return values.compactMap(\.intValue).first
+            return values.compactMap(\.intValue)
         default:
-            return value.intValue
+            return value.intValue.map { [$0] } ?? []
         }
+    }
+
+    private static func normalizedTableSpan(_ value: Int?) -> Int {
+        max(value ?? 1, 1)
     }
 
     private static func youtubeProviderName(for node: ProseMirrorNode) -> String? {

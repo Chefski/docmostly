@@ -51,6 +51,7 @@ extension NativeRichEditorViewModel {
 
             for rowIndex in table.rows.indices where table.rows[rowIndex].cells.indices.contains(columnIndex) {
                 table.rows[rowIndex].cells[columnIndex].columnWidth = clampedWidth
+                table.rows[rowIndex].cells[columnIndex].columnWidths = [clampedWidth]
             }
         }
     }
@@ -140,6 +141,18 @@ nonisolated enum NativeEditorTableNodeFactory {
 
         if let columnWidth = cell.columnWidth {
             attrs["colwidth"] = .array([.int(columnWidth)])
+        }
+
+        if cell.columnWidths.isEmpty == false {
+            attrs["colwidth"] = .array(cell.columnWidths.map { .int($0) })
+        }
+
+        if cell.columnSpan > 1 {
+            attrs["colspan"] = .int(cell.columnSpan)
+        }
+
+        if cell.rowSpan > 1 {
+            attrs["rowspan"] = .int(cell.rowSpan)
         }
 
         return attrs.isEmpty ? nil : attrs

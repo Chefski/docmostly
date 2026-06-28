@@ -42,6 +42,27 @@ struct NativeInlineCommentResolutionTests {
         )))
     }
 
+    @Test func removesOneOverlappingInlineCommentWithoutTouchingTheOther() {
+        let block = NativeEditorBlock(
+            kind: .paragraph,
+            text: overlappingMarkedText("Overlap"),
+            alignment: .left
+        )
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+
+        viewModel.removeInlineComment(commentID: "comment-1")
+
+        let marks = proseMirrorTextMarks(from: viewModel)
+        #expect(marks.contains(ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
+        )) == false)
+        #expect(marks == [
+            ProseMirrorMark(type: "comment", attrs: ["commentId": .string("comment-2"), "resolved": .bool(true)])
+        ])
+    }
+
     @Test func remoteResolutionUpdatesInlineCommentMarksWhileReadOnly() {
         let block = NativeEditorBlock(
             kind: .paragraph,
@@ -158,6 +179,18 @@ struct NativeInlineCommentResolutionTests {
         var attributedText = AttributedString(text)
         attributedText[NativeEditorCommentIDAttribute.self] = commentID
         attributedText[NativeEditorCommentResolvedAttribute.self] = false
+        attributedText.backgroundColor = .yellow.opacity(0.28)
+        return attributedText
+    }
+
+    private func overlappingMarkedText(_ text: String) -> AttributedString {
+        var attributedText = AttributedString(text)
+        attributedText[NativeEditorCommentIDAttribute.self] = "comment-1"
+        attributedText[NativeEditorCommentResolvedAttribute.self] = false
+        attributedText[NativeEditorCommentMarksAttribute.self] = [
+            NativeEditorInlineCommentMark(commentID: "comment-1", isResolved: false),
+            NativeEditorInlineCommentMark(commentID: "comment-2", isResolved: true)
+        ]
         attributedText.backgroundColor = .yellow.opacity(0.28)
         return attributedText
     }

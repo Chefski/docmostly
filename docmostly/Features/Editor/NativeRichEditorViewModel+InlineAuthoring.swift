@@ -60,8 +60,10 @@ extension NativeRichEditorViewModel {
         guard trimmedCommentID.isEmpty == false else { return }
 
         applyInlineAttributes { attributes in
-            attributes[NativeEditorCommentIDAttribute.self] = trimmedCommentID
-            attributes[NativeEditorCommentResolvedAttribute.self] = isResolved
+            attributes.addNativeEditorInlineComment(NativeEditorInlineCommentMark(
+                commentID: trimmedCommentID,
+                isResolved: isResolved
+            ))
             attributes.backgroundColor = .yellow.opacity(0.28)
         }
     }
@@ -81,8 +83,10 @@ extension NativeRichEditorViewModel {
             guard selection.hasSelectedRanges(in: document.blocks[index].text) else { return }
 
             document.blocks[index].text.transformAttributes(in: &selection) { attributes in
-                attributes[NativeEditorCommentIDAttribute.self] = trimmedCommentID
-                attributes[NativeEditorCommentResolvedAttribute.self] = isResolved
+                attributes.addNativeEditorInlineComment(NativeEditorInlineCommentMark(
+                    commentID: trimmedCommentID,
+                    isResolved: isResolved
+                ))
                 attributes.backgroundColor = .yellow.opacity(0.28)
             }
             document.blocks[index].selection = selection
@@ -162,16 +166,19 @@ extension NativeRichEditorViewModel {
 
         for index in document.blocks.indices {
             let ranges = document.blocks[index].text.runs.compactMap { run in
-                run[NativeEditorCommentIDAttribute.self] == commentID ? run.range : nil
+                run.hasNativeEditorInlineComment(commentID: commentID) ? run.range : nil
             }
             guard ranges.isEmpty == false else { continue }
 
             didUpdate = true
             for range in ranges {
-                document.blocks[index].text[range][NativeEditorCommentResolvedAttribute.self] = isResolved
-                document.blocks[index].text[range].backgroundColor = isResolved
-                    ? .gray.opacity(0.16)
-                    : .yellow.opacity(0.28)
+                let comments = document.blocks[index].text[range]
+                    .nativeEditorInlineComments
+                    .updatingNativeEditorInlineComment(NativeEditorInlineCommentMark(
+                        commentID: commentID,
+                        isResolved: isResolved
+                    ))
+                document.blocks[index].text.setNativeEditorInlineComments(comments, in: range)
             }
         }
 
@@ -186,17 +193,21 @@ extension NativeRichEditorViewModel {
 
         for index in document.blocks.indices {
             let ranges = document.blocks[index].text.runs.compactMap { run in
-                run[NativeEditorCommentIDAttribute.self] == commentID ? run.range : nil
+                run.hasNativeEditorInlineComment(commentID: commentID) ? run.range : nil
             }
             guard ranges.isEmpty == false else { continue }
 
             didUpdate = true
             for range in ranges {
                 let highlightColor = document.blocks[index].text[range][NativeEditorHighlightColorAttribute.self]
-                let restoredBackgroundColor = highlightColor.flatMap { Color(docmostlyHex: $0) }
-                document.blocks[index].text[range][NativeEditorCommentIDAttribute.self] = nil
-                document.blocks[index].text[range][NativeEditorCommentResolvedAttribute.self] = nil
-                document.blocks[index].text[range].backgroundColor = restoredBackgroundColor
+                let comments = document.blocks[index].text[range]
+                    .nativeEditorInlineComments
+                    .removingNativeEditorInlineComment(commentID: commentID)
+                document.blocks[index].text.setNativeEditorInlineComments(
+                    comments,
+                    in: range,
+                    fallbackBackgroundColor: highlightColor.flatMap { Color(docmostlyHex: $0) }
+                )
             }
         }
 
@@ -267,5 +278,32 @@ extension NativeRichEditorViewModel {
 
             document.blocks[index].selection = AttributedTextSelection()
         }
+    }
+}
+
+private extension AttributedString {
+    mutating func setNativeEditorInlineComments(
+        _ comments: [NativeEditorInlineCommentMark],
+        in range: Range<AttributedString.Index>,
+        fallbackBackgroundColor: Color? = nil
+    ) {
+        let normalizedComments = comments.normalizedNativeEditorInlineComments
+        self[range][NativeEditorCommentMarksAttribute.self] = normalizedComments.isEmpty ? nil : normalizedComments
+        self[range][NativeEditorCommentIDAttribute.self] = normalizedComments.first?.commentID
+        self[range][NativeEditorCommentResolvedAttribute.self] = normalizedComments.first?.isResolved
+        self[range].backgroundColor = backgroundColor(
+            for: normalizedComments,
+            fallbackBackgroundColor: fallbackBackgroundColor
+        )
+    }
+
+    private func backgroundColor(
+        for comments: [NativeEditorInlineCommentMark],
+        fallbackBackgroundColor: Color?
+    ) -> Color? {
+        guard comments.isEmpty == false else { return fallbackBackgroundColor }
+        return comments.contains { $0.isResolved == false }
+            ? .yellow.opacity(0.28)
+            : .gray.opacity(0.16)
     }
 }

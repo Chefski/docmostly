@@ -4,6 +4,7 @@ struct NativeEditorBodyView: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
+    var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 10) {
@@ -73,7 +74,10 @@ struct NativeEditorBodyView: View {
                     }
 
                     if authoringIsAvailable, viewModel.activeBlockID == block.id, viewModel.isShowingSlashCommands {
-                        NativeEditorSlashCommandMenu(viewModel: viewModel)
+                        NativeEditorSlashCommandMenu(
+                            viewModel: viewModel,
+                            importAttachment: importAttachment
+                        )
                             .padding(.leading, 34)
                     }
 

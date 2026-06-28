@@ -43,6 +43,31 @@ struct NativeRichEditorMechanicsTests {
         #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
     }
 
+    @Test func markdownInputRuleSupportsDocmostHeadingThreeShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("### Release details")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.document.blocks[0].kind == .heading(level: 3))
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Release details")
+    }
+
+    @Test func markdownInputRuleSupportsDividerShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("---")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.document.blocks[0].kind == .divider)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Divider")
+        #expect(viewModel.markdownForDocument() == "---")
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
@@ -134,6 +159,74 @@ struct NativeRichEditorMechanicsTests {
         """)
     }
 
+    @Test func pasteMarkdownRichBlocksCreatesNativeBlocks() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("""
+        ![Architecture](/files/image.png)
+        :::warning
+        Check migration plan
+        :::
+        $$
+        E = mc^2
+        $$
+        """)
+
+        #expect(viewModel.document.blocks.count == 4)
+
+        guard case .image(let image) = viewModel.document.blocks[1].kind else {
+            Issue.record("Expected pasted Markdown image to become a native image block.")
+            return
+        }
+        #expect(image.source == "/files/image.png")
+        #expect(image.alternativeText == "Architecture")
+
+        guard case .callout(let callout) = viewModel.document.blocks[2].kind else {
+            Issue.record("Expected pasted Markdown callout to become a native callout block.")
+            return
+        }
+        #expect(callout.style == "warning")
+        #expect(callout.previewText == "Check migration plan")
+
+        guard case .mathBlock(let math) = viewModel.document.blocks[3].kind else {
+            Issue.record("Expected pasted Markdown math fence to become a native math block.")
+            return
+        }
+        #expect(math.text == "E = mc^2")
+    }
+
+    @Test func pasteMarkdownInlineMathCreatesDocmostInlineAtom() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("Formula $E = mc^2$ today")
+
+        let inlineNodes = viewModel.document.proseMirrorDocument.content.last?.content ?? []
+        #expect(inlineNodes.map(\.type) == ["text", "mathInline", "text"])
+        #expect(inlineNodes[0].text == "Formula ")
+        #expect(inlineNodes[1].attrs?["text"] == .string("E = mc^2"))
+        #expect(inlineNodes[2].text == " today")
+    }
+
+    @Test func pasteMarkdownInlineMathPreservesSurroundingInlineMarks() {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("Formula **important** $E = mc^2$ `today`")
+
+        let inlineNodes = viewModel.document.proseMirrorDocument.content.last?.content ?? []
+        #expect(inlineNodes.map(\.type) == ["text", "text", "text", "mathInline", "text", "text"])
+        #expect(inlineNodes[1].text == "important")
+        #expect(inlineNodes[1].marks?.contains(ProseMirrorMark(type: "bold")) == true)
+        #expect(inlineNodes[3].attrs?["text"] == .string("E = mc^2"))
+        #expect(inlineNodes[5].text == "today")
+        #expect(inlineNodes[5].marks?.contains(ProseMirrorMark(type: "code")) == true)
+    }
+
     @Test func indentAndOutdentActiveListBlock() {
         let block = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Nested"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [block])
@@ -202,6 +295,20 @@ struct NativeRichEditorMechanicsTests {
         let viewModel = configuredViewModel(blocks: [heading, item])
 
         #expect(viewModel.markdownForDocument() == "# Roadmap\n- [x] Ship editor")
+    }
+
+    @Test func documentMarkdownConversionPreservesInlineMathAtom() {
+        var text = AttributedString("Formula ")
+        var mathText = AttributedString("E = mc^2")
+        mathText[NativeEditorMathInlineAttribute.self] = NativeEditorMathInline(text: "E = mc^2")
+        mathText.inlinePresentationIntent = .code
+        text += mathText
+        text += AttributedString(" today")
+
+        let block = NativeEditorBlock(kind: .paragraph, text: text, alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+
+        #expect(viewModel.markdownForDocument() == "Formula $E = mc^2$ today")
     }
 
     private func configuredViewModel(blocks: [NativeEditorBlock]) -> NativeRichEditorViewModel {

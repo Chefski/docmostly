@@ -9,7 +9,11 @@ extension NativeRichEditorViewModel {
         }
     }
 
-    func applySlashCommand(_ command: NativeEditorCommand) {
+    func applySlashCommand(_ command: NativeEditorCommand, now: Date = .now) {
+        if applyInlineSlashCommand(command, now: now) {
+            return
+        }
+
         performUndoableEdit {
             guard let index = activeBlockIndex else { return }
 
@@ -23,6 +27,71 @@ extension NativeRichEditorViewModel {
                 document.blocks[index].text = AttributedString("")
                 document.blocks[index].selection = AttributedTextSelection()
             }
+        }
+    }
+
+    @discardableResult
+    private func applyInlineSlashCommand(_ command: NativeEditorCommand, now: Date) -> Bool {
+        guard let segment = inlineSegment(for: command, now: now) else { return false }
+
+        performUndoableEdit {
+            guard let index = activeBlockIndex else { return }
+
+            if activeSlashCommandQuery != nil {
+                document.blocks[index].text = segment
+            } else {
+                insert(segment, into: &document.blocks[index])
+            }
+
+            document.blocks[index].selection = AttributedTextSelection()
+        }
+
+        return true
+    }
+
+    private func inlineSegment(for command: NativeEditorCommand, now: Date) -> AttributedString? {
+        switch command {
+        case .date:
+            AttributedString(now.formatted(date: .long, time: .omitted))
+        case .time:
+            AttributedString(now.formatted(date: .omitted, time: .shortened))
+        case .status:
+            statusSegment(text: "Status", color: "gray")
+        case .emoji:
+            AttributedString(":")
+        case .mathInline:
+            mathInlineSegment(text: "x = y")
+        default:
+            nil
+        }
+    }
+
+    private func statusSegment(text: String, color: String) -> AttributedString {
+        let status = NativeEditorStatusBadge(text: text, color: color)
+        var segment = AttributedString(text)
+        segment[NativeEditorStatusAttribute.self] = status
+        segment.inlinePresentationIntent = .stronglyEmphasized
+        return segment
+    }
+
+    private func mathInlineSegment(text: String) -> AttributedString {
+        let math = NativeEditorMathInline(text: text)
+        var segment = AttributedString(text)
+        segment[NativeEditorMathInlineAttribute.self] = math
+        segment.inlinePresentationIntent = .code
+        return segment
+    }
+
+    private func insert(_ segment: AttributedString, into block: inout NativeEditorBlock) {
+        switch block.selection.indices(in: block.text) {
+        case .ranges(let ranges):
+            if let range = ranges.ranges.first {
+                block.text.replaceSubrange(range, with: segment)
+            } else {
+                block.text.insert(segment, at: block.text.endIndex)
+            }
+        case .insertionPoint(let insertionIndex):
+            block.text.insert(segment, at: insertionIndex)
         }
     }
 

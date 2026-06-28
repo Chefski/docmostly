@@ -42,10 +42,9 @@ enum NativeEditorAttachmentBlockFactory {
     private static func videoBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         mediaBlock(
             id: id,
-            kind: .video(context.mediaPayload),
+            kind: .video(context.mediaPayload(title: context.attachment.fileName)),
             type: "video",
-            context: context,
-            title: context.attachment.fileName
+            context: context
         )
     }
 
@@ -58,11 +57,10 @@ enum NativeEditorAttachmentBlockFactory {
         kind: NativeEditorBlockKind,
         type: String,
         context: NativeEditorAttachmentContext,
-        title: String? = nil,
         dimensions: NativeEditorMediaDimensions? = nil
     ) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
-        if let title {
+        if let title = kind.mediaTitle {
             attrs["title"] = .string(title)
         }
         if let dimensions {
@@ -156,6 +154,17 @@ enum NativeEditorAttachmentBlockFactory {
     }
 }
 
+private extension NativeEditorBlockKind {
+    var mediaTitle: String? {
+        switch self {
+        case .image(let media), .video(let media), .audio(let media):
+            media.title
+        default:
+            nil
+        }
+    }
+}
+
 private struct NativeEditorAttachmentContext {
     let attachment: DocmostAttachment
     let source: String
@@ -163,9 +172,14 @@ private struct NativeEditorAttachmentContext {
     let imageDimensions: NativeEditorMediaDimensions?
 
     var mediaPayload: NativeEditorMediaBlock {
+        mediaPayload(title: nil)
+    }
+
+    func mediaPayload(title: String?) -> NativeEditorMediaBlock {
         NativeEditorMediaBlock(
             source: source,
             alternativeText: nil,
+            title: title,
             attachmentID: attachment.id,
             sizeInBytes: size,
             width: imageDimensions?.width.description,

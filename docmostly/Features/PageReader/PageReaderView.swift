@@ -65,7 +65,8 @@ struct PageReaderView: View {
                         NativeEditorBodyView(
                             viewModel: editorViewModel,
                             focusedField: $editorFocusedField,
-                            isAuthoringEnabled: readerMode == .edit
+                            isAuthoringEnabled: readerMode == .edit,
+                            importAttachment: beginAttachmentImport
                         )
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
