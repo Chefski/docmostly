@@ -25,7 +25,7 @@ enum NativeEditorCommentResolvedAttribute: CodableAttributedStringKey {
     static let name = "docmostly.commentResolved"
 }
 
-struct NativeEditorInlineCommentMark: Equatable, Hashable, Sendable, Codable {
+nonisolated struct NativeEditorInlineCommentMark: Equatable, Hashable, Sendable, Codable {
     var commentID: String
     var isResolved: Bool
 }
