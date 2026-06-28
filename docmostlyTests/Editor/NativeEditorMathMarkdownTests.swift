@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorMathMarkdownTests {
     @Test func markdownImportKeepsCurrencyDollarAmountsAsPlainText() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(
