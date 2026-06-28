@@ -58,6 +58,7 @@ extension AppState {
 
         guard pendingOfflineMutationCount == 0 else {
             try await queueOfflineMutation(offlinePayload)
+            scheduleOfflineQueueReconciliation()
             return
         }
 
@@ -87,6 +88,7 @@ extension AppState {
 
         guard pendingOfflineMutationCount == 0 else {
             try await queueOfflineMutation(offlinePayload)
+            scheduleOfflineQueueReconciliation()
             return
         }
 

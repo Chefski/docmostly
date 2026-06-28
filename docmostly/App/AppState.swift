@@ -349,10 +349,10 @@ final class AppState {
             }
             do {
                 try await clearPendingPageUpdate(pageId: pageId, title: title, document: document)
+                scheduleOfflineQueueReconciliation()
             } catch {
                 statusMessage = error.localizedDescription
             }
-            scheduleOfflineQueueReconciliation()
             return page
         } catch {
             guard canQueueOfflineMutation(after: error) else { throw error }

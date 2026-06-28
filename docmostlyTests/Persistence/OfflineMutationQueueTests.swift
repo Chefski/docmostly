@@ -114,6 +114,64 @@ struct OfflineMutationQueueTests {
         #expect(try queue.pending(scope: scope).map(\.id) == [first.id, second.id, third.id])
     }
 
+    @Test func legacyQueuedCommentPayloadDecodesWithLocalProjectionFields() throws {
+        let payloadData = Data(
+            #"""
+            {
+                "createComment": {
+                    "pageId": "page-1",
+                    "content": "{\"type\":\"doc\",\"content\":[]}",
+                    "type": "inline",
+                    "selection": "anchor",
+                    "yjsSelection": null
+                }
+            }
+            """#.utf8
+        )
+
+        let payload = try JSONDecoder().decode(OfflineMutationPayload.self, from: payloadData)
+
+        guard case .createComment(
+            let localId,
+            let pageId,
+            let content,
+            let plainText,
+            let type,
+            let selection,
+            let yjsSelection
+        ) = payload else {
+            Issue.record("Expected a legacy queued comment payload")
+            return
+        }
+        #expect(localId.hasPrefix("offline-comment-legacy-"))
+        #expect(pageId == "page-1")
+        #expect(content == #"{"type":"doc","content":[]}"#)
+        #expect(plainText == content)
+        #expect(type == .inline)
+        #expect(selection == "anchor")
+        #expect(yjsSelection == nil)
+    }
+
+    @Test func legacyQueuedLabelPayloadDecodesNamesAsLocalLabels() throws {
+        let payloadData = Data(
+            #"""
+            {
+                "addPageLabels": {
+                    "pageId": "page-1",
+                    "names": ["ios", "offline"]
+                }
+            }
+            """#.utf8
+        )
+
+        let payload = try JSONDecoder().decode(OfflineMutationPayload.self, from: payloadData)
+
+        #expect(payload == .addPageLabels(pageId: "page-1", labels: [
+            OfflinePageLabel(pageId: "page-1", name: "ios"),
+            OfflinePageLabel(pageId: "page-1", name: "offline")
+        ]))
+    }
+
     @Test func removingPendingOfflineLabelCollapsesQueuedAdd() throws {
         let queue = makeQueue()
         let removedLabel = OfflinePageLabel(pageId: "page-1", name: "ios")

@@ -128,6 +128,11 @@ nonisolated final class OfflineMutationQueue {
         case delete
     }
 
+    private enum PreparedPendingMutationUpdate {
+        case replace(payloadData: Data, kindRaw: String, coalescingKey: String?)
+        case delete
+    }
+
     private func updatePendingMutations(
         scope: CacheScope,
         transform: (OfflineMutationPayload) throws -> PendingMutationUpdate
@@ -140,7 +145,7 @@ nonisolated final class OfflineMutationQueue {
             }
         )
         let mutations = try context.fetch(descriptor)
-        var hasChanges = false
+        var changes: [(mutation: QueuedOfflineMutation, update: PreparedPendingMutationUpdate)] = []
 
         for mutation in mutations {
             let payload = try decoder.decode(OfflineMutationPayload.self, from: mutation.payloadData)
@@ -148,18 +153,32 @@ nonisolated final class OfflineMutationQueue {
             case .unchanged:
                 continue
             case .replace(let replacement):
-                mutation.kindRaw = replacement.kind.rawValue
-                mutation.coalescingKey = replacement.coalescingKey
-                mutation.payloadData = try encoder.encode(replacement)
-                mutation.updatedAt = Date.now
-                hasChanges = true
+                let payloadData = try encoder.encode(replacement)
+                changes.append((
+                    mutation,
+                    .replace(
+                        payloadData: payloadData,
+                        kindRaw: replacement.kind.rawValue,
+                        coalescingKey: replacement.coalescingKey
+                    )
+                ))
             case .delete:
-                context.delete(mutation)
-                hasChanges = true
+                changes.append((mutation, .delete))
             }
         }
 
-        guard hasChanges else { return }
+        guard changes.isEmpty == false else { return }
+        for change in changes {
+            switch change.update {
+            case .replace(let payloadData, let kindRaw, let coalescingKey):
+                change.mutation.kindRaw = kindRaw
+                change.mutation.coalescingKey = coalescingKey
+                change.mutation.payloadData = payloadData
+                change.mutation.updatedAt = Date.now
+            case .delete:
+                context.delete(change.mutation)
+            }
+        }
         try context.save()
     }
 

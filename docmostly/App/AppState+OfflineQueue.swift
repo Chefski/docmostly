@@ -150,26 +150,46 @@ extension AppState {
                         try await removeOfflineMutation(id: record.id, scope: cacheScope)
                         await refreshOfflineMutationCount()
                     } catch {
-                        if canQueueOfflineMutation(after: error) {
-                            try? await markOfflineMutationFailed(
-                                id: record.id,
-                                scope: cacheScope,
-                                message: error.localizedDescription
-                            )
+                        if shouldDropOfflineMutation(after: error) {
+                            try? await removeOfflineMutation(id: record.id, scope: cacheScope)
                             await refreshOfflineMutationCount()
-                            isOffline = true
-                            statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
-                            return
+                            statusMessage = "Dropped queued offline change: \(error.localizedDescription)"
+                            continue
                         }
 
-                        try? await removeOfflineMutation(id: record.id, scope: cacheScope)
+                        try? await markOfflineMutationFailed(
+                            id: record.id,
+                            scope: cacheScope,
+                            message: error.localizedDescription
+                        )
                         await refreshOfflineMutationCount()
-                        statusMessage = "Dropped queued offline change: \(error.localizedDescription)"
+                        if canQueueOfflineMutation(after: error) {
+                            isOffline = true
+                        }
+                        statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
+                        return
                     }
                 }
             }
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    private func shouldDropOfflineMutation(after error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        guard let apiError = error as? APIError else {
+            return false
+        }
+
+        switch apiError {
+        case .httpStatus(let status, _):
+            return status >= 400 && status < 500 && status != 401 && status != 403 && status != 408 && status != 429
+        case .connectionFailed, .invalidResponse, .missingData, .decodingFailed, .responseTooLarge:
+            return false
         }
     }
 

@@ -101,6 +101,42 @@ struct SessionCookieJarTests {
         #expect(clearedCookies.isEmpty)
     }
 
+    @Test func maxAgeTombstoneDeletesNonEmptyCookieWithDefaultPath() async throws {
+        let requestURL = try #require(URL(string: "https://docs.example.com/api/auth/logout"))
+        let jar = SessionCookieJar(cookies: [
+            cookie(name: "authToken", value: "old", domain: "docs.example.com", path: "/api/auth")
+        ])
+        let logoutResponse = try httpResponse(
+            url: requestURL,
+            headerFields: [
+                "Set-Cookie": "authToken=deleted; Max-Age=0; HttpOnly; Secure"
+            ]
+        )
+
+        await jar.ingestCookies(from: logoutResponse, requestURL: requestURL)
+        let clearedCookies = await jar.allCookies()
+
+        #expect(clearedCookies.isEmpty)
+    }
+
+    @Test func expiredSetCookieDateDeletesMatchingCookie() async throws {
+        let requestURL = try #require(URL(string: "https://docs.example.com/api/auth/logout"))
+        let jar = SessionCookieJar(cookies: [
+            cookie(name: "authToken", value: "old", domain: "docs.example.com", path: "/api/auth")
+        ])
+        let logoutResponse = try httpResponse(
+            url: requestURL,
+            headerFields: [
+                "Set-Cookie": "authToken=deleted; Path=/api/auth; Expires=Wed, 21 Oct 2015 07:28:00 GMT"
+            ]
+        )
+
+        await jar.ingestCookies(from: logoutResponse, requestURL: requestURL)
+        let clearedCookies = await jar.allCookies()
+
+        #expect(clearedCookies.isEmpty)
+    }
+
     private func cookie(
         name: String,
         value: String,

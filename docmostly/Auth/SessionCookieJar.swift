@@ -2,6 +2,20 @@ import Foundation
 
 actor SessionCookieJar {
     private var storedCookies: [StoredHTTPCookie]
+    private static let cookieMonthNumbers = [
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "may": 5,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12
+    ]
 
     init(cookies: [StoredHTTPCookie] = []) {
         storedCookies = cookies.filter { $0.isExpired == false }
@@ -70,12 +84,10 @@ actor SessionCookieJar {
         }
 
         let name = String(nameValue[..<separatorIndex])
-        let valueStart = nameValue.index(after: separatorIndex)
-        let value = String(nameValue[valueStart...])
-        guard value.isEmpty else { return }
+        guard name.isEmpty == false else { return }
 
         var domain = requestURL.host?.lowercased() ?? ""
-        var path = "/"
+        var path = Self.defaultCookiePath(for: requestURL)
         var isHostOnly = true
         var deletesCookie = false
 
@@ -91,9 +103,11 @@ actor SessionCookieJar {
             case "path":
                 path = value.isEmpty ? "/" : value
             case "max-age":
-                deletesCookie = deletesCookie || value == "0" || value.hasPrefix("-")
+                if let seconds = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                    deletesCookie = deletesCookie || seconds <= 0
+                }
             case "expires":
-                deletesCookie = deletesCookie || value.localizedStandardContains("1970")
+                deletesCookie = deletesCookie || Self.isExpiredCookieDate(value)
             default:
                 continue
             }
@@ -112,6 +126,59 @@ actor SessionCookieJar {
             isHostOnly: isHostOnly
         )
         storedCookies.removeAll { $0.hasSameIdentity(as: expiredCookie) }
+    }
+
+    private static func defaultCookiePath(for requestURL: URL) -> String {
+        let requestPath = requestURL.path
+        guard requestPath.hasPrefix("/"), requestPath != "/" else { return "/" }
+        guard let lastSlashIndex = requestPath.lastIndex(of: "/"), lastSlashIndex != requestPath.startIndex else {
+            return "/"
+        }
+        return String(requestPath[..<lastSlashIndex])
+    }
+
+    private static func isExpiredCookieDate(_ value: String) -> Bool {
+        guard let date = cookieDate(from: value) else { return false }
+        return date <= Date.now
+    }
+
+    private static func cookieDate(from value: String) -> Date? {
+        let parts = value
+            .replacing(",", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+        let offset = parts.first.flatMap { Int($0) } == nil ? 1 : 0
+        guard parts.count >= offset + 4,
+              let day = Int(parts[offset]),
+              let month = monthNumber(parts[offset + 1]),
+              let year = Int(parts[offset + 2])
+        else {
+            return nil
+        }
+
+        let timeParts = parts[offset + 3].split(separator: ":")
+        guard timeParts.count == 3,
+              let hour = Int(timeParts[0]),
+              let minute = Int(timeParts[1]),
+              let second = Int(timeParts[2])
+        else {
+            return nil
+        }
+
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        return components.date
+    }
+
+    private static func monthNumber(_ value: String) -> Int? {
+        cookieMonthNumbers[value.lowercased()]
     }
 
     private func removeExpiredCookies() {
