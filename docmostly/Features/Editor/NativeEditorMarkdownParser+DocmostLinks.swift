@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension NativeEditorMarkdownParser {
     private struct DocmostPageLink {
@@ -18,6 +19,12 @@ extension NativeEditorMarkdownParser {
         var mention: NativeEditorMention
     }
 
+    private struct DocmostCommentHTML {
+        var range: Range<String.Index>
+        var comment: NativeEditorInlineCommentMark
+        var bodyMarkdown: String
+    }
+
     static func appendMarkdownText(
         _ markdown: String,
         to result: inout AttributedString,
@@ -27,6 +34,17 @@ extension NativeEditorMarkdownParser {
 
         var remaining = markdown[...]
         var didAppendAtom = false
+        while let htmlComment = nextDocmostCommentHTML(in: remaining) {
+            appendMarkdownText(
+                String(remaining[..<htmlComment.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
+            appendComment(htmlComment, to: &result)
+            didAppendAtom = true
+            remaining = remaining[htmlComment.range.upperBound...]
+        }
+
         while let htmlMention = nextDocmostMentionHTML(in: remaining) {
             appendMarkdownText(
                 String(remaining[..<htmlMention.range.lowerBound]),
@@ -73,6 +91,21 @@ extension NativeEditorMarkdownParser {
         return "[\(label)](/p/\(slugID)\(anchor))"
     }
 
+    static func commentMarkdown(from comments: [NativeEditorInlineCommentMark], body: String) -> String {
+        comments.normalizedNativeEditorInlineComments.reversed().reduce(body) { markdown, comment in
+            commentHTMLMarkdown(from: comment, body: markdown)
+        }
+    }
+
+    private static func commentHTMLMarkdown(from comment: NativeEditorInlineCommentMark, body: String) -> String {
+        let className = comment.isResolved ? "comment-mark resolved" : "comment-mark"
+        let commentID = escapedInlineHTMLAttribute(comment.commentID)
+        let resolvedAttribute = comment.isResolved ? #" data-resolved="true""# : ""
+        return #"<span class="\#(className)" data-comment-id="\#(commentID)"\#(resolvedAttribute)>"#
+            + body
+            + "</span>"
+    }
+
     private static func mentionHTMLMarkdown(from mention: NativeEditorMention, fallbackText: String) -> String {
         let attrs: [(String, String?)] = [
             ("data-type", "mention"),
@@ -85,11 +118,11 @@ extension NativeEditorMarkdownParser {
             ("data-anchor-id", mention.anchorID)
         ]
         let attrText = attrs.compactMap { name, value in
-            value.nonEmpty.map { "\(name)=\"\(escapedMentionHTMLAttribute($0))\"" }
+            value.nonEmpty.map { "\(name)=\"\(escapedInlineHTMLAttribute($0))\"" }
         }.joined(separator: " ")
 
         let displayText = mentionHTMLDisplayText(from: mention, fallbackText: fallbackText)
-        return "<span \(attrText)>\(escapedMentionHTMLText(displayText))</span>"
+        return "<span \(attrText)>\(escapedInlineHTMLText(displayText))</span>"
     }
 
     private static func mentionHTMLDisplayText(from mention: NativeEditorMention, fallbackText: String) -> String {
@@ -167,6 +200,35 @@ extension NativeEditorMarkdownParser {
         result += segment
     }
 
+    private static func appendComment(_ htmlComment: DocmostCommentHTML, to result: inout AttributedString) {
+        var commentBody = AttributedString("")
+        appendMarkdownText(
+            htmlComment.bodyMarkdown,
+            to: &commentBody,
+            usesFoundationMarkdownParser: false
+        )
+        applyComment(htmlComment.comment, to: &commentBody)
+        result += commentBody
+    }
+
+    private static func applyComment(_ comment: NativeEditorInlineCommentMark, to text: inout AttributedString) {
+        let ranges = text.runs.map(\.range)
+        for range in ranges {
+            let comments = text[range].nativeEditorInlineComments.updatingNativeEditorInlineComment(comment)
+            text[range][NativeEditorCommentMarksAttribute.self] = comments.isEmpty ? nil : comments
+            text[range][NativeEditorCommentIDAttribute.self] = comments.first?.commentID
+            text[range][NativeEditorCommentResolvedAttribute.self] = comments.first?.isResolved
+            text[range].backgroundColor = commentBackgroundColor(for: comments)
+        }
+    }
+
+    private static func commentBackgroundColor(for comments: [NativeEditorInlineCommentMark]) -> Color? {
+        guard comments.isEmpty == false else { return nil }
+        return comments.contains { $0.isResolved == false }
+            ? .yellow.opacity(0.28)
+            : .gray.opacity(0.16)
+    }
+
     private static func plainMarkdownText(from markdown: String) -> String {
         let attributedText = (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
         return String(attributedText.characters)
@@ -220,14 +282,14 @@ extension NativeEditorMarkdownParser {
             }
 
             let openingTag = String(markdown[openRange.lowerBound...openTagEnd])
-            let attrs = mentionHTMLAttributes(from: openingTag)
+            let attrs = docmostInlineHTMLAttributes(from: openingTag)
             guard attrs["data-type"] == "mention" else {
                 searchStart = markdown.index(after: openRange.lowerBound)
                 continue
             }
 
             let contentStart = markdown.index(after: openTagEnd)
-            guard let closeRange = markdown[contentStart...].range(of: "</span>", options: .caseInsensitive) else {
+            guard let closeRange = matchingCloseSpanRange(in: markdown, bodyStart: contentStart) else {
                 return nil
             }
 
@@ -241,9 +303,46 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
+    private static func nextDocmostCommentHTML(in markdown: Substring) -> DocmostCommentHTML? {
+        var searchStart = markdown.startIndex
+
+        while searchStart < markdown.endIndex,
+              let openRange = markdown[searchStart...].range(of: "<span", options: .caseInsensitive) {
+            guard let openTagEnd = markdown[openRange.upperBound...].firstIndex(of: ">") else {
+                return nil
+            }
+
+            let openingTag = String(markdown[openRange.lowerBound...openTagEnd])
+            let attrs = docmostInlineHTMLAttributes(from: openingTag)
+            guard let commentID = attrs["data-comment-id"]?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nonEmpty
+            else {
+                searchStart = markdown.index(after: openRange.lowerBound)
+                continue
+            }
+
+            let contentStart = markdown.index(after: openTagEnd)
+            guard let closeRange = matchingCloseSpanRange(in: markdown, bodyStart: contentStart) else {
+                return nil
+            }
+
+            return DocmostCommentHTML(
+                range: openRange.lowerBound..<closeRange.upperBound,
+                comment: NativeEditorInlineCommentMark(
+                    commentID: commentID,
+                    isResolved: attrs["data-resolved"] != nil
+                ),
+                bodyMarkdown: String(markdown[contentStart..<closeRange.lowerBound])
+            )
+        }
+
+        return nil
+    }
+
     private static func mention(from attrs: [String: String], fallbackHTMLText: String) -> NativeEditorMention {
         let entityType = attrs["data-entity-type"]?.nonEmpty
-        let fallbackLabel = unescapedMentionHTMLText(fallbackHTMLText)
+        let fallbackLabel = unescapedInlineHTMLText(fallbackHTMLText)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .removingMentionTrigger
 
@@ -256,81 +355,6 @@ extension NativeEditorMarkdownParser {
             creatorID: attrs["data-creator-id"]?.nonEmpty,
             anchorID: attrs["data-anchor-id"]?.nonEmpty
         )
-    }
-
-    private static func mentionHTMLAttributes(from openingTag: String) -> [String: String] {
-        var attrs = [String: String]()
-        var index = openingTag.startIndex
-
-        while index < openingTag.endIndex {
-            guard let nameRange = nextMentionHTMLAttributeNameRange(in: openingTag, startingAt: index) else {
-                break
-            }
-
-            index = nameRange.upperBound
-            skipMentionHTMLWhitespace(in: openingTag, index: &index)
-            guard index < openingTag.endIndex, openingTag[index] == "=" else {
-                continue
-            }
-
-            index = openingTag.index(after: index)
-            skipMentionHTMLWhitespace(in: openingTag, index: &index)
-            let value = mentionHTMLAttributeValue(in: openingTag, startingAt: &index)
-            attrs[String(openingTag[nameRange]).lowercased()] = unescapedMentionHTMLText(value)
-        }
-
-        return attrs
-    }
-
-    private static func nextMentionHTMLAttributeNameRange(
-        in text: String,
-        startingAt index: String.Index
-    ) -> Range<String.Index>? {
-        var nameStart = index
-        while nameStart < text.endIndex, text[nameStart].isMentionHTMLAttributeNameCharacter == false {
-            nameStart = text.index(after: nameStart)
-        }
-
-        guard nameStart < text.endIndex else { return nil }
-
-        var nameEnd = nameStart
-        while nameEnd < text.endIndex, text[nameEnd].isMentionHTMLAttributeNameCharacter {
-            nameEnd = text.index(after: nameEnd)
-        }
-
-        return nameStart..<nameEnd
-    }
-
-    private static func mentionHTMLAttributeValue(
-        in text: String,
-        startingAt index: inout String.Index
-    ) -> String {
-        guard index < text.endIndex else { return "" }
-
-        if text[index] == "\"" || text[index] == "'" {
-            let quote = text[index]
-            let valueStart = text.index(after: index)
-            guard let valueEnd = text[valueStart...].firstIndex(of: quote) else {
-                index = text.endIndex
-                return String(text[valueStart...])
-            }
-
-            index = text.index(after: valueEnd)
-            return String(text[valueStart..<valueEnd])
-        }
-
-        let valueStart = index
-        while index < text.endIndex, text[index].isWhitespace == false, text[index] != ">" {
-            index = text.index(after: index)
-        }
-
-        return String(text[valueStart..<index])
-    }
-
-    private static func skipMentionHTMLWhitespace(in text: String, index: inout String.Index) {
-        while index < text.endIndex, text[index].isWhitespace {
-            index = text.index(after: index)
-        }
     }
 
     private static func nextBareDocmostPageLink(in markdown: Substring) -> DocmostMarkdownLink? {
@@ -465,24 +489,6 @@ extension NativeEditorMarkdownParser {
             .replacing("]", with: "\\]")
     }
 
-    private static func escapedMentionHTMLAttribute(_ text: String) -> String {
-        escapedMentionHTMLText(text).replacing("\"", with: "&quot;")
-    }
-
-    private static func escapedMentionHTMLText(_ text: String) -> String {
-        text
-            .replacing("&", with: "&amp;")
-            .replacing("<", with: "&lt;")
-            .replacing(">", with: "&gt;")
-    }
-
-    private static func unescapedMentionHTMLText(_ text: String) -> String {
-        text
-            .replacing("&quot;", with: "\"")
-            .replacing("&lt;", with: "<")
-            .replacing("&gt;", with: ">")
-            .replacing("&amp;", with: "&")
-    }
 }
 
 private extension Character {
@@ -495,9 +501,6 @@ private extension Character {
         }
     }
 
-    var isMentionHTMLAttributeNameCharacter: Bool {
-        isLetter || isNumber || self == "-" || self == "_" || self == ":"
-    }
 }
 
 private extension Optional where Wrapped == String {

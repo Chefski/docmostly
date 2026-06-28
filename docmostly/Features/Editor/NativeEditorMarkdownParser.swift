@@ -321,13 +321,16 @@ enum NativeEditorMarkdownParser {
 
         for run in text.runs {
             let runText = String(text[run.range].characters)
+            let runMarkdown: String
             if let math = run[NativeEditorMathInlineAttribute.self] {
-                output += "$\(math.text.replacing("$", with: "\\$"))$"
+                runMarkdown = "$\(math.text.replacing("$", with: "\\$"))$"
             } else if let mention = run[NativeEditorMentionAttribute.self] {
-                output += mentionMarkdown(from: mention, fallbackText: runText)
+                runMarkdown = mentionMarkdown(from: mention, fallbackText: runText)
             } else {
-                output += inlineRunMarkdown(from: run, text: runText)
+                runMarkdown = inlineRunMarkdown(from: run, text: runText)
             }
+
+            output += commentMarkdown(from: run.nativeEditorInlineComments, body: runMarkdown)
         }
 
         return output
