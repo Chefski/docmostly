@@ -306,11 +306,11 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
         if let sizeInBytes = diagram.sizeInBytes {
             attrs["size"] = .int(sizeInBytes)
         }
-        if let width = diagram.width.flatMap(Int.init) {
-            attrs["width"] = .int(width)
+        if let width = diagram.width.flatMap(proseMirrorDiagramDimension(from:)) {
+            attrs["width"] = width
         }
-        if let height = diagram.height.flatMap(Int.init) {
-            attrs["height"] = .int(height)
+        if let height = diagram.height.flatMap(proseMirrorDiagramDimension(from:)) {
+            attrs["height"] = height
         }
         if let aspectRatio = diagram.aspectRatio.flatMap(Double.init) {
             attrs["aspectRatio"] = .double(aspectRatio)
@@ -362,5 +362,14 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
         }
 
         return .double(value)
+    }
+
+    private static func proseMirrorDiagramDimension(from value: String) -> ProseMirrorJSONValue? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedValue.isEmpty == false else { return nil }
+        if let number = Double(trimmedValue) {
+            return proseMirrorNumber(from: number)
+        }
+        return .string(trimmedValue)
     }
 }

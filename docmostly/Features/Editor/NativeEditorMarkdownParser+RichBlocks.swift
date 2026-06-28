@@ -13,6 +13,10 @@ extension NativeEditorMarkdownParser {
             return calloutBlock
         }
 
+        if let diagramBlock = diagramHTMLBlock(in: lines, startingAt: index) {
+            return diagramBlock
+        }
+
         if let columnsBlock = columnsHTMLBlock(in: lines, startingAt: index) {
             return columnsBlock
         }
@@ -80,9 +84,9 @@ extension NativeEditorMarkdownParser {
         case .embed(let embed):
             embedMarkdown(from: embed)
         case .drawio(let diagram):
-            diagramMarkdown(from: diagram, fallbackTitle: "Draw.io diagram")
+            diagramMarkdown(from: diagram, type: "drawio")
         case .excalidraw(let diagram):
-            diagramMarkdown(from: diagram, fallbackTitle: "Excalidraw diagram")
+            diagramMarkdown(from: diagram, type: "excalidraw")
         case .mathBlock(let math):
             mathMarkdown(from: math)
         case .unsupported:
@@ -401,13 +405,6 @@ extension NativeEditorMarkdownParser {
         return "<!-- Docmost synced block reference: \(identifier) -->"
     }
 
-    private static func diagramMarkdown(from diagram: NativeEditorDiagramBlock, fallbackTitle: String) -> String {
-        linkMarkdown(
-            title: diagram.title ?? diagram.alternativeText ?? diagram.source ?? fallbackTitle,
-            url: diagram.source
-        )
-    }
-
     private static func embedMarkdown(from embed: NativeEditorEmbedBlock) -> String {
         if embed.provider == "iframe", let source = embed.source, source.isEmpty == false {
             return linkMarkdown(title: source, url: source)
@@ -494,7 +491,7 @@ extension NativeEditorMarkdownParser {
         return fileExtension
     }
 
-    private static func docmostAttachmentID(from source: String) -> String? {
+    static func docmostAttachmentID(from source: String) -> String? {
         let pathComponents = markdownLinkPath(from: source)
             .split(separator: "/", omittingEmptySubsequences: true)
             .map(String.init)
