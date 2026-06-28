@@ -57,6 +57,36 @@ struct NativeEditorRichMarkdownExportTests {
         #expect(viewModel.markdownForDocument() == #"<div data-type="pageBreak" class="page-break"></div>"#)
     }
 
+    @Test func documentMarkdownConversionPreservesDocmostColumnsHTMLShape() {
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .columns(NativeEditorColumnsBlock(
+                    layout: "three_equal",
+                    widthMode: "wide",
+                    columnCount: 3,
+                    previewText: "Plan Build Ship",
+                    columnTexts: ["Plan", "Build", "Ship"]
+                )),
+                text: AttributedString("Plan Build Ship"),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == """
+        <div data-type="columns" data-layout="three_equal" data-width-mode="wide">
+        <div data-type="column" data-width="1" style="flex: 1">
+        Plan
+        </div>
+        <div data-type="column" data-width="1" style="flex: 1">
+        Build
+        </div>
+        <div data-type="column" data-width="1" style="flex: 1">
+        Ship
+        </div>
+        </div>
+        """)
+    }
+
     @Test func documentMarkdownConversionPreservesRichBlockMeaning() {
         let viewModel = configuredViewModel(blocks: richMarkdownFixtureBlocks())
 

@@ -128,6 +128,37 @@ struct NativeEditorMarkdownImportTests {
         #expect(block.rawNode?.type == "pageBreak")
     }
 
+    @Test func docmostColumnsHTMLImportsAsNativeColumnsBlock() throws {
+        let markdown = """
+        <div data-type="columns" data-layout="two_left_sidebar" data-width-mode="wide">
+        <div data-type="column" data-width="0.6" style="flex: 0.6">
+        Navigation
+        </div>
+        <div data-type="column" data-width="1.4" style="flex: 1.4">
+        Main content
+        </div>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .columns(let columns) = block.kind else {
+            Issue.record("Expected Docmost columns HTML to import as a native columns block.")
+            return
+        }
+
+        #expect(columns.layout == "two_left_sidebar")
+        #expect(columns.widthMode == "wide")
+        #expect(columns.columnCount == 2)
+        #expect(columns.columnTexts == ["Navigation", "Main content"])
+        #expect(block.rawNode?.type == "columns")
+        #expect(block.rawNode?.attrs?["layout"] == .string("two_left_sidebar"))
+        #expect(block.rawNode?.attrs?["widthMode"] == .string("wide"))
+        #expect(block.rawNode?.content?.map(\.type) == ["column", "column"])
+        #expect(block.rawNode?.content?[0].attrs?["width"] == .double(0.6))
+        #expect(block.rawNode?.content?[1].attrs?["width"] == .double(1.4))
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
+
     @Test func docmostIframeMarkdownLinksImportAsEmbedBlocks() throws {
         let source = "https://player.example.com/embed/demo"
         let block = try #require(NativeEditorMarkdownParser.blocks(from: "[\(source)](\(source))").first)
