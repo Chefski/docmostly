@@ -41,6 +41,41 @@ struct NativeEditorInlineCommentMarkTests {
         #expect(inlineNodes.contains { $0.marks?.contains(commentMark) == true })
     }
 
+    @Test func markdownImportTreatsExplicitFalseResolvedAttributeAsUnresolved() throws {
+        let markdown = #"Review <span class="comment-mark" data-comment-id="comment-1" "# +
+            #"data-resolved="false">this copy</span> today"#
+        let block = try #require(
+            NativeEditorMarkdownParser.blocks(from: markdown).first
+        )
+
+        let comment = NativeEditorInlineCommentMark(commentID: "comment-1", isResolved: false)
+        let markedRun = try #require(block.text.runs.first { $0.nativeEditorInlineComments == [comment] })
+        #expect(String(block.text[markedRun.range].characters) == "this copy")
+
+        let inlineNodes = try #require(NativeEditorDocument(blocks: [block]).proseMirrorDocument.content.first?.content)
+        let commentMark = ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
+        )
+        #expect(inlineNodes.contains { $0.marks?.contains(commentMark) == true })
+    }
+
+    @Test func markdownImportPreservesCommentBodyContainingLiteralSpanText() throws {
+        let markdown = #"Review <span class="comment-mark" data-comment-id="comment-1">use `<span>` text</span> today"#
+        let block = try #require(
+            NativeEditorMarkdownParser.blocks(from: markdown).first
+        )
+
+        let comment = NativeEditorInlineCommentMark(commentID: "comment-1", isResolved: false)
+        let markedRuns = block.text.runs.filter { $0.nativeEditorInlineComments == [comment] }
+        #expect(markedRuns.isEmpty == false)
+
+        let markedText = markedRuns.reduce(into: "") { text, run in
+            text += String(block.text[run.range].characters)
+        }
+        #expect(markedText == "use <span> text")
+    }
+
     @Test func preservesOverlappingInlineCommentMarks() throws {
         let data = Data("""
         {

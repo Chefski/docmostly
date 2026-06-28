@@ -131,6 +131,28 @@ struct NativeEditorMentionMarkdownTests {
         #expect(attrs["creatorId"] == .string("creator-1"))
     }
 
+    @Test func pasteMarkdownDocmostUserMentionHTMLAllowsLiteralSpanTextBeforeClosingSpan() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+        let mentionHTML = #"<span data-type="mention" data-id="mention-1" data-label="Taylor" "# +
+            #"data-entity-type="user" data-entity-id="user-1">"# +
+            "@Taylor `<span>`</span>"
+
+        viewModel.pasteMarkdown("Discuss \(mentionHTML) today")
+
+        let inlineNodes = viewModel.document.proseMirrorDocument.content.last?.content ?? []
+        #expect(inlineNodes.map(\.type) == ["text", "mention", "text"])
+        #expect(inlineNodes[0].text == "Discuss ")
+        #expect(inlineNodes[2].text == " today")
+
+        let attrs = try #require(inlineNodes[1].attrs)
+        #expect(attrs["id"] == .string("mention-1"))
+        #expect(attrs["label"] == .string("Taylor"))
+        #expect(attrs["entityType"] == .string("user"))
+        #expect(attrs["entityId"] == .string("user-1"))
+    }
+
     private func userMentionHTML() -> String {
         #"<span data-type="mention" data-id="mention-1" data-label="Taylor" "# +
             #"data-entity-type="user" data-entity-id="user-1" data-creator-id="creator-1">"# +
