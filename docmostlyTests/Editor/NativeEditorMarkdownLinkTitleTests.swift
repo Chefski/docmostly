@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorMarkdownLinkTitleTests {
     @Test func imageTitleImportSupportsCommonMarkdownTitleDelimiters() throws {
         let markdownCases = [
