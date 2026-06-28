@@ -2,6 +2,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PageReaderView: View {
+    #if os(macOS)
+    @Environment(\.openWindow) var openWindow
+    #endif
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
     @State var viewModel = PageReaderViewModel()
@@ -31,6 +34,18 @@ struct PageReaderView: View {
     @FocusState var editorFocusedField: NativeEditorFocus?
 
     let pageID: String
+    let initialTitle: String?
+    let pageLoaded: @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void
+
+    init(
+        pageID: String,
+        initialTitle: String? = nil,
+        pageLoaded: @escaping @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void = { _, _, _ in }
+    ) {
+        self.pageID = pageID
+        self.initialTitle = initialTitle
+        self.pageLoaded = pageLoaded
+    }
 
     var body: some View {
         ScrollView {
@@ -68,7 +83,7 @@ struct PageReaderView: View {
         }
         .scrollPosition($scrollPosition)
         .safeAreaPadding(.bottom, 72)
-        .navigationTitle(editorViewModel?.title.isEmpty == false ? editorViewModel?.title ?? "Page" : "Page")
+        .navigationTitle(pageNavigationTitle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if let editorViewModel, editorViewModel.errorMessage == nil {
@@ -98,6 +113,10 @@ struct PageReaderView: View {
                         Button("Copy Link", systemImage: "link", action: copyPageLink)
 
                         Button("Copy as Markdown", systemImage: "doc.plaintext", action: copyPageMarkdown)
+
+                        #if os(macOS)
+                        Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
+                        #endif
 
                         Button(
                             viewModel.isFavoritePage ? "Remove from Favorites" : "Add to Favorites",

@@ -7,14 +7,14 @@ extension NativeEditorCollaborationPresenceClient {
             guard data.count <= NativeEditorHocuspocusFrame.maximumFrameBytes else {
                 throw NativeEditorHocuspocusProtocolError.payloadTooLarge
             }
-            data
+            return data
         case .string(let string):
             guard string.utf8.count <= NativeEditorHocuspocusFrame.maximumFrameBytes else {
                 throw NativeEditorHocuspocusProtocolError.payloadTooLarge
             }
-            Data(string.utf8)
+            return Data(string.utf8)
         @unknown default:
-            Data()
+            return Data()
         }
     }
 }

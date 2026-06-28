@@ -15,6 +15,8 @@ final class CachedPage {
     var spaceId: String = ""
     var spaceSlug: String?
     var updatedAt: Date?
+    var canEdit: Bool?
+    var hasRestriction: Bool?
     var cachedAt: Date = Date.now
     var lastOpenedAt: Date = Date.now
 
@@ -37,6 +39,10 @@ final class CachedPage {
         spaceId = page.spaceId
         spaceSlug = page.space?.slug
         updatedAt = page.updatedAt
+        if let permissions = page.permissions {
+            canEdit = permissions.canEdit
+            hasRestriction = permissions.hasRestriction
+        }
         self.cachedAt = cachedAt
         lastOpenedAt = cachedAt
     }
@@ -51,6 +57,8 @@ final class CachedPage {
         icon = editablePage.icon
         spaceId = editablePage.spaceId
         updatedAt = editablePage.updatedAt
+        canEdit = editablePage.permissions?.canEdit
+        hasRestriction = editablePage.permissions?.hasRestriction
         self.cachedAt = cachedAt
         lastOpenedAt = cachedAt
     }
@@ -65,11 +73,21 @@ final class CachedPage {
         spaceId = page.spaceId
         spaceSlug = page.space?.slug ?? spaceSlug
         updatedAt = page.updatedAt
+        if let permissions = page.permissions {
+            canEdit = permissions.canEdit
+            hasRestriction = permissions.hasRestriction
+        }
         cachedAt = Date.now
     }
 
     func matches(page: DocmostPage, htmlContent: String) -> Bool {
-        id == page.id &&
+        let permissionsMatch = if let permissions = page.permissions {
+            canEdit == Optional(permissions.canEdit) && hasRestriction == Optional(permissions.hasRestriction)
+        } else {
+            true
+        }
+
+        return id == page.id &&
             slugId == page.slugId &&
             title == page.title &&
             self.htmlContent == htmlContent &&
@@ -77,7 +95,8 @@ final class CachedPage {
             parentPageId == page.parentPageId &&
             spaceId == page.spaceId &&
             (page.space?.slug == nil || spaceSlug == page.space?.slug) &&
-            updatedAt == page.updatedAt
+            updatedAt == page.updatedAt &&
+            permissionsMatch
     }
 
     func update(editablePage: DocmostEditablePage) {
@@ -88,6 +107,15 @@ final class CachedPage {
         icon = editablePage.icon
         spaceId = editablePage.spaceId
         updatedAt = editablePage.updatedAt
+        canEdit = editablePage.permissions?.canEdit
+        hasRestriction = editablePage.permissions?.hasRestriction
+        cachedAt = Date.now
+    }
+
+    func updateLocalDraft(title: String, document: ProseMirrorDocument) throws {
+        let data = try JSONEncoder().encode(document)
+        self.title = title
+        proseMirrorJSONData = data
         cachedAt = Date.now
     }
 
@@ -98,7 +126,8 @@ final class CachedPage {
             cachedProseMirrorDocument() == (editablePage.content ?? ProseMirrorDocument()) &&
             icon == editablePage.icon &&
             spaceId == editablePage.spaceId &&
-            updatedAt == editablePage.updatedAt
+            updatedAt == editablePage.updatedAt &&
+            permissions == editablePage.permissions
     }
 
     func snapshot() -> CachedPageSnapshot {
@@ -143,9 +172,14 @@ final class CachedPage {
             icon: icon,
             spaceId: spaceId,
             updatedAt: updatedAt,
-            permissions: DocmostPagePermissions(canEdit: false, hasRestriction: false),
+            permissions: permissions,
             lastUpdatedBy: nil
         )
+    }
+
+    private var permissions: DocmostPagePermissions? {
+        guard let canEdit, let hasRestriction else { return nil }
+        return DocmostPagePermissions(canEdit: canEdit, hasRestriction: hasRestriction)
     }
 
     private func cachedProseMirrorDocument() -> ProseMirrorDocument? {

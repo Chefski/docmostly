@@ -19,6 +19,9 @@ extension PageReaderView {
 
         if editorViewModel.errorMessage == nil {
             self.editorViewModel = editorViewModel
+            if let currentSpaceID = editorViewModel.currentSpaceID {
+                pageLoaded(editorViewModel.currentPageSlugID, currentSpaceID, editorViewModel.title)
+            }
             if editorViewModel.canEdit == false {
                 readerMode = .read
             }
@@ -243,6 +246,14 @@ extension PageReaderView {
             .appending(path: pageSlug)
     }
 
+    var pageNavigationTitle: String {
+        if let title = editorViewModel?.title, title.isEmpty == false {
+            return title
+        }
+
+        return initialTitle ?? "Page"
+    }
+
     var currentSpaceSlug: String? {
         guard let editorViewModel else { return nil }
 
@@ -270,6 +281,18 @@ extension PageReaderView {
         let markdown = editorViewModel.markdownForDocument()
         NativeEditorClipboard.write("# \(title)\n\n\(markdown)")
     }
+
+    #if os(macOS)
+    func openCurrentPageInNewWindow() {
+        guard let editorViewModel else { return }
+
+        openWindow(value: MacPageWindowRoute(
+            pageID: editorViewModel.currentPageSlugID,
+            spaceID: editorViewModel.currentSpaceID,
+            title: editorViewModel.title
+        ))
+    }
+    #endif
 
     func duplicateCurrentPage() {
         guard let editorViewModel else { return }
