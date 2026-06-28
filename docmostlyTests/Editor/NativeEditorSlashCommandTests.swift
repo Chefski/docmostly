@@ -57,6 +57,10 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func slashCommandTitleWordStartPriorityScansPastMidWordMatches() {
+        #expect(NativeEditorCommand.iframeEmbed.matchPriority(query: "e") == 0)
+    }
+
     @Test func slashCommandMenuIsDisabledInsideCodeBlocks() {
         let block = NativeEditorBlock(
             kind: .codeBlock(language: nil),
