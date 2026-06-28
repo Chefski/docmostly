@@ -52,6 +52,10 @@ enum NativeEditorMarkdownParser {
             return detailsRule
         }
 
+        if let calloutRule = calloutInputRule(from: text) {
+            return calloutRule
+        }
+
         return lineInputRule(from: text)
     }
 
@@ -131,6 +135,26 @@ enum NativeEditorMarkdownParser {
 
         let details = NativeEditorDetailsBlock(summary: "Details", previewText: "Details", isOpen: true)
         return NativeEditorMarkdownInputRule(kind: .details(details), text: details.summary)
+    }
+
+    private static func calloutInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
+        guard text.hasPrefix(":::"), text.last?.isWhitespace == true else { return nil }
+
+        let typeText = text
+            .dropFirst(3)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard typeText.allSatisfy(\.isLetter) else { return nil }
+
+        let style = normalizedCalloutStyle(from: typeText)
+        let callout = NativeEditorCalloutBlock(style: style, icon: nil, previewText: "Callout")
+        return NativeEditorMarkdownInputRule(kind: .callout(callout), text: callout.previewText)
+    }
+
+    private static func normalizedCalloutStyle(from typeText: String) -> String {
+        let validStyles: Set<String> = ["default", "info", "note", "success", "warning", "danger"]
+        guard typeText.isEmpty == false else { return "info" }
+        let lowercasedType = typeText.lowercased()
+        return validStyles.contains(lowercasedType) ? lowercasedType : "info"
     }
 
     private static func lineInputRule(from text: String) -> NativeEditorMarkdownInputRule? {

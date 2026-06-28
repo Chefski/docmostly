@@ -98,6 +98,42 @@ struct NativeRichEditorMechanicsTests {
         #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
     }
 
+    @Test func markdownInputRuleSupportsDocmostDefaultCalloutShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("::: ")
+        viewModel.handleDocumentChanged()
+
+        guard case .callout(let callout) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost callout shortcut to create a native callout block.")
+            return
+        }
+        #expect(callout.style == "info")
+        #expect(callout.previewText == "Callout")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].type == "callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["type"] == .string("info"))
+    }
+
+    @Test func markdownInputRuleSupportsDocmostTypedCalloutShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString(":::warning ")
+        viewModel.handleDocumentChanged()
+
+        guard case .callout(let callout) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost typed callout shortcut to create a native callout block.")
+            return
+        }
+        #expect(callout.style == "warning")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["type"] == .string("warning"))
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
