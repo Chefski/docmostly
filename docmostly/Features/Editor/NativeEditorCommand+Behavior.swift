@@ -25,11 +25,11 @@ extension NativeEditorCommand {
     func matchPriority(query: String) -> Int? {
         guard query.isEmpty == false else { return 0 }
 
-        if title.localizedStandardContains(query) {
+        if title.localizedStandardContainsAtWordStart(query) {
             return 0
         }
 
-        if title.fuzzyMatchesSlashCommandQuery(query) {
+        if title.localizedStandardContains(query) || title.fuzzyMatchesSlashCommandQuery(query) {
             return 1
         }
 
@@ -149,6 +149,15 @@ extension NativeEditorCommand {
 }
 
 private extension String {
+    func localizedStandardContainsAtWordStart(_ query: String) -> Bool {
+        guard let range = localizedStandardRange(of: query) else { return false }
+        guard range.lowerBound != startIndex else { return true }
+
+        let previousIndex = index(before: range.lowerBound)
+        let previousCharacter = self[previousIndex]
+        return previousCharacter.isWhitespace || previousCharacter.isPunctuation
+    }
+
     func fuzzyMatchesSlashCommandQuery(_ query: String) -> Bool {
         let normalizedQuery = query.lowercased()
         guard normalizedQuery.isEmpty == false else { return true }
