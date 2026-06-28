@@ -41,6 +41,17 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do List"])
     }
 
+    @Test func slashCommandFilteringUsesSubtitlesWhenTitlesDoNotMatch() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/equation"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        let titles = viewModel.filteredSlashCommands.map(\.title)
+        #expect(titles.contains("Math Inline"))
+        #expect(titles.contains("Math Block"))
+    }
+
     @Test func applyingSlashCommandTransformsActiveBlockAndClearsSlashToken() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/h1"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")

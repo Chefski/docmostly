@@ -19,10 +19,20 @@ extension NativeEditorCommand {
     }
 
     func matches(query: String) -> Bool {
-        guard query.isEmpty == false else { return true }
+        matchPriority(query: query) != nil
+    }
 
-        return title.localizedStandardContains(query) ||
-            subtitle.localizedStandardContains(query) ||
-            rawValue.localizedStandardContains(query)
+    func matchPriority(query: String) -> Int? {
+        guard query.isEmpty == false else { return 0 }
+
+        if title.localizedStandardContains(query) || rawValue.localizedStandardContains(query) {
+            return 0
+        }
+
+        if subtitle.localizedStandardContains(query) {
+            return 1
+        }
+
+        return nil
     }
 }

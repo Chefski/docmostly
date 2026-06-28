@@ -13,17 +13,31 @@ extension NativeEditorMarkdownParser {
         var pageLink: DocmostPageLink
     }
 
-    static func appendMarkdownText(_ markdown: String, to result: inout AttributedString) {
+    static func appendMarkdownText(
+        _ markdown: String,
+        to result: inout AttributedString,
+        parsesInlineMarkdown: Bool = true
+    ) {
         guard markdown.isEmpty == false else { return }
 
         var remaining = markdown[...]
+        var didAppendAtom = false
         while let link = nextDocmostPageMarkdownLink(in: remaining) {
-            appendMarkdownTextWithBareDocmostPageLinks(String(remaining[..<link.range.lowerBound]), to: &result)
+            appendMarkdownTextWithBareDocmostPageLinks(
+                String(remaining[..<link.range.lowerBound]),
+                to: &result,
+                parsesInlineMarkdown: false
+            )
             appendMention(label: link.label, pageLink: link.pageLink, to: &result)
+            didAppendAtom = true
             remaining = remaining[link.range.upperBound...]
         }
 
-        appendMarkdownTextWithBareDocmostPageLinks(String(remaining), to: &result)
+        appendMarkdownTextWithBareDocmostPageLinks(
+            String(remaining),
+            to: &result,
+            parsesInlineMarkdown: parsesInlineMarkdown && didAppendAtom == false
+        )
     }
 
     static func mentionMarkdown(from mention: NativeEditorMention, fallbackText: String) -> String {
@@ -38,23 +52,42 @@ extension NativeEditorMarkdownParser {
 
     private static func appendMarkdownTextWithBareDocmostPageLinks(
         _ markdown: String,
-        to result: inout AttributedString
+        to result: inout AttributedString,
+        parsesInlineMarkdown: Bool
     ) {
         guard markdown.isEmpty == false else { return }
 
         var remaining = markdown[...]
+        var didAppendAtom = false
         while let link = nextBareDocmostPageLink(in: remaining) {
-            appendPlainMarkdownText(String(remaining[..<link.range.lowerBound]), to: &result)
+            appendPlainMarkdownText(
+                String(remaining[..<link.range.lowerBound]),
+                to: &result,
+                parsesInlineMarkdown: false
+            )
             appendMention(label: link.label, pageLink: link.pageLink, to: &result)
+            didAppendAtom = true
             remaining = remaining[link.range.upperBound...]
         }
 
-        appendPlainMarkdownText(String(remaining), to: &result)
+        appendPlainMarkdownText(
+            String(remaining),
+            to: &result,
+            parsesInlineMarkdown: parsesInlineMarkdown && didAppendAtom == false
+        )
     }
 
-    private static func appendPlainMarkdownText(_ markdown: String, to result: inout AttributedString) {
+    private static func appendPlainMarkdownText(
+        _ markdown: String,
+        to result: inout AttributedString,
+        parsesInlineMarkdown: Bool
+    ) {
         guard markdown.isEmpty == false else { return }
-        result += (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+        if parsesInlineMarkdown {
+            result += (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+        } else {
+            result += AttributedString(markdown)
+        }
     }
 
     private static func appendMention(

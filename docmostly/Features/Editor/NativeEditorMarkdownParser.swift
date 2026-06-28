@@ -197,7 +197,11 @@ enum NativeEditorMarkdownParser {
 
         while let inlineDelimiter = nextInlineMathDelimiter(in: remaining) {
             let openRange = inlineDelimiter.range
-            appendMarkdownText(String(remaining[..<openRange.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<openRange.lowerBound]),
+                to: &result,
+                parsesInlineMarkdown: false
+            )
 
             let contentStart = openRange.upperBound
             guard let closeRange = remaining[contentStart...].range(of: inlineDelimiter.value) else {
@@ -216,7 +220,7 @@ enum NativeEditorMarkdownParser {
             remaining = remaining[closeRange.upperBound...]
         }
 
-        appendMarkdownText(String(remaining), to: &result)
+        appendMarkdownText(String(remaining), to: &result, parsesInlineMarkdown: result.characters.isEmpty)
         return result
     }
 
