@@ -13,6 +13,10 @@ extension NativeEditorMarkdownParser {
             return calloutBlock
         }
 
+        if let mediaBlock = mediaHTMLBlock(in: lines, startingAt: index) {
+            return mediaBlock
+        }
+
         if let diagramBlock = diagramHTMLBlock(in: lines, startingAt: index) {
             return diagramBlock
         }
@@ -44,15 +48,16 @@ extension NativeEditorMarkdownParser {
     private static func mediaMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .image(let media):
-            imageMarkdown(from: media)
+            mediaHTMLMarkdown(from: media, type: "image") ?? imageMarkdown(from: media)
         case .video(let media):
-            mediaLinkMarkdown(from: media, fallbackTitle: "Video")
+            mediaHTMLMarkdown(from: media, type: "video") ?? mediaLinkMarkdown(from: media, fallbackTitle: "Video")
         case .audio(let media):
-            mediaLinkMarkdown(from: media, fallbackTitle: "Audio")
+            mediaHTMLMarkdown(from: media, type: "audio") ?? mediaLinkMarkdown(from: media, fallbackTitle: "Audio")
         case .pdf(let pdf):
-            linkMarkdown(title: pdf.name ?? pdf.source ?? "PDF", url: pdf.source)
+            pdfHTMLMarkdown(from: pdf) ?? linkMarkdown(title: pdf.name ?? pdf.source ?? "PDF", url: pdf.source)
         case .attachment(let attachment):
-            linkMarkdown(title: attachment.name ?? attachment.url ?? "Attachment", url: attachment.url)
+            attachmentHTMLMarkdown(from: attachment) ??
+                linkMarkdown(title: attachment.name ?? attachment.url ?? "Attachment", url: attachment.url)
         default:
             nil
         }
@@ -82,7 +87,7 @@ extension NativeEditorMarkdownParser {
     private static func embeddedMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .embed(let embed):
-            embedMarkdown(from: embed)
+            embedHTMLMarkdown(from: embed) ?? embedMarkdown(from: embed)
         case .drawio(let diagram):
             diagramMarkdown(from: diagram, type: "drawio")
         case .excalidraw(let diagram):
