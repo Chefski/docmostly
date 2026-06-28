@@ -102,7 +102,7 @@ extension AppState {
                 spaceId: "",
                 updatedAt: Date.now,
                 permissions: DocmostPagePermissions(canEdit: true, hasRestriction: false),
-                lastUpdatedBy: currentUser?.user
+                lastUpdatedBy: pagePerson(from: currentUser?.user)
             )
         }
     }
@@ -290,5 +290,10 @@ extension AppState {
             comments.append(comment)
         }
         pageCommentsByID[comment.pageId] = comments
+    }
+
+    private func pagePerson(from user: DocmostUser?) -> DocmostPagePerson? {
+        guard let user else { return nil }
+        return DocmostPagePerson(id: user.id, name: user.name, avatarUrl: user.avatarUrl)
     }
 }
