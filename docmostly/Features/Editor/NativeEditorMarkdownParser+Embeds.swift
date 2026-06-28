@@ -146,6 +146,7 @@ extension NativeEditorMarkdownParser {
     }
 
     static func embedHTMLMarkdown(from embed: NativeEditorEmbedBlock) -> String? {
+        guard embed.provider?.lowercased() != "iframe" else { return nil }
         guard embedRequiresDocmostHTML(embed) else { return nil }
 
         let openingTag = htmlTag("div", attributes: [
@@ -439,7 +440,9 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func embedRequiresDocmostHTML(_ embed: NativeEditorEmbedBlock) -> Bool {
-        embed.provider != nil && embed.provider != "iframe" ||
+        guard embed.provider?.lowercased() != "iframe" else { return false }
+
+        return embed.provider != nil ||
             embed.alignment != nil ||
             embed.width != nil ||
             embed.height != nil
@@ -524,7 +527,11 @@ extension NativeEditorMarkdownParser {
             return false
         }
 
-        return true
+        let path = components.percentEncodedPath.lowercased()
+        return path == "/embed" ||
+            path.contains("/embed/") ||
+            path == "/live-embed" ||
+            path.contains("/live-embed/")
     }
 
     private static func htmlTag(_ name: String, attributes: [(String, String?)]) -> String {
