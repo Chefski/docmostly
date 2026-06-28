@@ -38,14 +38,14 @@ struct NativeEditorRichBlockPreviewView: View {
             previewShell(
                 systemImage: "play.rectangle",
                 title: "Video",
-                subtitle: media.alternativeText ?? media.source
+                subtitle: media.alternativeText ?? media.title ?? media.source
             ) {
                 if let richBlockActions {
                     NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
                 }
             }
         case .audio(let media):
-            previewShell(systemImage: "waveform", title: "Audio", subtitle: media.source) {
+            previewShell(systemImage: "waveform", title: "Audio", subtitle: media.title ?? media.source) {
                 if let richBlockActions {
                     NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
                 }
@@ -132,6 +132,12 @@ struct NativeEditorRichBlockPreviewView: View {
                     )
                 }
             }
+        case .base(let base):
+            previewShell(
+                systemImage: "tablecells",
+                title: base.previewText,
+                subtitle: base.pageID ?? "Base page pending"
+            )
         case .embed(let embed):
             previewShell(
                 systemImage: "rectangle.connected.to.line.below",

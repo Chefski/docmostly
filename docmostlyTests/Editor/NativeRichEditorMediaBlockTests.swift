@@ -9,6 +9,7 @@ struct NativeRichEditorMediaBlockTests {
         let imageID = viewModel.document.blocks[0].id
         let pdfID = viewModel.document.blocks[1].id
         let attachmentID = viewModel.document.blocks[2].id
+        let videoID = viewModel.document.blocks[3].id
 
         viewModel.updateMediaBlock(
             blockID: imageID,
@@ -18,6 +19,16 @@ struct NativeRichEditorMediaBlockTests {
                 width: "1024",
                 height: "768",
                 alignment: "center"
+            )
+        )
+        viewModel.updateMediaBlock(
+            blockID: videoID,
+            update: NativeEditorMediaBlockUpdate(
+                source: "/files/demo-v2.mp4",
+                alternativeText: "Launch demo",
+                width: "1280",
+                height: "720",
+                alignment: "right"
             )
         )
         viewModel.updatePDFBlock(
@@ -42,6 +53,16 @@ struct NativeRichEditorMediaBlockTests {
         #expect(nodes[0].attrs?["height"] == .int(768))
         #expect(nodes[0].attrs?["align"] == .string("center"))
 
+        #expect(nodes[3].type == "video")
+        #expect(nodes[3].attrs?["src"] == .string("/files/demo-v2.mp4"))
+        #expect(nodes[3].attrs?["alt"] == .string("Launch demo"))
+        #expect(nodes[3].attrs?["title"] == .string("Demo original.mp4"))
+        #expect(nodes[3].attrs?["attachmentId"] == .string("video-1"))
+        #expect(nodes[3].attrs?["size"] == .int(8192))
+        #expect(nodes[3].attrs?["width"] == .int(1280))
+        #expect(nodes[3].attrs?["height"] == .int(720))
+        #expect(nodes[3].attrs?["align"] == .string("right"))
+
         #expect(nodes[1].type == "pdf")
         #expect(nodes[1].attrs?["src"] == .string("/files/spec-v2.pdf"))
         #expect(nodes[1].attrs?["name"] == .string("Spec v2.pdf"))
@@ -59,7 +80,8 @@ struct NativeRichEditorMediaBlockTests {
         viewModel.document = NativeEditorDocument(blocks: [
             imageBlock(),
             pdfBlock(),
-            attachmentBlock()
+            attachmentBlock(),
+            videoBlock()
         ])
         return viewModel
     }
@@ -69,6 +91,7 @@ struct NativeRichEditorMediaBlockTests {
             kind: .image(NativeEditorMediaBlock(
                 source: "/files/hero-old.png",
                 alternativeText: nil,
+                title: nil,
                 attachmentID: "image-1",
                 sizeInBytes: 2048,
                 width: nil,
@@ -77,6 +100,24 @@ struct NativeRichEditorMediaBlockTests {
                 alignment: nil
             )),
             text: AttributedString("Image"),
+            alignment: .left
+        )
+    }
+
+    private func videoBlock() -> NativeEditorBlock {
+        NativeEditorBlock(
+            kind: .video(NativeEditorMediaBlock(
+                source: "/files/demo.mp4",
+                alternativeText: nil,
+                title: "Demo original.mp4",
+                attachmentID: "video-1",
+                sizeInBytes: 8192,
+                width: nil,
+                height: nil,
+                aspectRatio: nil,
+                alignment: nil
+            )),
+            text: AttributedString("Demo original.mp4"),
             alignment: .left
         )
     }

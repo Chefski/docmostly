@@ -244,6 +244,15 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
         )
     }
 
+    static func baseNode(from base: NativeEditorBaseBlock) -> ProseMirrorNode {
+        var attrs: [String: ProseMirrorJSONValue] = ["pageId": base.pageID.map(ProseMirrorJSONValue.string) ?? .null]
+        if let pendingKey = base.pendingKey, pendingKey.isEmpty == false {
+            attrs["pendingKey"] = .string(pendingKey)
+        }
+
+        return ProseMirrorNode(type: "base", attrs: attrs)
+    }
+
     static func embedNode(from embed: NativeEditorEmbedBlock) -> ProseMirrorNode {
         var attrs: [String: ProseMirrorJSONValue] = [
             "src": .string(embed.source ?? ""),

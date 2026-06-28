@@ -72,6 +72,40 @@ struct NativeRichEditorTableTests {
         #expect(firstRowSecondCell?.attrs?["colwidth"] == .array([.int(236)]))
     }
 
+    @Test func editingMergedTableCellPreservesSpanAndColumnWidthAttributes() {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Merged",
+                    isHeader: true,
+                    backgroundColorName: "blue",
+                    columnWidth: 120,
+                    columnSpan: 2,
+                    rowSpan: 2,
+                    columnWidths: [120, 160]
+                ),
+                NativeEditorTableCell(plainText: "Status", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Native", isHeader: false, backgroundColorName: nil),
+                NativeEditorTableCell(plainText: "Ready", isHeader: false, backgroundColorName: nil)
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.updateTableCell(blockID: blockID, rowIndex: 0, columnIndex: 0, text: "Updated")
+
+        let firstCell = viewModel.document.proseMirrorDocument.content.first?.content?.first?.content?.first
+        #expect(firstCell?.attrs?["colspan"] == .int(2))
+        #expect(firstCell?.attrs?["rowspan"] == .int(2))
+        #expect(firstCell?.attrs?["colwidth"] == .array([.int(120), .int(160)]))
+        #expect(firstCell?.attrs?["backgroundColorName"] == .string("blue"))
+        #expect(firstCell?.content?.first?.content?.first?.text == "Updated")
+    }
+
     private func tableViewModel() -> NativeRichEditorViewModel {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/table"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")

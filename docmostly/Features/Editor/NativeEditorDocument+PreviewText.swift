@@ -22,9 +22,9 @@ nonisolated extension NativeEditorDocument {
         case .table(let table):
             "\(table.rows.count) rows, \(table.columnCount) columns"
         case .image(let media), .video(let media):
-            media.alternativeText ?? media.source ?? kind.accessibilityLabel
+            media.alternativeText ?? media.title ?? media.source ?? kind.accessibilityLabel
         case .audio(let media):
-            media.source ?? "Audio"
+            media.title ?? media.source ?? "Audio"
         case .pdf(let pdf):
             pdf.name ?? pdf.source ?? "PDF"
         case .attachment(let attachment):
@@ -52,6 +52,8 @@ nonisolated extension NativeEditorDocument {
             source.previewText
         case .transclusionReference(let reference):
             reference.transclusionID ?? reference.sourcePageID ?? "Synced block reference"
+        case .base(let base):
+            base.pageID ?? base.previewText
         default:
             nil
         }

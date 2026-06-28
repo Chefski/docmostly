@@ -22,6 +22,7 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
     case subpages
     case transclusionSource(NativeEditorTransclusionSourceBlock)
     case transclusionReference(NativeEditorTransclusionReferenceBlock)
+    case base(NativeEditorBaseBlock)
     case embed(NativeEditorEmbedBlock)
     case drawio(NativeEditorDiagramBlock)
     case excalidraw(NativeEditorDiagramBlock)
@@ -33,8 +34,8 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
         case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
             return true
         case .table, .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider,
-                .columns, .subpages, .transclusionSource, .transclusionReference, .embed, .drawio, .excalidraw,
-                .mathBlock, .unsupported:
+                .columns, .subpages, .transclusionSource, .transclusionReference, .base, .embed, .drawio,
+                .excalidraw, .mathBlock, .unsupported:
             return false
         }
     }
@@ -48,8 +49,8 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
         case .paragraph, .bulletListItem, .orderedListItem, .taskListItem, .blockquote:
             .body
         case .table, .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider,
-                .columns, .subpages, .transclusionSource, .transclusionReference, .embed, .drawio, .excalidraw,
-                .mathBlock, .unsupported:
+                .columns, .subpages, .transclusionSource, .transclusionReference, .base, .embed, .drawio,
+                .excalidraw, .mathBlock, .unsupported:
             .body
         }
     }
@@ -98,6 +99,8 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
             "Synced block"
         case .transclusionReference:
             "Synced block reference"
+        case .base(let base):
+            base.pageID == nil ? base.previewText : "Base"
         case .embed(let embed):
             embed.provider.map { "\($0) embed" } ?? "Embed"
         case .drawio:

@@ -10,6 +10,7 @@ extension NativeRichEditorViewModel {
             let media = NativeEditorMediaBlock(
                 source: Self.trimmedOptional(update.source),
                 alternativeText: Self.trimmedOptional(update.alternativeText),
+                title: currentMedia.title,
                 attachmentID: currentMedia.attachmentID,
                 sizeInBytes: currentMedia.sizeInBytes,
                 width: Self.trimmedOptional(update.width),
@@ -130,6 +131,9 @@ nonisolated extension NativeEditorRichBlockNodeFactory {
         )
         if let alternativeText = media.alternativeText {
             attrs["alt"] = .string(alternativeText)
+        }
+        if let title = media.title {
+            attrs["title"] = .string(title)
         }
         appendDimensions(width: media.width, height: media.height, aspectRatio: media.aspectRatio, to: &attrs)
         if let alignment = media.alignment {

@@ -96,6 +96,7 @@ struct NativeEditorDocumentTests {
             return
         }
         #expect(video.attachmentID == "video-1")
+        #expect(video.title == "Launch demo.mp4")
         try expectAudioPDFAndAttachmentBlocks(blocks)
     }
 

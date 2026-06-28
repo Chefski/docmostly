@@ -233,6 +233,8 @@ nonisolated extension NativeEditorDocument {
             NativeEditorRichBlockNodeFactory.transclusionSourceNode(from: source)
         case .transclusionReference(let reference):
             NativeEditorRichBlockNodeFactory.transclusionReferenceNode(from: reference)
+        case .base(let base):
+            NativeEditorRichBlockNodeFactory.baseNode(from: base)
         default:
             nil
         }
@@ -240,14 +242,14 @@ nonisolated extension NativeEditorDocument {
 
     private static func embeddedFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode {
         switch block.kind {
-        case .embed:
-            ProseMirrorNode(type: "embed")
-        case .drawio:
-            ProseMirrorNode(type: "drawio")
-        case .excalidraw:
-            ProseMirrorNode(type: "excalidraw")
-        case .mathBlock:
-            ProseMirrorNode(type: "mathBlock")
+        case .embed(let embed):
+            NativeEditorRichBlockNodeFactory.embedNode(from: embed)
+        case .drawio(let diagram):
+            NativeEditorRichBlockNodeFactory.diagramNode(from: diagram, type: "drawio")
+        case .excalidraw(let diagram):
+            NativeEditorRichBlockNodeFactory.diagramNode(from: diagram, type: "excalidraw")
+        case .mathBlock(let math):
+            NativeEditorRichBlockNodeFactory.mathBlockNode(from: math)
         case .unsupported:
             textContainerNode(type: "paragraph", block: block)
         default:

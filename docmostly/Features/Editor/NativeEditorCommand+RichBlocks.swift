@@ -3,6 +3,10 @@ import SwiftUI
 
 extension NativeEditorCommand {
     func replacementBlock(reusing id: UUID) -> NativeEditorBlock? {
+        if let mediaBlock = mediaReplacementBlock(reusing: id) {
+            return mediaBlock
+        }
+
         if let structuralBlock = structuralReplacementBlock(reusing: id) {
             return structuralBlock
         }
@@ -14,10 +18,41 @@ extension NativeEditorCommand {
         return textReplacementBlock(reusing: id)
     }
 
+    private func mediaReplacementBlock(reusing id: UUID) -> NativeEditorBlock? {
+        switch self {
+        case .image:
+            mediaBlock(reusing: id, type: "image", kind: blockKind)
+        case .video:
+            mediaBlock(reusing: id, type: "video", kind: blockKind)
+        case .audio:
+            mediaBlock(reusing: id, type: "audio", kind: blockKind)
+        case .pdf:
+            richBlock(
+                id: id,
+                kind: blockKind,
+                rawNode: NativeEditorRichBlockNodeFactory.pdfNode(from: .placeholder)
+            )
+        case .fileAttachment:
+            richBlock(
+                id: id,
+                kind: blockKind,
+                rawNode: NativeEditorRichBlockNodeFactory.attachmentNode(from: .placeholder)
+            )
+        default:
+            nil
+        }
+    }
+
     private func structuralReplacementBlock(reusing id: UUID) -> NativeEditorBlock? {
         switch self {
         case .table:
             richBlock(id: id, kind: blockKind, rawNode: tableNode)
+        case .baseInline, .kanban:
+            richBlock(
+                id: id,
+                kind: blockKind,
+                rawNode: NativeEditorRichBlockNodeFactory.baseNode(from: baseBlock)
+            )
         case .callout:
             richBlock(id: id, kind: blockKind, rawNode: calloutNode)
         case .details:
@@ -26,8 +61,12 @@ extension NativeEditorCommand {
             richBlock(id: id, kind: blockKind, rawNode: ProseMirrorNode(type: "pageBreak"))
         case .divider:
             richBlock(id: id, kind: blockKind, rawNode: ProseMirrorNode(type: "horizontalRule"))
-        case .columns:
-            richBlock(id: id, kind: blockKind, rawNode: columnsNode)
+        case .columns, .columns3, .columns4, .columns5:
+            richBlock(
+                id: id,
+                kind: blockKind,
+                rawNode: NativeEditorRichBlockNodeFactory.columnsNode(from: columnsBlock)
+            )
         case .subpages:
             richBlock(id: id, kind: blockKind, rawNode: ProseMirrorNode(type: "subpages"))
         case .syncedBlock:
@@ -39,10 +78,19 @@ extension NativeEditorCommand {
 
     private func embeddedReplacementBlock(reusing id: UUID) -> NativeEditorBlock? {
         switch self {
-        case .embed:
-            richBlock(id: id, kind: blockKind, rawNode: embedNode)
+        case .embed, .iframeEmbed, .airtableEmbed, .loomEmbed, .figmaEmbed, .typeformEmbed, .miroEmbed,
+                .youtubeEmbed, .vimeoEmbed, .framerEmbed, .googleDriveEmbed, .googleSheetsEmbed:
+            richBlock(
+                id: id,
+                kind: blockKind,
+                rawNode: NativeEditorRichBlockNodeFactory.embedNode(from: embedBlock)
+            )
         case .mathBlock:
             richBlock(id: id, kind: blockKind, rawNode: mathBlockNode)
+        case .drawio:
+            richBlock(id: id, kind: blockKind, rawNode: diagramNode(type: "drawio"))
+        case .excalidraw:
+            richBlock(id: id, kind: blockKind, rawNode: diagramNode(type: "excalidraw"))
         default:
             nil
         }
@@ -72,6 +120,14 @@ extension NativeEditorCommand {
         ]
     }
 
+    private var baseBlock: NativeEditorBaseBlock {
+        if case .base(let base) = blockKind {
+            return base
+        }
+
+        return NativeEditorBaseBlock(pageID: nil, pendingKey: nil, previewText: "Base")
+    }
+
     private var defaultSyncedBlockID: String {
         "sync-\(UUID().uuidString)"
     }
@@ -84,6 +140,18 @@ extension NativeEditorCommand {
             alignment: .left,
             rawNode: rawNode
         )
+    }
+
+    private func mediaBlock(id: UUID, type: String, kind: NativeEditorBlockKind) -> NativeEditorBlock {
+        richBlock(
+            id: id,
+            kind: kind,
+            rawNode: NativeEditorRichBlockNodeFactory.mediaNode(from: .placeholder, type: type)
+        )
+    }
+
+    private func mediaBlock(reusing id: UUID, type: String, kind: NativeEditorBlockKind) -> NativeEditorBlock {
+        mediaBlock(id: id, type: type, kind: kind)
     }
 
     private var tableNode: ProseMirrorNode {
@@ -127,22 +195,17 @@ extension NativeEditorCommand {
         )
     }
 
-    private var columnsNode: ProseMirrorNode {
-        ProseMirrorNode(
-            type: "columns",
-            attrs: ["layout": .string("two_equal")],
-            content: [
-                columnNode(text: "Left"),
-                columnNode(text: "Right")
-            ]
-        )
-    }
+    private var columnsBlock: NativeEditorColumnsBlock {
+        if case .columns(let columns) = blockKind {
+            return columns
+        }
 
-    private func columnNode(text: String) -> ProseMirrorNode {
-        ProseMirrorNode(
-            type: "column",
-            attrs: ["width": .int(1)],
-            content: [paragraphNode(text)]
+        return NativeEditorColumnsBlock(
+            layout: "two_equal",
+            widthMode: "wide",
+            columnCount: 2,
+            previewText: "Column 1 Column 2",
+            columnTexts: ["Column 1", "Column 2"]
         )
     }
 
@@ -166,15 +229,26 @@ extension NativeEditorCommand {
         )
     }
 
-    private var embedNode: ProseMirrorNode {
-        ProseMirrorNode(
-            type: "embed",
-            attrs: ["src": .string("https://example.com"), "provider": .string("Embed")]
+    private var embedBlock: NativeEditorEmbedBlock {
+        if case .embed(let embed) = blockKind {
+            return embed
+        }
+
+        return NativeEditorEmbedBlock(
+            source: nil,
+            provider: "Embed",
+            alignment: nil,
+            width: nil,
+            height: nil
         )
     }
 
     private var mathBlockNode: ProseMirrorNode {
         ProseMirrorNode(type: "mathBlock", attrs: ["text": .string("E = mc^2")])
+    }
+
+    private func diagramNode(type: String) -> ProseMirrorNode {
+        NativeEditorRichBlockNodeFactory.diagramNode(from: .placeholder, type: type)
     }
 
     private func paragraphNode(_ text: String) -> ProseMirrorNode {

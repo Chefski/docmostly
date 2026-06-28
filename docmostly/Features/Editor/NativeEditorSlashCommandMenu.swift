@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NativeEditorSlashCommandMenu: View {
     @Bindable var viewModel: NativeRichEditorViewModel
+    var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
 
     var body: some View {
         let commands = viewModel.filteredSlashCommands
@@ -21,7 +22,11 @@ struct NativeEditorSlashCommandMenu: View {
             } else {
                 ForEach(commands) { command in
                     Button {
-                        viewModel.applySlashCommand(command)
+                        if let importKind = command.attachmentImportKind {
+                            importAttachment(importKind)
+                        } else {
+                            viewModel.applySlashCommand(command)
+                        }
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: command.systemImage)
