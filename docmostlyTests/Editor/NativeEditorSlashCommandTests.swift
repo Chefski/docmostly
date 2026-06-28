@@ -71,6 +71,20 @@ struct NativeEditorSlashCommandTests {
         #expect(viewModel.filteredSlashCommands.isEmpty)
     }
 
+    @Test func applyingCodeBlockSlashCommandClearsSlashToken() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/code"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.applySlashCommand(.codeBlock)
+
+        #expect(viewModel.document.blocks[0].kind == .codeBlock(language: nil))
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+        #expect(viewModel.isShowingSlashCommands == false)
+        #expect(viewModel.isDirty == true)
+    }
+
     @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
