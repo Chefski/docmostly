@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorInlineCommentMarkTests {
     @Test func markdownExportPreservesDocmostInlineCommentSpan() {
         var text = AttributedString("Needs review")

@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct NativeRichEditorTableTests {
+    @Test func tableSlashCommandCreatesDocmostDefaultTableShape() throws {
+        let viewModel = tableViewModel()
+
+        guard case .table(let table) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected table block")
+            return
+        }
+
+        #expect(table.rows.count == 3)
+        #expect(table.columnCount == 3)
+        #expect(table.rows.first?.cells.allSatisfy(\.isHeader) == true)
+        #expect(table.rows.dropFirst().flatMap(\.cells).allSatisfy { $0.isHeader == false })
+        #expect(table.rows.flatMap(\.cells).allSatisfy { $0.plainText.isEmpty })
+
+        let tableNode = try #require(viewModel.document.proseMirrorDocument.content.first)
+        #expect(tableNode.content?.count == 3)
+        #expect(tableNode.content?.first?.content?.map(\.type) == ["tableHeader", "tableHeader", "tableHeader"])
+        #expect(tableNode.content?.dropFirst().allSatisfy { row in
+            row.content?.allSatisfy { $0.type == "tableCell" } == true
+        } == true)
+    }
+
     @Test func updatesTableCellAndReencodesRawTableNode() {
         let viewModel = tableViewModel()
         let blockID = viewModel.document.blocks[0].id
@@ -38,8 +60,8 @@ struct NativeRichEditorTableTests {
             Issue.record("Expected table block")
             return
         }
-        #expect(expandedTable.rows.count == 3)
-        #expect(expandedTable.columnCount == 3)
+        #expect(expandedTable.rows.count == 4)
+        #expect(expandedTable.columnCount == 4)
         #expect(expandedTable.rows[0].cells[1].isHeader == true)
         #expect(expandedTable.rows[1].cells.allSatisfy { $0.isHeader == false })
 
@@ -50,9 +72,9 @@ struct NativeRichEditorTableTests {
             Issue.record("Expected table block")
             return
         }
-        #expect(reducedTable.rows.count == 2)
-        #expect(reducedTable.columnCount == 2)
-        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
+        #expect(reducedTable.rows.count == 3)
+        #expect(reducedTable.columnCount == 3)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 3)
     }
 
     @Test func updatesTableColumnWidthAndReencodesCellColwidth() {

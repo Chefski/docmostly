@@ -108,16 +108,18 @@ extension NativeEditorCommand {
     }
 
     var defaultTableRows: [NativeEditorTableRow] {
-        [
-            NativeEditorTableRow(cells: [
-                NativeEditorTableCell(plainText: "Column 1", isHeader: true, backgroundColorName: nil),
-                NativeEditorTableCell(plainText: "Column 2", isHeader: true, backgroundColorName: nil)
-            ]),
-            NativeEditorTableRow(cells: [
-                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil),
-                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil)
-            ])
+        let columnCount = 3
+        return [
+            tableRow(columnCount: columnCount, isHeader: true),
+            tableRow(columnCount: columnCount, isHeader: false),
+            tableRow(columnCount: columnCount, isHeader: false)
         ]
+    }
+
+    private func tableRow(columnCount: Int, isHeader: Bool) -> NativeEditorTableRow {
+        NativeEditorTableRow(cells: (0..<columnCount).map { _ in
+            NativeEditorTableCell(plainText: "", isHeader: isHeader, backgroundColorName: nil)
+        })
     }
 
     private var baseBlock: NativeEditorBaseBlock {
@@ -155,19 +157,16 @@ extension NativeEditorCommand {
     }
 
     private var tableNode: ProseMirrorNode {
-        ProseMirrorNode(type: "table", content: [
-            tableRowNode(cellType: "tableHeader", texts: ["Column 1", "Column 2"]),
-            tableRowNode(cellType: "tableCell", texts: ["", ""])
-        ])
+        ProseMirrorNode(type: "table", content: defaultTableRows.map(tableRowNode))
     }
 
-    private func tableRowNode(cellType: String, texts: [String]) -> ProseMirrorNode {
+    private func tableRowNode(from row: NativeEditorTableRow) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "tableRow",
-            content: texts.map { text in
+            content: row.cells.map { cell in
                 ProseMirrorNode(
-                    type: cellType,
-                    content: [paragraphNode(text)]
+                    type: cell.isHeader ? "tableHeader" : "tableCell",
+                    content: [paragraphNode(cell.plainText)]
                 )
             }
         )

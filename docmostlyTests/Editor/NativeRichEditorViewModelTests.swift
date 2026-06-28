@@ -92,10 +92,10 @@ struct NativeRichEditorViewModelTests {
             Issue.record("Expected table block")
             return
         }
-        #expect(table.rows.count == 2)
+        #expect(table.rows.count == 3)
         #expect(viewModel.document.blocks[0].isEditable == false)
         #expect(viewModel.document.proseMirrorDocument.content.first?.type == "table")
-        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 3)
     }
 
     @Test func slashCommandInventoryIncludesMediaFileAndDiagramBlocks() {
