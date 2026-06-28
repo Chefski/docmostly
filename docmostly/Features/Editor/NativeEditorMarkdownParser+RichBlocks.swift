@@ -464,21 +464,6 @@ extension NativeEditorMarkdownParser {
         return unescapedHTMLText(String(line[contentStart..<contentEnd]))
     }
 
-    private static func markdownLinkSource(from destination: String) -> String {
-        var source = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if source.hasPrefix("<"), source.hasSuffix(">") {
-            source.removeFirst()
-            source.removeLast()
-        }
-
-        if let titleRange = source.range(of: " \"") {
-            source = String(source[..<titleRange.lowerBound])
-        }
-
-        return source.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private static func markdownLinkFileExtension(from source: String) -> String? {
         let path = markdownLinkPath(from: source)
         guard
