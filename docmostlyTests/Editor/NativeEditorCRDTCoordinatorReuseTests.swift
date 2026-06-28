@@ -24,6 +24,7 @@ struct NativeEditorCRDTCoordinatorReuseTests {
 }
 
 @MainActor
+@Suite(.serialized)
 struct CRDTEngineAttachmentTests {
     @Test func crdtAttachmentDoesNothingWithoutFactory() async {
         let appState = AppState()
