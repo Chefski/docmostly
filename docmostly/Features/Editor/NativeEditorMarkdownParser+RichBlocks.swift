@@ -221,13 +221,14 @@ extension NativeEditorMarkdownParser {
         let destinationStartIndex = line.index(after: openDestinationIndex)
         let destination = String(line[destinationStartIndex..<closeDestinationIndex])
         let source = markdownLinkSource(from: destination)
+        let title = markdownLinkTitle(from: destination)
         let attachmentID = docmostAttachmentID(from: source)
         guard source.isEmpty == false else { return nil }
 
         let media = NativeEditorMediaBlock(
             source: source,
             alternativeText: altText.isEmpty ? nil : altText,
-            title: nil,
+            title: title,
             attachmentID: attachmentID,
             sizeInBytes: nil,
             width: nil,
@@ -353,7 +354,8 @@ extension NativeEditorMarkdownParser {
             return media.alternativeText ?? "Image"
         }
 
-        return "![\(escapedMarkdownLinkText(media.alternativeText ?? ""))](\(source))"
+        let titlePart = markdownLinkTitlePart(from: media.title)
+        return "![\(escapedMarkdownLinkText(media.alternativeText ?? ""))](\(source)\(titlePart))"
     }
 
     private static func mediaLinkMarkdown(from media: NativeEditorMediaBlock, fallbackTitle: String) -> String {
