@@ -66,6 +66,28 @@ struct NativeRichEditorStructuralBlockTests {
         #expect(Set([columnsWithoutWidths, columnsWithNilWidths]).count == 1)
     }
 
+    @Test func columnsNormalizationClampsDeclaredCountToDocmostMaximum() {
+        let malformedColumns = NativeEditorColumnsBlock(
+            layout: "five_equal",
+            widthMode: "normal",
+            columnCount: 999,
+            previewText: "Plan",
+            columnTexts: ["Plan"]
+        )
+        let maximumColumns = NativeEditorColumnsBlock(
+            layout: "five_equal",
+            widthMode: "normal",
+            columnCount: 5,
+            previewText: "Plan",
+            columnTexts: ["Plan"]
+        )
+
+        let node = NativeEditorRichBlockNodeFactory.columnsNode(from: malformedColumns)
+        #expect(node.content?.count == 5)
+        #expect(malformedColumns == maximumColumns)
+        #expect(Set([malformedColumns, maximumColumns]).count == 1)
+    }
+
     @Test func updatesSyncedBlockIdentifiers() {
         let viewModel = structuralBlockViewModel()
         let sourceID = viewModel.document.blocks[1].id
