@@ -46,6 +46,30 @@ struct NativeEditorMentionMarkdownTests {
         #expect(attrs["anchorId"] == .string("shipping"))
     }
 
+    @Test func pasteMarkdownPageMentionsPreservesSurroundingInlineMarks() {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown(
+            """
+            Discuss **urgent** [spec](https://example.com/spec) before \
+            [Roadmap](https://docs.example.com/s/product/p/native-roadmap-abc123) now
+            """
+        )
+
+        let inlineNodes = viewModel.document.proseMirrorDocument.content.last?.content ?? []
+        #expect(inlineNodes.map(\.type) == ["text", "text", "text", "text", "text", "mention", "text"])
+        #expect(inlineNodes[1].text == "urgent")
+        #expect(inlineNodes[1].marks?.contains(ProseMirrorMark(type: "bold")) == true)
+        #expect(inlineNodes[3].text == "spec")
+        #expect(
+            inlineNodes[3].marks?.contains(
+                ProseMirrorMark(type: "link", attrs: ["href": .string("https://example.com/spec")])
+            ) == true
+        )
+    }
+
     @Test func documentMarkdownConversionPreservesMentionAtomsAsDocmostLinks() {
         var text = AttributedString("Discuss ")
         var mentionText = AttributedString("Roadmap")

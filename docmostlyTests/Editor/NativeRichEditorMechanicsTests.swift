@@ -211,6 +211,22 @@ struct NativeRichEditorMechanicsTests {
         #expect(inlineNodes[2].text == " today")
     }
 
+    @Test func pasteMarkdownInlineMathPreservesSurroundingInlineMarks() {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("Formula **important** $E = mc^2$ `today`")
+
+        let inlineNodes = viewModel.document.proseMirrorDocument.content.last?.content ?? []
+        #expect(inlineNodes.map(\.type) == ["text", "text", "text", "mathInline", "text", "text"])
+        #expect(inlineNodes[1].text == "important")
+        #expect(inlineNodes[1].marks?.contains(ProseMirrorMark(type: "bold")) == true)
+        #expect(inlineNodes[3].attrs?["text"] == .string("E = mc^2"))
+        #expect(inlineNodes[5].text == "today")
+        #expect(inlineNodes[5].marks?.contains(ProseMirrorMark(type: "code")) == true)
+    }
+
     @Test func indentAndOutdentActiveListBlock() {
         let block = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Nested"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [block])
