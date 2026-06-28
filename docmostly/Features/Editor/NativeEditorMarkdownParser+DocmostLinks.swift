@@ -56,6 +56,17 @@ extension NativeEditorMarkdownParser {
             remaining = remaining[htmlStatus.range.upperBound...]
         }
 
+        while let htmlHighlight = nextDocmostHighlightHTML(in: remaining) {
+            appendMarkdownText(
+                String(remaining[..<htmlHighlight.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
+            appendHighlight(htmlHighlight, to: &result)
+            didAppendAtom = true
+            remaining = remaining[htmlHighlight.range.upperBound...]
+        }
+
         while let htmlMention = nextDocmostMentionHTML(in: remaining) {
             appendMarkdownText(
                 String(remaining[..<htmlMention.range.lowerBound]),

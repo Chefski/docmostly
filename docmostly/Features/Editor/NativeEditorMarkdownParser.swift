@@ -370,7 +370,7 @@ enum NativeEditorMarkdownParser {
             } else if let mention = run[NativeEditorMentionAttribute.self] {
                 runMarkdown = mentionMarkdown(from: mention, fallbackText: runText)
             } else {
-                runMarkdown = inlineRunMarkdown(from: run, text: runText)
+                runMarkdown = highlightMarkdown(from: run, body: inlineRunMarkdown(from: run, text: runText))
             }
 
             output += commentMarkdown(from: run.nativeEditorInlineComments, body: runMarkdown)
