@@ -170,7 +170,56 @@ extension NativeEditorMarkdownParser {
             return cell.plainText
         }
 
+        if tableCellInlineContentContainsUnsafeLink(inlineContent) {
+            return markdownTableInlineContent(from: inlineContent)
+        }
+
         return inlineMarkdown(from: NativeEditorDocument.attributedText(from: inlineContent))
+    }
+
+    private static func tableCellInlineContentContainsUnsafeLink(
+        _ inlineContent: [NativeEditorInlineContent]
+    ) -> Bool {
+        inlineContent.contains { item in
+            guard case .text(_, let marks) = item else { return false }
+            return marks.contains { mark in
+                guard case .link(let href) = mark else { return false }
+                return href.isEmpty == false && NativeEditorDocument.safeLinkURL(from: href) == nil
+            }
+        }
+    }
+
+    private static func markdownTableInlineContent(from inlineContent: [NativeEditorInlineContent]) -> String {
+        inlineContent.map(markdownTableInlineContent).joined()
+    }
+
+    private static func markdownTableInlineContent(from item: NativeEditorInlineContent) -> String {
+        guard case .text(let text, let marks) = item,
+              let href = unsafeTableCellLinkHref(from: marks) else {
+            return inlineMarkdown(from: NativeEditorDocument.attributedText(from: item))
+        }
+
+        let nonLinkMarks = marks.filter { mark in
+            guard case .link = mark else { return true }
+            return false
+        }
+        var segment = AttributedString(text)
+        NativeEditorDocument.apply(nonLinkMarks, to: &segment)
+        let label = escapedMarkdownTableLinkLabel(inlineMarkdown(from: segment))
+        return "[\(label)](\(href))"
+    }
+
+    private static func unsafeTableCellLinkHref(from marks: [NativeEditorTextMark]) -> String? {
+        marks.compactMap { mark -> String? in
+            guard case .link(let href) = mark,
+                  href.isEmpty == false,
+                  NativeEditorDocument.safeLinkURL(from: href) == nil else {
+                return nil
+            }
+
+            return href
+        }
+        .first
     }
 
     private static func markdownTableSeparatorRow(columnCount: Int) -> String {
@@ -182,5 +231,12 @@ extension NativeEditorMarkdownParser {
             .replacing("|", with: "\\|")
             .replacing("\n", with: " ")
             .replacing("\r", with: " ")
+    }
+
+    private static func escapedMarkdownTableLinkLabel(_ text: String) -> String {
+        text
+            .replacing("\\", with: "\\\\")
+            .replacing("[", with: "\\[")
+            .replacing("]", with: "\\]")
     }
 }
