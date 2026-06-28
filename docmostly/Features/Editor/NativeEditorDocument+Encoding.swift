@@ -217,8 +217,8 @@ nonisolated extension NativeEditorDocument {
 
     private static func structuralFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode? {
         switch block.kind {
-        case .callout:
-            ProseMirrorNode(type: "callout", content: [textContainerNode(type: "paragraph", block: block)])
+        case .callout(let callout):
+            NativeEditorRichBlockNodeFactory.calloutNode(from: callout)
         case .details(let details):
             NativeEditorRichBlockNodeFactory.detailsNode(from: details)
         case .pageBreak:

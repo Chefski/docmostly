@@ -25,18 +25,20 @@ extension NativeEditorCommand {
     func matchPriority(query: String) -> Int? {
         guard query.isEmpty == false else { return 0 }
 
-        if title.localizedStandardContains(query)
-            || rawValue.localizedStandardContains(query)
-            || title.fuzzyMatchesSlashCommandQuery(query) {
+        if title.localizedStandardContains(query) || rawValue.localizedStandardContains(query) {
             return 0
         }
 
-        if subtitle.localizedStandardContains(query) {
+        if title.fuzzyMatchesSlashCommandQuery(query) {
             return 1
         }
 
+        if subtitle.localizedStandardContains(query) {
+            return 2
+        }
+
         if searchTerms.contains(where: { $0.localizedStandardContains(query) }) {
-            return 1
+            return 2
         }
 
         return nil
