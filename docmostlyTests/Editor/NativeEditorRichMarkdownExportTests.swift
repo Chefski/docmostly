@@ -4,6 +4,25 @@ import Testing
 
 @MainActor
 struct NativeEditorRichMarkdownExportTests {
+    @Test func documentMarkdownConversionPreservesIframeEmbedMarkdownShape() {
+        let source = "https://player.example.com/embed/demo"
+        let viewModel = configuredViewModel(blocks: [
+            NativeEditorBlock(
+                kind: .embed(NativeEditorEmbedBlock(
+                    source: source,
+                    provider: "iframe",
+                    alignment: nil,
+                    width: nil,
+                    height: nil
+                )),
+                text: AttributedString(source),
+                alignment: .left
+            )
+        ])
+
+        #expect(viewModel.markdownForDocument() == "[\(source)](\(source))")
+    }
+
     @Test func documentMarkdownConversionPreservesImageTitle() {
         let viewModel = configuredViewModel(blocks: [
             NativeEditorBlock(
