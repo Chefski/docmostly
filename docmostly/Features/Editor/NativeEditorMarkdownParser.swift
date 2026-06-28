@@ -48,6 +48,10 @@ enum NativeEditorMarkdownParser {
             return codeRule
         }
 
+        if let mathBlockRule = mathBlockInputRule(from: text) {
+            return mathBlockRule
+        }
+
         if let detailsRule = detailsInputRule(from: text) {
             return detailsRule
         }
@@ -128,6 +132,19 @@ enum NativeEditorMarkdownParser {
 
         let language = String(text.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
         return NativeEditorMarkdownInputRule(kind: .codeBlock(language: language.isEmpty ? nil : language), text: "")
+    }
+
+    private static func mathBlockInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
+        guard text.hasPrefix("$$$"), text.hasSuffix("$$$") else { return nil }
+
+        let mathText = text
+            .dropFirst(3)
+            .dropLast(3)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard mathText.isEmpty == false else { return nil }
+
+        let math = NativeEditorMathBlock(text: mathText)
+        return NativeEditorMarkdownInputRule(kind: .mathBlock(math), text: math.text)
     }
 
     private static func detailsInputRule(from text: String) -> NativeEditorMarkdownInputRule? {

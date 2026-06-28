@@ -134,6 +134,24 @@ struct NativeRichEditorMechanicsTests {
         #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["type"] == .string("warning"))
     }
 
+    @Test func markdownInputRuleSupportsDocmostMathBlockShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("$$$E = mc^2$$$")
+        viewModel.handleDocumentChanged()
+
+        guard case .mathBlock(let math) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost math shortcut to create a native math block.")
+            return
+        }
+        #expect(math.text == "E = mc^2")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "E = mc^2")
+        #expect(viewModel.document.proseMirrorDocument.content[0].type == "mathBlock")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["text"] == .string("E = mc^2"))
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
