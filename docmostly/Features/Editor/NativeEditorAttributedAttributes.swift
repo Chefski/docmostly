@@ -50,7 +50,7 @@ enum NativeEditorMathInlineAttribute: CodableAttributedStringKey {
     static let name = "docmostly.mathInline"
 }
 
-extension AttributedString {
+nonisolated extension AttributedString {
     var nativeEditorInlineComments: [NativeEditorInlineCommentMark] {
         if let comments = self[NativeEditorCommentMarksAttribute.self], comments.isEmpty == false {
             return comments.normalizedNativeEditorInlineComments
@@ -82,7 +82,7 @@ extension AttributedString {
     }
 }
 
-extension AttributedString.Runs.Run {
+nonisolated extension AttributedString.Runs.Run {
     var nativeEditorInlineComments: [NativeEditorInlineCommentMark] {
         if let comments = self[NativeEditorCommentMarksAttribute.self], comments.isEmpty == false {
             return comments.normalizedNativeEditorInlineComments
@@ -105,7 +105,7 @@ extension AttributedString.Runs.Run {
     }
 }
 
-extension AttributedSubstring {
+nonisolated extension AttributedSubstring {
     var nativeEditorInlineComments: [NativeEditorInlineCommentMark] {
         if let comments = self[NativeEditorCommentMarksAttribute.self], comments.isEmpty == false {
             return comments.normalizedNativeEditorInlineComments
@@ -124,7 +124,7 @@ extension AttributedSubstring {
     }
 }
 
-extension AttributeContainer {
+nonisolated extension AttributeContainer {
     mutating func addNativeEditorInlineComment(_ comment: NativeEditorInlineCommentMark) {
         setNativeEditorInlineComments(
             nativeEditorInlineComments.updatingNativeEditorInlineComment(comment)
@@ -156,7 +156,7 @@ extension AttributeContainer {
     }
 }
 
-extension Array where Element == NativeEditorInlineCommentMark {
+nonisolated extension Array where Element == NativeEditorInlineCommentMark {
     var normalizedNativeEditorInlineComments: [NativeEditorInlineCommentMark] {
         var seenCommentIDs: Set<String> = []
         return filter { comment in
