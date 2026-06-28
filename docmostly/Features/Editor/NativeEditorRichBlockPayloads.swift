@@ -144,6 +144,8 @@ nonisolated struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
 }
 
 nonisolated struct NativeEditorColumnsBlock: Hashable, Sendable {
+    private static let maximumColumnCount = 5
+
     var layout: String
     var widthMode: String
     var columnCount: Int
@@ -181,7 +183,7 @@ nonisolated struct NativeEditorColumnsBlock: Hashable, Sendable {
     }
 
     private var normalizedColumnCount: Int {
-        max(columnCount, 1)
+        min(max(columnCount, 1), Self.maximumColumnCount)
     }
 
     private func normalizedValues<Value>(_ values: [Value], fallback: Value) -> [Value] {
