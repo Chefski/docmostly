@@ -119,14 +119,14 @@ actor NativeEditorRealtimeEventClient {
             guard text.count <= NativeEditorRealtimeSocketFrame.maximumFrameCharacters else {
                 throw NativeEditorRealtimeSocketFrameError.frameTooLarge
             }
-            text
+            return text
         case .data(let data):
             guard data.count <= NativeEditorRealtimeSocketFrame.maximumFrameCharacters else {
                 throw NativeEditorRealtimeSocketFrameError.frameTooLarge
             }
-            String(bytes: data, encoding: .utf8) ?? ""
+            return String(bytes: data, encoding: .utf8) ?? ""
         @unknown default:
-            ""
+            return ""
         }
     }
 

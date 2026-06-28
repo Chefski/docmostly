@@ -33,7 +33,7 @@ actor DocmostAPIClient {
             let envelope = try decoder.decode(APIEnvelope<T>.self, from: data)
             return envelope.data
         } catch {
-            throw APIError.connectionFailed(error.localizedDescription)
+            throw APIError.decodingFailed(error.localizedDescription)
         }
     }
 
@@ -151,7 +151,7 @@ actor DocmostAPIClient {
             do {
                 return try decoder.decode(APIEnvelope<DocmostAttachment>.self, from: data).data
             } catch {
-                throw APIError.connectionFailed(error.localizedDescription)
+                throw APIError.decodingFailed(error.localizedDescription)
             }
         }
     }

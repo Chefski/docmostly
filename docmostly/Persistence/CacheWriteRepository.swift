@@ -26,6 +26,21 @@ actor CacheWriteRepository {
             }
         }
     }
+
+    func saveLocalEditableDraft(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        scope: CacheScope
+    ) throws -> DocmostEditablePage {
+        let repository = CacheRepository(context: ModelContext(modelContainer))
+        return try repository.saveLocalEditableDraft(
+            pageId: pageId,
+            title: title,
+            document: document,
+            scope: scope
+        )
+    }
 }
 
 nonisolated extension CacheWriteOperation {
