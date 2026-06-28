@@ -472,7 +472,8 @@ extension AppState {
         guard phase == .restoring else { return }
 
         let task = Task { [weak self] in
-            await self?.restore()
+            guard let self else { return }
+            await self.restore()
         }
         restoreTask = task
         await task.value

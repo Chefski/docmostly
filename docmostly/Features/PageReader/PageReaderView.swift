@@ -36,6 +36,11 @@ struct PageReaderView: View {
     let pageID: String
     let initialTitle: String? = nil
 
+    init(pageID: String, initialTitle: String? = nil) {
+        self.pageID = pageID
+        self.initialTitle = initialTitle
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
