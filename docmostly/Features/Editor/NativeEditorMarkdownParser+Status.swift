@@ -27,7 +27,8 @@ extension NativeEditorMarkdownParser {
 
             let contentStart = markdown.index(after: openTagEnd)
             guard let closeRange = matchingCloseSpanRange(in: markdown, bodyStart: contentStart) else {
-                return nil
+                searchStart = markdown.index(after: openRange.lowerBound)
+                continue
             }
 
             return (
