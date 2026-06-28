@@ -72,7 +72,7 @@ extension NativeEditorMarkdownParser {
             return structuralHTML
         }
 
-        switch block.kind {
+        return switch block.kind {
         case .callout(let callout):
             calloutMarkdown(from: callout)
         case .details(let details):
