@@ -46,6 +46,27 @@ nonisolated enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codab
             true
         }
     }
+
+    var requiresTableCellInlinePreservation: Bool {
+        switch self {
+        case .text(_, let marks):
+            marks.isEmpty == false
+        case .hardBreak:
+            false
+        case .mention, .status, .mathInline, .unsupported:
+            true
+        }
+    }
+}
+
+nonisolated extension Array where Element == NativeEditorInlineContent {
+    var plainText: String {
+        map(\.plainText).joined()
+    }
+
+    var preservedForTableCell: [NativeEditorInlineContent]? {
+        contains(where: \.requiresTableCellInlinePreservation) ? self : nil
+    }
 }
 
 nonisolated enum NativeEditorTextMark: Equatable, Hashable, Sendable, Codable {

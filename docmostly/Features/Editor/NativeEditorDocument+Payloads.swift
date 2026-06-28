@@ -162,8 +162,12 @@ nonisolated extension NativeEditorDocument {
             .prefix(NativeEditorTable.maximumColumnCount)
             .map { cell in
                 let columnWidths = tableColumnWidths(from: cell.attrs)
+                let cellContent = cell.content ?? []
+                let inlineContent = inlineContent(from: cellContent)
                 return NativeEditorTableCell(
-                    plainText: plainText(in: cell.content ?? []),
+                    plainText: inlineContent.plainText,
+                    inlineContent: inlineContent.preservedForTableCell,
+                    preservedContent: preservedTableCellContent(from: cellContent, inlineContent: inlineContent),
                     isHeader: cell.type == "tableHeader",
                     backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
                     columnWidth: columnWidths.first,
@@ -172,6 +176,24 @@ nonisolated extension NativeEditorDocument {
                     columnWidths: columnWidths
                 )
             }
+    }
+
+    private static func preservedTableCellContent(
+        from content: [ProseMirrorNode],
+        inlineContent: [NativeEditorInlineContent]
+    ) -> [ProseMirrorNode]? {
+        guard content.isEmpty == false else { return nil }
+
+        let hasBlockContent = content.count != 1 || content.first?.type != "paragraph"
+        let hasUnsupportedInlineContent = inlineContent.contains { item in
+            if case .unsupported = item {
+                return true
+            }
+
+            return false
+        }
+
+        return hasBlockContent || hasUnsupportedInlineContent ? content : nil
     }
 
     private static func tableColumnWidths(from attrs: [String: ProseMirrorJSONValue]?) -> [Int] {

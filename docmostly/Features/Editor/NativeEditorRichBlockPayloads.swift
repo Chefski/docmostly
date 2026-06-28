@@ -27,12 +27,36 @@ nonisolated struct NativeEditorTableRow: Equatable, Hashable, Sendable {
 
 nonisolated struct NativeEditorTableCell: Equatable, Hashable, Sendable {
     var plainText: String
+    var inlineContent: [NativeEditorInlineContent]?
+    var preservedContent: [ProseMirrorNode]?
     var isHeader: Bool
     var backgroundColorName: String?
     var columnWidth: Int?
     var columnSpan: Int = 1
     var rowSpan: Int = 1
     var columnWidths: [Int] = []
+
+    init(
+        plainText: String,
+        inlineContent: [NativeEditorInlineContent]? = nil,
+        preservedContent: [ProseMirrorNode]? = nil,
+        isHeader: Bool,
+        backgroundColorName: String?,
+        columnWidth: Int? = nil,
+        columnSpan: Int = 1,
+        rowSpan: Int = 1,
+        columnWidths: [Int] = []
+    ) {
+        self.plainText = plainText
+        self.inlineContent = inlineContent
+        self.preservedContent = preservedContent
+        self.isHeader = isHeader
+        self.backgroundColorName = backgroundColorName
+        self.columnWidth = columnWidth
+        self.columnSpan = columnSpan
+        self.rowSpan = rowSpan
+        self.columnWidths = columnWidths
+    }
 }
 
 nonisolated struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {

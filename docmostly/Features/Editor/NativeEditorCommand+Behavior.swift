@@ -33,6 +33,109 @@ extension NativeEditorCommand {
             return 1
         }
 
+        if searchTerms.contains(where: { $0.localizedStandardContains(query) }) {
+            return 1
+        }
+
         return nil
+    }
+
+    private var searchTerms: [String] {
+        switch self {
+        case .paragraph:
+            ["p", "text", "paragraph"]
+        case .heading1:
+            ["title", "big", "large", "h1"]
+        case .heading2:
+            ["subtitle", "medium", "h2"]
+        case .heading3:
+            ["subtitle", "small", "h3"]
+        case .bulletedList:
+            ["unordered", "point", "list"]
+        case .numberedList:
+            ["numbered", "ordered", "list", "ol"]
+        case .todoList:
+            ["todo", "task", "list", "check", "checkbox"]
+        case .quote:
+            ["blockquote", "quotes"]
+        case .codeBlock:
+            ["codeblock", "snippet"]
+        case .image:
+            ["photo", "picture", "media", "file", "attachment"]
+        case .video:
+            ["mp4", "media", "file", "attachment"]
+        case .audio:
+            ["music", "sound", "mp3", "media", "file", "attachment"]
+        case .pdf:
+            ["document", "embed"]
+        case .fileAttachment:
+            ["upload", "csv", "zip"]
+        case .table:
+            ["rows", "columns"]
+        case .baseInline:
+            ["base", "database", "grid", "spreadsheet"]
+        case .kanban:
+            ["board", "cards", "status", "task", "database"]
+        case .callout:
+            ["notice", "panel", "info", "warning", "success", "error", "danger"]
+        case .details:
+            ["collapsible", "block", "toggle", "details", "expand"]
+        case .mathInline:
+            ["math", "inline", "mathinline", "inlinemath", "inline math", "equation", "katex", "latex", "tex"]
+        case .pageBreak:
+            ["page", "break", "pagebreak", "print"]
+        case .divider:
+            ["horizontal rule", "hr"]
+        case .columns:
+            ["layout", "split", "side"]
+        case .columns3:
+            ["layout", "split", "triple"]
+        case .columns4, .columns5:
+            ["layout", "split"]
+        case .subpages:
+            ["child", "children", "nested", "hierarchy", "toc"]
+        case .syncedBlock:
+            ["sync", "excerpt", "transclusion", "reusable", "snippet"]
+        case .embed:
+            ["url", "external", "iframe"]
+        case .iframeEmbed:
+            ["iframe"]
+        case .airtableEmbed:
+            ["airtable"]
+        case .loomEmbed:
+            ["loom"]
+        case .figmaEmbed:
+            ["figma"]
+        case .typeformEmbed:
+            ["typeform"]
+        case .miroEmbed:
+            ["miro"]
+        case .youtubeEmbed:
+            ["youtube", "yt", "media", "video"]
+        case .vimeoEmbed:
+            ["vimeo"]
+        case .framerEmbed:
+            ["framer"]
+        case .googleDriveEmbed:
+            ["google drive", "gdrive"]
+        case .googleSheetsEmbed:
+            ["google sheets", "gsheets"]
+        case .mathBlock:
+            ["math", "block", "mathblock", "block math", "equation", "katex", "latex", "tex"]
+        case .mermaid:
+            ["diagrams", "chart", "uml"]
+        case .drawio:
+            ["diagrams", "charts", "uml", "whiteboard"]
+        case .excalidraw:
+            ["diagrams", "draw", "sketch", "whiteboard"]
+        case .date:
+            ["today"]
+        case .time:
+            ["now", "clock"]
+        case .status:
+            ["badge", "label", "lozenge"]
+        case .emoji:
+            ["icon", "smiley", "emoticon", "symbol", "reaction"]
+        }
     }
 }

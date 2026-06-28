@@ -191,7 +191,7 @@ enum NativeEditorMarkdownParser {
         )
     }
 
-    private static func inlineText(from markdown: String) -> AttributedString {
+    static func inlineText(from markdown: String) -> AttributedString {
         var result = AttributedString("")
         var remaining = markdown[...]
 
@@ -305,7 +305,7 @@ enum NativeEditorMarkdownParser {
         return min(columns / 2, 8)
     }
 
-    private static func inlineMarkdown(from text: AttributedString) -> String {
+    static func inlineMarkdown(from text: AttributedString) -> String {
         var output = ""
 
         for run in text.runs {

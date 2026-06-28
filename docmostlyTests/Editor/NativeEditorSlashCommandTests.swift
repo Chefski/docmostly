@@ -26,6 +26,24 @@ struct NativeEditorSlashCommandTests {
         #expect(titles.contains("Google Sheets"))
     }
 
+    @Test func slashCommandFilteringUsesDocmostSearchTerms() {
+        let expectations = [
+            SlashCommandFilterExpectation(query: "today", title: "Date"),
+            SlashCommandFilterExpectation(query: "now", title: "Time"),
+            SlashCommandFilterExpectation(query: "checkbox", title: "To-do List"),
+            SlashCommandFilterExpectation(query: "hr", title: "Divider"),
+            SlashCommandFilterExpectation(query: "pagebreak", title: "Page Break"),
+            SlashCommandFilterExpectation(query: "latex", title: "Math Inline"),
+            SlashCommandFilterExpectation(query: "lozenge", title: "Status"),
+            SlashCommandFilterExpectation(query: "reaction", title: "Emoji")
+        ]
+
+        for expectation in expectations {
+            let titles = slashCommandTitles(for: expectation.query)
+            #expect(titles.contains(expectation.title))
+        }
+    }
+
     @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
@@ -120,6 +138,15 @@ struct NativeEditorSlashCommandTests {
 
         return viewModel
     }
+
+    private func slashCommandTitles(for query: String) -> [String] {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/\(query)"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        return viewModel.filteredSlashCommands.map(\.title)
+    }
 }
 
 private struct ColumnCommandExpectation {
@@ -137,4 +164,9 @@ private struct EmbedCommandExpectation {
 private struct BaseCommandExpectation {
     let command: NativeEditorCommand
     let previewText: String
+}
+
+private struct SlashCommandFilterExpectation {
+    let query: String
+    let title: String
 }

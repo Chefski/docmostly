@@ -9,6 +9,8 @@ extension NativeRichEditorViewModel {
             }
 
             table.rows[rowIndex].cells[columnIndex].plainText = text
+            table.rows[rowIndex].cells[columnIndex].inlineContent = nil
+            table.rows[rowIndex].cells[columnIndex].preservedContent = nil
         }
     }
 
@@ -128,7 +130,7 @@ nonisolated enum NativeEditorTableNodeFactory {
         ProseMirrorNode(
             type: cell.isHeader ? "tableHeader" : "tableCell",
             attrs: cellAttrs(from: cell),
-            content: [paragraphNode(cell.plainText)]
+            content: cell.preservedContent ?? [paragraphNode(from: cell)]
         )
     }
 
@@ -158,10 +160,11 @@ nonisolated enum NativeEditorTableNodeFactory {
         return attrs.isEmpty ? nil : attrs
     }
 
-    private static func paragraphNode(_ text: String) -> ProseMirrorNode {
+    private static func paragraphNode(from cell: NativeEditorTableCell) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "paragraph",
-            content: NativeEditorDocument.inlineNodes(from: AttributedString(text))
+            content: cell.inlineContent.map(NativeEditorDocument.inlineNodes(from:)) ??
+                NativeEditorDocument.inlineNodes(from: AttributedString(cell.plainText))
         )
     }
 }

@@ -131,7 +131,8 @@ struct NativeRichEditorMechanicsTests {
 
         #expect(viewModel.document.blocks.count == 2)
 
-        guard case .table(let table) = viewModel.document.blocks[1].kind else {
+        let tableBlock = try #require(viewModel.document.blocks.dropFirst().first)
+        guard case .table(let table) = tableBlock.kind else {
             Issue.record("Expected pasted Markdown table to become a native table block.")
             return
         }
@@ -157,6 +158,38 @@ struct NativeRichEditorMechanicsTests {
         | Tables | Native |
         | Paste | Done |
         """)
+    }
+
+    @Test func pasteMarkdownTablePreservesInlineMarksInCells() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("""
+        | Feature | Source |
+        | --- | --- |
+        | **Tables** | [Spec](https://example.com/spec) |
+        """)
+
+        guard case .table(let table) = viewModel.document.blocks[1].kind else {
+            Issue.record("Expected pasted Markdown table to become a native table block.")
+            return
+        }
+
+        #expect(table.rows[1].cells.map(\.plainText) == ["Tables", "Spec"])
+
+        let bodyRow = try #require(viewModel.document.proseMirrorDocument.content.last?.content?.dropFirst().first)
+        let firstCellText = try #require(bodyRow.content?[0].content?.first?.content?.first)
+        let secondCellText = try #require(bodyRow.content?[1].content?.first?.content?.first)
+
+        #expect(firstCellText.text == "Tables")
+        #expect(firstCellText.marks?.contains(ProseMirrorMark(type: "bold")) == true)
+        #expect(secondCellText.text == "Spec")
+        #expect(
+            secondCellText.marks?.contains(
+                ProseMirrorMark(type: "link", attrs: ["href": .string("https://example.com/spec")])
+            ) == true
+        )
     }
 
     @Test func pasteMarkdownRichBlocksCreatesNativeBlocks() throws {

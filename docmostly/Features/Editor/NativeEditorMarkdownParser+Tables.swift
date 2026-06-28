@@ -64,8 +64,22 @@ extension NativeEditorMarkdownParser {
     ) -> NativeEditorTableRow {
         NativeEditorTableRow(
             cells: normalizedTableCells(cells, columnCount: columnCount).map {
-                NativeEditorTableCell(plainText: $0, isHeader: isHeader, backgroundColorName: nil)
+                tableCell(from: $0, isHeader: isHeader)
             }
+        )
+    }
+
+    private static func tableCell(from markdown: String, isHeader: Bool) -> NativeEditorTableCell {
+        let attributedText = inlineText(from: markdown)
+        let inlineContent = NativeEditorDocument
+            .inlineContent(from: NativeEditorDocument.inlineNodes(from: attributedText))
+            .preservedForTableCell
+
+        return NativeEditorTableCell(
+            plainText: String(attributedText.characters),
+            inlineContent: inlineContent,
+            isHeader: isHeader,
+            backgroundColorName: nil
         )
     }
 
@@ -147,8 +161,16 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func markdownTableRow(from row: NativeEditorTableRow, columnCount: Int) -> String {
-        let cells = normalizedTableCells(row.cells.map(\.plainText), columnCount: columnCount)
+        let cells = normalizedTableCells(row.cells.map(markdownTableCellContent), columnCount: columnCount)
         return "| \(cells.map(escapedMarkdownTableCell).joined(separator: " | ")) |"
+    }
+
+    private static func markdownTableCellContent(from cell: NativeEditorTableCell) -> String {
+        guard cell.preservedContent == nil, let inlineContent = cell.inlineContent else {
+            return cell.plainText
+        }
+
+        return inlineMarkdown(from: NativeEditorDocument.attributedText(from: inlineContent))
     }
 
     private static func markdownTableSeparatorRow(columnCount: Int) -> String {

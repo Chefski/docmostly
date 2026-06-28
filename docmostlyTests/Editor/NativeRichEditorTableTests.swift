@@ -106,6 +106,136 @@ struct NativeRichEditorTableTests {
         #expect(firstCell?.content?.first?.content?.first?.text == "Updated")
     }
 
+    @Test func editingTableCellPreservesInlineMarksInOtherCells() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [{ "type": "text", "text": "Feature" }]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [{ "type": "text", "text": "Status" }]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Tables",
+                              "marks": [{ "type": "bold" }]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [{ "type": "text", "text": "Draft" }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = try NativeEditorDocument(proseMirrorJSONData: data)
+        let blockID = try #require(viewModel.document.blocks.first?.id)
+
+        viewModel.updateTableCell(blockID: blockID, rowIndex: 1, columnIndex: 1, text: "Ready")
+
+        let bodyRow = try #require(viewModel.document.proseMirrorDocument.content.first?.content?.dropFirst().first)
+        let preservedText = try #require(bodyRow.content?.first?.content?.first?.content?.first)
+        #expect(preservedText.text == "Tables")
+        #expect(preservedText.marks?.contains(ProseMirrorMark(type: "bold")) == true)
+    }
+
+    @Test func editingTableCellPreservesUnsupportedRichContentInOtherCells() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "image",
+                          "attrs": {
+                            "src": "/files/table-image.png",
+                            "alt": "Architecture"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [{ "type": "text", "text": "Draft" }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = try NativeEditorDocument(proseMirrorJSONData: data)
+        let blockID = try #require(viewModel.document.blocks.first?.id)
+
+        viewModel.updateTableCell(blockID: blockID, rowIndex: 0, columnIndex: 1, text: "Ready")
+
+        let firstRow = try #require(viewModel.document.proseMirrorDocument.content.first?.content?.first)
+        let firstCell = try #require(firstRow.content?.first)
+        let preservedImage = try #require(firstCell.content?.first)
+        #expect(preservedImage.type == "image")
+        #expect(preservedImage.attrs?["src"] == .string("/files/table-image.png"))
+        #expect(preservedImage.attrs?["alt"] == .string("Architecture"))
+    }
+
     private func tableViewModel() -> NativeRichEditorViewModel {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/table"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
