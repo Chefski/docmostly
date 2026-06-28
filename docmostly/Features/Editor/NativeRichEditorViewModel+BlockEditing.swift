@@ -241,6 +241,7 @@ extension NativeRichEditorViewModel {
 
     var activeSlashCommandQuery: String? {
         guard let index = activeBlockIndex else { return nil }
+        guard document.blocks[index].kind.allowsSlashCommands else { return nil }
 
         let text = String(document.blocks[index].text.characters)
         guard text.first == "/", text.contains("\n") == false else {
@@ -248,5 +249,16 @@ extension NativeRichEditorViewModel {
         }
 
         return String(text.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private extension NativeEditorBlockKind {
+    var allowsSlashCommands: Bool {
+        switch self {
+        case .codeBlock:
+            false
+        default:
+            isEditable
+        }
     }
 }
