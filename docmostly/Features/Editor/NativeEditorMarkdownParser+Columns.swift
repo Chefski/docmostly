@@ -100,8 +100,8 @@ extension NativeEditorMarkdownParser {
         let columnTexts = columns.map(\.text)
         let columnWidths = columns.map(\.width)
         return NativeEditorColumnsBlock(
-            layout: attributes["data-layout"].nonEmpty ?? "two_equal",
-            widthMode: attributes["data-width-mode"].nonEmpty ?? "normal",
+            layout: nonEmptyAttribute(attributes["data-layout"]) ?? "two_equal",
+            widthMode: nonEmptyAttribute(attributes["data-width-mode"]) ?? "normal",
             columnCount: columnTexts.count,
             previewText: columnTexts.joined(separator: " "),
             columnTexts: columnTexts,
@@ -177,10 +177,11 @@ extension NativeEditorMarkdownParser {
         let text = String(value)
         return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
     }
-}
 
-private extension String {
-    var nonEmpty: String? {
-        isEmpty ? nil : self
+    private static func nonEmptyAttribute(_ value: String?) -> String? {
+        guard let value, value.isEmpty == false else {
+            return nil
+        }
+        return value
     }
 }
