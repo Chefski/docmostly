@@ -63,11 +63,21 @@ enum NativeEditorMarkdownParser {
         return (
             NativeEditorBlock(
                 kind: .paragraph,
-                text: inlineText(from: paragraphLines.joined(separator: "\n")),
+                text: multilineParagraphText(from: paragraphLines),
                 alignment: .left
             ),
             currentIndex
         )
+    }
+
+    private static func multilineParagraphText(from lines: [String]) -> AttributedString {
+        lines.enumerated().reduce(into: AttributedString("")) { result, item in
+            if item.offset > 0 {
+                result += AttributedString("\n")
+            }
+
+            result += inlineText(from: item.element)
+        }
     }
 
     private static func paragraphLineText(
