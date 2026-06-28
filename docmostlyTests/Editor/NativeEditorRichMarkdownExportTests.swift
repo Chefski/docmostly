@@ -75,7 +75,7 @@ struct NativeEditorRichMarkdownExportTests {
         Ship native editor
 
         </details>
-        <div style="page-break-after: always;"></div>
+        <div data-type="pageBreak" class="page-break"></div>
         [Example](https://example.com)
         $$
         E = mc^2

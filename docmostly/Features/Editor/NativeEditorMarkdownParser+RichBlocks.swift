@@ -17,7 +17,8 @@ extension NativeEditorMarkdownParser {
     }
 
     static func singleLineRichBlock(from line: String) -> NativeEditorBlock? {
-        imageMarkdownBlock(from: line) ?? linkedFileMarkdownBlock(from: line) ?? iframeEmbedMarkdownBlock(from: line)
+        pageBreakHTMLBlock(from: line) ?? imageMarkdownBlock(from: line) ?? linkedFileMarkdownBlock(from: line) ??
+            iframeEmbedMarkdownBlock(from: line)
     }
 
     static func richMarkdownLine(from block: NativeEditorBlock) -> String? {
@@ -56,7 +57,7 @@ extension NativeEditorMarkdownParser {
         case .details(let details):
             detailsMarkdown(from: details)
         case .pageBreak:
-            #"<div style="page-break-after: always;"></div>"#
+            #"<div data-type="pageBreak" class="page-break"></div>"#
         case .columns(let columns):
             columnsMarkdown(from: columns)
         case .subpages:
