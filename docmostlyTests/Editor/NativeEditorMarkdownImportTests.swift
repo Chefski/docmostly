@@ -226,6 +226,51 @@ struct NativeEditorMarkdownImportTests {
         #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
     }
 
+    @Test func docmostStructuralHTMLImportsAsNativeStructuralBlocks() throws {
+        let markdown = """
+        <div data-type="subpages"></div>
+        <div data-type="transclusionSource" data-id="sync-1">
+        Reusable launch checklist
+        </div>
+        <div data-type="transclusionReference" data-source-page-id="page-1" data-transclusion-id="sync-1"></div>
+        <div data-type="base-embed" data-page-id="base-page-1"></div>
+        """
+        let blocks = NativeEditorMarkdownParser.blocks(from: markdown)
+
+        try #require(blocks.count == 4)
+        #expect(blocks[0].kind == .subpages)
+        #expect(blocks[0].rawNode?.type == "subpages")
+
+        guard case .transclusionSource(let source) = blocks[1].kind else {
+            Issue.record("Expected Docmost transclusion source HTML to import as a native synced block.")
+            return
+        }
+        #expect(source.identifier == "sync-1")
+        #expect(source.previewText == "Reusable launch checklist")
+        #expect(blocks[1].rawNode?.type == "transclusionSource")
+        #expect(blocks[1].rawNode?.attrs?["id"] == .string("sync-1"))
+
+        guard case .transclusionReference(let reference) = blocks[2].kind else {
+            Issue.record("Expected Docmost transclusion reference HTML to import as a native synced block reference.")
+            return
+        }
+        #expect(reference.sourcePageID == "page-1")
+        #expect(reference.transclusionID == "sync-1")
+        #expect(blocks[2].rawNode?.type == "transclusionReference")
+        #expect(blocks[2].rawNode?.attrs?["sourcePageId"] == .string("page-1"))
+        #expect(blocks[2].rawNode?.attrs?["transclusionId"] == .string("sync-1"))
+
+        guard case .base(let base) = blocks[3].kind else {
+            Issue.record("Expected Docmost base embed HTML to import as a native base block.")
+            return
+        }
+        #expect(base.pageID == "base-page-1")
+        #expect(base.pendingKey == nil)
+        #expect(blocks[3].rawNode?.type == "base")
+        #expect(blocks[3].rawNode?.attrs?["pageId"] == .string("base-page-1"))
+        #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
+    }
+
     @Test func singleLineDocmostDiagramHTMLImportsAsNativeDiagramBlock() throws {
         let source = "/api/files/drawio-1/diagram.drawio.svg"
         let markdown = singleLineDocmostDiagramHTML(
