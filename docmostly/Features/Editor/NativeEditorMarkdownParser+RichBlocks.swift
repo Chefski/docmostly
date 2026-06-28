@@ -508,6 +508,9 @@ extension NativeEditorMarkdownParser {
         let attachmentIndex = pathComponents.index(after: filesIndex)
         guard pathComponents.indices.contains(attachmentIndex) else { return nil }
 
+        let filenameIndex = pathComponents.index(after: attachmentIndex)
+        guard pathComponents.indices.contains(filenameIndex) else { return nil }
+
         let attachmentID = pathComponents[attachmentIndex]
         guard attachmentID.isEmpty == false else { return nil }
         return attachmentID.removingPercentEncoding ?? attachmentID
