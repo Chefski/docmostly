@@ -216,13 +216,13 @@ nonisolated extension NativeEditorDocument {
 
         switch value {
         case .int(let width):
-            Double(width)
+            return Double(width)
         case .double(let width):
-            width
+            return width
         case .string(let width):
-            Double(width)
+            return Double(width)
         case .bool, .object, .array, .null:
-            Optional<Double>.none
+            return nil
         }
     }
 
