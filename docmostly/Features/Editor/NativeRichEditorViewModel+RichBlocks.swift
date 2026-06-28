@@ -218,8 +218,8 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
     }
 
     static func columnsNode(from columns: NativeEditorColumnsBlock) -> ProseMirrorNode {
-        let columnTexts = normalizedColumnTexts(from: columns)
-        let columnWidths = normalizedColumnWidths(from: columns, columnCount: columnTexts.count)
+        let columnTexts = columns.normalizedColumnTexts
+        let columnWidths = columns.normalizedColumnWidths
         return ProseMirrorNode(
             type: "columns",
             attrs: [
@@ -335,25 +335,6 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
             attrs: ["width": proseMirrorNumber(from: width ?? 1)],
             content: [paragraphNode(text)]
         )
-    }
-
-    private static func normalizedColumnTexts(from columns: NativeEditorColumnsBlock) -> [String] {
-        if columns.columnTexts.isEmpty == false {
-            return Array(columns.columnTexts.prefix(max(columns.columnCount, 1)))
-        }
-
-        let columnCount = max(columns.columnCount, 1)
-        let firstColumnText = columns.previewText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (0..<columnCount).map { index in index == 0 ? firstColumnText : "" }
-    }
-
-    private static func normalizedColumnWidths(
-        from columns: NativeEditorColumnsBlock,
-        columnCount: Int
-    ) -> [Double?] {
-        (0..<columnCount).map { index in
-            columns.columnWidths.indices.contains(index) ? columns.columnWidths[index] : nil
-        }
     }
 
     private static func proseMirrorNumber(from value: Double) -> ProseMirrorJSONValue {

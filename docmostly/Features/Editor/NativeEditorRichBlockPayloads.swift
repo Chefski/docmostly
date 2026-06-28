@@ -143,13 +143,52 @@ nonisolated struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
     var isOpen: Bool
 }
 
-nonisolated struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
+nonisolated struct NativeEditorColumnsBlock: Hashable, Sendable {
     var layout: String
     var widthMode: String
     var columnCount: Int
     var previewText: String
     var columnTexts: [String] = []
     var columnWidths: [Double?] = []
+
+    var normalizedColumnTexts: [String] {
+        if columnTexts.isEmpty == false {
+            return normalizedValues(columnTexts, fallback: "")
+        }
+
+        let firstColumnText = previewText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (0..<normalizedColumnCount).map { index in index == 0 ? firstColumnText : "" }
+    }
+
+    var normalizedColumnWidths: [Double?] {
+        normalizedValues(columnWidths, fallback: Optional<Double>.none)
+    }
+
+    static func == (lhs: NativeEditorColumnsBlock, rhs: NativeEditorColumnsBlock) -> Bool {
+        lhs.layout == rhs.layout &&
+            lhs.widthMode == rhs.widthMode &&
+            lhs.previewText == rhs.previewText &&
+            lhs.normalizedColumnTexts == rhs.normalizedColumnTexts &&
+            lhs.normalizedColumnWidths == rhs.normalizedColumnWidths
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(layout)
+        hasher.combine(widthMode)
+        hasher.combine(previewText)
+        hasher.combine(normalizedColumnTexts)
+        hasher.combine(normalizedColumnWidths)
+    }
+
+    private var normalizedColumnCount: Int {
+        max(columnCount, 1)
+    }
+
+    private func normalizedValues<Value>(_ values: [Value], fallback: Value) -> [Value] {
+        (0..<normalizedColumnCount).map { index in
+            values.indices.contains(index) ? values[index] : fallback
+        }
+    }
 }
 
 nonisolated struct NativeEditorTransclusionSourceBlock: Equatable, Hashable, Sendable {

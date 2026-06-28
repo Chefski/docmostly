@@ -39,8 +39,8 @@ extension NativeEditorMarkdownParser {
     }
 
     static func columnsMarkdown(from columns: NativeEditorColumnsBlock) -> String {
-        let columnTexts = normalizedColumnTexts(from: columns)
-        let columnWidths = normalizedColumnWidths(from: columns, columnCount: columnTexts.count)
+        let columnTexts = columns.normalizedColumnTexts
+        let columnWidths = columns.normalizedColumnWidths
         let widthMode = columns.widthMode.isEmpty ? "normal" : columns.widthMode
         let widthModeAttribute = widthMode == "normal"
             ? ""
@@ -144,25 +144,6 @@ extension NativeEditorMarkdownParser {
         }
 
         return unescapedInlineHTMLText(trimmedLine)
-    }
-
-    private static func normalizedColumnTexts(from columns: NativeEditorColumnsBlock) -> [String] {
-        if columns.columnTexts.isEmpty == false {
-            return Array(columns.columnTexts.prefix(max(columns.columnCount, 1)))
-        }
-
-        let columnCount = max(columns.columnCount, 1)
-        let firstColumnText = columns.previewText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (0..<columnCount).map { index in index == 0 ? firstColumnText : "" }
-    }
-
-    private static func normalizedColumnWidths(
-        from columns: NativeEditorColumnsBlock,
-        columnCount: Int
-    ) -> [Double?] {
-        (0..<columnCount).map { index in
-            columns.columnWidths.indices.contains(index) ? columns.columnWidths[index] : nil
-        }
     }
 
     private static func columnMarkdown(text: String, width: Double) -> String {
