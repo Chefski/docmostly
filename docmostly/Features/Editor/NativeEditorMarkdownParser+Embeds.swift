@@ -34,14 +34,14 @@ extension NativeEditorMarkdownParser {
         }
 
         var imageAttributes: [String: String] = [:]
-        var currentIndex = lines.index(after: index)
+        var currentIndex = index
 
         while currentIndex < lines.endIndex {
             let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            if let attrs = htmlTagAttributes(from: line, tagName: "img") {
+            if let attrs = firstHTMLTagAttributes(in: line, tagName: "img") {
                 imageAttributes = attrs
             }
-            if line.localizedCaseInsensitiveCompare("</div>") == .orderedSame {
+            if containsHTMLClosingTag(in: line, tagName: "div") {
                 let diagram = diagramBlock(from: attributes, imageAttributes: imageAttributes)
                 let kind = diagramKind(type: type, diagram: diagram)
                 return (
@@ -534,17 +534,6 @@ extension NativeEditorMarkdownParser {
         }.joined(separator: " ")
 
         return attributeText.isEmpty ? "<\(name)>" : "<\(name) \(attributeText)>"
-    }
-
-    private static func htmlTagAttributes(from line: String, tagName: String) -> [String: String]? {
-        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedLine.lowercased().hasPrefix("<\(tagName.lowercased())") else { return nil }
-        guard let tagEnd = trimmedLine.firstIndex(of: ">"), tagEnd > trimmedLine.startIndex else {
-            return nil
-        }
-
-        let openingTag = String(trimmedLine[trimmedLine.startIndex..<tagEnd])
-        return docmostInlineHTMLAttributes(from: openingTag)
     }
 
     private static func diagramType(from dataType: String?) -> String? {
