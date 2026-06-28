@@ -330,8 +330,20 @@ enum NativeEditorMarkdownParser {
             remaining = remaining[closeRange.upperBound...]
         }
 
-        appendMarkdownText(String(remaining), to: &result, usesFoundationMarkdownParser: result.characters.isEmpty)
+        appendMarkdownText(
+            String(remaining),
+            to: &result,
+            usesFoundationMarkdownParser: shouldUseFoundationMarkdownParser(for: markdown, after: result)
+        )
         return result
+    }
+
+    private static func shouldUseFoundationMarkdownParser(
+        for markdown: String,
+        after result: AttributedString
+    ) -> Bool {
+        let trimmedMarkdown = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.characters.isEmpty && trimmedMarkdown.hasPrefix("<") == false
     }
 
     static func inlineMathInputRuleText(from text: String) -> AttributedString? {
