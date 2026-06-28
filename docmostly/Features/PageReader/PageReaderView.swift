@@ -2,6 +2,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PageReaderView: View {
+    #if os(macOS)
+    @Environment(\.openWindow) var openWindow
+    #endif
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
     @State var viewModel = PageReaderViewModel()
@@ -98,6 +101,10 @@ struct PageReaderView: View {
                         Button("Copy Link", systemImage: "link", action: copyPageLink)
 
                         Button("Copy as Markdown", systemImage: "doc.plaintext", action: copyPageMarkdown)
+
+                        #if os(macOS)
+                        Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
+                        #endif
 
                         Button(
                             viewModel.isFavoritePage ? "Remove from Favorites" : "Add to Favorites",

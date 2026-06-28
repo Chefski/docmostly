@@ -271,6 +271,18 @@ extension PageReaderView {
         NativeEditorClipboard.write("# \(title)\n\n\(markdown)")
     }
 
+    #if os(macOS)
+    func openCurrentPageInNewWindow() {
+        guard let editorViewModel else { return }
+
+        openWindow(value: MacPageWindowRoute(
+            pageID: editorViewModel.currentPageSlugID,
+            spaceID: editorViewModel.currentSpaceID,
+            title: editorViewModel.title
+        ))
+    }
+    #endif
+
     func duplicateCurrentPage() {
         guard let editorViewModel else { return }
 
