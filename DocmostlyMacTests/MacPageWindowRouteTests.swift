@@ -21,6 +21,13 @@ struct MacPageWindowRouteTests {
         #expect(MacPageWindowRoute.selectedPageRoute(from: state) == nil)
     }
 
+    @Test func routeIsUnavailableWithoutASelectedSpace() {
+        let state = makeAppState()
+        state.selectPage(id: "page-slug")
+
+        #expect(MacPageWindowRoute.selectedPageRoute(from: state) == nil)
+    }
+
     private func makeAppState() -> AppState {
         let suiteName = "Docmostly.MacPageWindowRouteTests.\(UUID().uuidString)"
         let userDefaults = UserDefaults(suiteName: suiteName) ?? .standard

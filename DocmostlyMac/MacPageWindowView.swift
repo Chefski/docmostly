@@ -8,6 +8,9 @@ struct MacPageWindowView: View {
     @Environment(MacDesktopCommandController.self) private var commandController
     @State private var isCommandPalettePresented = false
     @State private var isPageCreationPresented = false
+    @State private var loadedPageID: String?
+    @State private var loadedPageSpaceID: String?
+    @State private var loadedPageTitle: String?
 
     let route: MacPageWindowRoute
     let modelContainer: ModelContainer?
@@ -29,7 +32,11 @@ struct MacPageWindowView: View {
                     description: Text("Open the main window to sign in.")
                 )
             case .authenticated:
-                PageReaderView(pageID: route.pageID, initialTitle: route.displayTitle)
+                PageReaderView(
+                    pageID: route.pageID,
+                    initialTitle: route.displayTitle,
+                    pageLoaded: updateLoadedPageContext
+                )
             }
         }
         .frame(minWidth: 760, minHeight: 560)
@@ -70,7 +77,8 @@ struct MacPageWindowView: View {
                 title: "Open Current Page in New Window",
                 subtitle: route.displayTitle,
                 systemImage: "macwindow.on.rectangle",
-                keywords: ["separate", "desktop"]
+                keywords: ["separate", "desktop"],
+                isEnabled: selectedPageRoute != nil
             ) {
                 openSelectedPageInNewWindow()
             },
@@ -134,7 +142,7 @@ struct MacPageWindowView: View {
     }
 
     private var selectedSpace: DocmostSpace? {
-        guard let spaceID = route.spaceID else { return nil }
+        guard let spaceID = loadedPageSpaceID ?? route.spaceID else { return nil }
         return appState.spaces.first { $0.id == spaceID }
     }
 
@@ -145,11 +153,21 @@ struct MacPageWindowView: View {
     private var focusedCommandActions: MacDesktopCommandActions {
         MacDesktopCommandActions(
             canCreatePage: { canCreatePage },
-            selectedPageRoute: { route },
+            selectedPageRoute: { selectedPageRoute },
             presentCommandPalette: presentCommandPalette,
             presentPageCreation: presentPageCreation,
             selectSidebarDestination: selectSidebarDestination,
             openSelectedPageInNewWindow: openSelectedPageInNewWindow
+        )
+    }
+
+    private var selectedPageRoute: MacPageWindowRoute? {
+        guard let selectedSpace else { return nil }
+
+        return MacPageWindowRoute(
+            pageID: loadedPageID ?? route.pageID,
+            spaceID: selectedSpace.id,
+            title: loadedPageTitle ?? route.title
         )
     }
 
@@ -159,6 +177,12 @@ struct MacPageWindowView: View {
 
     private func presentPageCreation() {
         isPageCreationPresented = true
+    }
+
+    private func updateLoadedPageContext(pageID: String, spaceID: String, title: String) {
+        loadedPageID = pageID
+        loadedPageSpaceID = spaceID
+        loadedPageTitle = title
     }
 
     private func createRootPage(title: String) async -> String? {
@@ -199,7 +223,8 @@ struct MacPageWindowView: View {
     }
 
     private func openSelectedPageInNewWindow() {
-        openWindow(value: route)
+        guard let selectedPageRoute else { return }
+        openWindow(value: selectedPageRoute)
     }
 
     private func selectSidebarDestination(_ destination: SidebarDestination) {

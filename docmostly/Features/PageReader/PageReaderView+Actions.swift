@@ -19,6 +19,9 @@ extension PageReaderView {
 
         if editorViewModel.errorMessage == nil {
             self.editorViewModel = editorViewModel
+            if let currentSpaceID = editorViewModel.currentSpaceID {
+                pageLoaded(editorViewModel.currentPageSlugID, currentSpaceID, editorViewModel.title)
+            }
             if editorViewModel.canEdit == false {
                 readerMode = .read
             }

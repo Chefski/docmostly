@@ -20,10 +20,11 @@ struct MacPageWindowRoute: Codable, Hashable, Identifiable, Sendable {
     @MainActor
     static func selectedPageRoute(from appState: AppState) -> MacPageWindowRoute? {
         guard let selectedPageID = appState.selectedPageID else { return nil }
+        guard let selectedSpaceID = appState.selectedSpaceID else { return nil }
 
         return MacPageWindowRoute(
             pageID: selectedPageID,
-            spaceID: appState.selectedSpaceID,
+            spaceID: selectedSpaceID,
             title: nil
         )
     }

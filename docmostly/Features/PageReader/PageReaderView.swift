@@ -35,10 +35,16 @@ struct PageReaderView: View {
 
     let pageID: String
     let initialTitle: String?
+    let pageLoaded: @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void
 
-    init(pageID: String, initialTitle: String? = nil) {
+    init(
+        pageID: String,
+        initialTitle: String? = nil,
+        pageLoaded: @escaping @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void = { _, _, _ in }
+    ) {
         self.pageID = pageID
         self.initialTitle = initialTitle
+        self.pageLoaded = pageLoaded
     }
 
     var body: some View {
