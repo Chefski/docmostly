@@ -92,7 +92,7 @@ struct NativeRichEditorViewModelTests {
             Issue.record("Expected table block")
             return
         }
-        #expect(table.rows.count == 3)
+        expectDocmostDefaultTableShape(table)
         #expect(viewModel.document.blocks[0].isEditable == false)
         #expect(viewModel.document.proseMirrorDocument.content.first?.type == "table")
         #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 3)
@@ -492,4 +492,11 @@ private struct SlashCommandExpectation {
     let command: NativeEditorCommand
     let nodeType: String
     let label: String
+}
+
+private func expectDocmostDefaultTableShape(_ table: NativeEditorTable) {
+    #expect(table.rows.count == 3)
+    #expect(table.columnCount == 3)
+    #expect(table.rows.first?.cells.allSatisfy(\.isHeader) == true)
+    #expect(table.rows.dropFirst().flatMap(\.cells).allSatisfy { $0.isHeader == false })
 }
