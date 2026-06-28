@@ -26,7 +26,7 @@ struct DocmostlyMacApp: App {
 
         WindowGroup("Page", for: MacPageWindowRoute.self) { route in
             if let route = route.wrappedValue {
-                MacPageWindowView(route: route)
+                MacPageWindowView(route: route, modelContainer: sharedModelContainer)
                     .environment(appState)
                     .environment(commandController)
                     .modelContainer(sharedModelContainer)

@@ -6,6 +6,8 @@ struct MacRootView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(AppState.self) private var appState
     @Environment(MacDesktopCommandController.self) private var commandController
+    @State private var isCommandPalettePresented = false
+    @State private var isPageCreationPresented = false
 
     let modelContainer: ModelContainer?
 
@@ -14,20 +16,18 @@ struct MacRootView: View {
     }
 
     var body: some View {
-        @Bindable var commandController = commandController
-
         RootView(modelContainer: modelContainer)
             .tint(.primary)
             .toolbar {
                 if appState.phase == .authenticated {
                     ToolbarItemGroup {
                         Button("New Page", systemImage: "doc.badge.plus") {
-                            commandController.presentPageCreation()
+                            presentPageCreation()
                         }
                         .disabled(canCreatePage == false)
 
                         Button("Command Palette", systemImage: "command") {
-                            commandController.presentCommandPalette()
+                            presentCommandPalette()
                         }
 
                         Button("Search", systemImage: "magnifyingglass") {
@@ -36,7 +36,7 @@ struct MacRootView: View {
                     }
                 }
             }
-            .sheet(isPresented: $commandController.isCommandPalettePresented) {
+            .sheet(isPresented: $isCommandPalettePresented) {
                 MacCommandPaletteView(
                     items: commandPaletteItems,
                     openSearchResult: openSearchResult,
@@ -44,13 +44,14 @@ struct MacRootView: View {
                 )
                 .environment(appState)
             }
-            .sheet(isPresented: $commandController.isPageCreationPresented) {
+            .sheet(isPresented: $isPageCreationPresented) {
                 MacQuickPageCreationSheet(
                     selectedSpace: selectedSpace,
                     createRootPage: createRootPage
                 )
+            }
+            .focusedValue(\.macDesktopCommandActions, focusedCommandActions)
         }
-    }
 
     private var commandPaletteItems: [MacCommandPaletteItem] {
         [
@@ -61,7 +62,7 @@ struct MacRootView: View {
                 keywords: ["create", "quick"],
                 isEnabled: canCreatePage
             ) {
-                commandController.presentPageCreation()
+                presentPageCreation()
             },
             MacCommandPaletteItem(
                 title: "Open Current Page in New Window",
@@ -148,6 +149,25 @@ struct MacRootView: View {
         MacPageWindowRoute.selectedPageRoute(from: appState)
     }
 
+    private var focusedCommandActions: MacDesktopCommandActions {
+        MacDesktopCommandActions(
+            canCreatePage: { canCreatePage },
+            selectedPageRoute: { selectedPageRoute },
+            presentCommandPalette: presentCommandPalette,
+            presentPageCreation: presentPageCreation,
+            selectSidebarDestination: selectSidebarDestination,
+            openSelectedPageInNewWindow: openSelectedPageInNewWindow
+        )
+    }
+
+    private func presentCommandPalette() {
+        isCommandPalettePresented = true
+    }
+
+    private func presentPageCreation() {
+        isPageCreationPresented = true
+    }
+
     private func createRootPage(title: String) async -> String? {
         guard let selectedSpace else {
             return "No space selected."
@@ -169,7 +189,6 @@ struct MacRootView: View {
     }
 
     private func openSearchResult(_ result: DocmostSearchResult) {
-        openWindow(id: "main")
         appState.selectPage(id: result.slugId, spaceID: result.space.id, revealSpaceInSidebar: true)
     }
 
@@ -184,6 +203,10 @@ struct MacRootView: View {
     private func openSelectedPageInNewWindow() {
         guard let selectedPageRoute else { return }
         openWindow(value: selectedPageRoute)
+    }
+
+    private func selectSidebarDestination(_ destination: SidebarDestination) {
+        appState.selectSidebarUtilityDestination(destination)
     }
 
     private func showSettings() {

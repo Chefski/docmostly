@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor
 struct DocmostlyMacCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.macDesktopCommandActions) private var focusedActions
+    @FocusedValue(\.macFocusedPageRoute) private var focusedPageRoute
 
     let appState: AppState
     let commandController: MacDesktopCommandController
@@ -77,11 +79,15 @@ struct DocmostlyMacCommands: Commands {
     }
 
     private var canCreatePage: Bool {
-        appState.phase == .authenticated && appState.isOffline == false && selectedSpace != nil
+        focusedActions?.canCreatePage() ?? defaultCanCreatePage
     }
 
     private var selectedPageRoute: MacPageWindowRoute? {
-        MacPageWindowRoute.selectedPageRoute(from: appState)
+        focusedPageRoute ?? focusedActions?.selectedPageRoute() ?? MacPageWindowRoute.selectedPageRoute(from: appState)
+    }
+
+    private var defaultCanCreatePage: Bool {
+        appState.phase == .authenticated && appState.isOffline == false && selectedSpace != nil
     }
 
     private var selectedSpace: DocmostSpace? {
@@ -94,19 +100,21 @@ struct DocmostlyMacCommands: Commands {
     }
 
     private func presentCommandPalette() {
-        openWindow(id: "main")
-        Task { @MainActor in
-            await Task.yield()
-            commandController.presentCommandPalette()
+        if let focusedActions {
+            focusedActions.presentCommandPalette()
+            return
         }
+
+        openWindow(id: "main")
     }
 
     private func presentPageCreation() {
-        openWindow(id: "main")
-        Task { @MainActor in
-            await Task.yield()
-            commandController.presentPageCreation()
+        if let focusedActions {
+            focusedActions.presentPageCreation()
+            return
         }
+
+        openWindow(id: "main")
     }
 
     private func showSettings() {
@@ -124,6 +132,11 @@ struct DocmostlyMacCommands: Commands {
     }
 
     private func select(_ destination: SidebarDestination) {
+        if let focusedActions {
+            focusedActions.selectSidebarDestination(destination)
+            return
+        }
+
         appState.selectSidebarUtilityDestination(destination)
         openWindow(id: "main")
     }

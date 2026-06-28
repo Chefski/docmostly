@@ -7,7 +7,7 @@ struct PageTreeNodeView: View {
     let isSelected: Bool
     let toggle: (PageTreeNode) -> Void
     let openInDetailColumn: (PageTreeNode) -> Void
-    let openInNewWindow: ((PageTreeNode) -> Void)? = nil
+    let openInNewWindow: ((PageTreeNode) -> Void)?
     let movePage: (String, PageTreeDropOperation) -> Void
     let createChild: (PageTreeNode) -> Void
     let duplicate: (PageTreeNode) -> Void
