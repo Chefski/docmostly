@@ -70,13 +70,15 @@ nonisolated extension NativeEditorDocument {
     static func columnsBlock(from node: ProseMirrorNode) -> NativeEditorColumnsBlock {
         let columns = (node.content ?? []).filter { $0.type == "column" }
         let columnTexts = columns.map { plainText(in: $0.content ?? []) }
+        let columnWidths = columns.map { columnWidth(from: $0.attrs) }
 
         return NativeEditorColumnsBlock(
             layout: node.attrs?["layout"]?.stringValue ?? "two_equal",
             widthMode: node.attrs?["widthMode"]?.stringValue ?? "normal",
             columnCount: columns.count,
             previewText: columnTexts.joined(separator: " "),
-            columnTexts: columnTexts
+            columnTexts: columnTexts,
+            columnWidths: columnWidths
         )
     }
 
@@ -206,6 +208,21 @@ nonisolated extension NativeEditorDocument {
             return values.compactMap(\.intValue)
         default:
             return value.intValue.map { [$0] } ?? []
+        }
+    }
+
+    private static func columnWidth(from attrs: [String: ProseMirrorJSONValue]?) -> Double? {
+        guard let value = attrs?["width"] else { return nil }
+
+        switch value {
+        case .int(let width):
+            Double(width)
+        case .double(let width):
+            width
+        case .string(let width):
+            Double(width)
+        case .bool, .object, .array, .null:
+            nil
         }
     }
 

@@ -149,6 +149,7 @@ nonisolated struct NativeEditorColumnsBlock: Equatable, Hashable, Sendable {
     var columnCount: Int
     var previewText: String
     var columnTexts: [String] = []
+    var columnWidths: [Double?] = []
 }
 
 nonisolated struct NativeEditorTransclusionSourceBlock: Equatable, Hashable, Sendable {

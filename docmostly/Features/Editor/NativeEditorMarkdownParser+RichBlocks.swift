@@ -13,6 +13,10 @@ extension NativeEditorMarkdownParser {
             return calloutBlock
         }
 
+        if let columnsBlock = columnsHTMLBlock(in: lines, startingAt: index) {
+            return columnsBlock
+        }
+
         return detailsHTMLBlock(in: lines, startingAt: index)
     }
 
@@ -380,13 +384,6 @@ extension NativeEditorMarkdownParser {
 
         </details>
         """
-    }
-
-    private static func columnsMarkdown(from columns: NativeEditorColumnsBlock) -> String {
-        let columnTexts = columns.columnTexts.isEmpty ? [columns.previewText] : columns.columnTexts
-        return columnTexts.enumerated().map { index, text in
-            "### Column \(index + 1)\n\(text.trimmedMarkdownBlockText)"
-        }.joined(separator: "\n\n")
     }
 
     private static func transclusionSourceMarkdown(from source: NativeEditorTransclusionSourceBlock) -> String {
