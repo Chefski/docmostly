@@ -456,7 +456,9 @@ enum NativeEditorMarkdownParser {
         for run in text.runs {
             let runText = String(text[run.range].characters)
             let runMarkdown: String
-            if let math = run[NativeEditorMathInlineAttribute.self] {
+            if let status = run[NativeEditorStatusAttribute.self] {
+                runMarkdown = statusMarkdown(from: status)
+            } else if let math = run[NativeEditorMathInlineAttribute.self] {
                 runMarkdown = "$\(math.text.replacing("$", with: "\\$"))$"
             } else if let mention = run[NativeEditorMentionAttribute.self] {
                 runMarkdown = mentionMarkdown(from: mention, fallbackText: runText)
