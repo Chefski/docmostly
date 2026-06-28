@@ -4,6 +4,8 @@ struct NativeEditorSlashCommandMenu: View {
     @Bindable var viewModel: NativeRichEditorViewModel
 
     var body: some View {
+        let commands = viewModel.filteredSlashCommands
+
         VStack(alignment: .leading, spacing: 0) {
             Text("Commands")
                 .font(.caption)
@@ -12,12 +14,12 @@ struct NativeEditorSlashCommandMenu: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
 
-            if viewModel.filteredSlashCommands.isEmpty {
+            if commands.isEmpty {
                 Text("No matching commands")
                     .foregroundStyle(.secondary)
                     .padding()
             } else {
-                ForEach(viewModel.filteredSlashCommands) { command in
+                ForEach(commands) { command in
                     Button {
                         viewModel.applySlashCommand(command)
                     } label: {

@@ -42,6 +42,17 @@ struct SpaceLogoURLTests {
         #expect(url.absoluteString == "https://cdn.example.com/space.png")
     }
 
+    @Test func acceptsSameOriginAbsoluteLogoURL() throws {
+        let url = try #require(
+            SpaceLogoURL.url(
+                logo: "https://docs.example.com/api/attachments/img/space-icon/space.png",
+                serverURLString: "https://docs.example.com"
+            )
+        )
+
+        #expect(url.absoluteString == "https://docs.example.com/api/attachments/img/space-icon/space.png")
+    }
+
     @Test func returnsNilForMissingLogo() {
         #expect(
             SpaceLogoURL.url(

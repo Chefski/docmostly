@@ -9,6 +9,14 @@ nonisolated struct ProseMirrorDocument: Codable, Hashable, Sendable {
         self.content = content
     }
 
+    static func decode(from data: Data) throws -> ProseMirrorDocument {
+        let decoder = JSONDecoder()
+        decoder.userInfo[.proseMirrorDecodingBudget] = ProseMirrorDecodingBudget()
+        let document = try decoder.decode(ProseMirrorDocument.self, from: data)
+        try document.validateNativeEditorBudget()
+        return document
+    }
+
     private enum CodingKeys: String, CodingKey {
         case type
         case content

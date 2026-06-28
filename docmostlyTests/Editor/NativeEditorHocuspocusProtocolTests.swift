@@ -241,6 +241,42 @@ struct NativeEditorHocuspocusProtocolTests {
         }
     }
 
+    @Test func rejectsOversizedHocuspocusFramesBeforeCopying() {
+        let frame = Data(
+            repeating: 0,
+            count: NativeEditorHocuspocusFrame.maximumFrameBytes + 1
+        )
+
+        #expect(throws: NativeEditorHocuspocusProtocolError.payloadTooLarge) {
+            _ = try NativeEditorHocuspocusFrame.parse(frame)
+        }
+    }
+
+    @Test func rejectsOversizedCollaborationWebSocketMessagesBeforeDataConversion() {
+        let message = URLSessionWebSocketTask.Message.string(String(
+            repeating: "A",
+            count: NativeEditorHocuspocusFrame.maximumFrameBytes + 1
+        ))
+
+        #expect(throws: NativeEditorHocuspocusProtocolError.payloadTooLarge) {
+            _ = try NativeEditorCollaborationPresenceClient.data(from: message)
+        }
+    }
+
+    @Test func rejectsAwarenessUpdatesWithExcessiveAggregateJSON() {
+        let oversizedJSON = """
+        {"user":{"id":"user-1","name":"\(String(
+            repeating: "A",
+            count: NativeEditorAwarenessState.maximumAggregateJSONBytes + 1
+        ))"},"cursor":null}
+        """
+        let update = makeAwarenessUpdate(clientID: 42, clock: 7, stateJSON: oversizedJSON)
+
+        #expect(throws: NativeEditorHocuspocusProtocolError.payloadTooLarge) {
+            _ = try NativeEditorAwarenessState.decodeUpdate(try readAwarenessPayload(fromFramePayload: update))
+        }
+    }
+
     private func makeHocuspocusFrame(documentName: String, messageType: Int, payload: Data) -> Data {
         var data = Data()
         data.append(encodeVarString(documentName))
@@ -260,6 +296,11 @@ struct NativeEditorHocuspocusProtocolTests {
         payload.append(encodeVarUint(update.count))
         payload.append(update)
         return payload
+    }
+
+    private func readAwarenessPayload(fromFramePayload payload: Data) throws -> Data {
+        var decoder = NativeEditorLib0Decoder(data: payload)
+        return try decoder.readVarUint8Array()
     }
 
     private func authPayload(type: Int, scope: String) -> Data {

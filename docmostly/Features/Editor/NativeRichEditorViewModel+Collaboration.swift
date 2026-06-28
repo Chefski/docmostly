@@ -280,13 +280,36 @@ extension NativeRichEditorViewModel {
     }
 
     func resolvedCursorsForBlock(id blockID: UUID) -> [NativeEditorResolvedRemoteCursor] {
-        guard let blockIndex = document.blocks.firstIndex(where: { $0.id == blockID }) else { return [] }
+        resolvedRemoteCursorsByBlockID[blockID] ?? []
+    }
 
-        return resolvedRemoteCursors.filter { cursor in
+    func rebuildResolvedRemoteCursorIndex() {
+        guard resolvedRemoteCursors.isEmpty == false else {
+            resolvedRemoteCursorsByBlockID = [:]
+            return
+        }
+
+        var blockIDsByIndex: [Int: UUID] = [:]
+        blockIDsByIndex.reserveCapacity(document.blocks.count)
+        for (index, block) in document.blocks.enumerated() {
+            blockIDsByIndex[index] = block.id
+        }
+
+        var cursorsByBlockID: [UUID: [NativeEditorResolvedRemoteCursor]] = [:]
+        for cursor in resolvedRemoteCursors {
             let lowerBound = min(cursor.anchor.blockIndex, cursor.head.blockIndex)
             let upperBound = max(cursor.anchor.blockIndex, cursor.head.blockIndex)
-            return (lowerBound...upperBound).contains(blockIndex)
+            let clampedLowerBound = max(lowerBound, document.blocks.startIndex)
+            let clampedUpperBound = min(upperBound, document.blocks.index(before: document.blocks.endIndex))
+            guard clampedLowerBound <= clampedUpperBound else { continue }
+
+            for blockIndex in clampedLowerBound...clampedUpperBound {
+                guard let blockID = blockIDsByIndex[blockIndex] else { continue }
+                cursorsByBlockID[blockID, default: []].append(cursor)
+            }
         }
+
+        resolvedRemoteCursorsByBlockID = cursorsByBlockID
     }
 
     private func isRemotePageNewer(_ page: DocmostEditablePage) -> Bool {

@@ -8,6 +8,7 @@ nonisolated struct StoredHTTPCookie: Codable, Equatable, Sendable {
     let expiresAt: Date?
     let isSecure: Bool
     let isHTTPOnly: Bool
+    let isHostOnly: Bool
 
     init(
         name: String,
@@ -16,7 +17,8 @@ nonisolated struct StoredHTTPCookie: Codable, Equatable, Sendable {
         path: String,
         expiresAt: Date?,
         isSecure: Bool,
-        isHTTPOnly: Bool
+        isHTTPOnly: Bool,
+        isHostOnly: Bool = false
     ) {
         self.name = name
         self.value = value
@@ -25,9 +27,33 @@ nonisolated struct StoredHTTPCookie: Codable, Equatable, Sendable {
         self.expiresAt = expiresAt
         self.isSecure = isSecure
         self.isHTTPOnly = isHTTPOnly
+        self.isHostOnly = isHostOnly
     }
 
-    init(cookie: HTTPCookie) {
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case value
+        case domain
+        case path
+        case expiresAt
+        case isSecure
+        case isHTTPOnly
+        case isHostOnly
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        value = try container.decode(String.self, forKey: .value)
+        domain = try container.decode(String.self, forKey: .domain)
+        path = try container.decode(String.self, forKey: .path)
+        expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
+        isSecure = try container.decode(Bool.self, forKey: .isSecure)
+        isHTTPOnly = try container.decode(Bool.self, forKey: .isHTTPOnly)
+        isHostOnly = try container.decodeIfPresent(Bool.self, forKey: .isHostOnly) ?? false
+    }
+
+    init(cookie: HTTPCookie, isHostOnly: Bool) {
         name = cookie.name
         value = cookie.value
         domain = cookie.domain
@@ -35,6 +61,7 @@ nonisolated struct StoredHTTPCookie: Codable, Equatable, Sendable {
         expiresAt = cookie.expiresDate
         isSecure = cookie.isSecure
         isHTTPOnly = cookie.isHTTPOnly
+        self.isHostOnly = isHostOnly
     }
 
     func makeCookie() -> HTTPCookie? {

@@ -139,7 +139,7 @@ final class CachedPage {
             id: id,
             slugId: slugId,
             title: title,
-            content: try JSONDecoder().decode(ProseMirrorDocument.self, from: proseMirrorJSONData),
+            content: try ProseMirrorDocument.decode(from: proseMirrorJSONData),
             icon: icon,
             spaceId: spaceId,
             updatedAt: updatedAt,
@@ -150,7 +150,7 @@ final class CachedPage {
 
     private func cachedProseMirrorDocument() -> ProseMirrorDocument? {
         guard let proseMirrorJSONData else { return nil }
-        return try? JSONDecoder().decode(ProseMirrorDocument.self, from: proseMirrorJSONData)
+        return try? ProseMirrorDocument.decode(from: proseMirrorJSONData)
     }
 }
 

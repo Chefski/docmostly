@@ -8,8 +8,7 @@ nonisolated struct NativeEditorDocument: Equatable {
     }
 
     init(proseMirrorJSONData data: Data) throws {
-        let document = try JSONDecoder().decode(ProseMirrorDocument.self, from: data)
-        try document.validateNativeEditorBudget()
+        let document = try ProseMirrorDocument.decode(from: data)
         self.init(proseMirrorDocument: document)
     }
 

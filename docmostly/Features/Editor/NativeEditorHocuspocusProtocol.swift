@@ -71,10 +71,15 @@ nonisolated enum NativeEditorYjsSyncMessage: Equatable, Sendable {
 }
 
 nonisolated struct NativeEditorHocuspocusFrame: Equatable, Sendable {
+    static let maximumFrameBytes = NativeEditorLib0Decoder.maximumDecodedPayloadBytes
+
     let documentName: String
     let message: NativeEditorHocuspocusMessage
 
     static func parse(_ data: Data) throws -> NativeEditorHocuspocusFrame {
+        guard data.count <= maximumFrameBytes else {
+            throw NativeEditorHocuspocusProtocolError.payloadTooLarge
+        }
         var decoder = NativeEditorLib0Decoder(data: data)
         let documentName = try decoder.readVarString()
         let typeValue = try decoder.readVarUint()
@@ -218,6 +223,8 @@ nonisolated struct NativeEditorCollaborationStatelessEvent: Decodable, Equatable
 
 nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
     static let maximumDecodedStateCount = 256
+    static let maximumStateJSONBytes = 16_384
+    static let maximumAggregateJSONBytes = 262_144
 
     let clientID: Int
     let clock: Int
@@ -240,11 +247,19 @@ nonisolated struct NativeEditorAwarenessState: Equatable, Sendable {
 
         var states: [NativeEditorAwarenessState] = []
         states.reserveCapacity(count)
+        var aggregateJSONBytes = 0
 
         for _ in 0..<count {
             let clientID = try decoder.readVarUint()
             let clock = try decoder.readVarUint()
             let stateJSON = try decoder.readVarString()
+            aggregateJSONBytes += stateJSON.utf8.count
+            guard
+                stateJSON.utf8.count <= maximumStateJSONBytes,
+                aggregateJSONBytes <= maximumAggregateJSONBytes
+            else {
+                throw NativeEditorHocuspocusProtocolError.payloadTooLarge
+            }
             let payload: NativeEditorAwarenessPayload?
 
             if stateJSON == "null" {

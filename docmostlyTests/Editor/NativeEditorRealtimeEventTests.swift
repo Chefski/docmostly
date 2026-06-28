@@ -6,11 +6,11 @@ import Testing
 struct NativeEditorRealtimeEventTests {
     @Test func buildsRealtimeEventSocketURLFromServerURL() throws {
         let secureURL = try NativeEditorRealtimeEventEndpoint.webSocketURL(
-            serverBaseURL: #require(URL(string: "https://docs.example.com/api"))
+            serverBaseURL: #require(URL(string: "https://docs.example.com/docmost"))
         )
 
         #expect(
-            secureURL.absoluteString == "wss://docs.example.com/socket.io/?EIO=4&transport=websocket"
+            secureURL.absoluteString == "wss://docs.example.com/docmost/socket.io/?EIO=4&transport=websocket"
         )
     }
 
@@ -210,5 +210,16 @@ struct NativeEditorRealtimeEventTests {
 
         #expect(request.value(forHTTPHeaderField: "Cookie") == "authToken=secret")
         #expect(request.httpShouldHandleCookies == false)
+    }
+
+    @Test func rejectsOversizedSocketIOFramesBeforeParsing() {
+        let oversized = String(
+            repeating: "a",
+            count: NativeEditorRealtimeSocketFrame.maximumFrameCharacters + 1
+        )
+
+        #expect(throws: NativeEditorRealtimeSocketFrameError.frameTooLarge) {
+            _ = try NativeEditorRealtimeSocketFrame.parse(oversized)
+        }
     }
 }

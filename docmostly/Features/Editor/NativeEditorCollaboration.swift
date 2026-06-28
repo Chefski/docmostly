@@ -197,7 +197,7 @@ enum NativeEditorCollaborationEndpoint {
         }
 
         components.scheme = webSocketScheme(for: components.scheme)
-        components.path = "/collab"
+        components.path = webSocketPath(basePath: components.path, endpointPath: "collab")
         components.query = nil
         components.fragment = nil
 
@@ -209,5 +209,13 @@ enum NativeEditorCollaborationEndpoint {
 
     private static func webSocketScheme(for scheme: String?) -> String {
         scheme == "https" ? "wss" : "ws"
+    }
+
+    private static func webSocketPath(basePath: String, endpointPath: String) -> String {
+        let trimmedBase = basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard trimmedBase.isEmpty == false else {
+            return "/\(endpointPath)"
+        }
+        return "/\(trimmedBase)/\(endpointPath)"
     }
 }

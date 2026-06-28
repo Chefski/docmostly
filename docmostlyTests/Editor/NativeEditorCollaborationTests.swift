@@ -26,7 +26,7 @@ struct NativeEditorCollaborationTests {
         )
 
         #expect(secureURL.absoluteString == "wss://docs.example.com/collab")
-        #expect(insecureURL.absoluteString == "ws://localhost:3000/collab")
+        #expect(insecureURL.absoluteString == "ws://localhost:3000/api/collab")
     }
 
     @Test func updatesActiveCollaboratorsFromAwarenessAndIgnoresLocalClient() {

@@ -7,7 +7,7 @@ nonisolated enum NativeEditorRealtimeEventEndpoint {
         }
 
         components.scheme = components.scheme == "https" ? "wss" : "ws"
-        components.path = "/socket.io/"
+        components.path = webSocketPath(basePath: components.path, endpointPath: "socket.io")
         components.queryItems = [
             URLQueryItem(name: "EIO", value: "4"),
             URLQueryItem(name: "transport", value: "websocket")
@@ -19,6 +19,18 @@ nonisolated enum NativeEditorRealtimeEventEndpoint {
         }
         return url
     }
+
+    private static func webSocketPath(basePath: String, endpointPath: String) -> String {
+        let trimmedBase = basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard trimmedBase.isEmpty == false else {
+            return "/\(endpointPath)/"
+        }
+        return "/\(trimmedBase)/\(endpointPath)/"
+    }
+}
+
+nonisolated enum NativeEditorRealtimeSocketFrameError: Error, Equatable, Sendable {
+    case frameTooLarge
 }
 
 nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
@@ -32,8 +44,12 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
 
     static let connectMessage = "40"
     static let pongMessage = "3"
+    static let maximumFrameCharacters = 1_000_000
 
     static func parse(_ text: String) throws -> NativeEditorRealtimeSocketFrame {
+        guard text.count <= maximumFrameCharacters else {
+            throw NativeEditorRealtimeSocketFrameError.frameTooLarge
+        }
         let frame = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch frame {
@@ -57,6 +73,10 @@ nonisolated enum NativeEditorRealtimeSocketFrame: Equatable, Sendable {
             return .ignored(frame)
         }
 
+        return try parseEventFrame(frame)
+    }
+
+    private static func parseEventFrame(_ frame: String) throws -> NativeEditorRealtimeSocketFrame {
         let payload = String(frame.dropFirst(2))
         let data = Data(payload.utf8)
         let envelope = try DocmostJSONDecoder.make().decode(SocketIOEventEnvelope.self, from: data)

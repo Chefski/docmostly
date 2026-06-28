@@ -5,6 +5,10 @@ nonisolated protocol HTTPDataLoading: Sendable {
     func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> (Data, URLResponse)
 }
 
+nonisolated enum DocmostResponseSizeLimit {
+    static let maximumBytes = 10_000_000
+}
+
 nonisolated enum DocmostURLSessionFactory {
     static func makeAPIURLSession() -> any HTTPDataLoading {
         let configuration = URLSessionConfiguration.default
@@ -67,7 +71,25 @@ private final class DocmostRedirectGuardedSession:
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await session.data(for: request, delegate: self)
+        let (bytes, response) = try await session.bytes(for: request, delegate: self)
+        if response.expectedContentLength > Int64(DocmostResponseSizeLimit.maximumBytes) {
+            throw APIError.responseTooLarge
+        }
+
+        var data = Data()
+        data.reserveCapacity(min(
+            max(Int(response.expectedContentLength), 0),
+            DocmostResponseSizeLimit.maximumBytes
+        ))
+
+        for try await byte in bytes {
+            data.append(byte)
+            guard data.count <= DocmostResponseSizeLimit.maximumBytes else {
+                throw APIError.responseTooLarge
+            }
+        }
+
+        return (data, response)
     }
 
     func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> (Data, URLResponse) {

@@ -68,21 +68,91 @@ nonisolated struct DocmostComment: Decodable, Identifiable, Hashable, Sendable {
             return nil
         }
 
-        let text = document.plainText
+        guard let text = try? document.plainText() else {
+            return nil
+        }
         return text.isEmpty ? nil : text
     }
+}
+
+nonisolated enum CommentContentDecodingLimits {
+    static let maximumDepth = 64
+    static let maximumChildrenPerNode = 256
+    static let maximumNodeCount = 10_000
+    static let maximumTextLength = 100_000
+    static let maximumAggregateTextLength = 500_000
 }
 
 nonisolated private struct CommentContentNode: Decodable {
     let text: String?
     let content: [CommentContentNode]?
 
-    var plainText: String {
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case content
+    }
+
+    init(from decoder: Decoder) throws {
+        guard decoder.codingPath.count <= CommentContentDecodingLimits.maximumDepth else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Comment content exceeds the supported nesting depth."
+                )
+            )
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decodeIfPresent(String.self, forKey: .text)
+        if let text, text.count > CommentContentDecodingLimits.maximumTextLength {
+            throw DecodingError.dataCorruptedError(
+                forKey: .text,
+                in: container,
+                debugDescription: "Comment text is too large."
+            )
+        }
+        content = try container.decodeIfPresent([CommentContentNode].self, forKey: .content)
+        if let content, content.count > CommentContentDecodingLimits.maximumChildrenPerNode {
+            throw DecodingError.dataCorruptedError(
+                forKey: .content,
+                in: container,
+                debugDescription: "Comment content has too many child nodes."
+            )
+        }
+    }
+
+    func plainText() throws -> String {
+        var remainingNodes = CommentContentDecodingLimits.maximumNodeCount
+        var remainingText = CommentContentDecodingLimits.maximumAggregateTextLength
+        return try plainText(remainingNodes: &remainingNodes, remainingText: &remainingText)
+    }
+
+    private func plainText(remainingNodes: inout Int, remainingText: inout Int) throws -> String {
+        remainingNodes -= 1
+        guard remainingNodes >= 0 else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: [], debugDescription: "Comment content has too many nodes.")
+            )
+        }
+
         var parts: [String] = []
         if let text, text.isEmpty == false {
+            remainingText -= text.count
+            guard remainingText >= 0 else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(codingPath: [], debugDescription: "Comment content is too large.")
+                )
+            }
             parts.append(text)
         }
-        parts.append(contentsOf: content?.map(\.plainText).filter { $0.isEmpty == false } ?? [])
+
+        for child in content ?? [] {
+            let childText = try child.plainText(remainingNodes: &remainingNodes, remainingText: &remainingText)
+            if childText.isEmpty == false {
+                parts.append(childText)
+            }
+        }
+
         return parts.joined(separator: " ")
     }
 }

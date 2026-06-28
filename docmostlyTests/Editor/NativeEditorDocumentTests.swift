@@ -191,6 +191,96 @@ struct NativeEditorDocumentTests {
         #expect(document.blocks.first?.kind == .heading(level: 1))
     }
 
+    @Test func rejectsOversizedProseMirrorAttributeStrings() {
+        let oversized = String(
+            repeating: "A",
+            count: ProseMirrorDecodingLimits.maximumAttributeStringLength + 1
+        )
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "attrs": { "tracking": "\(oversized)" },
+              "content": [{ "type": "text", "text": "Body" }]
+            }
+          ]
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try NativeEditorDocument(proseMirrorJSONData: data)
+        }
+    }
+
+    @Test func rejectsProseMirrorAttributesThatExceedAggregateCharacterBudget() {
+        let segment = String(
+            repeating: "A",
+            count: ProseMirrorDecodingLimits.maximumAttributeStringLength
+        )
+        let attrs = (0...ProseMirrorDecodingLimits.maximumAttributeAggregateCharacters / segment.count)
+            .map { #""tracking\#($0)": "\#(segment)""# }
+            .joined(separator: ",")
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "attrs": { \(attrs) },
+              "content": [{ "type": "text", "text": "Body" }]
+            }
+          ]
+        }
+        """.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try NativeEditorDocument(proseMirrorJSONData: data)
+        }
+    }
+
+    @Test func rejectsProseMirrorDocumentsThatExceedTotalNodeBudgetDuringDecode() {
+        let paragraph = """
+        {"type":"paragraph","content":[{"type":"text","text":"Body"}]}
+        """
+        let content = Array(
+            repeating: paragraph,
+            count: ProseMirrorDecodingLimits.maximumTotalNodeCount + 1
+        ).joined(separator: ",")
+        let data = Data("{\"type\":\"doc\",\"content\":[\(content)]}".utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try NativeEditorDocument(proseMirrorJSONData: data)
+        }
+    }
+
+    @Test func ignoresUnsafeRemoteLinkSchemes() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Run",
+                  "marks": [
+                    { "type": "link", "attrs": { "href": "javascript:alert(1)" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+
+        let document = try NativeEditorDocument(proseMirrorJSONData: data)
+
+        #expect(document.blocks.first?.text.runs.first?.link == nil)
+    }
+
     @Test func capsDecodedTableDimensions() {
         let oversizedRow = ProseMirrorNode(
             type: "tableRow",

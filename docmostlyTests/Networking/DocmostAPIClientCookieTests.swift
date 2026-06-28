@@ -83,6 +83,21 @@ struct DocmostAPIClientCookieTests {
         #expect(DocmostURLSessionFactory.isRedirectAllowed(from: original, to: redirect) == true)
     }
 
+    @Test func rejectsOversizedAPIResponseBodiesBeforeDecoding() async throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let loader = CapturingHTTPDataLoader(responses: [
+            try loaderResponse(
+                url: baseURL.appending(path: "api/users/me"),
+                data: Data(repeating: 0, count: DocmostAPIClient.maximumResponseBytes + 1)
+            )
+        ])
+        let client = DocmostAPIClient(baseURL: baseURL, loader: loader)
+
+        await #expect(throws: APIError.self) {
+            let _: CurrentUserResponse = try await client.send(.currentUser)
+        }
+    }
+
     private func cookie(name: String, value: String, domain: String, path: String) -> StoredHTTPCookie {
         StoredHTTPCookie(
             name: name,
@@ -91,7 +106,8 @@ struct DocmostAPIClientCookieTests {
             path: path,
             expiresAt: nil,
             isSecure: true,
-            isHTTPOnly: true
+            isHTTPOnly: true,
+            isHostOnly: false
         )
     }
 

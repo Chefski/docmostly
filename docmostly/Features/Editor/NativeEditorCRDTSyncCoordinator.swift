@@ -6,9 +6,11 @@ nonisolated enum NativeEditorCRDTSyncCoordinatorError: Error, Equatable, Sendabl
 
 actor NativeEditorCRDTSyncCoordinator {
     nonisolated static let maximumRemoteSyncPayloadBytes = NativeEditorLib0Decoder.maximumDecodedPayloadBytes
+    nonisolated static let maximumRemoteSyncSessionBytes = 10_000_000
 
     private let documentEngine: any NativeEditorCRDTDocumentEngine
     private var pendingLocalEchoCounts: [Data: Int] = [:]
+    private var remoteSyncSessionBytes = 0
 
     init(documentEngine: any NativeEditorCRDTDocumentEngine) {
         self.documentEngine = documentEngine
@@ -22,9 +24,11 @@ actor NativeEditorCRDTSyncCoordinator {
         switch message {
         case .stepOne(let stateVector):
             try validateRemotePayload(stateVector)
+            try recordRemotePayload(stateVector)
             return [.stepTwo(try await documentEngine.encodeStateAsUpdate(for: stateVector))]
         case .stepTwo(let update), .update(let update):
             try validateRemotePayload(update)
+            try recordRemotePayload(update)
             guard consumeLocalEcho(for: update) == false else { return [] }
             try await documentEngine.applyRemoteUpdate(update)
             return []
@@ -59,6 +63,13 @@ actor NativeEditorCRDTSyncCoordinator {
 
     private func validateRemotePayload(_ data: Data) throws {
         guard data.count <= Self.maximumRemoteSyncPayloadBytes else {
+            throw NativeEditorCRDTSyncCoordinatorError.remotePayloadTooLarge
+        }
+    }
+
+    private func recordRemotePayload(_ data: Data) throws {
+        remoteSyncSessionBytes += data.count
+        guard remoteSyncSessionBytes <= Self.maximumRemoteSyncSessionBytes else {
             throw NativeEditorCRDTSyncCoordinatorError.remotePayloadTooLarge
         }
     }

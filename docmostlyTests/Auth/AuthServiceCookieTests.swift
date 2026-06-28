@@ -100,7 +100,7 @@ struct AuthServiceCookieTests {
     }
 
     private func currentUserEnvelopeData() throws -> Data {
-        try #require("""
+        Data("""
         {
           "data": {
             "user": {
@@ -115,6 +115,6 @@ struct AuthServiceCookieTests {
           "success": true,
           "status": 200
         }
-        """.data(using: .utf8))
+        """.utf8)
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SpaceAddMemberCandidateRowView: View {
+struct SpaceAddMemberCandidateRowView: View, Equatable {
     let title: String
     let subtitle: String?
     let isSelected: Bool
@@ -27,5 +27,11 @@ struct SpaceAddMemberCandidateRowView: View {
                 }
             }
         }
+    }
+
+    static func == (lhs: SpaceAddMemberCandidateRowView, rhs: SpaceAddMemberCandidateRowView) -> Bool {
+        lhs.title == rhs.title &&
+            lhs.subtitle == rhs.subtitle &&
+            lhs.isSelected == rhs.isSelected
     }
 }

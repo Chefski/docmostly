@@ -2,8 +2,11 @@ import Foundation
 import SwiftUI
 
 extension NativeRichEditorViewModel {
-    var searchMatches: [NativeEditorSearchMatch] {
-        NativeEditorSearch.findMatches(in: document.blocks, query: searchQuery)
+    func refreshSearchMatches() {
+        searchMatches = NativeEditorSearch.findMatches(in: document.blocks, query: searchQuery)
+
+        guard currentSearchMatchIndex >= searchMatches.count else { return }
+        currentSearchMatchIndex = searchMatches.isEmpty ? 0 : searchMatches.count - 1
     }
 
     var searchMatchSummary: String {

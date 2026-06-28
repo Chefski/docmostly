@@ -149,7 +149,7 @@ nonisolated extension NativeEditorDocument {
         case .underline:
             text.underlineStyle = .single
         case .link(let href):
-            text.link = URL(string: href)
+            text.link = Self.safeLinkURL(from: href)
         case .highlight(let color, let colorName):
             if let color {
                 text[NativeEditorHighlightColorAttribute.self] = color
@@ -172,6 +172,13 @@ nonisolated extension NativeEditorDocument {
         case .bold, .italic, .strikethrough, .code, .unknown:
             return
         }
+    }
+
+    static func safeLinkURL(from href: String) -> URL? {
+        guard let url = URL(string: href) else { return nil }
+        let allowedSchemes = ["https", "http", "mailto"]
+        guard let scheme = url.scheme?.lowercased() else { return nil }
+        return allowedSchemes.contains(scheme) ? url : nil
     }
 
     static func insertPresentationIntent(

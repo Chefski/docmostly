@@ -6,7 +6,7 @@ struct NativeEditorBodyView: View {
     var isAuthoringEnabled = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        LazyVStack(alignment: .leading, spacing: 10) {
             TextField("Page title", text: $viewModel.title, axis: .vertical)
                 .font(.largeTitle)
                 .bold()

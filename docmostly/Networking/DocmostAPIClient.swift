@@ -2,6 +2,8 @@ import Foundation
 import UniformTypeIdentifiers
 
 actor DocmostAPIClient {
+    nonisolated static let maximumResponseBytes = DocmostResponseSizeLimit.maximumBytes
+
     nonisolated let baseURL: URL
     private let loader: any HTTPDataLoading
     private let decoder: JSONDecoder
@@ -24,6 +26,7 @@ actor DocmostAPIClient {
         let request = await authenticatedRequest(endpointRequest)
         let (data, response) = try await loader.data(for: request)
         await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
         try validate(response: response, data: data)
 
         do {
@@ -39,6 +42,7 @@ actor DocmostAPIClient {
         let request = await authenticatedRequest(endpointRequest)
         let (data, response) = try await loader.data(for: request)
         await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
         try validate(response: response, data: data)
     }
 
@@ -76,6 +80,7 @@ actor DocmostAPIClient {
         request = await authenticatedRequest(request)
         let (data, response) = try await loader.upload(for: request, fromFile: multipartBody.fileURL)
         await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
         try validate(response: response, data: data)
         return try decodeUploadResponse(from: data)
     }
@@ -113,6 +118,12 @@ actor DocmostAPIClient {
         guard 200..<300 ~= httpResponse.statusCode else {
             let message = decodeErrorMessage(from: data)
             throw APIError.httpStatus(httpResponse.statusCode, message)
+        }
+    }
+
+    private func validateResponseSize(_ data: Data) throws {
+        guard data.count <= Self.maximumResponseBytes else {
+            throw APIError.responseTooLarge
         }
     }
 

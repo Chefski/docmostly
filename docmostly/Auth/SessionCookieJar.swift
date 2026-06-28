@@ -29,8 +29,12 @@ actor SessionCookieJar {
             withResponseHeaderFields: Self.headerFields(from: response),
             for: requestURL
         )
-        for cookie in responseCookies.map(StoredHTTPCookie.init(cookie:)) {
-            upsert(cookie)
+        let setCookieHeaders = Self.setCookieHeaderValues(from: response)
+        for cookie in responseCookies {
+            upsert(StoredHTTPCookie(
+                cookie: cookie,
+                isHostOnly: Self.isHostOnlyCookie(cookie, setCookieHeaders: setCookieHeaders)
+            ))
         }
         removeExpiredCookies()
     }
@@ -73,6 +77,27 @@ actor SessionCookieJar {
         }
         return headerFields
     }
+
+    private static func setCookieHeaderValues(from response: HTTPURLResponse) -> [String] {
+        response.allHeaderFields.compactMap { key, value in
+            guard
+                let name = key as? String,
+                name.caseInsensitiveCompare("Set-Cookie") == .orderedSame
+            else {
+                return nil
+            }
+            return value as? String ?? String(describing: value)
+        }
+    }
+
+    private static func isHostOnlyCookie(_ cookie: HTTPCookie, setCookieHeaders: [String]) -> Bool {
+        guard let header = setCookieHeaders.first(where: { header in
+            header.lowercased().hasPrefix("\(cookie.name.lowercased())=")
+        }) else {
+            return true
+        }
+        return header.range(of: "domain=", options: .caseInsensitive) == nil
+    }
 }
 
 nonisolated extension Array where Element == StoredHTTPCookie {
@@ -103,6 +128,7 @@ nonisolated extension StoredHTTPCookie {
         name == other.name
             && normalizedDomain == other.normalizedDomain
             && normalizedPath == other.normalizedPath
+            && isHostOnly == other.isHostOnly
     }
 
     private var normalizedDomain: String {
@@ -121,6 +147,9 @@ nonisolated extension StoredHTTPCookie {
 
     private func matchesDomain(_ host: String) -> Bool {
         let cookieDomain = normalizedDomain
+        guard isHostOnly == false else {
+            return host == cookieDomain
+        }
         return host == cookieDomain || host.hasSuffix(".\(cookieDomain)")
     }
 

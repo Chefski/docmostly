@@ -298,7 +298,11 @@ nonisolated final class CacheRepository {
         return try context.fetch(descriptor)
     }
 
-    private func loadTreeItems(spaceId: String, parentPageId: String?, scope: CacheScope) throws -> [CachedPageTreeItem] {
+    private func loadTreeItems(
+        spaceId: String,
+        parentPageId: String?,
+        scope: CacheScope
+    ) throws -> [CachedPageTreeItem] {
         let serverBaseURL = scope.serverBaseURL
         let userID = scope.userID
         let parentID = parentPageId

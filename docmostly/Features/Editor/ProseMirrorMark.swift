@@ -21,6 +21,8 @@ nonisolated struct ProseMirrorMark: Codable, Hashable, Sendable {
         attrs = try container.decodeIfPresent([String: ProseMirrorJSONValue].self, forKey: .attrs)
         if let attrs {
             try ProseMirrorDecodingLimits.validateAttributeCount(attrs.count, decoder: decoder)
+            try (decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget)?
+                .validateAttributes(attrs, decoder: decoder)
         }
     }
 }

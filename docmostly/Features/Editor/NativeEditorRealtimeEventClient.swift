@@ -113,11 +113,17 @@ actor NativeEditorRealtimeEventClient {
         try await task.send(.string(text))
     }
 
-    private static func string(from message: URLSessionWebSocketTask.Message) -> String {
+    nonisolated static func string(from message: URLSessionWebSocketTask.Message) throws -> String {
         switch message {
         case .string(let text):
+            guard text.count <= NativeEditorRealtimeSocketFrame.maximumFrameCharacters else {
+                throw NativeEditorRealtimeSocketFrameError.frameTooLarge
+            }
             text
         case .data(let data):
+            guard data.count <= NativeEditorRealtimeSocketFrame.maximumFrameCharacters else {
+                throw NativeEditorRealtimeSocketFrameError.frameTooLarge
+            }
             String(bytes: data, encoding: .utf8) ?? ""
         @unknown default:
             ""

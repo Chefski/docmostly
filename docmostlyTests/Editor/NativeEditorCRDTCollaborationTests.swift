@@ -57,6 +57,30 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(engine.appliedRemoteUpdates == [])
     }
 
+    @Test func rejectsCumulativeRemoteCRDTSyncUpdates() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
+        let firstUpdate = Data(
+            repeating: 1,
+            count: NativeEditorCRDTSyncCoordinator.maximumRemoteSyncSessionBytes / 2
+        )
+        let secondUpdate = Data(
+            repeating: 2,
+            count: NativeEditorCRDTSyncCoordinator.maximumRemoteSyncSessionBytes / 2 + 1
+        )
+
+        #expect(try await coordinator.receive(.update(firstUpdate)) == [])
+        do {
+            _ = try await coordinator.receive(.update(secondUpdate))
+            Issue.record("Expected cumulative remote CRDT updates to be rejected")
+        } catch let error as NativeEditorCRDTSyncCoordinatorError {
+            #expect(error == .remotePayloadTooLarge)
+        } catch {
+            Issue.record("Expected CRDT sync size error, got \(error)")
+        }
+        #expect(engine.appliedRemoteUpdates == [firstUpdate])
+    }
+
     @Test func skipsOneMatchingCRDTUpdateEchoAfterLocalBroadcast() async throws {
         let engine = RecordingCRDTDocumentEngine()
         let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)

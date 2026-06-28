@@ -7,7 +7,12 @@ import SwiftUI
 final class NativeRichEditorViewModel {
     let pageID: String
     var title: String
-    var document = NativeEditorDocument()
+    var document = NativeEditorDocument() {
+        didSet {
+            rebuildResolvedRemoteCursorIndex()
+            refreshSearchMatches()
+        }
+    }
     var isLoading = false
     var isSaving = false
     var isDirty = false
@@ -20,14 +25,24 @@ final class NativeRichEditorViewModel {
     var isTitleFocused = false
     var canUndo = false
     var canRedo = false
-    var searchQuery = ""
+    var searchQuery = "" {
+        didSet {
+            refreshSearchMatches()
+        }
+    }
     var replacementText = ""
     var currentSearchMatchIndex = 0
+    var searchMatches: [NativeEditorSearchMatch] = []
     var realtimeStatus: NativeEditorRealtimeStatus = .disconnected
     var pendingRemoteUpdate: NativeEditorRemoteUpdate?
     var activeCollaborators: [NativeEditorCollaborator] = []
     var remoteCursors: [NativeEditorRemoteCursor] = []
-    var resolvedRemoteCursors: [NativeEditorResolvedRemoteCursor] = []
+    var resolvedRemoteCursors: [NativeEditorResolvedRemoteCursor] = [] {
+        didSet {
+            rebuildResolvedRemoteCursorIndex()
+        }
+    }
+    var resolvedRemoteCursorsByBlockID: [UUID: [NativeEditorResolvedRemoteCursor]] = [:]
 
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored private var editablePageSlugID: String

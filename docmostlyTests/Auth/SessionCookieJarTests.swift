@@ -42,6 +42,21 @@ struct SessionCookieJarTests {
         #expect(cookies.isEmpty)
     }
 
+    @Test func hostOnlyCookiesDoNotMatchSubdomains() async throws {
+        let jar = SessionCookieJar(cookies: [
+            cookie(name: "host", value: "host-value", domain: "docs.example.com", path: "/", isHostOnly: true),
+            cookie(name: "domain", value: "domain-value", domain: "example.com", path: "/", isHostOnly: false)
+        ])
+        let subdomainURL = try #require(URL(string: "https://api.docs.example.com/api/users/me"))
+        let siblingURL = try #require(URL(string: "https://api.example.com/api/users/me"))
+
+        let subdomainCookies = await jar.cookies(for: subdomainURL)
+        let siblingHeader = await jar.cookieHeader(for: siblingURL)
+
+        #expect(subdomainCookies.isEmpty)
+        #expect(siblingHeader == "domain=domain-value")
+    }
+
     @Test func replaceAndClearControlTheStoredCookieSet() async throws {
         let jar = SessionCookieJar(cookies: [
             cookie(name: "old", value: "old-value", domain: "docs.example.com", path: "/")
@@ -93,7 +108,8 @@ struct SessionCookieJarTests {
         path: String,
         expiresAt: Date? = nil,
         isSecure: Bool = false,
-        isHTTPOnly: Bool = true
+        isHTTPOnly: Bool = true,
+        isHostOnly: Bool = false
     ) -> StoredHTTPCookie {
         StoredHTTPCookie(
             name: name,
@@ -102,7 +118,8 @@ struct SessionCookieJarTests {
             path: path,
             expiresAt: expiresAt,
             isSecure: isSecure,
-            isHTTPOnly: isHTTPOnly
+            isHTTPOnly: isHTTPOnly,
+            isHostOnly: isHostOnly
         )
     }
 
