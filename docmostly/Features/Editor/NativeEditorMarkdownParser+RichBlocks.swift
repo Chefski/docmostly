@@ -17,7 +17,7 @@ extension NativeEditorMarkdownParser {
     }
 
     static func singleLineRichBlock(from line: String) -> NativeEditorBlock? {
-        imageMarkdownBlock(from: line) ?? linkedFileMarkdownBlock(from: line)
+        imageMarkdownBlock(from: line) ?? linkedFileMarkdownBlock(from: line) ?? iframeEmbedMarkdownBlock(from: line)
     }
 
     static func richMarkdownLine(from block: NativeEditorBlock) -> String? {
@@ -73,7 +73,7 @@ extension NativeEditorMarkdownParser {
     private static func embeddedMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .embed(let embed):
-            linkMarkdown(title: embed.provider ?? embed.source ?? "Embed", url: embed.source)
+            embedMarkdown(from: embed)
         case .drawio(let diagram):
             diagramMarkdown(from: diagram, fallbackTitle: "Draw.io diagram")
         case .excalidraw(let diagram):
@@ -408,6 +408,14 @@ extension NativeEditorMarkdownParser {
             title: diagram.title ?? diagram.alternativeText ?? diagram.source ?? fallbackTitle,
             url: diagram.source
         )
+    }
+
+    private static func embedMarkdown(from embed: NativeEditorEmbedBlock) -> String {
+        if embed.provider == "iframe", let source = embed.source, source.isEmpty == false {
+            return linkMarkdown(title: source, url: source)
+        }
+
+        return linkMarkdown(title: embed.provider ?? embed.source ?? "Embed", url: embed.source)
     }
 
     private static func mathMarkdown(from math: NativeEditorMathBlock) -> String {
