@@ -56,4 +56,19 @@ struct NativeEditorStatusMarkdownTests {
                 node.attrs?["color"] == .string("green")
         })
     }
+
+    @Test func markdownImportRecoversFromRepeatedMalformedStatusSpans() throws {
+        let malformedSpans = Array(
+            repeating: #"<span data-type="status" data-color="red">Broken "#,
+            count: 25
+        ).joined()
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: malformedSpans + #"<span data-type="status" data-color="green">Ship</span>"#
+        ).first)
+
+        let statusRun = try #require(block.text.runs.first { run in
+            run[NativeEditorStatusAttribute.self]?.text == "Ship"
+        })
+        #expect(statusRun[NativeEditorStatusAttribute.self]?.color == "green")
+    }
 }

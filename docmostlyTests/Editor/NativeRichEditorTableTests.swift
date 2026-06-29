@@ -261,6 +261,33 @@ struct NativeRichEditorTableTests {
         )
     }
 
+    @Test func markdownExportDoesNotDoubleEscapeAngleWrappedTableLinkBackslashes() {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "File", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Spec",
+                    inlineContent: [
+                        .text("Spec", marks: [.link(href: #"folder name\doc"#)])
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+
+        #expect(
+            NativeEditorMarkdownParser.tableMarkdown(from: table) ==
+                #"""
+                | File |
+                | --- |
+                | [Spec](<folder name\doc>) |
+                """#
+        )
+    }
+
     @Test func editingTableCellPreservesUnsupportedRichContentInOtherCells() throws {
         let data = Data("""
         {

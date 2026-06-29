@@ -227,10 +227,32 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func escapedMarkdownTableCell(_ text: String) -> String {
-        text.replacing("\\", with: "\\\\")
-            .replacing("|", with: "\\|")
-            .replacing("\n", with: " ")
-            .replacing("\r", with: " ")
+        var output = ""
+        var previousCharacter: Character?
+        var isInsideAngleWrappedLinkDestination = false
+
+        for character in text {
+            if character == "<", previousCharacter == "(" {
+                isInsideAngleWrappedLinkDestination = true
+            }
+
+            if character == "\\", isInsideAngleWrappedLinkDestination == false {
+                output += "\\\\"
+            } else if character == "|" {
+                output += "\\|"
+            } else if character == "\n" || character == "\r" {
+                output += " "
+            } else {
+                output.append(character)
+            }
+
+            if character == ">", isInsideAngleWrappedLinkDestination {
+                isInsideAngleWrappedLinkDestination = false
+            }
+            previousCharacter = character
+        }
+
+        return output
     }
 
     private static func escapedMarkdownTableLinkLabel(_ text: String) -> String {
@@ -254,10 +276,7 @@ extension NativeEditorMarkdownParser {
 
     private static func escapedAngleWrappedMarkdownLinkDestination(_ href: String) -> String {
         href
-            .replacing("\\", with: "\\\\")
-            .replacing("<", with: "%3C")
-            .replacing(">", with: "%3E")
-            .replacing("\n", with: "%0A")
-            .replacing("\r", with: "%0D")
+            .replacing("\n", with: " ")
+            .replacing("\r", with: " ")
     }
 }
