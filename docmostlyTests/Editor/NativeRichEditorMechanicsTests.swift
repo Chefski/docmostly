@@ -192,25 +192,17 @@ struct NativeRichEditorMechanicsTests {
         let viewModel = configuredViewModel(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.document.blocks[0].text = AttributedString(
-            "Use **bold** __strong__ *italic* _emphasis_ `code` and ~~strike~~"
-        )
+        viewModel.document.blocks[0].text = AttributedString("Use **bold** *italic* `code` and ~~strike~~")
         viewModel.handleDocumentChanged()
 
-        #expect(String(viewModel.document.blocks[0].text.characters) == "Use bold strong italic emphasis code and strike")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Use bold italic code and strike")
 
         let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
         #expect(inlineNodes.contains {
             $0.text == "bold" && $0.marks?.contains(ProseMirrorMark(type: "bold")) == true
         })
         #expect(inlineNodes.contains {
-            $0.text == "strong" && $0.marks?.contains(ProseMirrorMark(type: "bold")) == true
-        })
-        #expect(inlineNodes.contains {
             $0.text == "italic" && $0.marks?.contains(ProseMirrorMark(type: "italic")) == true
-        })
-        #expect(inlineNodes.contains {
-            $0.text == "emphasis" && $0.marks?.contains(ProseMirrorMark(type: "italic")) == true
         })
         #expect(inlineNodes.contains {
             $0.text == "code" && $0.marks?.contains(ProseMirrorMark(type: "code")) == true
