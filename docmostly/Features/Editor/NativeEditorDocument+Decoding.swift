@@ -200,11 +200,17 @@ nonisolated extension NativeEditorDocument {
             NativeEditorBlock(
                 kind: .codeBlock(language: node.attrs?["language"]?.stringValue),
                 text: AttributedString(plainText(in: node.content ?? [])),
-                alignment: .left
+                alignment: .left,
+                rawNode: codeBlockAttrsNeedRawPreservation(node) ? node : nil
             )
         default:
             nil
         }
+    }
+
+    private static func codeBlockAttrsNeedRawPreservation(_ node: ProseMirrorNode) -> Bool {
+        guard let attrs = node.attrs, attrs.isEmpty == false else { return false }
+        return attrs.keys.contains { $0 != "language" }
     }
 
     private static func richBlock(from node: ProseMirrorNode) -> NativeEditorBlock? {

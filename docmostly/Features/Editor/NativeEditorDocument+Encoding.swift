@@ -195,11 +195,23 @@ nonisolated extension NativeEditorDocument {
     }
 
     private static func codeBlockNode(language: String?, block: NativeEditorBlock) -> ProseMirrorNode {
-        ProseMirrorNode(
+        var attrs = preservedCodeBlockAttrs(from: block)
+        if let language {
+            attrs["language"] = .string(language)
+        } else {
+            attrs.removeValue(forKey: "language")
+        }
+
+        return ProseMirrorNode(
             type: "codeBlock",
-            attrs: language.map { ["language": .string($0)] },
+            attrs: attrs.isEmpty ? nil : attrs,
             content: plainTextNodes(from: String(block.text.characters))
         )
+    }
+
+    private static func preservedCodeBlockAttrs(from block: NativeEditorBlock) -> [String: ProseMirrorJSONValue] {
+        guard block.rawNode?.type == "codeBlock" else { return [:] }
+        return block.rawNode?.attrs ?? [:]
     }
 
     private static func richFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode {
