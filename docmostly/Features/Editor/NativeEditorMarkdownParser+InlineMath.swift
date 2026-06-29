@@ -11,10 +11,7 @@ extension NativeEditorMarkdownParser {
             appendMarkdownText(
                 String(remaining[..<openRange.lowerBound]),
                 to: &result,
-                usesFoundationMarkdownParser: shouldUseFoundationMarkdownParser(
-                    for: String(remaining[..<openRange.lowerBound]),
-                    after: result
-                )
+                usesFoundationMarkdownParser: false
             )
 
             let contentStart = openRange.upperBound

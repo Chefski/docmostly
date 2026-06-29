@@ -35,35 +35,55 @@ extension NativeEditorMarkdownParser {
         var remaining = markdown[...]
         var didAppendAtom = false
         while let htmlComment = nextDocmostCommentHTML(in: remaining) {
-            appendMarkdownTextPrefix(String(remaining[..<htmlComment.range.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<htmlComment.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
             appendComment(htmlComment, to: &result)
             didAppendAtom = true
             remaining = remaining[htmlComment.range.upperBound...]
         }
 
         while let htmlStatus = nextDocmostStatusHTML(in: remaining) {
-            appendMarkdownTextPrefix(String(remaining[..<htmlStatus.range.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<htmlStatus.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
             appendStatus(htmlStatus.status, to: &result)
             didAppendAtom = true
             remaining = remaining[htmlStatus.range.upperBound...]
         }
 
         while let htmlHighlight = nextDocmostHighlightHTML(in: remaining) {
-            appendMarkdownTextPrefix(String(remaining[..<htmlHighlight.range.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<htmlHighlight.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
             appendHighlight(htmlHighlight, to: &result)
             didAppendAtom = true
             remaining = remaining[htmlHighlight.range.upperBound...]
         }
 
         while let htmlTextColor = nextDocmostTextColorHTML(in: remaining) {
-            appendMarkdownTextPrefix(String(remaining[..<htmlTextColor.range.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<htmlTextColor.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
             appendTextColor(htmlTextColor, to: &result)
             didAppendAtom = true
             remaining = remaining[htmlTextColor.range.upperBound...]
         }
 
         while let htmlMention = nextDocmostMentionHTML(in: remaining) {
-            appendMarkdownTextPrefix(String(remaining[..<htmlMention.range.lowerBound]), to: &result)
+            appendMarkdownText(
+                String(remaining[..<htmlMention.range.lowerBound]),
+                to: &result,
+                usesFoundationMarkdownParser: false
+            )
             appendMention(htmlMention.mention, to: &result)
             didAppendAtom = true
             remaining = remaining[htmlMention.range.upperBound...]
@@ -84,15 +104,6 @@ extension NativeEditorMarkdownParser {
             String(remaining),
             to: &result,
             usesFoundationMarkdownParser: usesFoundationMarkdownParser && didAppendAtom == false
-        )
-    }
-
-    private static func appendMarkdownTextPrefix(_ markdown: String, to result: inout AttributedString) {
-        let trimmedMarkdown = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        appendMarkdownText(
-            markdown,
-            to: &result,
-            usesFoundationMarkdownParser: trimmedMarkdown.hasPrefix("<") == false
         )
     }
 
