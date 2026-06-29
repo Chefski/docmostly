@@ -73,6 +73,42 @@ extension NativeEditorMarkdownParser {
         return false
     }
 
+    static func htmlTagDepthDelta(in line: String, tagName: String) -> Int {
+        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        var delta = 0
+        var searchStart = trimmedLine.startIndex
+
+        while searchStart < trimmedLine.endIndex,
+              let openIndex = trimmedLine[searchStart...].firstIndex(of: "<") {
+            var nameStart = trimmedLine.index(after: openIndex)
+            guard nameStart < trimmedLine.endIndex else { break }
+
+            let isClosingTag = trimmedLine[nameStart] == "/"
+            if isClosingTag {
+                nameStart = trimmedLine.index(after: nameStart)
+            }
+
+            let nameEnd = htmlTagNameEnd(in: trimmedLine, startingAt: nameStart)
+            let name = String(trimmedLine[nameStart..<nameEnd])
+            guard name.compare(tagName, options: .caseInsensitive) == .orderedSame,
+                  isHTMLTagBoundary(at: nameEnd, in: trimmedLine),
+                  let closeIndex = htmlOpeningTagCloseIndex(in: trimmedLine, startingAt: nameEnd) else {
+                searchStart = nameEnd
+                continue
+            }
+
+            if isClosingTag {
+                delta -= 1
+            } else if isSelfClosingHTMLTag(in: trimmedLine, closeIndex: closeIndex) == false {
+                delta += 1
+            }
+
+            searchStart = trimmedLine.index(after: closeIndex)
+        }
+
+        return delta
+    }
+
     static func matchingCloseSpanRange(
         in markdown: Substring,
         bodyStart: String.Index
@@ -258,6 +294,17 @@ extension NativeEditorMarkdownParser {
         }
 
         return nil
+    }
+
+    private static func isSelfClosingHTMLTag(in text: String, closeIndex: String.Index) -> Bool {
+        guard closeIndex > text.startIndex else { return false }
+
+        var currentIndex = text.index(before: closeIndex)
+        while currentIndex > text.startIndex, text[currentIndex].isWhitespace {
+            currentIndex = text.index(before: currentIndex)
+        }
+
+        return text[currentIndex] == "/"
     }
 
     static func escapedInlineHTMLAttribute(_ text: String) -> String {

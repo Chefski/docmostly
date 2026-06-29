@@ -256,6 +256,7 @@ extension NativeEditorMarkdownParser {
 
         var childAttributes: [String: String] = [:]
         var currentIndex = index
+        var containerDepth = 0
 
         while currentIndex < lines.endIndex {
             let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -263,7 +264,8 @@ extension NativeEditorMarkdownParser {
                 childAttributes = attributes
             }
 
-            if containsHTMLClosingTag(in: line, tagName: "div") {
+            containerDepth += htmlTagDepthDelta(in: line, tagName: "div")
+            if containerDepth <= 0 {
                 let block = typedMediaDivBlock(type: type, attributes: attributes, childAttributes: childAttributes)
                 return (block, lines.index(after: currentIndex))
             }
