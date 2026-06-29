@@ -83,6 +83,58 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func slashCommandInventoryFollowsDocmostWebMenuOrder() {
+        #expect(slashCommandTitles(for: "") == [
+            "Text",
+            "To-do list",
+            "Heading 1",
+            "Heading 2",
+            "Heading 3",
+            "Bullet list",
+            "Numbered list",
+            "Quote",
+            "Code",
+            "Divider",
+            "Page break",
+            "Image",
+            "Video",
+            "Audio",
+            "Embed PDF",
+            "File attachment",
+            "Table",
+            "Base (Inline)",
+            "Kanban",
+            "Toggle block",
+            "Callout",
+            "Math inline",
+            "Math block",
+            "Mermaid diagram",
+            "Draw.io (diagrams.net)",
+            "Excalidraw (Whiteboard)",
+            "Date",
+            "Time",
+            "Status",
+            "Emoji",
+            "Subpages (Child pages)",
+            "Synced block",
+            "2 Columns",
+            "3 Columns",
+            "4 Columns",
+            "5 Columns",
+            "Iframe embed",
+            "Airtable",
+            "Loom",
+            "Figma",
+            "Typeform",
+            "Miro",
+            "YouTube",
+            "Vimeo",
+            "Framer",
+            "Google Drive",
+            "Google Sheets"
+        ])
+    }
+
     @Test func slashCommandFilteringUsesDocmostSearchTerms() {
         let expectations = [
             SlashCommandFilterExpectation(query: "today", title: "Date"),
