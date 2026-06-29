@@ -188,6 +188,8 @@ nonisolated extension NativeEditorDocument {
         guard content.isEmpty == false else { return nil }
 
         let hasBlockContent = content.count != 1 || content.first?.type != "paragraph"
+        let hasParagraphAttrs = content.first?.type == "paragraph" &&
+            content.first?.attrs?.isEmpty == false
         let hasUnsupportedInlineContent = inlineContent.contains { item in
             if case .unsupported = item {
                 return true
@@ -196,7 +198,7 @@ nonisolated extension NativeEditorDocument {
             return false
         }
 
-        return hasBlockContent || hasUnsupportedInlineContent ? content : nil
+        return hasBlockContent || hasParagraphAttrs || hasUnsupportedInlineContent ? content : nil
     }
 
     private static func tableColumnWidths(from attrs: [String: ProseMirrorJSONValue]?) -> [Int] {

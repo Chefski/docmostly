@@ -107,6 +107,67 @@ struct NativeEditorTablePayloadTests {
         #expect(encodedCell.attrs?["backgroundColorName"] == .string("yellow"))
     }
 
+    @Test func editingTableCellPreservesParagraphAttributesInOtherCells() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": { "textAlign": "right" },
+                          "content": [{ "type": "text", "text": "Metric" }]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [{ "type": "text", "text": "Draft" }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+
+        let document = try NativeEditorDocument(proseMirrorJSONData: data)
+
+        guard case .table(var table) = document.blocks.first?.kind else {
+            Issue.record("Expected table block")
+            return
+        }
+
+        table.rows[0].cells[1].plainText = "Ready"
+        table.rows[0].cells[1].inlineContent = nil
+        table.rows[0].cells[1].preservedContent = nil
+
+        let reencodedDocument = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+        ])
+        let firstCell = try #require(
+            reencodedDocument.proseMirrorDocument.content.first?.content?.first?.content?.first
+        )
+        let firstParagraph = try #require(firstCell.content?.first)
+
+        #expect(firstParagraph.attrs?["textAlign"] == .string("right"))
+        #expect(firstParagraph.content?.first?.text == "Metric")
+    }
+
     @MainActor
     @Test func tableCellBackgroundRespectsRGBAAlphaPercentages() {
         let components = NativeEditorTableLayout.cssRGBAComponents(from: "rgba(255, 0, 0, 50%)")
