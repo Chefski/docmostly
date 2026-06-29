@@ -228,7 +228,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    static func htmlTagNameMatches(_ name: String, _ tagName: String, locale _: Locale? = nil) -> Bool {
+    nonisolated static func htmlTagNameMatches(_ name: String, _ tagName: String, locale _: Locale? = nil) -> Bool {
         name.compare(tagName, options: .caseInsensitive) == .orderedSame
     }
 
