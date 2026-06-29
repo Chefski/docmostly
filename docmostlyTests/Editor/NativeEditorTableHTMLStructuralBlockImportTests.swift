@@ -46,6 +46,44 @@ struct TableHTMLStructuralImportTests {
         #expect(imported.nodeContent[2].attrs?["transclusionId"] == .string("transclusion-1"))
         #expect(imported.nodeContent[3].attrs?["id"] == .string("source-1"))
     }
+
+    @Test func docmostHTMLTableCellPreservesContainerStructuralBlocks() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <details open="">
+        <summary data-type="detailsSummary">Release notes</summary>
+        <div data-type="detailsContent">
+        Ship native table support
+        </div>
+        </details>
+        <div data-type="columns" data-layout="two_equal" data-width-mode="fixed">
+        <div data-type="column" data-width="1" style="flex: 1">
+        First column
+        </div>
+        <div data-type="column" data-width="2.5" style="flex: 2.5">
+        Second column
+        </div>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let imported = try importedStructuralTableCell(from: markdown)
+        let preservedContent = try #require(imported.cell.preservedContent)
+
+        #expect(preservedContent.map(\.type) == ["details", "columns"])
+        expectDetailsBlock(preservedContent[0])
+        expectColumnsBlock(preservedContent[1])
+
+        #expect(imported.nodeContent.map(\.type) == preservedContent.map(\.type))
+        #expect(imported.nodeContent[0].content?.first?.type == "detailsSummary")
+        #expect(imported.nodeContent[1].content?.map(\.type) == ["column", "column"])
+    }
 }
 
 @MainActor
@@ -81,4 +119,22 @@ private func expectTransclusionSource(_ node: ProseMirrorNode) {
     #expect(node.attrs?["id"] == .string("source-1"))
     #expect(node.content?.first?.type == "paragraph")
     #expect(node.content?.first?.content?.first?.text == "Shared requirement")
+}
+
+private func expectDetailsBlock(_ node: ProseMirrorNode) {
+    #expect(node.attrs?["open"] == .bool(true))
+    #expect(node.content?.map(\.type) == ["detailsSummary", "detailsContent"])
+    #expect(node.content?.first?.content?.first?.text == "Release notes")
+    #expect(node.content?[1].content?.first?.type == "paragraph")
+    #expect(node.content?[1].content?.first?.content?.first?.text == "Ship native table support")
+}
+
+private func expectColumnsBlock(_ node: ProseMirrorNode) {
+    #expect(node.attrs?["layout"] == .string("two_equal"))
+    #expect(node.attrs?["widthMode"] == .string("fixed"))
+    #expect(node.content?.count == 2)
+    #expect(node.content?.first?.attrs?["width"] == .int(1))
+    #expect(node.content?.first?.content?.first?.content?.first?.text == "First column")
+    #expect(node.content?[1].attrs?["width"] == .double(2.5))
+    #expect(node.content?[1].content?.first?.content?.first?.text == "Second column")
 }
