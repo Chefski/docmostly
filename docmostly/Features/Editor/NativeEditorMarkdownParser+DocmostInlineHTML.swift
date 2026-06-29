@@ -119,6 +119,11 @@ extension NativeEditorMarkdownParser {
 
         while searchStart < markdown.endIndex,
               let closeRange = markdown[searchStart...].range(of: "</span>", options: .caseInsensitive) {
+            if isInsideMarkdownCodeSpan(closeRange.lowerBound, ranges: codeSpanRanges) {
+                searchStart = closeRange.upperBound
+                continue
+            }
+
             if let nestedOpenRange = nextOpeningSpanRange(
                 in: markdown,
                 startingAt: searchStart,
