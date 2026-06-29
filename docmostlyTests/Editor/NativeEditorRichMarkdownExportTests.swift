@@ -368,7 +368,7 @@ struct NativeEditorRichMarkdownExportTests {
             kind: .attachment(NativeEditorAttachmentBlock(
                 url: "/files/archive.zip",
                 name: "Archive.zip",
-                mimeType: "application/zip",
+                mimeType: nil,
                 sizeInBytes: nil,
                 attachmentID: nil
             )),

@@ -423,6 +423,7 @@ extension NativeEditorMarkdownParser {
 
     private static func attachmentRequiresDocmostHTML(_ attachment: NativeEditorAttachmentBlock) -> Bool {
         attachment.attachmentID != nil ||
+            attachment.mimeType != nil ||
             attachment.sizeInBytes != nil
     }
 

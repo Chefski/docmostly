@@ -68,4 +68,48 @@ struct NativeEditorMediaMarkdownExportTests {
         [Archive.zip](/api/files/file-1/Archive.zip#download)
         """#)
     }
+
+    @Test func markdownExportPreservesAttachmentMimeTypeAsDocmostHTML() {
+        let block = NativeEditorBlock(
+            kind: .attachment(NativeEditorAttachmentBlock(
+                url: "/api/files/file-1/Archive.zip",
+                name: "Archive.zip",
+                mimeType: "application/zip",
+                sizeInBytes: nil,
+                attachmentID: nil
+            )),
+            text: AttributedString("Archive.zip"),
+            alignment: .left
+        )
+
+        #expect(
+            NativeEditorMarkdownParser.markdown(from: [block]) ==
+                docmostAttachmentHTML(
+                    url: "/api/files/file-1/Archive.zip",
+                    name: "Archive.zip",
+                    mimeType: "application/zip"
+                )
+        )
+    }
+}
+
+private func docmostAttachmentHTML(url: String, name: String, mimeType: String) -> String {
+    let openingTag = htmlTag("div", attributes: [
+        ("data-type", "attachment"),
+        ("data-attachment-url", url),
+        ("data-attachment-name", name),
+        ("data-attachment-mime", mimeType)
+    ])
+    return """
+    \(openingTag)
+    <a href="\(url)" class="attachment" target="blank">\(name)</a>
+    </div>
+    """
+}
+
+private func htmlTag(_ name: String, attributes: [(String, String?)]) -> String {
+    let attributeText = attributes.compactMap { key, value -> String? in
+        value.map { #"\#(key)="\#($0)""# }
+    }.joined(separator: " ")
+    return "<\(name) \(attributeText)>"
 }
