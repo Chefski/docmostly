@@ -55,8 +55,15 @@ extension NativeEditorMarkdownParser {
         while searchStart < trimmedLine.endIndex,
               let openIndex = trimmedLine[searchStart...].firstIndex(of: "<") {
             var nameStart = trimmedLine.index(after: openIndex)
-            guard nameStart < trimmedLine.endIndex, trimmedLine[nameStart] == "/" else {
-                searchStart = nameStart
+            guard nameStart < trimmedLine.endIndex else { break }
+
+            guard trimmedLine[nameStart] == "/" else {
+                let nameEnd = htmlTagNameEnd(in: trimmedLine, startingAt: nameStart)
+                if let closeIndex = htmlOpeningTagCloseIndex(in: trimmedLine, startingAt: nameEnd) {
+                    searchStart = trimmedLine.index(after: closeIndex)
+                } else {
+                    searchStart = nameStart
+                }
                 continue
             }
 
