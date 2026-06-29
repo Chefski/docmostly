@@ -92,7 +92,7 @@ jobs:
           xcodebuild build \
             -project docmostly.xcodeproj \
             -scheme docmostly \
-            -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5),OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
 
   macos-unit-tests:
