@@ -16,13 +16,15 @@ nonisolated extension NativeEditorDocument {
     static func textBlock(kind: NativeEditorBlockKind, node: ProseMirrorNode) -> NativeEditorBlock {
         let inlineContent = inlineContent(from: node.content ?? [])
         let needsRawPreservation = inlineContent.contains(where: \.requiresRawPreservation)
+        let needsAttrPreservation = editableAttrsNeedRawPreservation(kind: kind, node: node)
+        let rawNode = needsRawPreservation || needsAttrPreservation ? node : nil
 
         return NativeEditorBlock(
             kind: kind,
             text: attributedText(from: inlineContent),
             alignment: NativeEditorTextAlignment(attrs: node.attrs),
             inlineContent: needsRawPreservation ? inlineContent : nil,
-            rawNode: needsRawPreservation ? node : nil
+            rawNode: rawNode
         )
     }
 
@@ -58,6 +60,25 @@ nonisolated extension NativeEditorDocument {
                 result += plainText(in: node.content ?? [])
             }
         }
+    }
+
+    private static func editableAttrsNeedRawPreservation(
+        kind: NativeEditorBlockKind,
+        node: ProseMirrorNode
+    ) -> Bool {
+        guard let attrs = node.attrs, attrs.isEmpty == false else { return false }
+
+        let modeledKeys: Set<String>
+        switch kind {
+        case .paragraph:
+            modeledKeys = ["textAlign"]
+        case .heading:
+            modeledKeys = ["level", "textAlign"]
+        default:
+            return false
+        }
+
+        return attrs.keys.contains { modeledKeys.contains($0) == false }
     }
 
     private static func editableBlocks(from node: ProseMirrorNode) -> [NativeEditorBlock]? {

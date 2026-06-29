@@ -31,9 +31,15 @@ nonisolated extension NativeEditorDocument {
         block: NativeEditorBlock,
         attrs: [String: ProseMirrorJSONValue] = [:]
     ) -> ProseMirrorNode {
-        var mergedAttrs = attrs
+        var mergedAttrs = preservedEditableAttrs(type: type, block: block)
+        for attr in attrs {
+            mergedAttrs[attr.key] = attr.value
+        }
+
         if let alignment = block.alignment.proseMirrorValue {
             mergedAttrs["textAlign"] = alignment
+        } else {
+            mergedAttrs.removeValue(forKey: "textAlign")
         }
 
         return ProseMirrorNode(
@@ -41,6 +47,14 @@ nonisolated extension NativeEditorDocument {
             attrs: mergedAttrs.isEmpty ? nil : mergedAttrs,
             content: block.inlineContent.map(inlineNodes(from:)) ?? inlineNodes(from: block.text)
         )
+    }
+
+    private static func preservedEditableAttrs(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [String: ProseMirrorJSONValue] {
+        guard block.rawNode?.type == type else { return [:] }
+        return block.rawNode?.attrs ?? [:]
     }
 
     static func inlineNodes(from attributedText: AttributedString) -> [ProseMirrorNode] {
