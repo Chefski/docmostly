@@ -37,6 +37,22 @@ struct NativeEditorMediaHTMLFidelityTests {
         verifyEmbed(blocks[4])
     }
 
+    @Test func importsDocmostEmbedHTMLWithNestedProviderDivBeforeLink() throws {
+        let markdown = """
+        <div data-type="embed" data-provider="Figma" data-align="center" data-width="800" data-height="600">
+        <div class="provider-card">
+        Provider metadata
+        </div>
+        <a href="https://www.figma.com/file/demo" target="blank">https://www.figma.com/file/demo</a>
+        </div>
+        """
+        let blocks = NativeEditorMarkdownParser.blocks(from: markdown)
+
+        try #require(blocks.count == 1)
+        verifyEmbed(blocks[0])
+        #expect(NativeEditorMarkdownParser.markdown(from: blocks) == embedHTML())
+    }
+
     private func nativeBlocks() -> [NativeEditorBlock] {
         [
             NativeEditorBlock(kind: .image(imageBlock()), text: AttributedString("Hero"), alignment: .left),
