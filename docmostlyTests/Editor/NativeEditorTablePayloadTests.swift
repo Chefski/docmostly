@@ -108,6 +108,7 @@ struct NativeEditorTablePayloadTests {
         #expect(encodedCell.attrs?["backgroundColorName"] == .string("yellow"))
     }
 
+    @MainActor
     @Test func tableCellBackgroundRespectsRGBAAlphaPercentages() {
         let cell = NativeEditorTableCell(
             plainText: "Risk",
