@@ -190,9 +190,10 @@ extension NativeEditorMarkdownParser {
             )
         }
         let mediaMatches = htmlTableMediaContentMatches(from: html, excluding: containerRanges)
-        let nodes = (
-            textBlockMatches + codeBlockMatches + mediaMatches + listMatches + calloutMatches + structuralMatches
-        )
+        let preservedMatches = textBlockMatches + codeBlockMatches + mediaMatches +
+            listMatches + calloutMatches + structuralMatches
+        let inlineGapMatches = htmlTableInlineGapContentMatches(from: html, between: preservedMatches)
+        let nodes = (preservedMatches + inlineGapMatches)
             .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
