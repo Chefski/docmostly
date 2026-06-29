@@ -184,7 +184,7 @@ nonisolated extension NativeEditorDocument {
         case .heading(let level):
             textContainerNode(type: "heading", block: block, attrs: ["level": .int(level)])
         case .blockquote:
-            ProseMirrorNode(type: "blockquote", content: [textContainerNode(type: "paragraph", block: block)])
+            blockquoteNode(from: block)
         case .codeBlock(let language):
             codeBlockNode(language: language, block: block)
         case .bulletListItem, .orderedListItem, .taskListItem:

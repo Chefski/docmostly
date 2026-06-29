@@ -195,7 +195,7 @@ nonisolated extension NativeEditorDocument {
         case "heading":
             textBlock(kind: .heading(level: node.attrs?["level"]?.intValue ?? 1), node: node)
         case "blockquote":
-            textBlock(kind: .blockquote, node: firstTextContainer(in: node) ?? node)
+            blockquoteBlock(from: node)
         case "codeBlock":
             NativeEditorBlock(
                 kind: .codeBlock(language: node.attrs?["language"]?.stringValue),
@@ -206,6 +206,22 @@ nonisolated extension NativeEditorDocument {
         default:
             nil
         }
+    }
+
+    private static func blockquoteBlock(from node: ProseMirrorNode) -> NativeEditorBlock {
+        var block = textBlock(kind: .blockquote, node: firstTextContainer(in: node) ?? node)
+        if blockquoteNeedsRawPreservation(node) {
+            block.rawNode = node
+        }
+        return block
+    }
+
+    private static func blockquoteNeedsRawPreservation(_ node: ProseMirrorNode) -> Bool {
+        if let attrs = node.attrs, attrs.isEmpty == false {
+            return true
+        }
+
+        return (node.content ?? []).count != 1
     }
 
     private static func codeBlockAttrsNeedRawPreservation(_ node: ProseMirrorNode) -> Bool {
