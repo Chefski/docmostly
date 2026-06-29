@@ -29,23 +29,23 @@ extension NativeEditorCommand {
             return 0
         }
 
-        if title.localizedStandardContains(query) {
+        if rawValue.localizedStandardContains(query) {
             return 1
         }
 
-        if rawValue.localizedStandardContains(query) {
-            return 2
-        }
-
         if subtitle.localizedStandardContains(query) {
-            return 2
+            return 1
         }
 
         if searchTerms.contains(where: { $0.localizedStandardContains(query) }) {
-            return 2
+            return 1
         }
 
         if title.fuzzyMatchesSlashCommandQuery(query) {
+            return 2
+        }
+
+        if title.localizedStandardContains(query) {
             return 3
         }
 
