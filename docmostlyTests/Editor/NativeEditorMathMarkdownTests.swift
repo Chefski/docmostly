@@ -4,6 +4,20 @@ import Testing
 
 @MainActor
 struct NativeEditorMathMarkdownTests {
+    @Test func nativeMathBlockExportsAsDocmostMathFenceMarkdown() {
+        let block = NativeEditorBlock(
+            kind: .mathBlock(NativeEditorMathBlock(text: "E = mc^2")),
+            text: AttributedString("E = mc^2"),
+            alignment: .left
+        )
+
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == """
+        $$
+        E = mc^2
+        $$
+        """)
+    }
+
     @Test func markdownImportSupportsSingleLineMathBlockFence() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(
             from: "$$E = mc^2$$"
@@ -17,10 +31,11 @@ struct NativeEditorMathMarkdownTests {
         #expect(math.text == "E = mc^2")
         #expect(block.rawNode?.type == "mathBlock")
         #expect(block.rawNode?.attrs?["text"] == .string("E = mc^2"))
-        #expect(
-            NativeEditorMarkdownParser.markdown(from: [block]) ==
-                #"<div data-type="mathBlock" data-katex="true">E = mc^2</div>"#
-        )
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == """
+        $$
+        E = mc^2
+        $$
+        """)
     }
 
     @Test func markdownImportKeepsCurrencyDollarAmountsAsPlainText() throws {

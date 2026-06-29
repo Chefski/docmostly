@@ -22,8 +22,6 @@ extension NativeEditorMarkdownParser {
             calloutHTMLMarkdown(from: callout)
         case .details(let details):
             detailsHTMLMarkdown(from: details)
-        case .mathBlock(let math):
-            mathBlockHTMLMarkdown(from: math)
         default:
             nil
         }
@@ -158,11 +156,6 @@ extension NativeEditorMarkdownParser {
         </div>
         </details>
         """
-    }
-
-    private static func mathBlockHTMLMarkdown(from math: NativeEditorMathBlock) -> String {
-        let text = escapedInlineHTMLText(math.text.trimmingCharacters(in: .whitespacesAndNewlines))
-        return #"<div data-type="mathBlock" data-katex="true">\#(text)</div>"#
     }
 
     private static func htmlContainerBody(

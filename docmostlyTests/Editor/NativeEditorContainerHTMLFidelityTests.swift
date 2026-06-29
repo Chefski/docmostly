@@ -51,7 +51,7 @@ struct NativeEditorContainerHTMLFidelityTests {
         #expect(blocks[2].rawNode?.attrs?["text"] == .string("E = mc^2"))
     }
 
-    @Test func exportsNativeCalloutDetailsAndMathBlocksAsDocmostHTMLWhenNeeded() {
+    @Test func exportsNativeCalloutDetailsAsDocmostHTMLAndMathAsFenceMarkdown() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(
@@ -90,7 +90,9 @@ struct NativeEditorContainerHTMLFidelityTests {
         Ship build
         </div>
         </details>
-        <div data-type="mathBlock" data-katex="true">E = mc^2</div>
+        $$
+        E = mc^2
+        $$
         """)
     }
 
