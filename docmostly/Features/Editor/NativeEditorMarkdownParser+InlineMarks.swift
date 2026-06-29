@@ -82,6 +82,12 @@ extension NativeEditorMarkdownParser {
             ),
             delimitedInlineMarkdownMatch(
                 in: markdown,
+                delimiter: "__",
+                intent: .stronglyEmphasized,
+                priority: 2
+            ),
+            delimitedInlineMarkdownMatch(
+                in: markdown,
                 delimiter: "~~",
                 intent: .strikethrough,
                 priority: 3
@@ -89,6 +95,12 @@ extension NativeEditorMarkdownParser {
             delimitedInlineMarkdownMatch(
                 in: markdown,
                 delimiter: "*",
+                intent: .emphasized,
+                priority: 4
+            ),
+            delimitedInlineMarkdownMatch(
+                in: markdown,
+                delimiter: "_",
                 intent: .emphasized,
                 priority: 4
             )
@@ -182,7 +194,7 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        if delimiter == "*", isPartOfStrongDelimiter(openRange, in: markdown) {
+        if delimiter.count == 1, isPartOfRepeatedDelimiter(openRange, delimiter: delimiter, in: markdown) {
             return nil
         }
 
@@ -203,6 +215,21 @@ extension NativeEditorMarkdownParser {
         return markdown[markdown.index(before: index)] == "!"
     }
 
+    private static func isPartOfRepeatedDelimiter(
+        _ range: Range<String.Index>,
+        delimiter: String,
+        in markdown: Substring
+    ) -> Bool {
+        guard let delimiterCharacter = delimiter.first else { return false }
+
+        if range.lowerBound > markdown.startIndex,
+           markdown[markdown.index(before: range.lowerBound)] == delimiterCharacter {
+            return true
+        }
+
+        return range.upperBound < markdown.endIndex && markdown[range.upperBound] == delimiterCharacter
+    }
+
     private static func markdownLinkDestination(from destination: String) -> String {
         let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -213,17 +240,5 @@ extension NativeEditorMarkdownParser {
         }
 
         return trimmedDestination.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
-    }
-
-    private static func isPartOfStrongDelimiter(
-        _ range: Range<String.Index>,
-        in markdown: Substring
-    ) -> Bool {
-        if range.lowerBound > markdown.startIndex,
-           markdown[markdown.index(before: range.lowerBound)] == "*" {
-            return true
-        }
-
-        return range.upperBound < markdown.endIndex && markdown[range.upperBound] == "*"
     }
 }
