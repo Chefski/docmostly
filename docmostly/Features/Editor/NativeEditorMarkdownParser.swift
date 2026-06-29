@@ -378,6 +378,10 @@ enum NativeEditorMarkdownParser {
         let plainText = String(block.text.characters)
         let text = inlineMarkdown(from: block.text)
 
+        if let editableHTML = editableHTMLMarkdown(from: block) {
+            return editableHTML
+        }
+
         switch block.kind {
         case .heading(let level):
             return "\(String(repeating: "#", count: max(level, 1))) \(text)"

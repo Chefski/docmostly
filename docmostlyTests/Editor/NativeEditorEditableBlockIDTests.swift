@@ -4,6 +4,37 @@ import Testing
 
 @MainActor
 struct NativeEditorEditableBlockIDTests {
+    @Test func importsDocmostHeadingHTMLWithEditableAttrs() throws {
+        let markdown = #"<h2 id="heading-deep-link" data-indent="2" style="text-align: center">Roadmap</h2>"#
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        #expect(block.kind == .heading(level: 2))
+        #expect(block.isEditable == true)
+        #expect(String(block.text.characters) == "Roadmap")
+        #expect(block.alignment == .center)
+        #expect(block.rawNode?.type == "heading")
+        #expect(block.rawNode?.attrs?["level"] == .int(2))
+        #expect(block.rawNode?.attrs?["id"] == .string("heading-deep-link"))
+        #expect(block.rawNode?.attrs?["indent"] == .int(2))
+        #expect(block.rawNode?.attrs?["textAlign"] == .string("center"))
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
+
+    @Test func importsDocmostParagraphHTMLWithEditableAttrs() throws {
+        let markdown = #"<p id="paragraph-node" data-indent="1" style="text-align: right">Body</p>"#
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        #expect(block.kind == .paragraph)
+        #expect(block.isEditable == true)
+        #expect(String(block.text.characters) == "Body")
+        #expect(block.alignment == .right)
+        #expect(block.rawNode?.type == "paragraph")
+        #expect(block.rawNode?.attrs?["id"] == .string("paragraph-node"))
+        #expect(block.rawNode?.attrs?["indent"] == .int(1))
+        #expect(block.rawNode?.attrs?["textAlign"] == .string("right"))
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
+
     @Test func preservesEditableBlockIDsAfterNativeEdits() throws {
         let data = Data("""
         {
