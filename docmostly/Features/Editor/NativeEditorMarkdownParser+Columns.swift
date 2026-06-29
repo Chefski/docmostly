@@ -9,33 +9,38 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        var columns: [ParsedColumnHTML] = []
-        var currentIndex = lines.index(after: index)
+        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div") else {
+            return nil
+        }
 
-        while currentIndex < lines.endIndex {
-            let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.localizedCaseInsensitiveCompare("</div>") == .orderedSame {
-                guard columns.isEmpty == false else { return nil }
-                let columnsBlock = nativeColumnsBlock(from: columnsAttributes, columns: columns)
-                return (
-                    NativeEditorBlock(
-                        kind: .columns(columnsBlock),
-                        text: AttributedString(columnsBlock.previewText),
-                        alignment: .left,
-                        rawNode: NativeEditorRichBlockNodeFactory.columnsNode(from: columnsBlock)
-                    ),
-                    lines.index(after: currentIndex)
-                )
+        var columns: [ParsedColumnHTML] = []
+        var currentIndex = body.lines.startIndex
+
+        while currentIndex < body.lines.endIndex {
+            let line = body.lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty {
+                currentIndex = body.lines.index(after: currentIndex)
+                continue
             }
 
-            guard let column = parsedColumnHTML(in: lines, startingAt: currentIndex) else {
+            guard let column = parsedColumnHTML(in: body.lines, startingAt: currentIndex) else {
                 return nil
             }
             columns.append(column.column)
             currentIndex = column.endIndex
         }
 
-        return nil
+        guard columns.isEmpty == false else { return nil }
+        let columnsBlock = nativeColumnsBlock(from: columnsAttributes, columns: columns)
+        return (
+            NativeEditorBlock(
+                kind: .columns(columnsBlock),
+                text: AttributedString(columnsBlock.previewText),
+                alignment: .left,
+                rawNode: columnsHTMLNode(from: columnsAttributes, columns: columns)
+            ),
+            body.endIndex
+        )
     }
 
     static func columnsMarkdown(from columns: NativeEditorColumnsBlock) -> String {
@@ -61,6 +66,7 @@ extension NativeEditorMarkdownParser {
     private struct ParsedColumnHTML {
         var text: String
         var width: Double?
+        var content: [ProseMirrorNode]
     }
 
     private static func parsedColumnHTML(
@@ -71,26 +77,19 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        var bodyLines: [String] = []
-        var currentIndex = lines.index(after: index)
-
-        while currentIndex < lines.endIndex {
-            let line = lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.localizedCaseInsensitiveCompare("</div>") == .orderedSame {
-                return (
-                    ParsedColumnHTML(
-                        text: columnText(from: bodyLines),
-                        width: columnAttributes["data-width"].flatMap(Double.init)
-                    ),
-                    lines.index(after: currentIndex)
-                )
-            }
-
-            bodyLines.append(lines[currentIndex])
-            currentIndex = lines.index(after: currentIndex)
+        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div") else {
+            return nil
         }
 
-        return nil
+        let content = containerContentNodes(from: body.lines)
+        return (
+            ParsedColumnHTML(
+                text: columnText(from: body.lines, content: content),
+                width: columnAttributes["data-width"].flatMap(Double.init),
+                content: content
+            ),
+            body.endIndex
+        )
     }
 
     private static func nativeColumnsBlock(
@@ -125,8 +124,13 @@ extension NativeEditorMarkdownParser {
         return attributes
     }
 
-    private static func columnText(from lines: [String]) -> String {
-        lines.compactMap(columnTextLine(from:))
+    private static func columnText(from lines: [String], content: [ProseMirrorNode]) -> String {
+        let preservedText = containerPreviewText(from: content)
+        if preservedText.isEmpty == false {
+            return preservedText
+        }
+
+        return lines.compactMap(columnTextLine(from:))
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -153,6 +157,41 @@ extension NativeEditorMarkdownParser {
         \(escapedInlineHTMLText(text.trimmingCharacters(in: .whitespacesAndNewlines)))
         </div>
         """
+    }
+
+    private static func columnsHTMLNode(
+        from attributes: [String: String],
+        columns: [ParsedColumnHTML]
+    ) -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "columns",
+            attrs: [
+                "layout": .string(nonEmptyAttribute(attributes["data-layout"]) ?? "two_equal"),
+                "widthMode": .string(nonEmptyAttribute(attributes["data-width-mode"]) ?? "normal")
+            ],
+            content: columns.map(columnHTMLNode(from:))
+        )
+    }
+
+    private static func columnHTMLNode(from column: ParsedColumnHTML) -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "column",
+            attrs: ["width": proseMirrorNumber(from: column.width ?? 1)],
+            content: column.content.isEmpty ? [
+                ProseMirrorNode(
+                    type: "paragraph",
+                    content: NativeEditorDocument.inlineNodes(from: inlineText(from: column.text))
+                )
+            ] : column.content
+        )
+    }
+
+    private static func proseMirrorNumber(from value: Double) -> ProseMirrorJSONValue {
+        if value.rounded() == value, let intValue = Int(exactly: value) {
+            return .int(intValue)
+        }
+
+        return .double(value)
     }
 
     private static func htmlNumber(_ value: Double) -> String {

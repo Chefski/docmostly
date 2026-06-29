@@ -61,7 +61,9 @@ struct TableHTMLStructuralImportTests {
         </details>
         <div data-type="columns" data-layout="two_equal" data-width-mode="fixed">
         <div data-type="column" data-width="1" style="flex: 1">
-        First column
+        <p>First column</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>First follow-up</p>
         </div>
         <div data-type="column" data-width="2.5" style="flex: 2.5">
         Second column
@@ -156,6 +158,8 @@ private func expectColumnsBlock(_ node: ProseMirrorNode) {
     #expect(node.content?.count == 2)
     #expect(node.content?.first?.attrs?["width"] == .int(1))
     #expect(node.content?.first?.content?.first?.content?.first?.text == "First column")
+    #expect(node.content?.first?.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
+    #expect(node.content?.first?.content?[2].content?.first?.text == "First follow-up")
     #expect(node.content?[1].attrs?["width"] == .double(2.5))
     #expect(node.content?[1].content?.first?.content?.first?.text == "Second column")
 }

@@ -136,22 +136,30 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func htmlTableColumnNode(from container: HTMLTableDivContainer) -> ProseMirrorNode {
-        ProseMirrorNode(
+        let content = htmlTableColumnContent(from: container.body)
+        return ProseMirrorNode(
             type: "column",
             attrs: [
                 "width": htmlTableStructuralNumber(
                     from: nonEmptyHTMLTableAttribute(container.attrs["data-width"]) ?? "1"
                 )
             ],
-            content: [
-                ProseMirrorNode(
-                    type: "paragraph",
-                    content: NativeEditorDocument.inlineNodes(
-                        from: inlineText(from: htmlTableStructuralText(from: container.body))
-                    )
-                )
-            ]
+            content: content
         )
+    }
+
+    private static func htmlTableColumnContent(from body: String) -> [ProseMirrorNode] {
+        let content = containerContentNodes(from: containerBodyLines(from: body))
+        if content.isEmpty == false {
+            return content
+        }
+
+        return [
+            ProseMirrorNode(
+                type: "paragraph",
+                content: NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableStructuralText(from: body)))
+            )
+        ]
     }
 
     private static func htmlTableTransclusionReferenceNode(attrs: [String: String]) -> ProseMirrorNode {

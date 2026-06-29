@@ -143,7 +143,7 @@ extension NativeEditorMarkdownParser {
         """
     }
 
-    private static func htmlContainerBody(
+    static func htmlContainerBody(
         in lines: [String],
         startingAt index: Array<String>.Index,
         tagName: String
@@ -257,7 +257,7 @@ extension NativeEditorMarkdownParser {
             .first
     }
 
-    private static func containerContentNodes(from lines: [String]) -> [ProseMirrorNode] {
+    static func containerContentNodes(from lines: [String]) -> [ProseMirrorNode] {
         let html = lines.joined(separator: "\n")
         if let nodes = htmlTablePreservedContent(from: html, dropsSinglePlainParagraph: false) {
             return nodes
@@ -268,7 +268,7 @@ extension NativeEditorMarkdownParser {
         return [containerParagraphNode(text)]
     }
 
-    private static func containerPreviewText(from nodes: [ProseMirrorNode]) -> String {
+    static func containerPreviewText(from nodes: [ProseMirrorNode]) -> String {
         nodes.map { NativeEditorDocument.plainText(in: [$0]) }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { $0.isEmpty == false }
@@ -378,7 +378,7 @@ extension NativeEditorMarkdownParser {
         return String(html[bodyStart..<bodyEnd])
     }
 
-    private static func containerBodyLines(from html: String) -> [String] {
+    static func containerBodyLines(from html: String) -> [String] {
         html.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
     }
 
