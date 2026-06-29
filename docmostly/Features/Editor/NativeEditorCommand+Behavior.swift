@@ -29,14 +29,6 @@ extension NativeEditorCommand {
             return 0
         }
 
-        if rawValue.localizedStandardContains(query) {
-            return 1
-        }
-
-        if subtitle.localizedStandardContains(query) {
-            return 1
-        }
-
         if searchTerms.contains(where: { $0.localizedStandardContains(query) }) {
             return 1
         }
@@ -45,8 +37,16 @@ extension NativeEditorCommand {
             return 2
         }
 
-        if title.localizedStandardContains(query) {
+        if rawValue.localizedStandardContains(query) {
             return 3
+        }
+
+        if subtitle.localizedStandardContains(query) {
+            return 3
+        }
+
+        if title.localizedStandardContains(query) {
+            return 4
         }
 
         return nil
