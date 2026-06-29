@@ -96,7 +96,7 @@ struct NativeEditorContainerHTMLFidelityTests {
         """)
     }
 
-    @Test func exportsIconlessNativeCalloutAsDocmostHTML() {
+    @Test func exportsSingleLineIconlessNativeCalloutAsDocmostFenceMarkdown() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(
@@ -112,9 +112,35 @@ struct NativeEditorContainerHTMLFidelityTests {
         viewModel.resetEditingHistory()
 
         #expect(viewModel.markdownForDocument() == """
-        <div data-type="callout" data-callout-type="info">
+        :::info
         Check migration plan
-        </div>
+        :::
+        """)
+    }
+
+    @Test func exportsIconlessNativeCalloutAsDocmostFenceMarkdown() {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(
+                kind: .callout(NativeEditorCalloutBlock(
+                    style: "warning",
+                    icon: nil,
+                    previewText: """
+                    Check migration plan
+                    Confirm rollback owner
+                    """
+                )),
+                text: AttributedString("Check migration plan"),
+                alignment: .left
+            )
+        ])
+        viewModel.resetEditingHistory()
+
+        #expect(viewModel.markdownForDocument() == """
+        :::warning
+        Check migration plan
+        Confirm rollback owner
+        :::
         """)
     }
 }

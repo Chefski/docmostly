@@ -209,9 +209,9 @@ struct NativeEditorRichMarkdownExportTests {
         [Release audio.m4a](/files/audio.m4a)
         [Spec.pdf](/files/spec.pdf)
         [Archive.zip](/files/archive.zip)
-        <div data-type="callout" data-callout-type="warning">
+        :::warning
         Check migration plan
-        </div>
+        :::
         <details open="">
         <summary data-type="detailsSummary">Release checklist</summary>
         <div data-type="detailsContent">
