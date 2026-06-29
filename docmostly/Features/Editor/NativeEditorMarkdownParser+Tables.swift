@@ -159,6 +159,8 @@ extension NativeEditorMarkdownParser {
             if isEscaped {
                 if character == "|" {
                     cells[cells.count - 1].append(character)
+                } else if character == "\\" {
+                    cells[cells.count - 1].append(character)
                 } else {
                     cells[cells.count - 1].append("\\")
                     cells[cells.count - 1].append(character)

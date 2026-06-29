@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct NativeEditorTableMarkdownExportTests {
+    @Test func markdownTableRoundTripPreservesLiteralBackslashesInCells() throws {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Path", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: #"C:\Temp\spec.txt"#, isHeader: false, backgroundColorName: nil)
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let importedTable) = importedBlock.kind else {
+            Issue.record("Expected table Markdown to reimport as a table.")
+            return
+        }
+
+        #expect(importedTable.rows[1].cells[0].plainText == #"C:\Temp\spec.txt"#)
+        #expect(NativeEditorMarkdownParser.markdown(from: [importedBlock]) == markdown)
+    }
+
     @Test func markdownExportPreservesInlineMarksInsideAlignedTableCells() throws {
         let document = try NativeEditorDocument(proseMirrorJSONData: Data("""
         {
