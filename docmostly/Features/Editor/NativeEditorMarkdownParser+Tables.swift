@@ -231,7 +231,10 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func markdownTableCellContent(from cell: NativeEditorTableCell) -> String {
-        guard cell.preservedContent == nil, let inlineContent = cell.inlineContent else {
+        guard
+            let inlineContent = cell.inlineContent,
+            tableCellCanExportInlineMarkdown(cell)
+        else {
             return cell.plainText
         }
 
@@ -240,6 +243,28 @@ extension NativeEditorMarkdownParser {
         }
 
         return inlineMarkdown(from: NativeEditorDocument.attributedText(from: inlineContent))
+    }
+
+    private static func tableCellCanExportInlineMarkdown(_ cell: NativeEditorTableCell) -> Bool {
+        guard let preservedContent = cell.preservedContent else { return true }
+        let hasUnsupportedInlineContent = cell.inlineContent?.contains(where: isUnsupportedInlineContent) ?? false
+        guard preservedContent.count == 1,
+              let paragraph = preservedContent.first,
+              paragraph.type == "paragraph",
+              hasUnsupportedInlineContent == false else {
+            return false
+        }
+
+        let attrs = paragraph.attrs ?? [:]
+        return attrs.keys.allSatisfy { $0 == "textAlign" }
+    }
+
+    private static func isUnsupportedInlineContent(_ item: NativeEditorInlineContent) -> Bool {
+        if case .unsupported = item {
+            return true
+        }
+
+        return false
     }
 
     private static func tableCellInlineContentContainsUnsafeLink(
