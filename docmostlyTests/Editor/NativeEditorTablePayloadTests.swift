@@ -116,4 +116,14 @@ struct NativeEditorTablePayloadTests {
         #expect(components?.blue == 0)
         #expect(components?.opacity == 0.5)
     }
+
+    @MainActor
+    @Test func tableCellBackgroundRespectsRGBColorPercentages() {
+        let components = NativeEditorTableLayout.cssRGBAComponents(from: "rgb(100%, 0%, 50%)")
+
+        #expect(components?.red == 255)
+        #expect(components?.green == 0)
+        #expect(components?.blue == 127.5)
+        #expect(components?.opacity == 1)
+    }
 }
