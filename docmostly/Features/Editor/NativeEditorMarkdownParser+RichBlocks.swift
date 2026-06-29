@@ -37,7 +37,8 @@ extension NativeEditorMarkdownParser {
     }
 
     static func singleLineRichBlock(from line: String) -> NativeEditorBlock? {
-        pageBreakHTMLBlock(from: line) ?? imageMarkdownBlock(from: line) ?? iframeEmbedMarkdownBlock(from: line) ??
+        singleLineMathFenceBlock(from: line) ?? pageBreakHTMLBlock(from: line) ?? imageMarkdownBlock(from: line) ??
+            iframeEmbedMarkdownBlock(from: line) ??
             linkedFileMarkdownBlock(from: line)
     }
 

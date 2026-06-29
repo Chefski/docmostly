@@ -4,6 +4,25 @@ import Testing
 
 @MainActor
 struct NativeEditorMathMarkdownTests {
+    @Test func markdownImportSupportsSingleLineMathBlockFence() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: "$$E = mc^2$$"
+        ).first)
+
+        guard case .mathBlock(let math) = block.kind else {
+            Issue.record("Expected standalone double-dollar math to import as a native math block.")
+            return
+        }
+
+        #expect(math.text == "E = mc^2")
+        #expect(block.rawNode?.type == "mathBlock")
+        #expect(block.rawNode?.attrs?["text"] == .string("E = mc^2"))
+        #expect(
+            NativeEditorMarkdownParser.markdown(from: [block]) ==
+                #"<div data-type="mathBlock" data-katex="true">E = mc^2</div>"#
+        )
+    }
+
     @Test func markdownImportKeepsCurrencyDollarAmountsAsPlainText() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(
             from: "Budget is $5 and $6 tomorrow"
