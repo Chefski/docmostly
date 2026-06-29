@@ -134,24 +134,52 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func codeInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
-        guard
-            let openIndex = markdown.firstIndex(of: "`"),
-            let closeIndex = markdown[markdown.index(after: openIndex)...].firstIndex(of: "`")
-        else {
-            return nil
-        }
+        guard let openingRun = nextBacktickRun(in: markdown, startingAt: markdown.startIndex),
+              let closingRun = nextMatchingBacktickRun(in: markdown, after: openingRun) else { return nil }
 
-        let contentStart = markdown.index(after: openIndex)
-        let content = String(markdown[contentStart..<closeIndex])
+        let content = String(markdown[openingRun.upperBound..<closingRun.lowerBound])
         guard content.isEmpty == false else { return nil }
 
         var text = AttributedString(content)
         text.inlinePresentationIntent = .code
         return InlineMarkdownMatch(
-            range: openIndex..<markdown.index(after: closeIndex),
+            range: openingRun.lowerBound..<closingRun.upperBound,
             text: text,
             priority: 0
         )
+    }
+
+    private static func nextMatchingBacktickRun(
+        in markdown: Substring,
+        after openingRun: Range<String.Index>
+    ) -> Range<String.Index>? {
+        var searchStart = openingRun.upperBound
+
+        while let run = nextBacktickRun(in: markdown, startingAt: searchStart) {
+            if markdown.distance(from: run.lowerBound, to: run.upperBound) ==
+                markdown.distance(from: openingRun.lowerBound, to: openingRun.upperBound) {
+                return run
+            }
+
+            searchStart = run.upperBound
+        }
+
+        return nil
+    }
+
+    private static func nextBacktickRun(
+        in markdown: Substring,
+        startingAt searchStart: String.Index
+    ) -> Range<String.Index>? {
+        guard searchStart < markdown.endIndex,
+              let runStart = markdown[searchStart...].firstIndex(of: "`") else { return nil }
+
+        var runEnd = runStart
+        while runEnd < markdown.endIndex, markdown[runEnd] == "`" {
+            runEnd = markdown.index(after: runEnd)
+        }
+
+        return runStart..<runEnd
     }
 
     private static func linkedInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
