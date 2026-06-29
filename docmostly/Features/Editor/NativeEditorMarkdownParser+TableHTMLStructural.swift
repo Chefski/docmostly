@@ -9,7 +9,7 @@ extension NativeEditorMarkdownParser {
         let containerRanges = excludedRanges + containerMatches.map(\.range)
         let divMatches = htmlRegexMatches(pattern: #"<div\b([^>]*)>(.*?)</div>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
-                guard htmlTableRange(match.range, isNestedIn: containerRanges) == false,
+                guard htmlTableRange(match.range, isContainedIn: containerRanges) == false,
                       let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
                       let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
                     return nil
@@ -219,6 +219,12 @@ extension NativeEditorMarkdownParser {
                 )
             ] : content
         )
+    }
+
+    private static func htmlTableRange(_ range: NSRange, isContainedIn ranges: [NSRange]) -> Bool {
+        ranges.contains { container in
+            range.location >= container.location && NSMaxRange(range) <= NSMaxRange(container)
+        }
     }
 
     private static func htmlTableStructuralDivType(from dataType: String?) -> String? {
