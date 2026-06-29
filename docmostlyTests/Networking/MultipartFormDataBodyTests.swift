@@ -4,7 +4,7 @@ import Testing
 
 struct MultipartFormDataBodyTests {
     @Test func writesFieldsAndFileIntoMultipartBody() throws {
-        let sourceURL = URL.temporaryDirectory.appending(path: "docmostly-upload-source.txt")
+        let sourceURL = temporarySourceURL()
         try "hello attachment".write(to: sourceURL, atomically: true, encoding: .utf8)
         defer {
             try? FileManager.default.removeItem(at: sourceURL)
@@ -40,7 +40,7 @@ struct MultipartFormDataBodyTests {
     }
 
     @Test func rejectsHeaderControlCharacters() throws {
-        let sourceURL = URL.temporaryDirectory.appending(path: "docmostly-upload-source.txt")
+        let sourceURL = temporarySourceURL()
         try "hello attachment".write(to: sourceURL, atomically: true, encoding: .utf8)
         defer {
             try? FileManager.default.removeItem(at: sourceURL)
@@ -93,5 +93,9 @@ struct MultipartFormDataBodyTests {
             includingPropertiesForKeys: nil
         )
         #expect(remainingFiles.isEmpty)
+    }
+
+    private func temporarySourceURL() -> URL {
+        URL.temporaryDirectory.appending(path: "docmostly-upload-source-\(UUID().uuidString).txt")
     }
 }

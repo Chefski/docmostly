@@ -200,8 +200,8 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
 
         #expect(selection.anchor.targetName == NativeEditorCollaborationDocument.yjsFragmentName)
         #expect(selection.head.targetName == NativeEditorCollaborationDocument.yjsFragmentName)
-        #expect(selection.anchor.type.client != 0)
-        #expect(selection.head.type.client != 0)
+        #expect(selection.anchor.assoc == 0)
+        #expect(selection.head.assoc == 0)
     }
 
     private static let runtimeSource = """
