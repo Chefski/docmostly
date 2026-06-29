@@ -131,8 +131,14 @@ extension NativeEditorCommand {
     }
 
     private var defaultSyncedBlockID: String {
-        "sync-\(UUID().uuidString)"
+        var generator = SystemRandomNumberGenerator()
+        return String((0..<Self.docmostNodeIDLength).map { _ in
+            Self.docmostNodeIDAlphabet.randomElement(using: &generator) ?? "a"
+        })
     }
+
+    private static let docmostNodeIDAlphabet = Array("abcdefghijklmnopqrstuvwxyz")
+    private static let docmostNodeIDLength = 12
 
     private func richBlock(id: UUID, kind: NativeEditorBlockKind, rawNode: ProseMirrorNode) -> NativeEditorBlock {
         NativeEditorBlock(
