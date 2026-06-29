@@ -5,10 +5,13 @@ extension NativeEditorMarkdownParser {
         from html: String,
         excluding excludedRanges: [NSRange]
     ) -> [HTMLTableContentMatch] {
-        htmlTableImageContentMatches(from: html, excluding: excludedRanges) +
-            htmlTableMediaElementContentMatches(from: html, excluding: excludedRanges, type: "video") +
-            htmlTableMediaElementContentMatches(from: html, excluding: excludedRanges, type: "audio") +
-            htmlTableTypedMediaDivContentMatches(from: html, excluding: excludedRanges)
+        let typedDivMatches = htmlTableTypedMediaDivContentMatches(from: html, excluding: excludedRanges)
+        let typedDivRanges = excludedRanges + typedDivMatches.map(\.range)
+
+        return htmlTableImageContentMatches(from: html, excluding: typedDivRanges) +
+            htmlTableMediaElementContentMatches(from: html, excluding: typedDivRanges, type: "video") +
+            htmlTableMediaElementContentMatches(from: html, excluding: typedDivRanges, type: "audio") +
+            typedDivMatches
     }
 
     private static func htmlTableImageContentMatches(
@@ -153,13 +156,20 @@ extension NativeEditorMarkdownParser {
         attrs: [String: String],
         body: String
     ) -> ProseMirrorNode {
-        if type == "pdf" {
+        switch type {
+        case "pdf":
             let iframeAttrs = firstHTMLTagAttributes(in: body, tagName: "iframe") ?? [:]
             return htmlTablePDFNode(attrs: attrs, iframeAttrs: iframeAttrs)
+        case "attachment":
+            let linkAttrs = firstHTMLTagAttributes(in: body, tagName: "a") ?? [:]
+            return htmlTableAttachmentNode(attrs: attrs, linkAttrs: linkAttrs)
+        case "embed":
+            let linkAttrs = firstHTMLTagAttributes(in: body, tagName: "a") ?? [:]
+            return htmlTableEmbedNode(attrs: attrs, linkAttrs: linkAttrs)
+        default:
+            let imageAttrs = firstHTMLTagAttributes(in: body, tagName: "img") ?? [:]
+            return htmlTableDiagramNode(type: type, attrs: attrs, imageAttrs: imageAttrs)
         }
-
-        let linkAttrs = firstHTMLTagAttributes(in: body, tagName: "a") ?? [:]
-        return htmlTableAttachmentNode(attrs: attrs, linkAttrs: linkAttrs)
     }
 
     private static func htmlTablePDFNode(
@@ -223,13 +233,79 @@ extension NativeEditorMarkdownParser {
         return ProseMirrorNode(type: "attachment", attrs: nodeAttrs.isEmpty ? nil : nodeAttrs)
     }
 
+    private static func htmlTableEmbedNode(
+        attrs: [String: String],
+        linkAttrs: [String: String]
+    ) -> ProseMirrorNode {
+        var nodeAttrs = [String: ProseMirrorJSONValue]()
+        let source = nonEmptyHTMLTableAttribute(attrs["data-src"]) ?? nonEmptyHTMLTableAttribute(linkAttrs["href"])
+
+        if let source {
+            nodeAttrs["src"] = .string(source)
+        }
+        if let provider = nonEmptyHTMLTableAttribute(attrs["data-provider"]) {
+            nodeAttrs["provider"] = .string(provider)
+        }
+        if let alignment = nonEmptyHTMLTableAttribute(attrs["data-align"]) {
+            nodeAttrs["align"] = .string(alignment)
+        }
+        if let width = nonEmptyHTMLTableAttribute(attrs["data-width"]).flatMap(Int.init) {
+            nodeAttrs["width"] = .int(width)
+        }
+        if let height = nonEmptyHTMLTableAttribute(attrs["data-height"]).flatMap(Int.init) {
+            nodeAttrs["height"] = .int(height)
+        }
+
+        return ProseMirrorNode(type: "embed", attrs: nodeAttrs.isEmpty ? nil : nodeAttrs)
+    }
+
+    private static func htmlTableDiagramNode(
+        type: String,
+        attrs: [String: String],
+        imageAttrs: [String: String]
+    ) -> ProseMirrorNode {
+        var nodeAttrs = [String: ProseMirrorJSONValue]()
+        let source = nonEmptyHTMLTableAttribute(attrs["data-src"]) ?? nonEmptyHTMLTableAttribute(imageAttrs["src"])
+
+        if let source {
+            nodeAttrs["src"] = .string(source)
+        }
+        if let title = nonEmptyHTMLTableAttribute(attrs["data-title"]) {
+            nodeAttrs["title"] = .string(title)
+        }
+        if let alternativeText = nonEmptyHTMLTableAttribute(attrs["data-alt"]) {
+            nodeAttrs["alt"] = .string(alternativeText)
+        }
+        if let attachmentID = nonEmptyHTMLTableAttribute(attrs["data-attachment-id"]) ??
+            source.flatMap(docmostAttachmentID) {
+            nodeAttrs["attachmentId"] = .string(attachmentID)
+        }
+        if let sizeInBytes = nonEmptyHTMLTableAttribute(attrs["data-size"]).flatMap(Int.init) {
+            nodeAttrs["size"] = .int(sizeInBytes)
+        }
+        let widthValue = nonEmptyHTMLTableAttribute(attrs["data-width"]) ??
+            nonEmptyHTMLTableAttribute(imageAttrs["width"])
+        if let width = widthValue.flatMap(htmlTableProseMirrorNumberOrString) {
+            nodeAttrs["width"] = width
+        }
+        if let height = nonEmptyHTMLTableAttribute(attrs["data-height"]).flatMap(htmlTableProseMirrorNumberOrString) {
+            nodeAttrs["height"] = height
+        }
+        if let aspectRatio = nonEmptyHTMLTableAttribute(attrs["data-aspect-ratio"]).flatMap(Double.init) {
+            nodeAttrs["aspectRatio"] = .double(aspectRatio)
+        }
+        if let alignment = nonEmptyHTMLTableAttribute(attrs["data-align"]) {
+            nodeAttrs["align"] = .string(alignment)
+        }
+
+        return ProseMirrorNode(type: type, attrs: nodeAttrs.isEmpty ? nil : nodeAttrs)
+    }
+
     private static func htmlTableTypedMediaDivType(from dataType: String?) -> String? {
         guard let dataType else { return nil }
-        if dataType.localizedCaseInsensitiveCompare("pdf") == .orderedSame {
-            return "pdf"
-        }
-        if dataType.localizedCaseInsensitiveCompare("attachment") == .orderedSame {
-            return "attachment"
+        for supportedType in ["pdf", "attachment", "embed", "drawio", "excalidraw"]
+            where dataType.localizedCaseInsensitiveCompare(supportedType) == .orderedSame {
+            return supportedType
         }
         return nil
     }
