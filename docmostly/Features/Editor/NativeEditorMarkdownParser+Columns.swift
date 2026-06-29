@@ -63,6 +63,33 @@ extension NativeEditorMarkdownParser {
         """
     }
 
+    static func rawColumnsMarkdown(from node: ProseMirrorNode?) -> String? {
+        guard
+            let node,
+            node.type == "columns",
+            rawColumnsNeedsStructuredMarkdown(node)
+        else {
+            return nil
+        }
+
+        let layout = escapedInlineHTMLAttribute(node.attrs?["layout"]?.stringValue ?? "two_equal")
+        let widthMode = node.attrs?["widthMode"]?.stringValue ?? "normal"
+        let widthModeAttribute = widthMode == "normal"
+            ? ""
+            : #" data-width-mode="\#(escapedInlineHTMLAttribute(widthMode))""#
+        let columnMarkup = (node.content ?? [])
+            .filter { $0.type == "column" }
+            .map(rawColumnMarkdown(from:))
+            .joined(separator: "\n")
+        guard columnMarkup.isEmpty == false else { return nil }
+
+        return """
+        <div data-type="columns" data-layout="\(layout)"\(widthModeAttribute)>
+        \(columnMarkup)
+        </div>
+        """
+    }
+
     private struct ParsedColumnHTML {
         var text: String
         var width: Double?
@@ -159,6 +186,78 @@ extension NativeEditorMarkdownParser {
         """
     }
 
+    private static func rawColumnsNeedsStructuredMarkdown(_ node: ProseMirrorNode) -> Bool {
+        (node.content ?? [])
+            .filter { $0.type == "column" }
+            .contains { column in
+                rawColumnNeedsStructuredMarkdown(column)
+            }
+    }
+
+    private static func rawColumnNeedsStructuredMarkdown(_ node: ProseMirrorNode) -> Bool {
+        let content = node.content ?? []
+        guard content.count == 1, let paragraph = content.first, paragraph.type == "paragraph" else {
+            return true
+        }
+
+        return paragraph.attrs?.isEmpty == false
+    }
+
+    private static func rawColumnMarkdown(from node: ProseMirrorNode) -> String {
+        let widthText = htmlNumber(from: node.attrs?["width"])
+        let body = (node.content ?? [])
+            .map(rawColumnContentMarkdown(from:))
+            .joined(separator: "\n")
+
+        return """
+        <div data-type="column" data-width="\(widthText)" style="flex: \(widthText)">
+        \(body)
+        </div>
+        """
+    }
+
+    private static func rawColumnContentMarkdown(from node: ProseMirrorNode) -> String {
+        switch node.type {
+        case "paragraph":
+            "<p>\(rawInlineHTMLMarkdown(from: node.content ?? []))</p>"
+        case "heading":
+            rawHeadingMarkdown(from: node)
+        case "pageBreak":
+            #"<div data-type="pageBreak" class="page-break"></div>"#
+        case "horizontalRule":
+            "<hr>"
+        case "codeBlock":
+            rawCodeBlockMarkdown(from: node)
+        default:
+            escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
+        }
+    }
+
+    private static func rawHeadingMarkdown(from node: ProseMirrorNode) -> String {
+        let level = min(max(node.attrs?["level"]?.intValue ?? 1, 1), 6)
+        return "<h\(level)>\(rawInlineHTMLMarkdown(from: node.content ?? []))</h\(level)>"
+    }
+
+    private static func rawCodeBlockMarkdown(from node: ProseMirrorNode) -> String {
+        let language = node.attrs?["language"]?.stringValue
+            .map { #" class="language-\#(escapedInlineHTMLAttribute($0))""# } ?? ""
+        return "<pre><code\(language)>\(escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node])))</code></pre>"
+    }
+
+    private static func rawInlineHTMLMarkdown(from nodes: [ProseMirrorNode]) -> String {
+        nodes.map { node in
+            switch node.type {
+            case "text":
+                escapedInlineHTMLText(node.text ?? "")
+            case "hardBreak":
+                "<br>"
+            default:
+                escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
+            }
+        }
+        .joined()
+    }
+
     private static func columnsHTMLNode(
         from attributes: [String: String],
         columns: [ParsedColumnHTML]
@@ -197,6 +296,19 @@ extension NativeEditorMarkdownParser {
     private static func htmlNumber(_ value: Double) -> String {
         let text = String(value)
         return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    }
+
+    private static func htmlNumber(from value: ProseMirrorJSONValue?) -> String {
+        switch value {
+        case .int(let width):
+            String(width)
+        case .double(let width):
+            htmlNumber(width)
+        case .string(let width):
+            width.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "1" : width
+        case .bool, .object, .array, .null, nil:
+            "1"
+        }
     }
 
     private static func nonEmptyAttribute(_ value: String?) -> String? {

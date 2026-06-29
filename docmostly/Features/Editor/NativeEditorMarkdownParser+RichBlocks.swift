@@ -93,7 +93,7 @@ extension NativeEditorMarkdownParser {
         case .pageBreak:
             #"<div data-type="pageBreak" class="page-break"></div>"#
         case .columns(let columns):
-            columnsMarkdown(from: columns)
+            rawColumnsMarkdown(from: block.rawNode) ?? columnsMarkdown(from: columns)
         default:
             nil
         }

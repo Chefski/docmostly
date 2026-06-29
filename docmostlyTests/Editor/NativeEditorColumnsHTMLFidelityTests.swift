@@ -37,4 +37,22 @@ struct NativeEditorColumnsHTMLFidelityTests {
         #expect(columnNodes[0].content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
         #expect(columnNodes[1].content?.map(\.type) == ["paragraph"])
     }
+
+    @Test func importedDocmostColumnsExportStructuredColumnContent() throws {
+        let markdown = """
+        <div data-type="columns" data-layout="two_equal" data-width-mode="wide">
+        <div data-type="column" data-width="2" style="flex: 2">
+        <p>Plan rollout</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Confirm metrics</p>
+        </div>
+        <div data-type="column" data-width="1" style="flex: 1">
+        <p>Ship notes</p>
+        </div>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
 }
