@@ -38,7 +38,7 @@ struct NativeRichEditorViewModelTests {
 
         #expect(viewModel.isShowingSlashCommands == true)
         #expect(viewModel.slashCommandQuery == "to")
-        #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do List"])
+        #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do List", "Toggle block"])
     }
 
     @Test func slashCommandFilteringUsesSubtitlesWhenTitlesDoNotMatch() {
@@ -104,8 +104,8 @@ struct NativeRichEditorViewModelTests {
         #expect(titles.contains("Image"))
         #expect(titles.contains("Video"))
         #expect(titles.contains("Audio"))
-        #expect(titles.contains("PDF"))
-        #expect(titles.contains("File"))
+        #expect(titles.contains("Embed PDF"))
+        #expect(titles.contains("File attachment"))
         #expect(titles.contains("Draw.io"))
         #expect(titles.contains("Excalidraw"))
     }
