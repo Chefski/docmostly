@@ -55,16 +55,36 @@ enum NativeEditorTableLayout {
         let components = trimmedValue[trimmedValue.index(after: openParen)..<closeParen]
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .compactMap(Double.init)
-        guard components.count >= 3 else { return nil }
+        guard components.count >= 3,
+              let red = cssColorComponent(from: components[0]),
+              let green = cssColorComponent(from: components[1]),
+              let blue = cssColorComponent(from: components[2]) else {
+            return nil
+        }
 
-        let opacity = components.indices.contains(3) ? min(max(components[3], 0), 1) : 1
+        let opacity = components.indices.contains(3) ? cssAlphaComponent(from: components[3]) ?? 1 : 1
         return Color(
-            red: min(max(components[0], 0), 255) / 255,
-            green: min(max(components[1], 0), 255) / 255,
-            blue: min(max(components[2], 0), 255) / 255,
+            red: red / 255,
+            green: green / 255,
+            blue: blue / 255,
             opacity: opacity
         )
+    }
+
+    private static func cssColorComponent(from value: String) -> Double? {
+        guard let component = Double(value) else { return nil }
+        return min(max(component, 0), 255)
+    }
+
+    private static func cssAlphaComponent(from value: String) -> Double? {
+        if value.hasSuffix("%") {
+            let percentageText = value.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let percentage = Double(percentageText) else { return nil }
+            return min(max(percentage / 100, 0), 1)
+        }
+
+        guard let alpha = Double(value) else { return nil }
+        return min(max(alpha, 0), 1)
     }
 
     private static func backgroundColor(for name: String) -> Color? {

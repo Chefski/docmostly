@@ -206,7 +206,7 @@ extension NativeEditorMarkdownParser {
         var segment = AttributedString(text)
         NativeEditorDocument.apply(nonLinkMarks, to: &segment)
         let label = escapedMarkdownTableLinkLabel(inlineMarkdown(from: segment))
-        return "[\(label)](\(href))"
+        return "[\(label)](\(markdownTableLinkDestination(from: href)))"
     }
 
     private static func unsafeTableCellLinkHref(from marks: [NativeEditorTextMark]) -> String? {
@@ -238,5 +238,26 @@ extension NativeEditorMarkdownParser {
             .replacing("\\", with: "\\\\")
             .replacing("[", with: "\\[")
             .replacing("]", with: "\\]")
+    }
+
+    private static func markdownTableLinkDestination(from href: String) -> String {
+        guard href.contains(where: requiresAngleWrappedMarkdownLinkDestination) else {
+            return href
+        }
+
+        return "<\(escapedAngleWrappedMarkdownLinkDestination(href))>"
+    }
+
+    private static func requiresAngleWrappedMarkdownLinkDestination(_ character: Character) -> Bool {
+        character.isWhitespace || character == "(" || character == ")" || character == "<" || character == ">"
+    }
+
+    private static func escapedAngleWrappedMarkdownLinkDestination(_ href: String) -> String {
+        href
+            .replacing("\\", with: "\\\\")
+            .replacing("<", with: "%3C")
+            .replacing(">", with: "%3E")
+            .replacing("\n", with: "%0A")
+            .replacing("\r", with: "%0D")
     }
 }

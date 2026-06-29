@@ -34,9 +34,15 @@ extension NativeEditorMarkdownParser {
 
     static func nextDocmostHighlightHTML(in markdown: Substring) -> DocmostHighlightHTML? {
         var searchStart = markdown.startIndex
+        let codeSpanRanges = markdownCodeSpanRanges(in: markdown, bodyStart: markdown.startIndex)
 
         while searchStart < markdown.endIndex,
               let openRange = markdown[searchStart...].range(of: "<mark", options: .caseInsensitive) {
+            guard isInsideMarkdownCodeSpan(openRange.lowerBound, ranges: codeSpanRanges) == false else {
+                searchStart = openRange.upperBound
+                continue
+            }
+
             let tagNameEnd = markdown.index(openRange.lowerBound, offsetBy: 5)
             guard isHighlightHTMLTagBoundary(at: tagNameEnd, in: markdown),
                   let openTagEnd = markdown[openRange.upperBound...].firstIndex(of: ">") else {
@@ -45,7 +51,11 @@ extension NativeEditorMarkdownParser {
             }
 
             let contentStart = markdown.index(after: openTagEnd)
-            guard let closeRange = markdown[contentStart...].range(of: "</mark>", options: .caseInsensitive) else {
+            guard let closeRange = matchingCloseMarkRange(
+                in: markdown,
+                startingAt: contentStart,
+                codeSpanRanges: codeSpanRanges
+            ) else {
                 return nil
             }
 
@@ -56,6 +66,26 @@ extension NativeEditorMarkdownParser {
                 colorName: attrs["data-highlight-color-name"]?.trimmedNonEmpty,
                 bodyMarkdown: String(markdown[contentStart..<closeRange.lowerBound])
             )
+        }
+
+        return nil
+    }
+
+    private static func matchingCloseMarkRange(
+        in markdown: Substring,
+        startingAt contentStart: String.Index,
+        codeSpanRanges: [Range<String.Index>]
+    ) -> Range<String.Index>? {
+        var searchStart = contentStart
+
+        while searchStart < markdown.endIndex,
+              let closeRange = markdown[searchStart...].range(of: "</mark>", options: .caseInsensitive) {
+            guard isInsideMarkdownCodeSpan(closeRange.lowerBound, ranges: codeSpanRanges) == false else {
+                searchStart = closeRange.upperBound
+                continue
+            }
+
+            return closeRange
         }
 
         return nil

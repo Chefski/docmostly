@@ -90,10 +90,14 @@ extension NativeEditorMarkdownParser {
 
             let nameEnd = htmlTagNameEnd(in: trimmedLine, startingAt: nameStart)
             let name = String(trimmedLine[nameStart..<nameEnd])
-            guard htmlTagNameMatches(name, tagName),
-                  isHTMLTagBoundary(at: nameEnd, in: trimmedLine),
+            guard isHTMLTagBoundary(at: nameEnd, in: trimmedLine),
                   let closeIndex = htmlOpeningTagCloseIndex(in: trimmedLine, startingAt: nameEnd) else {
                 searchStart = nameEnd
+                continue
+            }
+
+            guard htmlTagNameMatches(name, tagName) else {
+                searchStart = trimmedLine.index(after: closeIndex)
                 continue
             }
 
@@ -176,7 +180,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func markdownCodeSpanRanges(
+    static func markdownCodeSpanRanges(
         in markdown: Substring,
         bodyStart: String.Index
     ) -> [Range<String.Index>] {
@@ -219,7 +223,7 @@ extension NativeEditorMarkdownParser {
         return ranges
     }
 
-    private static func isInsideMarkdownCodeSpan(
+    static func isInsideMarkdownCodeSpan(
         _ index: String.Index,
         ranges: [Range<String.Index>]
     ) -> Bool {

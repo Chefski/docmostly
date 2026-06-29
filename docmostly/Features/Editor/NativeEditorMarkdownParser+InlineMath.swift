@@ -4,13 +4,17 @@ extension NativeEditorMarkdownParser {
     static func inlineText(from markdown: String) -> AttributedString {
         var result = AttributedString("")
         var remaining = markdown[...]
+        let codeSpanRanges = markdownCodeSpanRanges(in: remaining, bodyStart: remaining.startIndex)
 
-        while let inlineDelimiter = nextInlineMathDelimiter(in: remaining) {
+        while let inlineDelimiter = nextInlineMathDelimiter(in: remaining, codeSpanRanges: codeSpanRanges) {
             let openRange = inlineDelimiter.range
             appendMarkdownText(
                 String(remaining[..<openRange.lowerBound]),
                 to: &result,
-                usesFoundationMarkdownParser: false
+                usesFoundationMarkdownParser: shouldUseFoundationMarkdownParser(
+                    for: String(remaining[..<openRange.lowerBound]),
+                    after: result
+                )
             )
 
             let contentStart = openRange.upperBound
@@ -131,16 +135,24 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func nextInlineMathDelimiter(
-        in markdown: Substring
+        in markdown: Substring,
+        codeSpanRanges: [Range<String.Index>]
     ) -> (range: Range<String.Index>, value: String)? {
-        let singleDollarRange = markdown.range(of: "$")
-        let doubleDollarRange = markdown.range(of: "$$")
+        var searchStart = markdown.startIndex
 
-        if let doubleDollarRange, doubleDollarRange.lowerBound == singleDollarRange?.lowerBound {
-            return (doubleDollarRange, "$$")
-        }
+        while searchStart < markdown.endIndex,
+              let dollarIndex = markdown[searchStart...].firstIndex(of: "$") {
+            let singleDollarRange = dollarIndex..<markdown.index(after: dollarIndex)
+            guard isInsideMarkdownCodeSpan(dollarIndex, ranges: codeSpanRanges) == false else {
+                searchStart = singleDollarRange.upperBound
+                continue
+            }
 
-        if let singleDollarRange {
+            let nextIndex = markdown.index(after: dollarIndex)
+            if nextIndex < markdown.endIndex, markdown[nextIndex] == "$" {
+                return (dollarIndex..<markdown.index(after: nextIndex), "$$")
+            }
+
             return (singleDollarRange, "$")
         }
 

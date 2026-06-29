@@ -86,7 +86,8 @@ extension NativeEditorMarkdownParser {
                isEscapedCharacter(at: index, in: destination) == false,
                index != destination.startIndex {
                 let previousIndex = destination.index(before: index)
-                if destination[previousIndex].isWhitespace {
+                if destination[previousIndex].isWhitespace,
+                   isEscapedCharacter(at: previousIndex, in: destination) == false {
                     match = MarkdownLinkTitleMatch(
                         sourceEnd: previousIndex,
                         titleRange: destination.index(after: index)..<closeIndex

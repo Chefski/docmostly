@@ -19,9 +19,15 @@ extension NativeEditorMarkdownParser {
 
     static func nextDocmostTextColorHTML(in markdown: Substring) -> DocmostTextColorHTML? {
         var searchStart = markdown.startIndex
+        let codeSpanRanges = markdownCodeSpanRanges(in: markdown, bodyStart: markdown.startIndex)
 
         while searchStart < markdown.endIndex,
               let openRange = markdown[searchStart...].range(of: "<span", options: .caseInsensitive) {
+            guard isInsideMarkdownCodeSpan(openRange.lowerBound, ranges: codeSpanRanges) == false else {
+                searchStart = openRange.upperBound
+                continue
+            }
+
             let tagNameEnd = markdown.index(openRange.lowerBound, offsetBy: 5)
             guard isTextColorHTMLTagBoundary(at: tagNameEnd, in: markdown),
                   let openTagEnd = markdown[openRange.upperBound...].firstIndex(of: ">") else {
@@ -67,6 +73,8 @@ extension NativeEditorMarkdownParser {
     private static func applyTextColor(_ color: String, to text: inout AttributedString) {
         let ranges = text.runs.map(\.range)
         for range in ranges {
+            guard text[range][NativeEditorTextColorAttribute.self] == nil else { continue }
+
             text[range][NativeEditorTextColorAttribute.self] = color
             if let swiftUIColor = Color(docmostlyHex: color) {
                 text[range].foregroundColor = swiftUIColor
