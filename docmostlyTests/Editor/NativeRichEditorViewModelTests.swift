@@ -38,7 +38,7 @@ struct NativeRichEditorViewModelTests {
 
         #expect(viewModel.isShowingSlashCommands == true)
         #expect(viewModel.slashCommandQuery == "to")
-        #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do List", "Toggle block"])
+        #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do list", "Toggle block"])
     }
 
     @Test func slashCommandFilteringUsesSubtitlesWhenTitlesDoNotMatch() {
@@ -48,8 +48,8 @@ struct NativeRichEditorViewModelTests {
         viewModel.focus(blockID: block.id)
 
         let titles = viewModel.filteredSlashCommands.map(\.title)
-        #expect(titles.contains("Math Inline"))
-        #expect(titles.contains("Math Block"))
+        #expect(titles.contains("Math inline"))
+        #expect(titles.contains("Math block"))
     }
 
     @Test func applyingSlashCommandTransformsActiveBlockAndClearsSlashToken() {
@@ -106,8 +106,8 @@ struct NativeRichEditorViewModelTests {
         #expect(titles.contains("Audio"))
         #expect(titles.contains("Embed PDF"))
         #expect(titles.contains("File attachment"))
-        #expect(titles.contains("Draw.io"))
-        #expect(titles.contains("Excalidraw"))
+        #expect(titles.contains("Draw.io (diagrams.net)"))
+        #expect(titles.contains("Excalidraw (Whiteboard)"))
     }
 
     @Test func slashCommandInventoryIncludesInlineEverydayCommands() {
@@ -117,7 +117,7 @@ struct NativeRichEditorViewModelTests {
         #expect(titles.contains("Time"))
         #expect(titles.contains("Status"))
         #expect(titles.contains("Emoji"))
-        #expect(titles.contains("Math Inline"))
+        #expect(titles.contains("Math inline"))
     }
 
     @Test func mediaSlashCommandsMapToAttachmentImportKinds() {
@@ -220,7 +220,7 @@ struct NativeRichEditorViewModelTests {
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        #expect(viewModel.filteredSlashCommands.map(\.title).contains("Math Inline"))
+        #expect(viewModel.filteredSlashCommands.map(\.title).contains("Math inline"))
 
         viewModel.applySlashCommand(.mathInline)
 
