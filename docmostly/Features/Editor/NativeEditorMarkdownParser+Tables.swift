@@ -248,7 +248,7 @@ extension NativeEditorMarkdownParser {
         inlineContent.contains { item in
             guard case .text(_, let marks) = item else { return false }
             return marks.contains { mark in
-                guard case .link(let href) = mark else { return false }
+                guard case .link(let href, _) = mark else { return false }
                 return href.isEmpty == false && NativeEditorDocument.safeLinkURL(from: href) == nil
             }
         }
@@ -276,7 +276,7 @@ extension NativeEditorMarkdownParser {
 
     private static func unsafeTableCellLinkHref(from marks: [NativeEditorTextMark]) -> String? {
         marks.compactMap { mark -> String? in
-            guard case .link(let href) = mark,
+            guard case .link(let href, _) = mark,
                   href.isEmpty == false,
                   NativeEditorDocument.safeLinkURL(from: href) == nil else {
                 return nil

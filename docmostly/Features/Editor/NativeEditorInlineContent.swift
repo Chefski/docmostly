@@ -75,7 +75,7 @@ nonisolated enum NativeEditorTextMark: Equatable, Hashable, Sendable, Codable {
     case underline
     case strikethrough
     case code
-    case link(href: String)
+    case link(href: String, isInternal: Bool = false)
     case highlight(color: String?, colorName: String?)
     case textColor(String)
     case `subscript`

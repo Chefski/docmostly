@@ -127,15 +127,18 @@ extension NativeRichEditorViewModel {
             else {
                 return
             }
+            let link = NativeEditorLink(href: url.absoluteString, isInternal: false)
 
             if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
                 var selection = document.blocks[index].selection
                 document.blocks[index].text.transformAttributes(in: &selection) { attributes in
                     attributes.link = url
+                    attributes[NativeEditorLinkAttribute.self] = link
                 }
                 document.blocks[index].selection = selection
             } else {
                 document.blocks[index].text.link = url
+                document.blocks[index].text[NativeEditorLinkAttribute.self] = link
             }
         }
     }
@@ -148,10 +151,12 @@ extension NativeRichEditorViewModel {
                 var selection = document.blocks[index].selection
                 document.blocks[index].text.transformAttributes(in: &selection) { attributes in
                     attributes.link = nil
+                    attributes[NativeEditorLinkAttribute.self] = nil
                 }
                 document.blocks[index].selection = selection
             } else {
                 document.blocks[index].text.link = nil
+                document.blocks[index].text[NativeEditorLinkAttribute.self] = nil
             }
         }
     }

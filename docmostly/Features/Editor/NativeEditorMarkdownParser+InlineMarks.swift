@@ -45,7 +45,7 @@ extension NativeEditorMarkdownParser {
             }
         }
 
-        if let href = run.link?.absoluteString {
+        if let href = run[NativeEditorLinkAttribute.self]?.href ?? run.link?.absoluteString {
             output = "[\(escapedMarkdownLinkLabel(output))](\(href))"
         }
 
@@ -218,6 +218,9 @@ extension NativeEditorMarkdownParser {
 
             var text = attributedInlineMarkdown(from: label)
             text.link = url
+            if let link = NativeEditorDocument.preservedLink(href: destination) {
+                text[NativeEditorLinkAttribute.self] = link
+            }
             return InlineMarkdownMatch(
                 range: openLabelIndex..<markdown.index(after: closeDestinationIndex),
                 text: text,

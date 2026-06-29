@@ -89,7 +89,10 @@ nonisolated extension NativeEditorDocument {
     static func richTextMark(from mark: ProseMirrorMark) -> NativeEditorTextMark {
         switch mark.type {
         case "link":
-            .link(href: mark.attrs?["href"]?.stringValue ?? "")
+            .link(
+                href: mark.attrs?["href"]?.stringValue ?? "",
+                isInternal: mark.attrs?["internal"]?.boolValue ?? false
+            )
         case "highlight":
             .highlight(
                 color: mark.attrs?["color"]?.stringValue,
@@ -148,8 +151,8 @@ nonisolated extension NativeEditorDocument {
         switch mark {
         case .underline:
             text.underlineStyle = .single
-        case .link(let href):
-            text.link = Self.safeLinkURL(from: href)
+        case .link(let href, let isInternal):
+            applyLinkMark(href: href, isInternal: isInternal, to: &text)
         case .highlight(let color, let colorName):
             if let color {
                 text[NativeEditorHighlightColorAttribute.self] = color
@@ -178,11 +181,27 @@ nonisolated extension NativeEditorDocument {
         }
     }
 
+    static func applyLinkMark(href: String, isInternal: Bool, to text: inout AttributedString) {
+        guard let link = preservedLink(href: href, isInternal: isInternal) else { return }
+        text[NativeEditorLinkAttribute.self] = link
+        text.link = safeLinkURL(from: href)
+    }
+
     static func safeLinkURL(from href: String) -> URL? {
         guard let url = URL(string: href) else { return nil }
         let allowedSchemes = ["https", "http", "mailto"]
         guard let scheme = url.scheme?.lowercased() else { return nil }
         return allowedSchemes.contains(scheme) ? url : nil
+    }
+
+    static func preservedLink(href: String, isInternal: Bool = false) -> NativeEditorLink? {
+        guard href.isEmpty == false else { return nil }
+
+        if safeLinkURL(from: href) != nil || href.hasPrefix("/") || href.hasPrefix("#") {
+            return NativeEditorLink(href: href, isInternal: isInternal)
+        }
+
+        return nil
     }
 
     static func insertPresentationIntent(
