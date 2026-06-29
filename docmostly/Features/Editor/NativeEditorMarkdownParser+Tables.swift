@@ -5,6 +5,10 @@ extension NativeEditorMarkdownParser {
         in lines: [String],
         startingAt index: Array<String>.Index
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
+        if let htmlTable = htmlTableBlock(in: lines, startingAt: index) {
+            return htmlTable
+        }
+
         let separatorIndex = lines.index(after: index)
         guard
             separatorIndex < lines.endIndex,
