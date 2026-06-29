@@ -234,6 +234,33 @@ struct NativeRichEditorTableTests {
         )
     }
 
+    @Test func markdownExportWrapsUnsafeRelativeLinksInsideTableCells() {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "File", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Spec",
+                    inlineContent: [
+                        .text("Spec", marks: [.link(href: "/p/project plan)/Spec.pdf")])
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+
+        #expect(
+            NativeEditorMarkdownParser.tableMarkdown(from: table) ==
+                """
+                | File |
+                | --- |
+                | [Spec](</p/project plan)/Spec.pdf>) |
+                """
+        )
+    }
+
     @Test func editingTableCellPreservesUnsupportedRichContentInOtherCells() throws {
         let data = Data("""
         {

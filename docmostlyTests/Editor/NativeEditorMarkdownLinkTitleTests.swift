@@ -16,12 +16,19 @@ struct NativeEditorMarkdownLinkTitleTests {
 
             guard case .image(let image) = block.kind else {
                 Issue.record("Expected Markdown image to import as a native image block.")
-                return
+                continue
             }
 
             #expect(image.source == "/files/image.png")
             #expect(image.title == "System diagram")
             #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
         }
+    }
+
+    @Test func escapedWhitespaceBeforeDelimiterDoesNotStartMarkdownLinkTitle() {
+        let destination = #"/files/my\ "diagram.png""#
+
+        #expect(NativeEditorMarkdownParser.markdownLinkSource(from: destination) == destination)
+        #expect(NativeEditorMarkdownParser.markdownLinkTitle(from: destination) == nil)
     }
 }

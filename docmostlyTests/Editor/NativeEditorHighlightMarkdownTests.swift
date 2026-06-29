@@ -46,4 +46,22 @@ struct NativeEditorHighlightMarkdownTests {
         )
         #expect(inlineNodes.contains { $0.marks?.contains(highlightMark) == true })
     }
+
+    @Test func markdownImportIgnoresHighlightHTMLInsideCodeSpans() throws {
+        let markdown = ##"Keep `<mark data-color="#FEF3C7">literal</mark>` then "## +
+            ##"<mark data-color="#DCFCE7" data-highlight-color-name="green">real</mark>"##
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        let codeRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == ##"<mark data-color="#FEF3C7">literal</mark>"##
+        })
+        #expect(codeRun.inlinePresentationIntent?.contains(.code) == true)
+        #expect(codeRun[NativeEditorHighlightColorAttribute.self] == nil)
+
+        let highlightRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == "real"
+        })
+        #expect(highlightRun[NativeEditorHighlightColorAttribute.self] == "#DCFCE7")
+        #expect(highlightRun[NativeEditorHighlightColorNameAttribute.self] == "green")
+    }
 }

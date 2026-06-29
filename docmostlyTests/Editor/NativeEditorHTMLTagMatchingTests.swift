@@ -25,4 +25,10 @@ struct NativeEditorHTMLTagMatchingTests {
 
         #expect(closeRange == expectedCloseRange)
     }
+
+    @Test func htmlTagDepthDeltaIgnoresTagLookalikesInsideQuotedAttributes() {
+        let line = #"<div><span data-attr="</div>">x</span></div>"#
+
+        #expect(NativeEditorMarkdownParser.htmlTagDepthDelta(in: line, tagName: "div") == 0)
+    }
 }

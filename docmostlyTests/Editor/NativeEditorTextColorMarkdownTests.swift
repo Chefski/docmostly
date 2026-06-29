@@ -41,4 +41,41 @@ struct NativeEditorTextColorMarkdownTests {
         )
         #expect(inlineNodes.contains { $0.marks?.contains(textColorMark) == true })
     }
+
+    @Test func markdownImportIgnoresTextColorHTMLInsideCodeSpans() throws {
+        let markdown = ##"Keep `<span style="color: #DC2626">literal</span>` then "## +
+            ##"<span style="color: #2563EB">real</span>"##
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        let codeRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == #"<span style="color: #DC2626">literal</span>"#
+        })
+        #expect(codeRun.inlinePresentationIntent?.contains(.code) == true)
+        #expect(codeRun[NativeEditorTextColorAttribute.self] == nil)
+
+        let coloredRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == "real"
+        })
+        #expect(coloredRun[NativeEditorTextColorAttribute.self] == "#2563EB")
+    }
+
+    @Test func markdownImportPreservesNestedTextColorSpans() throws {
+        let markdown = ##"<span style="color: #111827">outer "## +
+            ##"<span style="color: #2563EB">inner</span> tail</span>"##
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        let outerRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == "outer "
+        })
+        let innerRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == "inner"
+        })
+        let tailRun = try #require(block.text.runs.first { run in
+            String(block.text[run.range].characters) == " tail"
+        })
+
+        #expect(outerRun[NativeEditorTextColorAttribute.self] == "#111827")
+        #expect(innerRun[NativeEditorTextColorAttribute.self] == "#2563EB")
+        #expect(tailRun[NativeEditorTextColorAttribute.self] == "#111827")
+    }
 }
