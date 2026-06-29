@@ -9,13 +9,24 @@ extension NativeEditorMarkdownParser {
         guard
             separatorIndex < lines.endIndex,
             let headerCells = markdownTableCells(from: lines[index]),
-            isMarkdownTableSeparatorRow(lines[separatorIndex], columnCount: headerCells.count)
+            let separatorAlignments = markdownTableSeparatorColumnAlignments(
+                from: lines[separatorIndex],
+                columnCount: headerCells.count
+            )
         else {
             return nil
         }
 
         let columnCount = min(headerCells.count, NativeEditorTable.maximumColumnCount)
-        var rows = [tableRow(from: headerCells, isHeader: true, columnCount: columnCount)]
+        let columnAlignments = normalizedTableColumnAlignments(separatorAlignments, columnCount: columnCount)
+        var rows = [
+            tableRow(
+                from: headerCells,
+                isHeader: true,
+                columnCount: columnCount,
+                columnAlignments: columnAlignments
+            )
+        ]
         var currentIndex = lines.index(after: separatorIndex)
 
         while currentIndex < lines.endIndex, rows.count < NativeEditorTable.maximumRowCount {
@@ -27,7 +38,14 @@ extension NativeEditorMarkdownParser {
                 break
             }
 
-            rows.append(tableRow(from: cells, isHeader: false, columnCount: columnCount))
+            rows.append(
+                tableRow(
+                    from: cells,
+                    isHeader: false,
+                    columnCount: columnCount,
+                    columnAlignments: columnAlignments
+                )
+            )
             currentIndex = lines.index(after: currentIndex)
         }
 
@@ -49,7 +67,7 @@ extension NativeEditorMarkdownParser {
         let columnCount = max(table.columnCount, 1)
         let rows = [
             markdownTableRow(from: headerRow, columnCount: columnCount),
-            markdownTableSeparatorRow(columnCount: columnCount)
+            markdownTableSeparatorRow(columnAlignments: tableColumnAlignments(from: table, columnCount: columnCount))
         ] + table.rows.dropFirst().map {
             markdownTableRow(from: $0, columnCount: columnCount)
         }
@@ -60,16 +78,23 @@ extension NativeEditorMarkdownParser {
     private static func tableRow(
         from cells: [String],
         isHeader: Bool,
-        columnCount: Int
+        columnCount: Int,
+        columnAlignments: [NativeEditorTextAlignment?] = []
     ) -> NativeEditorTableRow {
-        NativeEditorTableRow(
-            cells: normalizedTableCells(cells, columnCount: columnCount).map {
-                tableCell(from: $0, isHeader: isHeader)
+        let normalizedCells = normalizedTableCells(cells, columnCount: columnCount)
+        return NativeEditorTableRow(
+            cells: normalizedCells.enumerated().map { offset, cell in
+                let textAlignment = columnAlignments.indices.contains(offset) ? columnAlignments[offset] : nil
+                return tableCell(from: cell, isHeader: isHeader, textAlignment: textAlignment)
             }
         )
     }
 
-    private static func tableCell(from markdown: String, isHeader: Bool) -> NativeEditorTableCell {
+    private static func tableCell(
+        from markdown: String,
+        isHeader: Bool,
+        textAlignment: NativeEditorTextAlignment?
+    ) -> NativeEditorTableCell {
         let attributedText = inlineText(from: markdown)
         let inlineContent = NativeEditorDocument
             .inlineContent(from: NativeEditorDocument.inlineNodes(from: attributedText))
@@ -79,6 +104,7 @@ extension NativeEditorMarkdownParser {
             plainText: String(attributedText.characters),
             inlineContent: inlineContent,
             isHeader: isHeader,
+            textAlignment: textAlignment,
             backgroundColorName: nil
         )
     }
@@ -158,15 +184,23 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func isMarkdownTableSeparatorRow(_ line: String, columnCount: Int) -> Bool {
+        markdownTableSeparatorColumnAlignments(from: line, columnCount: columnCount) != nil
+    }
+
+    private static func markdownTableSeparatorColumnAlignments(
+        from line: String,
+        columnCount: Int
+    ) -> [NativeEditorTextAlignment?]? {
         guard
             columnCount > 0,
             let cells = markdownTableCells(from: line),
             cells.count == columnCount
         else {
-            return false
+            return nil
         }
 
-        return cells.allSatisfy(isMarkdownTableSeparatorCell)
+        guard cells.allSatisfy(isMarkdownTableSeparatorCell) else { return nil }
+        return cells.map(markdownTableSeparatorAlignment)
     }
 
     private static func isMarkdownTableSeparatorCell(_ text: String) -> Bool {
@@ -174,6 +208,21 @@ extension NativeEditorMarkdownParser {
         let separator = trimmedText.trimmingCharacters(in: CharacterSet(charactersIn: ":"))
         guard separator.count >= 3 else { return false }
         return separator.allSatisfy { $0 == "-" }
+    }
+
+    private static func markdownTableSeparatorAlignment(from text: String) -> NativeEditorTextAlignment? {
+        let trimmedText = text.trimmingCharacters(in: .whitespaces)
+
+        switch (trimmedText.first == ":", trimmedText.last == ":") {
+        case (true, true):
+            return .center
+        case (false, true):
+            return .right
+        case (true, false):
+            return .left
+        case (false, false):
+            return nil
+        }
     }
 
     private static func markdownTableRow(from row: NativeEditorTableRow, columnCount: Int) -> String {
@@ -238,8 +287,48 @@ extension NativeEditorMarkdownParser {
         .first
     }
 
-    private static func markdownTableSeparatorRow(columnCount: Int) -> String {
-        "| \(Array(repeating: "---", count: columnCount).joined(separator: " | ")) |"
+    private static func tableColumnAlignments(
+        from table: NativeEditorTable,
+        columnCount: Int
+    ) -> [NativeEditorTextAlignment?] {
+        (0..<columnCount).map { columnIndex in
+            table.rows.lazy.compactMap { row -> NativeEditorTextAlignment? in
+                guard row.cells.indices.contains(columnIndex) else { return nil }
+                return row.cells[columnIndex].textAlignment
+            }
+            .first
+        }
+    }
+
+    private static func normalizedTableColumnAlignments(
+        _ alignments: [NativeEditorTextAlignment?],
+        columnCount: Int
+    ) -> [NativeEditorTextAlignment?] {
+        var result = Array(alignments.prefix(columnCount))
+
+        if result.count < columnCount {
+            result.append(contentsOf: Array(repeating: nil, count: columnCount - result.count))
+        }
+
+        return result
+    }
+
+    private static func markdownTableSeparatorRow(columnAlignments: [NativeEditorTextAlignment?]) -> String {
+        let cells = columnAlignments.map(markdownTableSeparatorCell)
+        return "| \(cells.joined(separator: " | ")) |"
+    }
+
+    private static func markdownTableSeparatorCell(for alignment: NativeEditorTextAlignment?) -> String {
+        switch alignment {
+        case .left:
+            ":---"
+        case .center:
+            ":---:"
+        case .right:
+            "---:"
+        case .justify, nil:
+            "---"
+        }
     }
 
     private static func escapedMarkdownTableCell(_ text: String) -> String {

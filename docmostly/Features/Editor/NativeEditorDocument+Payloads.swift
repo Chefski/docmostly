@@ -171,6 +171,7 @@ nonisolated extension NativeEditorDocument {
                     inlineContent: inlineContent.preservedForTableCell,
                     preservedContent: preservedTableCellContent(from: cellContent, inlineContent: inlineContent),
                     isHeader: cell.type == "tableHeader",
+                    textAlignment: tableCellTextAlignment(from: cellContent),
                     backgroundColor: cell.attrs?["backgroundColor"]?.stringValue,
                     backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
                     columnWidth: columnWidths.first,
@@ -179,6 +180,19 @@ nonisolated extension NativeEditorDocument {
                     columnWidths: columnWidths
                 )
             }
+    }
+
+    private static func tableCellTextAlignment(from content: [ProseMirrorNode]) -> NativeEditorTextAlignment? {
+        guard
+            let firstNode = content.first,
+            firstNode.type == "paragraph",
+            let attrs = firstNode.attrs,
+            attrs.keys.contains("textAlign")
+        else {
+            return nil
+        }
+
+        return NativeEditorTextAlignment(attrs: attrs)
     }
 
     private static func preservedTableCellContent(

@@ -167,8 +167,14 @@ nonisolated enum NativeEditorTableNodeFactory {
     private static func paragraphNode(from cell: NativeEditorTableCell) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "paragraph",
+            attrs: paragraphAttrs(from: cell),
             content: cell.inlineContent.map(NativeEditorDocument.inlineNodes(from:)) ??
                 NativeEditorDocument.inlineNodes(from: AttributedString(cell.plainText))
         )
+    }
+
+    private static func paragraphAttrs(from cell: NativeEditorTableCell) -> [String: ProseMirrorJSONValue]? {
+        guard let textAlignment = cell.textAlignment else { return nil }
+        return ["textAlign": .string(textAlignment.rawValue)]
     }
 }

@@ -30,6 +30,7 @@ nonisolated struct NativeEditorTableCell: Equatable, Hashable, Sendable {
     var inlineContent: [NativeEditorInlineContent]?
     var preservedContent: [ProseMirrorNode]?
     var isHeader: Bool
+    var textAlignment: NativeEditorTextAlignment?
     var backgroundColor: String?
     var backgroundColorName: String?
     var columnWidth: Int?
@@ -42,6 +43,7 @@ nonisolated struct NativeEditorTableCell: Equatable, Hashable, Sendable {
         inlineContent: [NativeEditorInlineContent]? = nil,
         preservedContent: [ProseMirrorNode]? = nil,
         isHeader: Bool,
+        textAlignment: NativeEditorTextAlignment? = nil,
         backgroundColor: String? = nil,
         backgroundColorName: String?,
         columnWidth: Int? = nil,
@@ -53,6 +55,7 @@ nonisolated struct NativeEditorTableCell: Equatable, Hashable, Sendable {
         self.inlineContent = inlineContent
         self.preservedContent = preservedContent
         self.isHeader = isHeader
+        self.textAlignment = textAlignment
         self.backgroundColor = backgroundColor
         self.backgroundColorName = backgroundColorName
         self.columnWidth = columnWidth

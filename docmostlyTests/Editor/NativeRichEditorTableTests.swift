@@ -130,6 +130,46 @@ struct NativeRichEditorTableTests {
         #expect(firstCell?.content?.first?.content?.first?.text == "Updated")
     }
 
+    @Test func editingAlignedTableCellPreservesParagraphAlignmentAttribute() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": { "textAlign": "center" },
+                          "content": [{ "type": "text", "text": "Status" }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = try NativeEditorDocument(proseMirrorJSONData: data)
+        let blockID = try #require(viewModel.document.blocks.first?.id)
+
+        viewModel.updateTableCell(blockID: blockID, rowIndex: 0, columnIndex: 0, text: "Ready")
+
+        let cell = try #require(viewModel.document.proseMirrorDocument.content.first?.content?.first?.content?.first)
+        let paragraph = try #require(cell.content?.first)
+        #expect(paragraph.attrs?["textAlign"] == .string("center"))
+        #expect(paragraph.content?.first?.text == "Ready")
+    }
+
     @Test func editingTableCellPreservesInlineMarksInOtherCells() throws {
         let data = Data("""
         {
@@ -286,6 +326,39 @@ struct NativeRichEditorTableTests {
                 | [Spec](<folder name\doc>) |
                 """#
         )
+    }
+
+    @Test func markdownImportExportPreservesTableColumnAlignmentMarkers() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: """
+        | Metric | Owner | Status |
+        | :--- | :---: | ---: |
+        | Launch | Taylor | Ready |
+        """)
+
+        let block = try #require(blocks.first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected table block")
+            return
+        }
+
+        #expect(
+            NativeEditorMarkdownParser.tableMarkdown(from: table) ==
+                """
+                | Metric | Owner | Status |
+                | :--- | :---: | ---: |
+                | Launch | Taylor | Ready |
+                """
+        )
+
+        let rows = try #require(block.rawNode?.content)
+        let headerCells = try #require(rows.first?.content)
+        let bodyCells = try #require(rows.dropFirst().first?.content)
+        #expect(headerCells[0].content?.first?.attrs?["textAlign"] == .string("left"))
+        #expect(headerCells[1].content?.first?.attrs?["textAlign"] == .string("center"))
+        #expect(headerCells[2].content?.first?.attrs?["textAlign"] == .string("right"))
+        #expect(bodyCells[0].content?.first?.attrs?["textAlign"] == .string("left"))
+        #expect(bodyCells[1].content?.first?.attrs?["textAlign"] == .string("center"))
+        #expect(bodyCells[2].content?.first?.attrs?["textAlign"] == .string("right"))
     }
 
     @Test func editingTableCellPreservesUnsupportedRichContentInOtherCells() throws {
