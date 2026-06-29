@@ -264,7 +264,7 @@ extension NativeEditorMarkdownParser {
         body: String
     ) -> ProseMirrorNode {
         let attrs = docmostInlineHTMLAttributes(from: "<\(tagName)\(attributeText)>")
-        let content = NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: body)))
+        let content = NativeEditorDocument.inlineNodes(from: htmlTableInlineAttributedText(from: body))
 
         if let headingLevel = htmlTableHeadingLevel(from: tagName) {
             return ProseMirrorNode(
@@ -307,7 +307,7 @@ extension NativeEditorMarkdownParser {
         return [
             ProseMirrorNode(
                 type: "paragraph",
-                content: NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: html)))
+                content: NativeEditorDocument.inlineNodes(from: htmlTableInlineAttributedText(from: html))
             )
         ]
     }
@@ -460,31 +460,6 @@ extension NativeEditorMarkdownParser {
             attrs["textAlign"] = .string(textAlignment.rawValue)
         }
         return attrs.isEmpty ? nil : attrs
-    }
-
-    private static func htmlTableInlineContent(from html: String) -> [NativeEditorInlineContent] {
-        let inlineMarkdown = htmlTableInlineMarkdown(from: html)
-        let attributedText = inlineText(from: inlineMarkdown)
-        return NativeEditorDocument.inlineContent(from: NativeEditorDocument.inlineNodes(from: attributedText))
-    }
-
-    private static func htmlTableInlineMarkdown(from html: String) -> String {
-        let paragraphSeparated = htmlRegexReplacing(
-            pattern: #"</p>\s*<p\b[^>]*>"#,
-            in: html,
-            with: "\n"
-        )
-        let hardBreakSeparated = htmlRegexReplacing(
-            pattern: #"<br\s*/?>"#,
-            in: paragraphSeparated,
-            with: "\n"
-        )
-        let withoutOpeningParagraphs = htmlRegexReplacing(
-            pattern: #"<p\b[^>]*>"#,
-            in: hardBreakSeparated,
-            with: ""
-        )
-        return htmlRegexReplacing(pattern: #"</p>"#, in: withoutOpeningParagraphs, with: "")
     }
 
     private static func htmlTableSpan(from value: String?) -> Int {

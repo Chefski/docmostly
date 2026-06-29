@@ -104,6 +104,34 @@ struct NativeEditorTableHTMLImportTests {
         ])
     }
 
+    @Test func docmostHTMLTableCellKeepsPlainMarkdownCharactersLiteral() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td><p>Use *literal* _markers_ [draft] &amp; `backticks`</p></td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        #expect(cell.plainText == "Use *literal* _markers_ [draft] & `backticks`")
+        #expect(cell.inlineContent == nil)
+
+        let node = NativeEditorDocument.node(from: block)
+        let paragraph = try #require(node.content?.first?.content?.first?.content?.first)
+        let textNode = try #require(paragraph.content?.first)
+        #expect(textNode.text == "Use *literal* _markers_ [draft] & `backticks`")
+        #expect(textNode.marks == nil)
+    }
+
     @Test func docmostHTMLTableCellPreservesBlockContent() throws {
         let markdown = """
         <table>
