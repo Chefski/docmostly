@@ -272,6 +272,7 @@ enum NativeEditorMarkdownParser {
             ("# ", .heading(level: 1)),
             ("- ", .bulletListItem),
             ("* ", .bulletListItem),
+            ("+ ", .bulletListItem),
             ("> ", .blockquote)
         ]
 
@@ -280,8 +281,8 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func taskInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
-        let uncheckedPrefixes = ["- [ ] ", "* [ ] ", "[] ", "[ ] "]
-        let checkedPrefixes = ["- [x] ", "- [X] ", "* [x] ", "* [X] ", "[x] ", "[X] "]
+        let uncheckedPrefixes = ["- [ ] ", "* [ ] ", "+ [ ] ", "[] ", "[ ] "]
+        let checkedPrefixes = ["- [x] ", "- [X] ", "* [x] ", "* [X] ", "+ [x] ", "+ [X] ", "[x] ", "[X] "]
 
         if let prefix = uncheckedPrefixes.first(where: { text.hasPrefix($0) }) {
             return NativeEditorMarkdownInputRule(
