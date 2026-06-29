@@ -97,10 +97,39 @@ extension NativeEditorMarkdownParser {
         let trimmedLine = line.trimmingCharacters(in: .whitespaces)
         guard trimmedLine.contains("|") else { return nil }
 
+        var cells = splitMarkdownTableCells(from: trimmedLine)
+
+        if trimmedLine.first == "|", cells.first?.isEmpty == true {
+            cells.removeFirst()
+        }
+
+        if trimmedLine.last == "|", cells.last?.isEmpty == true {
+            cells.removeLast()
+        }
+
+        let trimmedCells = cells.map { $0.trimmingCharacters(in: .whitespaces) }
+        guard trimmedCells.isEmpty == false, trimmedCells.contains(where: { $0.isEmpty == false }) else {
+            return nil
+        }
+
+        return trimmedCells
+    }
+
+    private static func splitMarkdownTableCells(from line: String) -> [String] {
         var cells = [""]
         var isEscaped = false
+        let codeSpanRanges = markdownCodeSpanRanges(in: line[...], bodyStart: line.startIndex)
+        var index = line.startIndex
 
-        for character in trimmedLine {
+        while index < line.endIndex {
+            let character = line[index]
+            defer { index = line.index(after: index) }
+
+            if isInsideMarkdownCodeSpan(index, ranges: codeSpanRanges) {
+                cells[cells.count - 1].append(character)
+                continue
+            }
+
             if isEscaped {
                 if character == "|" {
                     cells[cells.count - 1].append(character)
@@ -125,20 +154,7 @@ extension NativeEditorMarkdownParser {
             cells[cells.count - 1].append("\\")
         }
 
-        if trimmedLine.first == "|", cells.first?.isEmpty == true {
-            cells.removeFirst()
-        }
-
-        if trimmedLine.last == "|", cells.last?.isEmpty == true {
-            cells.removeLast()
-        }
-
-        let trimmedCells = cells.map { $0.trimmingCharacters(in: .whitespaces) }
-        guard trimmedCells.isEmpty == false, trimmedCells.contains(where: { $0.isEmpty == false }) else {
-            return nil
-        }
-
-        return trimmedCells
+        return cells
     }
 
     private static func isMarkdownTableSeparatorRow(_ line: String, columnCount: Int) -> Bool {
