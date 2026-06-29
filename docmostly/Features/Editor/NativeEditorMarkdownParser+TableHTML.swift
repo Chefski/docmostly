@@ -140,9 +140,17 @@ extension NativeEditorMarkdownParser {
         return NativeEditorTextAlignment(rawValue: value.lowercased())
     }
 
-    private static func htmlTablePreservedContent(from html: String) -> [ProseMirrorNode]? {
+    private static func htmlTablePreservedContent(
+        from html: String,
+        dropsSinglePlainParagraph: Bool = true
+    ) -> [ProseMirrorNode]? {
+        let listMatches = htmlTableListContentMatches(from: html)
+        let listRanges = listMatches.map(\.range)
         let textBlockMatches = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
+                guard htmlTableRange(match.range, isNestedIn: listRanges) == false else {
+                    return nil
+                }
                 guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
                       let attributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
                       let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
@@ -150,7 +158,7 @@ extension NativeEditorMarkdownParser {
                 }
 
                 return HTMLTableContentMatch(
-                    location: match.range.location,
+                    range: match.range,
                     node: htmlTableContentNode(tagName: tagName, attributeText: attributeText, body: body)
                 )
             }
@@ -159,6 +167,9 @@ extension NativeEditorMarkdownParser {
             in: html
         )
         .compactMap { match -> HTMLTableContentMatch? in
+            guard htmlTableRange(match.range, isNestedIn: listRanges) == false else {
+                return nil
+            }
             guard let preAttributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
                   let codeAttributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
                   let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
@@ -166,7 +177,7 @@ extension NativeEditorMarkdownParser {
             }
 
             return HTMLTableContentMatch(
-                location: match.range.location,
+                range: match.range,
                 node: htmlTableCodeBlockNode(
                     preAttributeText: preAttributeText,
                     codeAttributeText: codeAttributeText,
@@ -174,15 +185,40 @@ extension NativeEditorMarkdownParser {
                 )
             )
         }
-        let nodes = (textBlockMatches + codeBlockMatches)
-            .sorted { $0.location < $1.location }
+        let nodes = (textBlockMatches + codeBlockMatches + listMatches)
+            .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
         guard nodes.isEmpty == false else { return nil }
-        if nodes.count == 1, nodes.first?.type == "paragraph", nodes.first?.attrs?.isEmpty != false {
+        if dropsSinglePlainParagraph,
+           nodes.count == 1,
+           nodes.first?.type == "paragraph",
+           nodes.first?.attrs?.isEmpty != false {
             return nil
         }
         return nodes
+    }
+
+    private static func htmlTableListContentMatches(from html: String) -> [HTMLTableContentMatch] {
+        htmlRegexMatches(pattern: #"<(ul|ol)\b([^>]*)>(.*?)</\1>"#, in: html)
+            .compactMap { match -> HTMLTableContentMatch? in
+                guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
+                      let attributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
+                      let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
+                    return nil
+                }
+
+                return HTMLTableContentMatch(
+                    range: match.range,
+                    node: htmlTableListNode(tagName: tagName, attributeText: attributeText, body: body)
+                )
+            }
+    }
+
+    private static func htmlTableRange(_ range: NSRange, isNestedIn ranges: [NSRange]) -> Bool {
+        ranges.contains { container in
+            range.location > container.location && NSMaxRange(range) <= NSMaxRange(container)
+        }
     }
 
     private static func htmlTableContentNode(
@@ -206,6 +242,88 @@ extension NativeEditorMarkdownParser {
             attrs: htmlTableContentAttrs(baseAttrs: [:], htmlAttrs: attrs),
             content: content
         )
+    }
+
+    private static func htmlTableListNode(
+        tagName: String,
+        attributeText: String,
+        body: String
+    ) -> ProseMirrorNode {
+        let attrs = docmostInlineHTMLAttributes(from: "<\(tagName)\(attributeText)>")
+        let isOrderedList = htmlTagNameMatches(tagName, "ol")
+        let isTaskList = isOrderedList == false &&
+            attrs["data-type"]?.compare("taskList", options: .caseInsensitive) == .orderedSame
+        let nodeType = isOrderedList ? "orderedList" : (isTaskList ? "taskList" : "bulletList")
+        var nodeAttrs = [String: ProseMirrorJSONValue]()
+
+        if isOrderedList, let start = Int(attrs["start"] ?? ""), start != 1 {
+            nodeAttrs["start"] = .int(start)
+        }
+
+        return ProseMirrorNode(
+            type: nodeType,
+            attrs: nodeAttrs.isEmpty ? nil : nodeAttrs,
+            content: htmlTableListItems(from: body, itemType: isTaskList ? "taskItem" : "listItem")
+        )
+    }
+
+    private static func htmlTableListItems(from html: String, itemType: String) -> [ProseMirrorNode] {
+        htmlRegexMatches(pattern: #"<li\b([^>]*)>(.*?)</li>"#, in: html).compactMap { match in
+            guard let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
+                  let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
+                return nil
+            }
+
+            return htmlTableListItemNode(itemType: itemType, attributeText: attributeText, body: body)
+        }
+    }
+
+    private static func htmlTableListItemNode(
+        itemType: String,
+        attributeText: String,
+        body: String
+    ) -> ProseMirrorNode {
+        var attrs = [String: ProseMirrorJSONValue]()
+        if itemType == "taskItem" {
+            attrs["checked"] = .bool(htmlTableTaskItemIsChecked(attributeText: attributeText, body: body))
+        }
+
+        return ProseMirrorNode(
+            type: itemType,
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: htmlTableListItemContent(from: body)
+        )
+    }
+
+    private static func htmlTableListItemContent(from html: String) -> [ProseMirrorNode] {
+        if let preservedContent = htmlTablePreservedContent(from: html, dropsSinglePlainParagraph: false) {
+            return preservedContent
+        }
+
+        return [
+            ProseMirrorNode(
+                type: "paragraph",
+                content: NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: html)))
+            )
+        ]
+    }
+
+    private static func htmlTableTaskItemIsChecked(attributeText: String, body: String) -> Bool {
+        let attrs = docmostInlineHTMLAttributes(from: "<li\(attributeText)>")
+        if let value = attrs["data-checked"] ?? attrs["checked"] ?? attrs["aria-checked"] {
+            return htmlTableBooleanAttributeIsTruthy(value)
+        }
+
+        return htmlRegexMatches(pattern: #"<input\b[^>]*\bchecked(?:\s*=\s*['"]?(?:checked|true|1)['"]?)?"#, in: body)
+            .isEmpty == false
+    }
+
+    private static func htmlTableBooleanAttributeIsTruthy(_ value: String) -> Bool {
+        let normalizedValue = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedValue == "" ||
+            normalizedValue == "true" ||
+            normalizedValue == "checked" ||
+            normalizedValue == "1"
     }
 
     private static func htmlTableCodeBlockNode(
@@ -379,6 +497,6 @@ extension NativeEditorMarkdownParser {
 }
 
 private struct HTMLTableContentMatch {
-    var location: Int
+    var range: NSRange
     var node: ProseMirrorNode
 }

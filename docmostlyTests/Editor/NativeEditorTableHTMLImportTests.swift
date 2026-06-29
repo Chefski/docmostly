@@ -176,4 +176,54 @@ struct NativeEditorTableHTMLImportTests {
         print(value)
         """)
     }
+
+    @Test func docmostHTMLTableCellPreservesListContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <ul>
+        <li><p>Plan rollout</p></li>
+        <li><p>Measure feedback</p></li>
+        </ul>
+        <ol start="3">
+        <li><p>Ship polish</p></li>
+        </ol>
+        <ul data-type="taskList">
+        <li data-type="taskItem" data-checked="true"><p>Confirm docs</p></li>
+        </ul>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText == "Plan rolloutMeasure feedbackShip polishConfirm docs")
+        #expect(preservedContent.map(\.type) == ["bulletList", "orderedList", "taskList"])
+
+        let bulletItems = try #require(preservedContent[0].content)
+        #expect(bulletItems.map(\.type) == ["listItem", "listItem"])
+        #expect(bulletItems[0].content?.first?.content?.first?.text == "Plan rollout")
+        #expect(bulletItems[1].content?.first?.content?.first?.text == "Measure feedback")
+        #expect(preservedContent[1].attrs?["start"] == .int(3))
+        #expect(preservedContent[1].content?.first?.content?.first?.content?.first?.text == "Ship polish")
+        #expect(preservedContent[2].content?.first?.type == "taskItem")
+        #expect(preservedContent[2].content?.first?.attrs?["checked"] == .bool(true))
+        #expect(preservedContent[2].content?.first?.content?.first?.content?.first?.text == "Confirm docs")
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["bulletList", "orderedList", "taskList"])
+        #expect(cellContent[1].attrs?["start"] == .int(3))
+        #expect(cellContent[2].content?.first?.attrs?["checked"] == .bool(true))
+    }
 }
