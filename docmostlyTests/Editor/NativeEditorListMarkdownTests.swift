@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorListMarkdownTests {
     @Test func markdownImportSupportsPlusListMarkers() throws {
         let blocks = NativeEditorMarkdownParser.blocks(from: """
