@@ -8,11 +8,14 @@ nonisolated extension NativeEditorDocument {
         case "hardBreak":
             [.hardBreak]
         case "mention":
-            [.mention(mention(from: node))]
+            [.mention(mention(from: node), marks: textMarks(from: node.marks ?? []))]
         case "status":
-            [.status(statusBadge(from: node))]
+            [.status(statusBadge(from: node), marks: textMarks(from: node.marks ?? []))]
         case "mathInline":
-            [.mathInline(NativeEditorMathInline(text: node.attrs?["text"]?.stringValue ?? ""))]
+            [.mathInline(
+                NativeEditorMathInline(text: node.attrs?["text"]?.stringValue ?? ""),
+                marks: textMarks(from: node.marks ?? [])
+            )]
         default:
             nestedInlineContent(from: node)
         }
@@ -34,19 +37,22 @@ nonisolated extension NativeEditorDocument {
             return segment
         case .hardBreak:
             return AttributedString("\n")
-        case .mention(let mention):
+        case .mention(let mention, let marks):
             var segment = AttributedString(mention.displayText)
             segment[NativeEditorMentionAttribute.self] = mention
             segment.foregroundColor = DocmostlyTheme.primary
+            apply(marks, to: &segment)
             return segment
-        case .status(let status):
+        case .status(let status, let marks):
             var segment = AttributedString(status.text)
             segment[NativeEditorStatusAttribute.self] = status
+            apply(marks, to: &segment)
             return segment
-        case .mathInline(let math):
+        case .mathInline(let math, let marks):
             var segment = AttributedString(math.text)
             segment[NativeEditorMathInlineAttribute.self] = math
             segment.inlinePresentationIntent = .code
+            apply(marks, to: &segment)
             return segment
         case .unsupported(let node):
             return AttributedString(node.text ?? "")

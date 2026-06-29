@@ -3,9 +3,9 @@ import Foundation
 nonisolated enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codable {
     case text(String, marks: [NativeEditorTextMark])
     case hardBreak
-    case mention(NativeEditorMention)
-    case status(NativeEditorStatusBadge)
-    case mathInline(NativeEditorMathInline)
+    case mention(NativeEditorMention, marks: [NativeEditorTextMark] = [])
+    case status(NativeEditorStatusBadge, marks: [NativeEditorTextMark] = [])
+    case mathInline(NativeEditorMathInline, marks: [NativeEditorTextMark] = [])
     case unsupported(ProseMirrorNode)
 
     var plainText: String {
@@ -14,11 +14,11 @@ nonisolated enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codab
             text
         case .hardBreak:
             "\n"
-        case .mention(let mention):
+        case .mention(let mention, _):
             mention.displayText
-        case .status(let status):
+        case .status(let status, _):
             status.text
-        case .mathInline(let math):
+        case .mathInline(let math, _):
             math.text
         case .unsupported(let node):
             node.text ?? ""
@@ -40,8 +40,14 @@ nonisolated enum NativeEditorInlineContent: Equatable, Hashable, Sendable, Codab
             }
         case .hardBreak:
             false
-        case .mention, .status, .mathInline:
-            false
+        case .mention(_, let marks), .status(_, let marks), .mathInline(_, let marks):
+            marks.contains { mark in
+                if case .unknown = mark {
+                    return true
+                }
+
+                return false
+            }
         case .unsupported:
             true
         }

@@ -121,4 +121,53 @@ struct NativeEditorInlineCommentMarkTests {
             ProseMirrorMark(type: "comment", attrs: ["commentId": .string("comment-2"), "resolved": .bool(true)])
         ])
     }
+
+    @Test func preservesInlineCommentMarksOnMentionAtoms() throws {
+        let data = Data("""
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Ask " },
+                {
+                  "type": "mention",
+                  "attrs": {
+                    "id": "mention-1",
+                    "label": "Taylor",
+                    "entityType": "user",
+                    "entityId": "user-1"
+                  },
+                  "marks": [
+                    {
+                      "type": "comment",
+                      "attrs": { "commentId": "comment-1", "resolved": false }
+                    }
+                  ]
+                },
+                { "type": "text", "text": " today" }
+              ]
+            }
+          ]
+        }
+        """.utf8)
+
+        let document = try NativeEditorDocument(proseMirrorJSONData: data)
+        let block = try #require(document.blocks.first)
+        let mentionRun = try #require(block.text.runs.first { run in
+            run[NativeEditorMentionAttribute.self]?.identifier == "mention-1"
+        })
+
+        #expect(mentionRun.nativeEditorInlineComments == [
+            NativeEditorInlineCommentMark(commentID: "comment-1", isResolved: false)
+        ])
+
+        let mentionNode = try #require(
+            document.proseMirrorDocument.content.first?.content?.first { $0.type == "mention" }
+        )
+        #expect(mentionNode.marks == [
+            ProseMirrorMark(type: "comment", attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)])
+        ])
+    }
 }

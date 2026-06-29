@@ -452,29 +452,48 @@ nonisolated extension NativeEditorDocument {
 
     private static func inlineAtom(from run: AttributedString.Runs.Run) -> InlineAtomEncoding? {
         if let mention = run[NativeEditorMentionAttribute.self] {
+            var node = ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+            node.marks = atomMarks(from: run, presentationMarkType: nil)
             return InlineAtomEncoding(
                 displayText: mention.displayText,
-                node: ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+                node: node
             )
         }
 
         if let status = run[NativeEditorStatusAttribute.self] {
+            var node = ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
+            node.marks = atomMarks(from: run, presentationMarkType: "bold")
             return InlineAtomEncoding(
                 displayText: status.text,
-                node: ProseMirrorNode(type: "status", attrs: statusAttrs(from: status)),
+                node: node,
                 presentationMarkType: "bold"
             )
         }
 
         if let math = run[NativeEditorMathInlineAttribute.self] {
+            var node = ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+            node.marks = atomMarks(from: run, presentationMarkType: "code")
             return InlineAtomEncoding(
                 displayText: math.text,
-                node: ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)]),
+                node: node,
                 presentationMarkType: "code"
             )
         }
 
         return nil
+    }
+
+    private static func atomMarks(
+        from run: AttributedString.Runs.Run,
+        presentationMarkType: String?
+    ) -> [ProseMirrorMark]? {
+        guard var marks = marks(from: run) else { return nil }
+
+        if let presentationMarkType {
+            marks.removeAll { $0.type == presentationMarkType }
+        }
+
+        return marks.isEmpty ? nil : marks
     }
 
     private static func marksForTextSurroundingAtom(
@@ -496,12 +515,24 @@ nonisolated extension NativeEditorDocument {
             ProseMirrorNode(type: "text", marks: proseMirrorMarks(from: marks), text: text)
         case .hardBreak:
             ProseMirrorNode(type: "hardBreak")
-        case .mention(let mention):
-            ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
-        case .status(let status):
-            ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
-        case .mathInline(let math):
-            ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+        case .mention(let mention, let marks):
+            ProseMirrorNode(
+                type: "mention",
+                attrs: attrs(from: mention),
+                marks: proseMirrorMarks(from: marks)
+            )
+        case .status(let status, let marks):
+            ProseMirrorNode(
+                type: "status",
+                attrs: statusAttrs(from: status),
+                marks: proseMirrorMarks(from: marks)
+            )
+        case .mathInline(let math, let marks):
+            ProseMirrorNode(
+                type: "mathInline",
+                attrs: ["text": .string(math.text)],
+                marks: proseMirrorMarks(from: marks)
+            )
         case .unsupported(let node):
             node
         }
