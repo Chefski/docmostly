@@ -26,6 +26,14 @@ struct NativeEditorSlashCommandTests {
         #expect(titles.contains("Google Sheets"))
     }
 
+    @Test func slashCommandInventoryUsesDocmostWebCommandTitles() {
+        let titles = NativeEditorCommand.allCases.map(\.title)
+
+        #expect(titles.contains("Embed PDF"))
+        #expect(titles.contains("File attachment"))
+        #expect(titles.contains("Toggle block"))
+    }
+
     @Test func slashCommandFilteringUsesDocmostSearchTerms() {
         let expectations = [
             SlashCommandFilterExpectation(query: "today", title: "Date"),
