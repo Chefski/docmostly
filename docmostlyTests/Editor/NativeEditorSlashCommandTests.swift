@@ -177,6 +177,24 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func applyingSyncedBlockSlashCommandCreatesDocmostNodeID() throws {
+        let viewModel = viewModelAfterApplying(.syncedBlock)
+        let block = viewModel.document.blocks[0]
+
+        guard case .transclusionSource(let source) = block.kind else {
+            Issue.record("Expected synced block slash command to create a transclusion source")
+            return
+        }
+
+        let identifier = try #require(source.identifier)
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+
+        #expect(identifier.count == 12)
+        #expect(identifier.unicodeScalars.allSatisfy { (97...122).contains(Int($0.value)) })
+        #expect(node.type == "transclusionSource")
+        #expect(node.attrs?["id"] == .string(identifier))
+    }
+
     private func viewModelAfterApplying(_ command: NativeEditorCommand) -> NativeRichEditorViewModel {
         let block = NativeEditorBlock(
             kind: .paragraph,
