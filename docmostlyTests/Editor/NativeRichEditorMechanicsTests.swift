@@ -187,6 +187,36 @@ struct NativeRichEditorMechanicsTests {
         #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
     }
 
+    @Test func markdownInputRuleSupportsDocmostInlineMarkShortcuts() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Use **bold** *italic* `code` and ~~strike~~")
+        viewModel.handleDocumentChanged()
+
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Use bold italic code and strike")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.contains {
+            $0.text == "bold" && $0.marks?.contains(ProseMirrorMark(type: "bold")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "italic" && $0.marks?.contains(ProseMirrorMark(type: "italic")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "code" && $0.marks?.contains(ProseMirrorMark(type: "code")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "strike" && $0.marks?.contains(ProseMirrorMark(type: "strike")) == true
+        })
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
