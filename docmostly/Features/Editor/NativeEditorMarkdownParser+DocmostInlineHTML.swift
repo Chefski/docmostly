@@ -113,6 +113,7 @@ extension NativeEditorMarkdownParser {
         in markdown: Substring,
         bodyStart: String.Index
     ) -> Range<String.Index>? {
+        let codeSpanRanges = markdownCodeSpanRanges(in: markdown, bodyStart: bodyStart)
         var depth = 1
         var searchStart = bodyStart
 
@@ -122,7 +123,7 @@ extension NativeEditorMarkdownParser {
                 in: markdown,
                 startingAt: searchStart,
                 before: closeRange.lowerBound,
-                bodyStart: bodyStart
+                codeSpanRanges: codeSpanRanges
             ) {
                 depth += 1
                 searchStart = nestedOpenRange.upperBound
@@ -143,13 +144,13 @@ extension NativeEditorMarkdownParser {
         in markdown: Substring,
         startingAt searchStart: String.Index,
         before upperBound: String.Index,
-        bodyStart: String.Index
+        codeSpanRanges: [Range<String.Index>]
     ) -> Range<String.Index>? {
         var currentSearchStart = searchStart
 
         while currentSearchStart < upperBound,
               let openRange = markdown[currentSearchStart..<upperBound].range(of: "<span", options: .caseInsensitive) {
-            if isInsideMarkdownCodeSpan(openRange.lowerBound, in: markdown, bodyStart: bodyStart) {
+            if isInsideMarkdownCodeSpan(openRange.lowerBound, ranges: codeSpanRanges) {
                 currentSearchStart = openRange.upperBound
                 continue
             }
@@ -170,36 +171,70 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func isInsideMarkdownCodeSpan(
-        _ index: String.Index,
+    private static func markdownCodeSpanRanges(
         in markdown: Substring,
         bodyStart: String.Index
-    ) -> Bool {
+    ) -> [Range<String.Index>] {
+        var ranges = [Range<String.Index>]()
+        var activeBacktickRunStart: String.Index?
         var activeBacktickRunLength: Int?
         var currentIndex = bodyStart
 
-        while currentIndex < index {
+        while currentIndex < markdown.endIndex {
             guard markdown[currentIndex] == "`" else {
                 currentIndex = markdown.index(after: currentIndex)
                 continue
             }
 
+            let runStart = currentIndex
             var runLength = 0
-            while currentIndex < index, markdown[currentIndex] == "`" {
+            while currentIndex < markdown.endIndex, markdown[currentIndex] == "`" {
                 runLength += 1
                 currentIndex = markdown.index(after: currentIndex)
             }
 
             if let activeLength = activeBacktickRunLength {
                 if activeLength == runLength {
+                    if let activeBacktickRunStart {
+                        ranges.append(activeBacktickRunStart..<currentIndex)
+                    }
+                    activeBacktickRunStart = nil
                     activeBacktickRunLength = nil
                 }
             } else {
+                activeBacktickRunStart = runStart
                 activeBacktickRunLength = runLength
             }
         }
 
-        return activeBacktickRunLength != nil
+        if let activeBacktickRunStart {
+            ranges.append(activeBacktickRunStart..<markdown.endIndex)
+        }
+
+        return ranges
+    }
+
+    private static func isInsideMarkdownCodeSpan(
+        _ index: String.Index,
+        ranges: [Range<String.Index>]
+    ) -> Bool {
+        var low = ranges.startIndex
+        var high = ranges.endIndex
+
+        while low < high {
+            let mid = low + (high - low) / 2
+            let range = ranges[mid]
+
+            if index < range.lowerBound {
+                high = mid
+            } else if index >= range.upperBound {
+                low = mid + 1
+            } else {
+                return true
+            }
+        }
+
+        return false
     }
 
     private static func openingHTMLTagRange(in text: String, tagName: String) -> Range<String.Index>? {
