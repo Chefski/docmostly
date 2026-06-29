@@ -12,14 +12,7 @@ extension NativeEditorMarkdownParser {
 
         while let range = nextHTMLTablePreservedInlineRange(in: remaining) {
             appendHTMLTablePlainText(String(remaining[..<range.lowerBound]), to: &output)
-
-            var preserved = AttributedString("")
-            appendMarkdownText(
-                String(remaining[range]),
-                to: &preserved,
-                usesFoundationMarkdownParser: false
-            )
-            output += preserved
+            appendHTMLTablePreservedInline(String(remaining[range]), to: &output)
             remaining = remaining[range.upperBound...]
         }
 
@@ -53,9 +46,25 @@ extension NativeEditorMarkdownParser {
             nextHTMLTablePreservedTagRange(in: html, tagName: "mark"),
             nextHTMLTablePreservedTagRange(in: html, tagName: "u"),
             nextHTMLTablePreservedTagRange(in: html, tagName: "sup"),
-            nextHTMLTablePreservedTagRange(in: html, tagName: "sub")
+            nextHTMLTablePreservedTagRange(in: html, tagName: "sub"),
+            nextHTMLTableStandardMarkRange(in: html)
         ]
         .compactMap { $0 }
+        .min { $0.lowerBound < $1.lowerBound }
+    }
+
+    private static func nextHTMLTableStandardMarkRange(in html: Substring) -> Range<String.Index>? {
+        [
+            "strong",
+            "b",
+            "em",
+            "i",
+            "code",
+            "s",
+            "strike",
+            "del"
+        ]
+        .compactMap { nextHTMLTablePreservedTagRange(in: html, tagName: $0) }
         .min { $0.lowerBound < $1.lowerBound }
     }
 
@@ -130,6 +139,67 @@ extension NativeEditorMarkdownParser {
         output += AttributedString(unescapedInlineHTMLText(withoutTags))
     }
 
+    private static func appendHTMLTablePreservedInline(_ html: String, to output: inout AttributedString) {
+        if let standardMark = htmlTableStandardMark(from: html) {
+            var markedText = htmlTableInlineAttributedText(from: standardMark.body)
+            NativeEditorDocument.apply([standardMark.mark], to: &markedText)
+            output += markedText
+            return
+        }
+
+        var preserved = AttributedString("")
+        appendMarkdownText(html, to: &preserved, usesFoundationMarkdownParser: false)
+        output += preserved
+    }
+
+    private static func htmlTableStandardMark(from html: String) -> (mark: NativeEditorTextMark, body: String)? {
+        let trimmedHTML = html.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedHTML.hasPrefix("<"),
+              let openTagEnd = trimmedHTML.firstIndex(of: ">") else {
+            return nil
+        }
+
+        let tagNameStart = trimmedHTML.index(after: trimmedHTML.startIndex)
+        let tagName = htmlTableOpeningTagName(in: trimmedHTML, startingAt: tagNameStart).lowercased()
+        guard let mark = htmlTableStandardMark(for: tagName) else { return nil }
+
+        let closingTag = "</\(tagName)>"
+        guard let closeRange = trimmedHTML.range(
+            of: closingTag,
+            options: [.caseInsensitive, .backwards]
+        ) else {
+            return nil
+        }
+
+        let bodyStart = trimmedHTML.index(after: openTagEnd)
+        return (mark, String(trimmedHTML[bodyStart..<closeRange.lowerBound]))
+    }
+
+    private static func htmlTableStandardMark(for tagName: String) -> NativeEditorTextMark? {
+        switch tagName {
+        case "strong", "b":
+            .bold
+        case "em", "i":
+            .italic
+        case "code":
+            .code
+        case "s", "strike", "del":
+            .strikethrough
+        default:
+            nil
+        }
+    }
+
+    private static func htmlTableOpeningTagName(in html: String, startingAt index: String.Index) -> String {
+        var currentIndex = index
+        while currentIndex < html.endIndex,
+              html[currentIndex].isHTMLTableInlineTagNameCharacter {
+            currentIndex = html.index(after: currentIndex)
+        }
+
+        return String(html[index..<currentIndex])
+    }
+
     private static func htmlTableInlineRegexReplacing(
         pattern: String,
         in text: String,
@@ -144,5 +214,11 @@ extension NativeEditorMarkdownParser {
 
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         return expression.stringByReplacingMatches(in: text, range: range, withTemplate: replacement)
+    }
+}
+
+private extension Character {
+    var isHTMLTableInlineTagNameCharacter: Bool {
+        isLetter || isNumber || self == "-"
     }
 }
