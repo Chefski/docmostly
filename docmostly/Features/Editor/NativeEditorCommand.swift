@@ -128,9 +128,9 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .audio:
             "Audio"
         case .pdf:
-            "PDF"
+            "Embed PDF"
         case .fileAttachment:
-            "File"
+            "File attachment"
         case .table:
             "Table"
         case .baseInline:
@@ -140,7 +140,7 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .callout:
             "Callout"
         case .details:
-            "Details"
+            "Toggle block"
         case .mathInline:
             "Math Inline"
         case .pageBreak:
@@ -229,9 +229,9 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .audio:
             "Audio placeholder"
         case .pdf:
-            "PDF placeholder"
+            "Upload and embed a PDF file"
         case .fileAttachment:
-            "File attachment placeholder"
+            "Upload any file from your device"
         case .table:
             "Two-column table"
         case .baseInline:
@@ -241,7 +241,7 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .callout:
             "Highlighted note"
         case .details:
-            "Collapsible detail section"
+            "Insert collapsible block"
         case .mathInline:
             "Inline equation"
         case .pageBreak:
