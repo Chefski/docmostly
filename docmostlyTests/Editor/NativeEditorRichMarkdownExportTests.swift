@@ -222,7 +222,9 @@ struct NativeEditorRichMarkdownExportTests {
         <div data-type="embed" data-src="https://example.com" data-provider="Example">
         <a href="https://example.com" target="blank">https://example.com</a>
         </div>
-        <div data-type="mathBlock" data-katex="true">E = mc^2</div>
+        $$
+        E = mc^2
+        $$
         """)
     }
 
