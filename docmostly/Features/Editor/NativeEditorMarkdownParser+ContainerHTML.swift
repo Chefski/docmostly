@@ -19,7 +19,7 @@ extension NativeEditorMarkdownParser {
     static func docmostContainerHTMLMarkdown(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .callout(let callout):
-            callout.icon == nil ? nil : calloutHTMLMarkdown(from: callout)
+            calloutHTMLMarkdown(from: callout)
         case .details(let details):
             detailsHTMLMarkdown(from: details)
         case .mathBlock(let math):
