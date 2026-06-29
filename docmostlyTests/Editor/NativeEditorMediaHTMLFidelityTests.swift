@@ -53,6 +53,24 @@ struct NativeEditorMediaHTMLFidelityTests {
         #expect(NativeEditorMarkdownParser.markdown(from: blocks) == embedHTML())
     }
 
+    @Test func importsStandaloneIframeHTMLAsIframeEmbedBlock() throws {
+        let markdown = #"<iframe src="https://example.com/embed/demo"></iframe>"#
+        let blocks = NativeEditorMarkdownParser.blocks(from: markdown)
+
+        try #require(blocks.count == 1)
+        guard case .embed(let embed) = blocks[0].kind else {
+            Issue.record("Expected standalone iframe HTML to import as an iframe embed block.")
+            return
+        }
+
+        #expect(embed.source == "https://example.com/embed/demo")
+        #expect(embed.provider == "iframe")
+        #expect(NativeEditorDocument.node(from: blocks[0]).type == "embed")
+        #expect(NativeEditorMarkdownParser.markdown(from: blocks) == """
+        [https://example.com/embed/demo](https://example.com/embed/demo)
+        """)
+    }
+
     private func nativeBlocks() -> [NativeEditorBlock] {
         [
             NativeEditorBlock(kind: .image(imageBlock()), text: AttributedString("Hero"), alignment: .left),
