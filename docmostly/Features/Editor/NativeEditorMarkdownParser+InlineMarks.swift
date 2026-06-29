@@ -71,8 +71,24 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func codeMarkdown(from text: String) -> String {
-        let delimiter = text.contains("`") ? "``" : "`"
+        let delimiter = String(repeating: "`", count: longestBacktickRunLength(in: text) + 1)
         return "\(delimiter)\(text)\(delimiter)"
+    }
+
+    private static func longestBacktickRunLength(in text: String) -> Int {
+        var longestRunLength = 0
+        var currentRunLength = 0
+
+        for character in text {
+            if character == "`" {
+                currentRunLength += 1
+                longestRunLength = max(longestRunLength, currentRunLength)
+            } else {
+                currentRunLength = 0
+            }
+        }
+
+        return longestRunLength
     }
 
     private static func escapedMarkdownLinkLabel(_ text: String) -> String {
