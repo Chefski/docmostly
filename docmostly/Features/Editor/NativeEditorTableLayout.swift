@@ -2,6 +2,13 @@ import Foundation
 import SwiftUI
 
 enum NativeEditorTableLayout {
+    struct CSSRGBAComponents {
+        var red: Double
+        var green: Double
+        var blue: Double
+        var opacity: Double
+    }
+
     static let minimumColumnWidth: CGFloat = 128
     static let defaultColumnWidth: CGFloat = 184
     static let compactColumnWidth: CGFloat = 176
@@ -45,6 +52,17 @@ enum NativeEditorTableLayout {
             return hexColor
         }
 
+        guard let components = cssRGBAComponents(from: trimmedValue) else { return nil }
+        return Color(
+            red: components.red / 255,
+            green: components.green / 255,
+            blue: components.blue / 255,
+            opacity: components.opacity
+        )
+    }
+
+    nonisolated static func cssRGBAComponents(from value: String) -> CSSRGBAComponents? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowercasedValue = trimmedValue.lowercased()
         guard lowercasedValue.hasPrefix("rgb(") || lowercasedValue.hasPrefix("rgba("),
               let openParen = trimmedValue.firstIndex(of: "("),
@@ -63,20 +81,15 @@ enum NativeEditorTableLayout {
         }
 
         let opacity = components.indices.contains(3) ? cssAlphaComponent(from: components[3]) ?? 1 : 1
-        return Color(
-            red: red / 255,
-            green: green / 255,
-            blue: blue / 255,
-            opacity: opacity
-        )
+        return CSSRGBAComponents(red: red, green: green, blue: blue, opacity: opacity)
     }
 
-    private static func cssColorComponent(from value: String) -> Double? {
+    nonisolated private static func cssColorComponent(from value: String) -> Double? {
         guard let component = Double(value) else { return nil }
         return min(max(component, 0), 255)
     }
 
-    private static func cssAlphaComponent(from value: String) -> Double? {
+    nonisolated private static func cssAlphaComponent(from value: String) -> Double? {
         if value.hasSuffix("%") {
             let percentageText = value.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
             guard let percentage = Double(percentageText) else { return nil }

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -108,20 +107,12 @@ struct NativeEditorTablePayloadTests {
         #expect(encodedCell.attrs?["backgroundColorName"] == .string("yellow"))
     }
 
-    @MainActor
     @Test func tableCellBackgroundRespectsRGBAAlphaPercentages() {
-        let cell = NativeEditorTableCell(
-            plainText: "Risk",
-            isHeader: false,
-            backgroundColor: "rgba(255, 0, 0, 50%)",
-            backgroundColorName: nil
-        )
+        let components = NativeEditorTableLayout.cssRGBAComponents(from: "rgba(255, 0, 0, 50%)")
 
-        let resolved = NativeEditorTableLayout.cellBackground(for: cell).resolve(in: EnvironmentValues())
-
-        #expect(resolved.red == 1)
-        #expect(resolved.green == 0)
-        #expect(resolved.blue == 0)
-        #expect(resolved.opacity == 0.5)
+        #expect(components?.red == 255)
+        #expect(components?.green == 0)
+        #expect(components?.blue == 0)
+        #expect(components?.opacity == 0.5)
     }
 }
