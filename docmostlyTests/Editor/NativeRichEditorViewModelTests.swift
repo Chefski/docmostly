@@ -168,10 +168,13 @@ struct NativeRichEditorViewModelTests {
 
         viewModel.applySlashCommand(.mermaid)
 
+        let mermaidSeed = "flowchart LR\n    A --> B"
         #expect(viewModel.document.blocks[0].kind == .codeBlock(language: "mermaid"))
+        #expect(String(viewModel.document.blocks[0].text.characters) == mermaidSeed)
         #expect(viewModel.document.blocks[0].isEditable == true)
         #expect(viewModel.document.proseMirrorDocument.content.first?.type == "codeBlock")
         #expect(viewModel.document.proseMirrorDocument.content.first?.attrs?["language"] == .string("mermaid"))
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.first?.text == mermaidSeed)
     }
 
     @Test func applyingDateTimeAndEmojiSlashCommandsReplacesSlashToken() throws {
@@ -445,10 +448,6 @@ struct NativeRichEditorViewModelTests {
         proseMirrorInlineNodes(from: viewModel).flatMap { $0.marks ?? [] }
     }
 
-    private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
-        viewModel.document.proseMirrorDocument.content.first?.content ?? []
-    }
-
     private func inlineSlashCommandText(
         command: NativeEditorCommand,
         slashText: String,
@@ -492,6 +491,10 @@ private struct SlashCommandExpectation {
     let command: NativeEditorCommand
     let nodeType: String
     let label: String
+}
+
+private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
+    viewModel.document.proseMirrorDocument.content.first?.content ?? []
 }
 
 private func expectDocmostDefaultTableShape(_ table: NativeEditorTable) {

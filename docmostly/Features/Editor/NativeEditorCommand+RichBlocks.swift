@@ -102,7 +102,7 @@ extension NativeEditorCommand {
         return NativeEditorBlock(
             id: id,
             kind: .codeBlock(language: "mermaid"),
-            text: AttributedString("graph TD; A-->B"),
+            text: AttributedString("flowchart LR\n    A --> B"),
             alignment: .left
         )
     }
