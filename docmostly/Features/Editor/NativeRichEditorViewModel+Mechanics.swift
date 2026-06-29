@@ -80,7 +80,7 @@ extension NativeRichEditorViewModel {
         guard
             let index = activeBlockIndex,
             document.blocks[index].kind.allowsInlineMarkdownInputRules,
-            let attributedText = NativeEditorMarkdownParser.inlineMathInputRuleText(
+            let attributedText = NativeEditorMarkdownParser.inlineMarkdownInputRuleText(
                 from: String(document.blocks[index].text.characters)
             )
         else {

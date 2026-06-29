@@ -1,6 +1,16 @@
 import Foundation
 
 extension NativeEditorMarkdownParser {
+    static func inlineMarkdownInputRuleText(from text: String) -> AttributedString? {
+        if let inlineMathText = inlineMathInputRuleText(from: text) {
+            return inlineMathText
+        }
+
+        let attributedText = attributedInlineMarkdown(from: text)
+        guard String(attributedText.characters) != text else { return nil }
+        return attributedText
+    }
+
     static func attributedInlineMarkdown(from markdown: String) -> AttributedString {
         var output = AttributedString("")
         var remaining = markdown[...]
