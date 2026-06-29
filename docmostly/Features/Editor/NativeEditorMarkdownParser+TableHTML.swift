@@ -141,16 +141,42 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func htmlTablePreservedContent(from html: String) -> [ProseMirrorNode]? {
-        let nodes = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
-            .compactMap { match -> ProseMirrorNode? in
+        let textBlockMatches = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
+            .compactMap { match -> HTMLTableContentMatch? in
                 guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
                       let attributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
                       let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
                     return nil
                 }
 
-                return htmlTableContentNode(tagName: tagName, attributeText: attributeText, body: body)
+                return HTMLTableContentMatch(
+                    location: match.range.location,
+                    node: htmlTableContentNode(tagName: tagName, attributeText: attributeText, body: body)
+                )
             }
+        let codeBlockMatches = htmlRegexMatches(
+            pattern: #"<pre\b([^>]*)>\s*<code\b([^>]*)>(.*?)</code>\s*</pre>"#,
+            in: html
+        )
+        .compactMap { match -> HTMLTableContentMatch? in
+            guard let preAttributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
+                  let codeAttributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
+                  let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
+                return nil
+            }
+
+            return HTMLTableContentMatch(
+                location: match.range.location,
+                node: htmlTableCodeBlockNode(
+                    preAttributeText: preAttributeText,
+                    codeAttributeText: codeAttributeText,
+                    body: body
+                )
+            )
+        }
+        let nodes = (textBlockMatches + codeBlockMatches)
+            .sorted { $0.location < $1.location }
+            .map(\.node)
 
         guard nodes.isEmpty == false else { return nil }
         if nodes.count == 1, nodes.first?.type == "paragraph", nodes.first?.attrs?.isEmpty != false {
@@ -180,6 +206,55 @@ extension NativeEditorMarkdownParser {
             attrs: htmlTableContentAttrs(baseAttrs: [:], htmlAttrs: attrs),
             content: content
         )
+    }
+
+    private static func htmlTableCodeBlockNode(
+        preAttributeText: String,
+        codeAttributeText: String,
+        body: String
+    ) -> ProseMirrorNode {
+        let preAttrs = docmostInlineHTMLAttributes(from: "<pre\(preAttributeText)>")
+        let codeAttrs = docmostInlineHTMLAttributes(from: "<code\(codeAttributeText)>")
+        var attrs = [String: ProseMirrorJSONValue]()
+
+        if let language = htmlTableCodeBlockLanguage(codeAttrs: codeAttrs, preAttrs: preAttrs) {
+            attrs["language"] = .string(language)
+        }
+
+        let text = unescapedInlineHTMLText(body)
+        return ProseMirrorNode(
+            type: "codeBlock",
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: text.isEmpty ? [] : [ProseMirrorNode(type: "text", text: text)]
+        )
+    }
+
+    private static func htmlTableCodeBlockLanguage(
+        codeAttrs: [String: String],
+        preAttrs: [String: String]
+    ) -> String? {
+        nonEmptyHTMLTableAttribute(codeAttrs["data-language"]) ??
+            nonEmptyHTMLTableAttribute(codeAttrs["language"]) ??
+            htmlTableCodeBlockLanguage(fromClassName: codeAttrs["class"]) ??
+            nonEmptyHTMLTableAttribute(preAttrs["data-language"]) ??
+            nonEmptyHTMLTableAttribute(preAttrs["language"]) ??
+            htmlTableCodeBlockLanguage(fromClassName: preAttrs["class"])
+    }
+
+    private static func htmlTableCodeBlockLanguage(fromClassName className: String?) -> String? {
+        guard let className else { return nil }
+
+        for component in className.split(whereSeparator: \.isWhitespace) {
+            let lowercasedComponent = component.lowercased()
+            if lowercasedComponent.hasPrefix("language-") {
+                return nonEmptyHTMLTableAttribute(String(component.dropFirst("language-".count)))
+            }
+            if lowercasedComponent.hasPrefix("lang-") {
+                return nonEmptyHTMLTableAttribute(String(component.dropFirst("lang-".count)))
+            }
+        }
+
+        return nil
     }
 
     private static func htmlTableHeadingLevel(from tagName: String) -> Int? {
@@ -301,4 +376,9 @@ extension NativeEditorMarkdownParser {
         guard let value, value.isEmpty == false else { return nil }
         return value
     }
+}
+
+private struct HTMLTableContentMatch {
+    var location: Int
+    var node: ProseMirrorNode
 }

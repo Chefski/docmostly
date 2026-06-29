@@ -137,4 +137,43 @@ struct NativeEditorTableHTMLImportTests {
         #expect(cellContent[0].content?.first?.text == "Phase")
         #expect(cellContent[1].content?.first?.text == "Ship native tables")
     }
+
+    @Test func docmostHTMLTableCellPreservesCodeBlockContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <pre><code class="language-swift">let value = &lt;draft&gt;
+        print(value)</code></pre>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText == """
+        let value = <draft>
+        print(value)
+        """)
+        #expect(preservedContent.map(\.type) == ["codeBlock"])
+        #expect(preservedContent[0].attrs?["language"] == .string("swift"))
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["codeBlock"])
+        #expect(cellContent[0].attrs?["language"] == .string("swift"))
+        #expect(cellContent[0].content?.first?.text == """
+        let value = <draft>
+        print(value)
+        """)
+    }
 }
