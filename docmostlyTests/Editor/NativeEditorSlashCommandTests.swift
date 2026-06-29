@@ -5,6 +5,11 @@ import Testing
 
 @MainActor
 struct NativeEditorSlashCommandTests {
+    @Test func slashCommandMenuExposesGenericEmbedCommand() {
+        #expect(NativeEditorCommand.slashMenuCases.contains(.embed))
+        #expect(slashCommandTitles(for: "embed").contains("Embed"))
+    }
+
     @Test func slashCommandInventoryIncludesBaseColumnsAndProviderEmbeds() {
         let titles = NativeEditorCommand.allCases.map(\.title)
 
@@ -65,6 +70,7 @@ struct NativeEditorSlashCommandTests {
             "3 Columns",
             "4 Columns",
             "5 Columns",
+            "Embed",
             "Iframe embed",
             "Airtable",
             "Loom",
@@ -121,6 +127,7 @@ struct NativeEditorSlashCommandTests {
             "3 Columns",
             "4 Columns",
             "5 Columns",
+            "Embed",
             "Iframe embed",
             "Airtable",
             "Loom",

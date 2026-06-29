@@ -38,6 +38,7 @@ extension NativeEditorCommand {
         .columns3,
         .columns4,
         .columns5,
+        .embed,
         .iframeEmbed,
         .airtableEmbed,
         .loomEmbed,
