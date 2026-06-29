@@ -104,12 +104,15 @@ extension NativeEditorMarkdownParser {
     private static func htmlTableCell(tagName: String, attributeText: String, body: String) -> NativeEditorTableCell {
         let attrs = docmostInlineHTMLAttributes(from: "<\(tagName)\(attributeText)>")
         let paragraphAttrs = htmlTableParagraphAttributes(in: body)
-        let inlineContent = htmlTableInlineContent(from: body)
+        let preservedContent = htmlTablePreservedContent(from: body)
+        let inlineContent = preservedContent.map(NativeEditorDocument.inlineContent(from:)) ??
+            htmlTableInlineContent(from: body)
         let plainText = inlineContent.plainText
 
         return NativeEditorTableCell(
             plainText: plainText,
             inlineContent: inlineContent.preservedForTableCell,
+            preservedContent: preservedContent,
             isHeader: tagName.localizedCaseInsensitiveCompare("th") == .orderedSame,
             textAlignment: htmlTableTextAlignment(from: paragraphAttrs),
             backgroundColor: nonEmptyHTMLTableAttribute(attrs["data-background-color"]) ??
@@ -135,6 +138,68 @@ extension NativeEditorMarkdownParser {
             htmlStyleValue(named: "text-align", in: attrs["style"])
         guard let value else { return nil }
         return NativeEditorTextAlignment(rawValue: value.lowercased())
+    }
+
+    private static func htmlTablePreservedContent(from html: String) -> [ProseMirrorNode]? {
+        let nodes = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
+            .compactMap { match -> ProseMirrorNode? in
+                guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
+                      let attributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
+                      let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
+                    return nil
+                }
+
+                return htmlTableContentNode(tagName: tagName, attributeText: attributeText, body: body)
+            }
+
+        guard nodes.isEmpty == false else { return nil }
+        if nodes.count == 1, nodes.first?.type == "paragraph", nodes.first?.attrs?.isEmpty != false {
+            return nil
+        }
+        return nodes
+    }
+
+    private static func htmlTableContentNode(
+        tagName: String,
+        attributeText: String,
+        body: String
+    ) -> ProseMirrorNode {
+        let attrs = docmostInlineHTMLAttributes(from: "<\(tagName)\(attributeText)>")
+        let content = NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: body)))
+
+        if let headingLevel = htmlTableHeadingLevel(from: tagName) {
+            return ProseMirrorNode(
+                type: "heading",
+                attrs: htmlTableContentAttrs(baseAttrs: ["level": .int(headingLevel)], htmlAttrs: attrs),
+                content: content
+            )
+        }
+
+        return ProseMirrorNode(
+            type: "paragraph",
+            attrs: htmlTableContentAttrs(baseAttrs: [:], htmlAttrs: attrs),
+            content: content
+        )
+    }
+
+    private static func htmlTableHeadingLevel(from tagName: String) -> Int? {
+        guard tagName.count == 2,
+              tagName.first?.lowercased() == "h",
+              let level = Int(tagName.suffix(1)) else {
+            return nil
+        }
+        return min(max(level, 1), 6)
+    }
+
+    private static func htmlTableContentAttrs(
+        baseAttrs: [String: ProseMirrorJSONValue],
+        htmlAttrs: [String: String]
+    ) -> [String: ProseMirrorJSONValue]? {
+        var attrs = baseAttrs
+        if let textAlignment = htmlTableTextAlignment(from: htmlAttrs) {
+            attrs["textAlign"] = .string(textAlignment.rawValue)
+        }
+        return attrs.isEmpty ? nil : attrs
     }
 
     private static func htmlTableInlineContent(from html: String) -> [NativeEditorInlineContent] {

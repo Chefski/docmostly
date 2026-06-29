@@ -103,4 +103,38 @@ struct NativeEditorTableHTMLImportTests {
             ProseMirrorMark(type: "comment", attrs: ["commentId": .string("comment-1"), "resolved": .bool(true)])
         ])
     }
+
+    @Test func docmostHTMLTableCellPreservesBlockContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <h2>Phase</h2>
+        <p>Ship native tables</p>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText == "PhaseShip native tables")
+        #expect(preservedContent.map(\.type) == ["heading", "paragraph"])
+        #expect(preservedContent[0].attrs?["level"] == .int(2))
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["heading", "paragraph"])
+        #expect(cellContent[0].attrs?["level"] == .int(2))
+        #expect(cellContent[0].content?.first?.text == "Phase")
+        #expect(cellContent[1].content?.first?.text == "Ship native tables")
+    }
 }
