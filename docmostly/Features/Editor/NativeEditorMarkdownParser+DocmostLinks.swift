@@ -292,9 +292,10 @@ extension NativeEditorMarkdownParser {
                 let closeLabelIndex = markdown[markdown.index(after: openLabelIndex)...].firstIndex(of: "]"),
                 markdown.index(after: closeLabelIndex) < markdown.endIndex,
                 markdown[markdown.index(after: closeLabelIndex)] == "(",
-                let closeDestinationIndex = markdown[
-                    markdown.index(after: markdown.index(after: closeLabelIndex))...
-                ].firstIndex(of: ")")
+                let closeDestinationIndex = closingMarkdownLinkDestinationIndex(
+                    in: markdown,
+                    startingAt: markdown.index(after: markdown.index(after: closeLabelIndex))
+                )
             else {
                 return nil
             }

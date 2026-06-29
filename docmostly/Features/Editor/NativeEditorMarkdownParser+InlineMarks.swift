@@ -196,9 +196,10 @@ extension NativeEditorMarkdownParser {
                 let closeLabelIndex = markdown[markdown.index(after: openLabelIndex)...].firstIndex(of: "]"),
                 markdown.index(after: closeLabelIndex) < markdown.endIndex,
                 markdown[markdown.index(after: closeLabelIndex)] == "(",
-                let closeDestinationIndex = markdown[
-                    markdown.index(after: markdown.index(after: closeLabelIndex))...
-                ].firstIndex(of: ")")
+                let closeDestinationIndex = closingMarkdownLinkDestinationIndex(
+                    in: markdown,
+                    startingAt: markdown.index(after: markdown.index(after: closeLabelIndex))
+                )
             else {
                 return nil
             }
@@ -206,7 +207,7 @@ extension NativeEditorMarkdownParser {
             let labelStartIndex = markdown.index(after: openLabelIndex)
             let destinationStartIndex = markdown.index(after: markdown.index(after: closeLabelIndex))
             let label = String(markdown[labelStartIndex..<closeLabelIndex])
-            let destination = markdownLinkDestination(
+            let destination = markdownLinkSource(
                 from: String(markdown[destinationStartIndex..<closeDestinationIndex])
             )
 
@@ -261,6 +262,17 @@ extension NativeEditorMarkdownParser {
         return markdown[markdown.index(before: index)] == "!"
     }
 
+    static func closingMarkdownLinkDestinationIndex(
+        in markdown: Substring,
+        startingAt destinationStartIndex: String.Index
+    ) -> String.Index? {
+        var scanner = MarkdownLinkDestinationScanner(
+            markdown: markdown,
+            destinationStartIndex: destinationStartIndex
+        )
+        return scanner.closingIndex()
+    }
+
     private static func isPartOfRepeatedDelimiter(
         _ range: Range<String.Index>,
         delimiter: String,
@@ -276,15 +288,118 @@ extension NativeEditorMarkdownParser {
         return range.upperBound < markdown.endIndex && markdown[range.upperBound] == delimiterCharacter
     }
 
-    private static func markdownLinkDestination(from destination: String) -> String {
-        let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+}
 
-        if trimmedDestination.hasPrefix("<"),
-           let closeIndex = trimmedDestination.firstIndex(of: ">") {
-            let sourceStartIndex = trimmedDestination.index(after: trimmedDestination.startIndex)
-            return String(trimmedDestination[sourceStartIndex..<closeIndex])
+private struct MarkdownLinkDestinationScanner {
+    var markdown: Substring
+    var index: String.Index
+    var nestedParenthesisCount = 0
+    var quoteDelimiter: Character?
+    var isInsideAngleDestination = false
+    var hasReadNonWhitespaceDestinationCharacter = false
+
+    init(markdown: Substring, destinationStartIndex: String.Index) {
+        self.markdown = markdown
+        index = destinationStartIndex
+    }
+
+    mutating func closingIndex() -> String.Index? {
+        while index < markdown.endIndex {
+            let character = markdown[index]
+            defer { index = markdown.index(after: index) }
+
+            if consumesEscapedCharacter(character) || consumesQuotedCharacter(character) ||
+                consumesAngleDestinationCharacter(character) || consumesOpeningAngleDestination(character) ||
+                consumesTitleQuote(character) {
+                continue
+            }
+
+            if let closingIndex = consumeParenthesis(character) {
+                return closingIndex
+            }
+
+            markDestinationCharacter(character)
         }
 
-        return trimmedDestination.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
+        return nil
+    }
+
+    mutating private func consumesEscapedCharacter(_ character: Character) -> Bool {
+        guard isEscapedCharacter(at: index) else { return false }
+        markDestinationCharacter(character)
+        return true
+    }
+
+    mutating private func consumesQuotedCharacter(_ character: Character) -> Bool {
+        guard let delimiter = quoteDelimiter else { return false }
+        if character == delimiter {
+            quoteDelimiter = nil
+        }
+        return true
+    }
+
+    mutating private func consumesAngleDestinationCharacter(_ character: Character) -> Bool {
+        guard isInsideAngleDestination else { return false }
+        if character == ">" {
+            isInsideAngleDestination = false
+        }
+        return true
+    }
+
+    mutating private func consumesOpeningAngleDestination(_ character: Character) -> Bool {
+        guard character == "<", hasReadNonWhitespaceDestinationCharacter == false else { return false }
+        isInsideAngleDestination = true
+        hasReadNonWhitespaceDestinationCharacter = true
+        return true
+    }
+
+    mutating private func consumesTitleQuote(_ character: Character) -> Bool {
+        guard isMarkdownLinkTitleQuote(character) else { return false }
+        quoteDelimiter = character
+        return true
+    }
+
+    mutating private func consumeParenthesis(_ character: Character) -> String.Index? {
+        switch character {
+        case "(":
+            nestedParenthesisCount += 1
+            return nil
+        case ")":
+            guard nestedParenthesisCount > 0 else { return index }
+            nestedParenthesisCount -= 1
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    mutating private func markDestinationCharacter(_ character: Character) {
+        if character.isWhitespace == false {
+            hasReadNonWhitespaceDestinationCharacter = true
+        }
+    }
+
+    private func isMarkdownLinkTitleQuote(_ character: Character) -> Bool {
+        guard character == "\"" || character == "'",
+              index > markdown.startIndex else {
+            return false
+        }
+
+        return markdown[markdown.index(before: index)].isWhitespace
+    }
+
+    private func isEscapedCharacter(at index: String.Index) -> Bool {
+        var backslashCount = 0
+        var currentIndex = index
+
+        while currentIndex > markdown.startIndex {
+            let previousIndex = markdown.index(before: currentIndex)
+            guard markdown[previousIndex] == "\\" else { break }
+
+            backslashCount += 1
+            currentIndex = previousIndex
+        }
+
+        return backslashCount.isMultiple(of: 2) == false
     }
 }
