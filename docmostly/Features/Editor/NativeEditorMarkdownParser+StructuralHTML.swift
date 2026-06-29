@@ -52,7 +52,7 @@ extension NativeEditorMarkdownParser {
         case .subpages:
             #"<div data-type="subpages"></div>"#
         case .transclusionSource(let source):
-            transclusionSourceHTMLMarkdown(from: source)
+            rawTransclusionSourceHTMLMarkdown(from: block.rawNode) ?? transclusionSourceHTMLMarkdown(from: source)
         case .transclusionReference(let reference):
             transclusionReferenceHTMLMarkdown(from: reference)
         case .base(let base):
@@ -67,30 +67,22 @@ extension NativeEditorMarkdownParser {
         startingAt index: Array<String>.Index,
         attributes: [String: String]
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
-        var bodyLines: [String] = []
-        var currentIndex = lines.index(after: index)
-
-        while currentIndex < lines.endIndex {
-            let line = lines[currentIndex]
-            if containsHTMLClosingTag(in: line, tagName: "div") {
-                let source = NativeEditorTransclusionSourceBlock(
-                    identifier: nonEmptyStructuralHTMLAttribute(attributes["data-id"]),
-                    previewText: structuralHTMLText(from: bodyLines)
-                )
-                return (
-                    docmostStructuralBlock(
-                        kind: .transclusionSource(source),
-                        rawNode: NativeEditorRichBlockNodeFactory.transclusionSourceNode(from: source)
-                    ),
-                    lines.index(after: currentIndex)
-                )
-            }
-
-            bodyLines.append(line)
-            currentIndex = lines.index(after: currentIndex)
+        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div") else {
+            return nil
         }
 
-        return nil
+        let contentNodes = containerContentNodes(from: body.lines)
+        let source = NativeEditorTransclusionSourceBlock(
+            identifier: nonEmptyStructuralHTMLAttribute(attributes["data-id"]),
+            previewText: containerPreviewText(from: contentNodes)
+        )
+        return (
+            docmostStructuralBlock(
+                kind: .transclusionSource(source),
+                rawNode: transclusionSourceHTMLNode(from: source, content: contentNodes)
+            ),
+            body.endIndex
+        )
     }
 
     private static func transclusionSourceHTMLMarkdown(from source: NativeEditorTransclusionSourceBlock) -> String {
@@ -105,6 +97,60 @@ extension NativeEditorMarkdownParser {
         \(previewText)
         </div>
         """
+    }
+
+    private static func rawTransclusionSourceHTMLMarkdown(from node: ProseMirrorNode?) -> String? {
+        guard
+            let node,
+            node.type == "transclusionSource",
+            rawTransclusionSourceNeedsStructuredMarkdown(node)
+        else {
+            return nil
+        }
+
+        let openingTag = structuralHTMLTag("div", attributes: [
+            ("data-type", "transclusionSource"),
+            ("data-id", node.attrs?["id"]?.stringValue)
+        ])
+        let body = (node.content ?? [])
+            .map(structuralContentHTMLMarkdown(from:))
+            .joined(separator: "\n")
+
+        return """
+        \(openingTag)
+        \(body)
+        </div>
+        """
+    }
+
+    private static func rawTransclusionSourceNeedsStructuredMarkdown(_ node: ProseMirrorNode) -> Bool {
+        let content = node.content ?? []
+        guard content.count == 1, content.first?.type == "paragraph" else {
+            return content.isEmpty == false
+        }
+
+        return false
+    }
+
+    private static func transclusionSourceHTMLNode(
+        from source: NativeEditorTransclusionSourceBlock,
+        content: [ProseMirrorNode]
+    ) -> ProseMirrorNode {
+        var attrs = [String: ProseMirrorJSONValue]()
+        if let identifier = source.identifier, identifier.isEmpty == false {
+            attrs["id"] = .string(identifier)
+        }
+
+        return ProseMirrorNode(
+            type: "transclusionSource",
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: content.isEmpty ? [
+                ProseMirrorNode(
+                    type: "paragraph",
+                    content: NativeEditorDocument.inlineNodes(from: inlineText(from: source.previewText))
+                )
+            ] : content
+        )
     }
 
     private static func transclusionReferenceHTMLMarkdown(
@@ -155,6 +201,48 @@ extension NativeEditorMarkdownParser {
         lines.map(unescapedInlineHTMLText)
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func structuralContentHTMLMarkdown(from node: ProseMirrorNode) -> String {
+        switch node.type {
+        case "paragraph":
+            "<p>\(structuralInlineHTMLMarkdown(from: node.content ?? []))</p>"
+        case "heading":
+            structuralHeadingHTMLMarkdown(from: node)
+        case "pageBreak":
+            #"<div data-type="pageBreak" class="page-break"></div>"#
+        case "horizontalRule":
+            "<hr>"
+        case "codeBlock":
+            structuralCodeBlockHTMLMarkdown(from: node)
+        default:
+            escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
+        }
+    }
+
+    private static func structuralHeadingHTMLMarkdown(from node: ProseMirrorNode) -> String {
+        let level = min(max(node.attrs?["level"]?.intValue ?? 1, 1), 6)
+        return "<h\(level)>\(structuralInlineHTMLMarkdown(from: node.content ?? []))</h\(level)>"
+    }
+
+    private static func structuralCodeBlockHTMLMarkdown(from node: ProseMirrorNode) -> String {
+        let language = node.attrs?["language"]?.stringValue
+            .map { #" class="language-\#(escapedInlineHTMLAttribute($0))""# } ?? ""
+        return "<pre><code\(language)>\(escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node])))</code></pre>"
+    }
+
+    private static func structuralInlineHTMLMarkdown(from nodes: [ProseMirrorNode]) -> String {
+        nodes.map { node in
+            switch node.type {
+            case "text":
+                escapedInlineHTMLText(node.text ?? "")
+            case "hardBreak":
+                "<br>"
+            default:
+                escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
+            }
+        }
+        .joined()
     }
 
     private static func structuralHTMLTag(_ name: String, attributes: [(String, String?)]) -> String {

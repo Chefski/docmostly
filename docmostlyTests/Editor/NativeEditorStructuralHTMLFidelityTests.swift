@@ -45,4 +45,25 @@ struct NativeEditorStructuralHTMLFidelityTests {
         <div data-type="base-embed" data-page-id="base-page-1"></div>
         """)
     }
+
+    @Test func importedDocmostTransclusionSourceExportsStructuredContentBlocks() throws {
+        let markdown = """
+        <div data-type="transclusionSource" data-id="sync-1">
+        <p>Reusable launch checklist</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Confirm smoke test</p>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .transclusionSource(let source) = block.kind else {
+            Issue.record("Expected Docmost transclusion source HTML to import as a native synced block.")
+            return
+        }
+
+        #expect(source.identifier == "sync-1")
+        #expect(source.previewText == "Reusable launch checklist\nConfirm smoke test")
+        #expect(block.rawNode?.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
 }

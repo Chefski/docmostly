@@ -107,6 +107,35 @@ struct TableHTMLStructuralImportTests {
         #expect(preservedContent.first?.attrs == nil)
         #expect(imported.nodeContent.map(\.type) == ["pageBreak"])
     }
+
+    @Test func docmostHTMLTableCellPreservesTransclusionSourceStructuredContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <div data-type="transclusionSource" data-id="source-1">
+        <p>Shared requirement</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Shared follow-up</p>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let imported = try importedStructuralTableCell(from: markdown)
+        let preservedContent = try #require(imported.cell.preservedContent)
+        let transclusionSource = try #require(preservedContent.first)
+
+        #expect(preservedContent.map(\.type) == ["transclusionSource"])
+        #expect(transclusionSource.attrs?["id"] == .string("source-1"))
+        #expect(transclusionSource.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
+        #expect(transclusionSource.content?.first?.content?.first?.text == "Shared requirement")
+        #expect(transclusionSource.content?[2].content?.first?.text == "Shared follow-up")
+        #expect(imported.nodeContent.first?.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
+    }
 }
 
 @MainActor

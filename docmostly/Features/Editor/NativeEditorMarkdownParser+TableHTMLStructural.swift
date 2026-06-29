@@ -32,7 +32,8 @@ extension NativeEditorMarkdownParser {
         excluding excludedRanges: [NSRange]
     ) -> [HTMLTableContentMatch] {
         htmlTableDetailsContentMatches(from: html, excluding: excludedRanges) +
-            htmlTableColumnsContentMatches(from: html, excluding: excludedRanges)
+            htmlTableColumnsContentMatches(from: html, excluding: excludedRanges) +
+            htmlTableTransclusionSourceContentMatches(from: html, excluding: excludedRanges)
     }
 
     private static func htmlTableDetailsContentMatches(
@@ -68,6 +69,23 @@ extension NativeEditorMarkdownParser {
                 return HTMLTableContentMatch(
                     range: container.range,
                     node: htmlTableColumnsNode(attrs: container.attrs, body: container.body)
+                )
+            }
+    }
+
+    private static func htmlTableTransclusionSourceContentMatches(
+        from html: String,
+        excluding excludedRanges: [NSRange]
+    ) -> [HTMLTableContentMatch] {
+        htmlTableTypedDivContainers(from: html, dataType: "transclusionSource")
+            .compactMap { container -> HTMLTableContentMatch? in
+                guard htmlTableRange(container.range, isNestedIn: excludedRanges) == false else {
+                    return nil
+                }
+
+                return HTMLTableContentMatch(
+                    range: container.range,
+                    node: htmlTableTransclusionSourceNode(attrs: container.attrs, body: container.body)
                 )
             }
     }
@@ -183,7 +201,7 @@ extension NativeEditorMarkdownParser {
         body: String
     ) -> ProseMirrorNode {
         var nodeAttrs = [String: ProseMirrorJSONValue]()
-        let text = htmlTableStructuralText(from: body)
+        let content = containerContentNodes(from: containerBodyLines(from: body))
 
         if let identifier = nonEmptyHTMLTableAttribute(attrs["data-id"]) {
             nodeAttrs["id"] = .string(identifier)
@@ -192,12 +210,14 @@ extension NativeEditorMarkdownParser {
         return ProseMirrorNode(
             type: "transclusionSource",
             attrs: nodeAttrs.isEmpty ? nil : nodeAttrs,
-            content: [
+            content: content.isEmpty ? [
                 ProseMirrorNode(
                     type: "paragraph",
-                    content: NativeEditorDocument.inlineNodes(from: inlineText(from: text))
+                    content: NativeEditorDocument.inlineNodes(
+                        from: inlineText(from: htmlTableStructuralText(from: body))
+                    )
                 )
-            ]
+            ] : content
         )
     }
 
