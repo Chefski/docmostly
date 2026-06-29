@@ -6,6 +6,12 @@ struct NativeEditorMarkdownInputRule: Equatable {
 }
 
 enum NativeEditorMarkdownParser {
+    private struct CodeFence {
+        var marker: Character
+        var length: Int
+        var language: String
+    }
+
     static func blocks(from markdown: String) -> [NativeEditorBlock] {
         let markdown = removingLeadingYAMLFrontMatter(from: markdown)
         let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -175,17 +181,16 @@ enum NativeEditorMarkdownParser {
         startingAt index: Array<String>.Index
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
         let line = lines[index].trimmingCharacters(in: .whitespaces)
-        guard line.hasPrefix("```") else { return nil }
+        guard let openingFence = codeFenceOpening(from: line) else { return nil }
 
-        let language = String(line.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
         var content: [String] = []
         var currentIndex = lines.index(after: index)
 
         while currentIndex < lines.endIndex {
             let currentLine = lines[currentIndex]
-            if currentLine.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+            if isCodeFenceClosingLine(currentLine, matching: openingFence) {
                 return (
-                    codeBlock(language: language, text: content.joined(separator: "\n")),
+                    codeBlock(language: openingFence.language, text: content.joined(separator: "\n")),
                     lines.index(after: currentIndex)
                 )
             }
@@ -194,7 +199,38 @@ enum NativeEditorMarkdownParser {
             currentIndex = lines.index(after: currentIndex)
         }
 
-        return (codeBlock(language: language, text: content.joined(separator: "\n")), currentIndex)
+        return (codeBlock(language: openingFence.language, text: content.joined(separator: "\n")), currentIndex)
+    }
+
+    private static func codeFenceOpening(from line: String) -> CodeFence? {
+        guard let marker = line.first, marker == "`" || marker == "~" else { return nil }
+
+        let length = leadingRunLength(of: marker, in: line)
+        guard length >= 3 else { return nil }
+
+        let languageStartIndex = line.index(line.startIndex, offsetBy: length)
+        let language = String(line[languageStartIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return CodeFence(marker: marker, length: length, language: language)
+    }
+
+    private static func isCodeFenceClosingLine(_ line: String, matching openingFence: CodeFence) -> Bool {
+        let line = line.trimmingCharacters(in: .whitespaces)
+        guard line.first == openingFence.marker else { return false }
+
+        let closingLength = leadingRunLength(of: openingFence.marker, in: line)
+        guard closingLength >= openingFence.length else { return false }
+
+        let remainingStartIndex = line.index(line.startIndex, offsetBy: closingLength)
+        return line[remainingStartIndex...].allSatisfy(\.isWhitespace)
+    }
+
+    private static func leadingRunLength(of marker: Character, in text: String) -> Int {
+        var length = 0
+        for character in text {
+            guard character == marker else { break }
+            length += 1
+        }
+        return length
     }
 
     private static func codeBlock(language: String, text: String) -> NativeEditorBlock {
@@ -206,10 +242,12 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func codeInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
-        guard text.hasPrefix("```") else { return nil }
+        guard let openingFence = codeFenceOpening(from: text) else { return nil }
 
-        let language = String(text.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
-        return NativeEditorMarkdownInputRule(kind: .codeBlock(language: language.isEmpty ? nil : language), text: "")
+        return NativeEditorMarkdownInputRule(
+            kind: .codeBlock(language: openingFence.language.isEmpty ? nil : openingFence.language),
+            text: ""
+        )
     }
 
     private static func mathBlockInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
@@ -351,11 +389,30 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func codeMarkdown(language: String?, text: String) -> String {
-        """
-        ```\(language ?? "")
+        let fenceLength = max(3, longestBacktickRunLength(in: text) + 1)
+        let fence = String(repeating: "`", count: fenceLength)
+
+        return """
+        \(fence)\(language ?? "")
         \(text)
-        ```
+        \(fence)
         """
+    }
+
+    private static func longestBacktickRunLength(in text: String) -> Int {
+        var longestRun = 0
+        var currentRun = 0
+
+        for character in text {
+            if character == "`" {
+                currentRun += 1
+                longestRun = max(longestRun, currentRun)
+            } else {
+                currentRun = 0
+            }
+        }
+
+        return longestRun
     }
 
     private static func isDivider(_ text: String) -> Bool {
