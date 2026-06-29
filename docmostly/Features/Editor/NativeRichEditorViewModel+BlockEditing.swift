@@ -277,6 +277,9 @@ extension NativeRichEditorViewModel {
         guard let slashIndex = prefix.lastIndex(of: "/") else {
             return nil
         }
+        guard slashCommandTriggerHasAllowedPrefix(slashIndex, in: prefix) else {
+            return nil
+        }
 
         let queryStartIndex = prefix.index(after: slashIndex)
         let rawQuery = String(prefix[queryStartIndex...])
@@ -288,6 +291,11 @@ extension NativeRichEditorViewModel {
             query: rawQuery.trimmingCharacters(in: .whitespacesAndNewlines),
             range: slashTextIndex..<insertionIndex
         )
+    }
+
+    private func slashCommandTriggerHasAllowedPrefix(_ slashIndex: String.Index, in text: String) -> Bool {
+        guard slashIndex != text.startIndex else { return true }
+        return text[text.index(before: slashIndex)] == " "
     }
 }
 
