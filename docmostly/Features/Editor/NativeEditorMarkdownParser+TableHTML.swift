@@ -187,7 +187,8 @@ extension NativeEditorMarkdownParser {
                 )
             )
         }
-        let nodes = (textBlockMatches + codeBlockMatches + listMatches + calloutMatches)
+        let imageMatches = htmlTableImageContentMatches(from: html, excluding: containerRanges)
+        let nodes = (textBlockMatches + codeBlockMatches + imageMatches + listMatches + calloutMatches)
             .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
@@ -243,7 +244,7 @@ extension NativeEditorMarkdownParser {
             }
     }
 
-    private static func htmlTableRange(_ range: NSRange, isNestedIn ranges: [NSRange]) -> Bool {
+    static func htmlTableRange(_ range: NSRange, isNestedIn ranges: [NSRange]) -> Bool {
         ranges.contains { container in
             range.location > container.location && NSMaxRange(range) <= NSMaxRange(container)
         }
@@ -511,7 +512,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func htmlRegexMatches(pattern: String, in text: String) -> [NSTextCheckingResult] {
+    static func htmlRegexMatches(pattern: String, in text: String) -> [NSTextCheckingResult] {
         guard let expression = try? NSRegularExpression(
             pattern: pattern,
             options: [.caseInsensitive, .dotMatchesLineSeparators]
@@ -522,7 +523,7 @@ extension NativeEditorMarkdownParser {
         return expression.matches(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text))
     }
 
-    private static func htmlRegexString(
+    static func htmlRegexString(
         match: NSTextCheckingResult,
         captureIndex: Int,
         in text: String
@@ -548,13 +549,13 @@ extension NativeEditorMarkdownParser {
         return expression.stringByReplacingMatches(in: text, range: range, withTemplate: replacement)
     }
 
-    private static func nonEmptyHTMLTableAttribute(_ value: String?) -> String? {
+    static func nonEmptyHTMLTableAttribute(_ value: String?) -> String? {
         guard let value, value.isEmpty == false else { return nil }
         return value
     }
 }
 
-private struct HTMLTableContentMatch {
+struct HTMLTableContentMatch {
     var range: NSRange
     var node: ProseMirrorNode
 }

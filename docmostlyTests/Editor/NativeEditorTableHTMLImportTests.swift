@@ -264,4 +264,46 @@ struct NativeEditorTableHTMLImportTests {
         #expect(cellContent[0].attrs?["icon"] == .string("rocket"))
         #expect(cellContent[0].content?.first?.content?.first?.text == "Check launch notes")
     }
+
+    @Test func docmostHTMLTableCellPreservesImageContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <img src="/api/attachments/img/image-1.png" alt="Architecture" title="System diagram"
+        width="640" height="360" data-align="center" data-attachment-id="image-1"
+        data-size="2048" data-aspect-ratio="1.7777778">
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText.isEmpty)
+        #expect(preservedContent.map(\.type) == ["image"])
+        #expect(preservedContent[0].attrs?["src"] == .string("/api/attachments/img/image-1.png"))
+        #expect(preservedContent[0].attrs?["alt"] == .string("Architecture"))
+        #expect(preservedContent[0].attrs?["title"] == .string("System diagram"))
+        #expect(preservedContent[0].attrs?["width"] == .int(640))
+        #expect(preservedContent[0].attrs?["height"] == .int(360))
+        #expect(preservedContent[0].attrs?["align"] == .string("center"))
+        #expect(preservedContent[0].attrs?["attachmentId"] == .string("image-1"))
+        #expect(preservedContent[0].attrs?["size"] == .int(2048))
+        #expect(preservedContent[0].attrs?["aspectRatio"] == .double(1.7777778))
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["image"])
+        #expect(cellContent[0].attrs?["attachmentId"] == .string("image-1"))
+        #expect(cellContent[0].attrs?["aspectRatio"] == .double(1.7777778))
+    }
 }
