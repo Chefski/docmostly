@@ -27,7 +27,7 @@ enum NativeEditorTableLayout {
 
     static func cellBackground(for cell: NativeEditorTableCell) -> Color {
         if let backgroundColor = cell.backgroundColor,
-           let cssBackground = backgroundColor(cssValue: backgroundColor) {
+           let cssBackground = cssBackgroundColor(from: backgroundColor) {
             return cssBackground
         }
 
@@ -39,8 +39,8 @@ enum NativeEditorTableLayout {
         return cell.isHeader ? Color.secondary.opacity(0.12) : Color.clear
     }
 
-    private static func backgroundColor(cssValue: String) -> Color? {
-        let trimmedValue = cssValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func cssBackgroundColor(from value: String) -> Color? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if let hexColor = Color(docmostlyHex: trimmedValue) {
             return hexColor
         }
