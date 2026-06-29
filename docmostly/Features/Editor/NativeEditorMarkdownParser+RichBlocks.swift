@@ -67,10 +67,14 @@ extension NativeEditorMarkdownParser {
         case .audio(let media):
             mediaHTMLMarkdown(from: media, type: "audio") ?? mediaLinkMarkdown(from: media, fallbackTitle: "Audio")
         case .pdf(let pdf):
-            pdfHTMLMarkdown(from: pdf) ?? linkMarkdown(title: pdf.name ?? pdf.source ?? "PDF", url: pdf.source)
+            pdfHTMLMarkdown(from: pdf) ??
+                linkMarkdown(title: pdf.name ?? markdownLinkDisplayName(from: pdf.source) ?? "PDF", url: pdf.source)
         case .attachment(let attachment):
             attachmentHTMLMarkdown(from: attachment) ??
-                linkMarkdown(title: attachment.name ?? attachment.url ?? "Attachment", url: attachment.url)
+                linkMarkdown(
+                    title: attachment.name ?? markdownLinkDisplayName(from: attachment.url) ?? "Attachment",
+                    url: attachment.url
+                )
         default:
             nil
         }
@@ -384,7 +388,8 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func mediaLinkMarkdown(from media: NativeEditorMediaBlock, fallbackTitle: String) -> String {
-        linkMarkdown(title: media.alternativeText ?? media.title ?? media.source ?? fallbackTitle, url: media.source)
+        let title = media.alternativeText ?? media.title ?? markdownLinkDisplayName(from: media.source) ?? fallbackTitle
+        return linkMarkdown(title: title, url: media.source)
     }
 
     private static func calloutMarkdown(from callout: NativeEditorCalloutBlock) -> String {
@@ -425,6 +430,18 @@ extension NativeEditorMarkdownParser {
     private static func linkMarkdown(title: String, url: String?) -> String {
         guard let url, url.isEmpty == false else { return title }
         return "[\(escapedMarkdownLinkText(title))](\(url))"
+    }
+
+    private static func markdownLinkDisplayName(from source: String?) -> String? {
+        guard let source, source.isEmpty == false else { return nil }
+        let path = markdownLinkPath(from: source)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/\\"))
+        guard path.isEmpty == false else { return nil }
+
+        let separatorIndex = path.lastIndex { $0 == "/" || $0 == "\\" }
+        let nameStart = separatorIndex.map { path.index(after: $0) } ?? path.startIndex
+        let name = String(path[nameStart...])
+        return name.isEmpty ? nil : name
     }
 
     private static func sanitizedCalloutStyle(_ value: String) -> String {
