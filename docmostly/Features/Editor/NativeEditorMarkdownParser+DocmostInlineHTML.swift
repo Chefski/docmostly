@@ -63,7 +63,7 @@ extension NativeEditorMarkdownParser {
             nameStart = trimmedLine.index(after: nameStart)
             let nameEnd = htmlTagNameEnd(in: trimmedLine, startingAt: nameStart)
             let name = String(trimmedLine[nameStart..<nameEnd])
-            if name.localizedCaseInsensitiveCompare(tagName) == .orderedSame,
+            if htmlTagNameMatches(name, tagName),
                isHTMLTagBoundary(at: nameEnd, in: trimmedLine) {
                 return true
             }
@@ -90,7 +90,7 @@ extension NativeEditorMarkdownParser {
 
             let nameEnd = htmlTagNameEnd(in: trimmedLine, startingAt: nameStart)
             let name = String(trimmedLine[nameStart..<nameEnd])
-            guard name.compare(tagName, options: .caseInsensitive) == .orderedSame,
+            guard htmlTagNameMatches(name, tagName),
                   isHTMLTagBoundary(at: nameEnd, in: trimmedLine),
                   let closeIndex = htmlOpeningTagCloseIndex(in: trimmedLine, startingAt: nameEnd) else {
                 searchStart = nameEnd
@@ -157,7 +157,7 @@ extension NativeEditorMarkdownParser {
             let nameStart = markdown.index(after: openRange.lowerBound)
             let nameEnd = htmlTagNameEnd(in: markdown, startingAt: nameStart)
             let name = String(markdown[nameStart..<nameEnd])
-            guard name.localizedCaseInsensitiveCompare("span") == .orderedSame,
+            guard htmlTagNameMatches(name, "span"),
                   isHTMLTagBoundary(at: nameEnd, in: markdown),
                   let closeIndex = htmlOpeningTagCloseIndex(in: markdown, startingAt: nameEnd) else {
                 currentSearchStart = openRange.upperBound
@@ -215,7 +215,7 @@ extension NativeEditorMarkdownParser {
 
             let nameEnd = htmlTagNameEnd(in: text, startingAt: nameStart)
             let name = String(text[nameStart..<nameEnd])
-            guard name.localizedCaseInsensitiveCompare(tagName) == .orderedSame,
+            guard htmlTagNameMatches(name, tagName),
                   isHTMLTagBoundary(at: nameEnd, in: text),
                   let closeIndex = htmlOpeningTagCloseIndex(in: text, startingAt: nameEnd) else {
                 searchStart = nameEnd
@@ -226,6 +226,10 @@ extension NativeEditorMarkdownParser {
         }
 
         return nil
+    }
+
+    static func htmlTagNameMatches(_ name: String, _ tagName: String, locale _: Locale? = nil) -> Bool {
+        name.compare(tagName, options: .caseInsensitive) == .orderedSame
     }
 
     private static func htmlTagNameEnd(in text: String, startingAt index: String.Index) -> String.Index {
