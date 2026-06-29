@@ -94,6 +94,7 @@ struct NativeEditorTablePayloadTests {
         }
 
         let cell = try #require(table.rows.first?.cells.first)
+        #expect(cell.backgroundColor == "rgb(254, 243, 199)")
         #expect(cell.backgroundColorName == "yellow")
 
         let reencodedDocument = NativeEditorDocument(blocks: [

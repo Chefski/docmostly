@@ -100,6 +100,7 @@ struct NativeRichEditorTableTests {
                 NativeEditorTableCell(
                     plainText: "Merged",
                     isHeader: true,
+                    backgroundColor: "rgb(219, 234, 254)",
                     backgroundColorName: "blue",
                     columnWidth: 120,
                     columnSpan: 2,
@@ -124,6 +125,7 @@ struct NativeRichEditorTableTests {
         #expect(firstCell?.attrs?["colspan"] == .int(2))
         #expect(firstCell?.attrs?["rowspan"] == .int(2))
         #expect(firstCell?.attrs?["colwidth"] == .array([.int(120), .int(160)]))
+        #expect(firstCell?.attrs?["backgroundColor"] == .string("rgb(219, 234, 254)"))
         #expect(firstCell?.attrs?["backgroundColorName"] == .string("blue"))
         #expect(firstCell?.content?.first?.content?.first?.text == "Updated")
     }

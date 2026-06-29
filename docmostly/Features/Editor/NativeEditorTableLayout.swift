@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum NativeEditorTableLayout {
@@ -25,12 +26,45 @@ enum NativeEditorTableLayout {
     }
 
     static func cellBackground(for cell: NativeEditorTableCell) -> Color {
+        if let backgroundColor = cell.backgroundColor,
+           let cssBackground = backgroundColor(cssValue: backgroundColor) {
+            return cssBackground
+        }
+
         if let backgroundColorName = cell.backgroundColorName,
            let namedBackground = backgroundColor(for: backgroundColorName) {
             return namedBackground
         }
 
         return cell.isHeader ? Color.secondary.opacity(0.12) : Color.clear
+    }
+
+    private static func backgroundColor(cssValue: String) -> Color? {
+        let trimmedValue = cssValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hexColor = Color(docmostlyHex: trimmedValue) {
+            return hexColor
+        }
+
+        let lowercasedValue = trimmedValue.lowercased()
+        guard lowercasedValue.hasPrefix("rgb(") || lowercasedValue.hasPrefix("rgba("),
+              let openParen = trimmedValue.firstIndex(of: "("),
+              let closeParen = trimmedValue.lastIndex(of: ")") else {
+            return nil
+        }
+
+        let components = trimmedValue[trimmedValue.index(after: openParen)..<closeParen]
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .compactMap(Double.init)
+        guard components.count >= 3 else { return nil }
+
+        let opacity = components.indices.contains(3) ? min(max(components[3], 0), 1) : 1
+        return Color(
+            red: min(max(components[0], 0), 255) / 255,
+            green: min(max(components[1], 0), 255) / 255,
+            blue: min(max(components[2], 0), 255) / 255,
+            opacity: opacity
+        )
     }
 
     private static func backgroundColor(for name: String) -> Color? {

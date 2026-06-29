@@ -171,6 +171,7 @@ nonisolated extension NativeEditorDocument {
                     inlineContent: inlineContent.preservedForTableCell,
                     preservedContent: preservedTableCellContent(from: cellContent, inlineContent: inlineContent),
                     isHeader: cell.type == "tableHeader",
+                    backgroundColor: cell.attrs?["backgroundColor"]?.stringValue,
                     backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
                     columnWidth: columnWidths.first,
                     columnSpan: normalizedTableSpan(cell.attrs?["colspan"]?.intValue),

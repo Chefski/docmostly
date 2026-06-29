@@ -137,6 +137,10 @@ nonisolated enum NativeEditorTableNodeFactory {
     private static func cellAttrs(from cell: NativeEditorTableCell) -> [String: ProseMirrorJSONValue]? {
         var attrs: [String: ProseMirrorJSONValue] = [:]
 
+        if let backgroundColor = cell.backgroundColor, backgroundColor.isEmpty == false {
+            attrs["backgroundColor"] = .string(backgroundColor)
+        }
+
         if let backgroundColorName = cell.backgroundColorName, backgroundColorName.isEmpty == false {
             attrs["backgroundColorName"] = .string(backgroundColorName.lowercased())
         }
