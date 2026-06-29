@@ -104,10 +104,12 @@ extension NativeEditorMarkdownParser {
     private static func htmlTableCell(tagName: String, attributeText: String, body: String) -> NativeEditorTableCell {
         let attrs = docmostInlineHTMLAttributes(from: "<\(tagName)\(attributeText)>")
         let paragraphAttrs = htmlTableParagraphAttributes(in: body)
-        let plainText = htmlTablePlainText(from: body)
+        let inlineContent = htmlTableInlineContent(from: body)
+        let plainText = inlineContent.plainText
 
         return NativeEditorTableCell(
             plainText: plainText,
+            inlineContent: inlineContent.preservedForTableCell,
             isHeader: tagName.localizedCaseInsensitiveCompare("th") == .orderedSame,
             textAlignment: htmlTableTextAlignment(from: paragraphAttrs),
             backgroundColor: nonEmptyHTMLTableAttribute(attrs["data-background-color"]) ??
@@ -135,7 +137,13 @@ extension NativeEditorMarkdownParser {
         return NativeEditorTextAlignment(rawValue: value.lowercased())
     }
 
-    private static func htmlTablePlainText(from html: String) -> String {
+    private static func htmlTableInlineContent(from html: String) -> [NativeEditorInlineContent] {
+        let inlineMarkdown = htmlTableInlineMarkdown(from: html)
+        let attributedText = inlineText(from: inlineMarkdown)
+        return NativeEditorDocument.inlineContent(from: NativeEditorDocument.inlineNodes(from: attributedText))
+    }
+
+    private static func htmlTableInlineMarkdown(from html: String) -> String {
         let paragraphSeparated = htmlRegexReplacing(
             pattern: #"</p>\s*<p\b[^>]*>"#,
             in: html,
@@ -146,8 +154,12 @@ extension NativeEditorMarkdownParser {
             in: paragraphSeparated,
             with: "\n"
         )
-        let withoutTags = htmlRegexReplacing(pattern: #"<[^>]+>"#, in: hardBreakSeparated, with: "")
-        return unescapedInlineHTMLText(withoutTags).trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutOpeningParagraphs = htmlRegexReplacing(
+            pattern: #"<p\b[^>]*>"#,
+            in: hardBreakSeparated,
+            with: ""
+        )
+        return htmlRegexReplacing(pattern: #"</p>"#, in: withoutOpeningParagraphs, with: "")
     }
 
     private static func htmlTableSpan(from value: String?) -> Int {
