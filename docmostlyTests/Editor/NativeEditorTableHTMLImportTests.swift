@@ -306,4 +306,54 @@ struct NativeEditorTableHTMLImportTests {
         #expect(cellContent[0].attrs?["attachmentId"] == .string("image-1"))
         #expect(cellContent[0].attrs?["aspectRatio"] == .double(1.7777778))
     }
+
+    @Test func docmostHTMLTableCellPreservesVideoAndAudioContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <video src="/api/files/video-1/Launch.mp4" aria-label="Launch demo"
+        width="75%" height="360" data-align="right" data-attachment-id="video-1"
+        data-size="4096" data-aspect-ratio="1.7777778" controls="true">
+        <source src="/api/files/video-1/Launch.mp4">
+        </video>
+        <audio src="/api/files/audio-1/Briefing.m4a" data-attachment-id="audio-1"
+        data-size="2048" controls="true" preload="metadata">
+        <source src="/api/files/audio-1/Briefing.m4a">
+        </audio>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText.isEmpty)
+        #expect(preservedContent.map(\.type) == ["video", "audio"])
+        #expect(preservedContent[0].attrs?["src"] == .string("/api/files/video-1/Launch.mp4"))
+        #expect(preservedContent[0].attrs?["alt"] == .string("Launch demo"))
+        #expect(preservedContent[0].attrs?["width"] == .string("75%"))
+        #expect(preservedContent[0].attrs?["height"] == .int(360))
+        #expect(preservedContent[0].attrs?["align"] == .string("right"))
+        #expect(preservedContent[0].attrs?["attachmentId"] == .string("video-1"))
+        #expect(preservedContent[0].attrs?["size"] == .int(4096))
+        #expect(preservedContent[0].attrs?["aspectRatio"] == .double(1.7777778))
+        #expect(preservedContent[1].attrs?["src"] == .string("/api/files/audio-1/Briefing.m4a"))
+        #expect(preservedContent[1].attrs?["attachmentId"] == .string("audio-1"))
+        #expect(preservedContent[1].attrs?["size"] == .int(2048))
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["video", "audio"])
+        #expect(cellContent[0].attrs?["attachmentId"] == .string("video-1"))
+        #expect(cellContent[1].attrs?["attachmentId"] == .string("audio-1"))
+    }
 }

@@ -187,8 +187,8 @@ extension NativeEditorMarkdownParser {
                 )
             )
         }
-        let imageMatches = htmlTableImageContentMatches(from: html, excluding: containerRanges)
-        let nodes = (textBlockMatches + codeBlockMatches + imageMatches + listMatches + calloutMatches)
+        let mediaMatches = htmlTableMediaContentMatches(from: html, excluding: containerRanges)
+        let nodes = (textBlockMatches + codeBlockMatches + mediaMatches + listMatches + calloutMatches)
             .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
