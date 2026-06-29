@@ -211,22 +211,15 @@ extension NativeEditorMarkdownParser {
         from html: String,
         excluding excludedRanges: [NSRange]
     ) -> [HTMLTableContentMatch] {
-        htmlRegexMatches(pattern: #"<div\b([^>]*)>(.*?)</div>"#, in: html)
-            .compactMap { match -> HTMLTableContentMatch? in
-                guard htmlTableRange(match.range, isNestedIn: excludedRanges) == false,
-                      let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
-                      let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
-                    return nil
-                }
-
-                let attrs = docmostInlineHTMLAttributes(from: "<div\(attributeText)>")
-                guard attrs["data-type"]?.compare("callout", options: .caseInsensitive) == .orderedSame else {
+        htmlTableTypedDivContainers(from: html, dataType: "callout")
+            .compactMap { container -> HTMLTableContentMatch? in
+                guard htmlTableRange(container.range, isNestedIn: excludedRanges) == false else {
                     return nil
                 }
 
                 return HTMLTableContentMatch(
-                    range: match.range,
-                    node: htmlTableCalloutNode(attrs: attrs, body: body)
+                    range: container.range,
+                    node: htmlTableCalloutNode(attrs: container.attrs, body: container.body)
                 )
             }
     }

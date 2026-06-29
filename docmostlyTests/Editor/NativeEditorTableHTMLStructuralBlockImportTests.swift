@@ -136,6 +136,34 @@ struct TableHTMLStructuralImportTests {
         #expect(transclusionSource.content?[2].content?.first?.text == "Shared follow-up")
         #expect(imported.nodeContent.first?.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
     }
+
+    @Test func docmostHTMLTableCellKeepsNestedStructuralBlocksInsideCallouts() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <div data-type="callout" data-callout-type="warning" data-callout-icon="rocket">
+        <div data-type="mathBlock" data-katex="true">E = mc^2</div>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let imported = try importedStructuralTableCell(from: markdown)
+        let preservedContent = try #require(imported.cell.preservedContent)
+        let callout = try #require(preservedContent.first)
+        let encodedCallout = try #require(imported.nodeContent.first)
+
+        #expect(preservedContent.map(\.type) == ["callout"])
+        #expect(callout.content?.map(\.type) == ["mathBlock"])
+        #expect(callout.content?.first?.attrs?["text"] == .string("E = mc^2"))
+        #expect(imported.nodeContent.map(\.type) == ["callout"])
+        #expect(encodedCallout.content?.map(\.type) == ["mathBlock"])
+        #expect(encodedCallout.content?.first?.attrs?["text"] == .string("E = mc^2"))
+    }
 }
 
 @MainActor

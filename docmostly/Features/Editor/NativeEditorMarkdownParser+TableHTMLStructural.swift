@@ -299,7 +299,7 @@ extension NativeEditorMarkdownParser {
         return unescapedInlineHTMLText(withoutTags).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func htmlTableTypedDivContainers(from html: String, dataType: String) -> [HTMLTableDivContainer] {
+    static func htmlTableTypedDivContainers(from html: String, dataType: String) -> [HTMLTableDivContainer] {
         let tags = htmlRegexMatches(pattern: #"</?div\b[^>]*>"#, in: html)
         var containers: [HTMLTableDivContainer] = []
 
@@ -405,7 +405,7 @@ extension NativeEditorMarkdownParser {
     }
 }
 
-private struct HTMLTableDivContainer {
+struct HTMLTableDivContainer {
     var range: NSRange
     var attrs: [String: String]
     var body: String
