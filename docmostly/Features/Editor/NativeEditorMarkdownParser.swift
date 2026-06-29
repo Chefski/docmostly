@@ -358,7 +358,7 @@ enum NativeEditorMarkdownParser {
     }
 
     private static func isDivider(_ text: String) -> Bool {
-        text == "---" || text == "***"
+        text == "---" || text == "***" || text == "___"
     }
 
     private static func listIndentLevel(from line: String) -> Int {
