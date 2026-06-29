@@ -144,10 +144,12 @@ extension NativeEditorMarkdownParser {
         from html: String,
         dropsSinglePlainParagraph: Bool = true
     ) -> [ProseMirrorNode]? {
-        let calloutMatches = htmlTableCalloutContentMatches(from: html)
+        let structuralMatches = htmlTableStructuralContentMatches(from: html, excluding: [])
+        let structuralRanges = structuralMatches.map(\.range)
+        let calloutMatches = htmlTableCalloutContentMatches(from: html, excluding: structuralRanges)
         let calloutRanges = calloutMatches.map(\.range)
-        let listMatches = htmlTableListContentMatches(from: html, excluding: calloutRanges)
-        let containerRanges = calloutRanges + listMatches.map(\.range)
+        let listMatches = htmlTableListContentMatches(from: html, excluding: structuralRanges + calloutRanges)
+        let containerRanges = structuralRanges + calloutRanges + listMatches.map(\.range)
         let textBlockMatches = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
                 guard htmlTableRange(match.range, isNestedIn: containerRanges) == false else {
@@ -188,7 +190,9 @@ extension NativeEditorMarkdownParser {
             )
         }
         let mediaMatches = htmlTableMediaContentMatches(from: html, excluding: containerRanges)
-        let nodes = (textBlockMatches + codeBlockMatches + mediaMatches + listMatches + calloutMatches)
+        let nodes = (
+            textBlockMatches + codeBlockMatches + mediaMatches + listMatches + calloutMatches + structuralMatches
+        )
             .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
@@ -202,10 +206,14 @@ extension NativeEditorMarkdownParser {
         return nodes
     }
 
-    private static func htmlTableCalloutContentMatches(from html: String) -> [HTMLTableContentMatch] {
+    private static func htmlTableCalloutContentMatches(
+        from html: String,
+        excluding excludedRanges: [NSRange]
+    ) -> [HTMLTableContentMatch] {
         htmlRegexMatches(pattern: #"<div\b([^>]*)>(.*?)</div>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
-                guard let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
+                guard htmlTableRange(match.range, isNestedIn: excludedRanges) == false,
+                      let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
                       let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
                     return nil
                 }
