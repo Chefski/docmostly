@@ -106,20 +106,24 @@ extension NativeEditorMarkdownParser {
     ) -> Range<String.Index>? {
         var searchStart = html.startIndex
         let openingPrefix = "<\(tagName)"
-        let closingTag = "</\(tagName)>"
 
         while searchStart < html.endIndex,
               let openRange = html[searchStart...].range(of: openingPrefix, options: .caseInsensitive) {
             let nameEnd = html.index(openRange.lowerBound, offsetBy: openingPrefix.count)
             guard htmlTableIsTagBoundary(at: nameEnd, in: html),
-                  let openTagEnd = html[openRange.upperBound...].firstIndex(of: ">") else {
+                  let openTagEnd = htmlTableOpeningTagCloseIndex(in: html, startingAt: nameEnd) else {
                 searchStart = openRange.upperBound
                 continue
             }
 
             let contentStart = html.index(after: openTagEnd)
-            guard let closeRange = html[contentStart...].range(of: closingTag, options: .caseInsensitive) else {
-                return nil
+            guard let closeRange = matchingCloseHTMLTableTagRange(
+                in: html,
+                bodyStart: contentStart,
+                tagName: tagName
+            ) else {
+                searchStart = openRange.upperBound
+                continue
             }
 
             return openRange.lowerBound..<closeRange.upperBound
@@ -130,6 +134,98 @@ extension NativeEditorMarkdownParser {
 
     private static func htmlTableIsTagBoundary(at index: String.Index, in html: Substring) -> Bool {
         index == html.endIndex || html[index].isWhitespace || html[index] == ">" || html[index] == "/"
+    }
+
+    private static func matchingCloseHTMLTableTagRange(
+        in html: Substring,
+        bodyStart: String.Index,
+        tagName: String
+    ) -> Range<String.Index>? {
+        var depth = 1
+        var searchStart = bodyStart
+
+        while searchStart < html.endIndex,
+              let tagStart = html[searchStart...].firstIndex(of: "<") {
+            var nameStart = html.index(after: tagStart)
+            guard nameStart < html.endIndex else { return nil }
+
+            let isClosingTag = html[nameStart] == "/"
+            if isClosingTag {
+                nameStart = html.index(after: nameStart)
+            }
+            guard nameStart < html.endIndex else { return nil }
+
+            let nameEnd = htmlTableTagNameEnd(in: html, startingAt: nameStart)
+            let name = String(html[nameStart..<nameEnd])
+            guard htmlTableTagNameMatches(name, tagName),
+                  htmlTableIsTagBoundary(at: nameEnd, in: html),
+                  let closeIndex = htmlTableOpeningTagCloseIndex(in: html, startingAt: nameEnd) else {
+                searchStart = html.index(after: tagStart)
+                continue
+            }
+
+            searchStart = html.index(after: closeIndex)
+            if isClosingTag {
+                depth -= 1
+                if depth == 0 {
+                    return tagStart..<searchStart
+                }
+            } else if htmlTableIsSelfClosingTag(in: html, closeIndex: closeIndex) == false {
+                depth += 1
+            }
+        }
+
+        return nil
+    }
+
+    private static func htmlTableTagNameEnd(in html: Substring, startingAt index: String.Index) -> String.Index {
+        var currentIndex = index
+        while currentIndex < html.endIndex,
+              html[currentIndex].isHTMLTableInlineTagNameCharacter {
+            currentIndex = html.index(after: currentIndex)
+        }
+
+        return currentIndex
+    }
+
+    private static func htmlTableTagNameMatches(_ name: String, _ tagName: String) -> Bool {
+        name.compare(tagName, options: .caseInsensitive) == .orderedSame
+    }
+
+    private static func htmlTableOpeningTagCloseIndex(
+        in html: Substring,
+        startingAt index: String.Index
+    ) -> String.Index? {
+        var currentIndex = index
+        var quote: Character?
+
+        while currentIndex < html.endIndex {
+            let character = html[currentIndex]
+            if let activeQuote = quote {
+                if character == activeQuote {
+                    quote = nil
+                }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == ">" {
+                return currentIndex
+            }
+
+            currentIndex = html.index(after: currentIndex)
+        }
+
+        return nil
+    }
+
+    private static func htmlTableIsSelfClosingTag(in html: Substring, closeIndex: String.Index) -> Bool {
+        guard closeIndex > html.startIndex else { return false }
+
+        var currentIndex = html.index(before: closeIndex)
+        while currentIndex > html.startIndex, html[currentIndex].isWhitespace {
+            currentIndex = html.index(before: currentIndex)
+        }
+
+        return html[currentIndex] == "/"
     }
 
     private static func appendHTMLTablePlainText(_ html: String, to output: inout AttributedString) {

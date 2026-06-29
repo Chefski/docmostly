@@ -42,4 +42,35 @@ struct NativeEditorTableInlineMarkTests {
         #expect(content[5].marks == [ProseMirrorMark(type: "code")])
         #expect(content[7].marks == [ProseMirrorMark(type: "strike")])
     }
+
+    @Test func docmostHTMLTableCellPreservesNestedIdenticalInlineHTMLMarks() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td><p>Keep <strong>outer <strong>inner</strong> tail</strong> done</p></td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        #expect(cell.plainText == "Keep outer inner tail done")
+        #expect(cell.inlineContent == [
+            .text("Keep ", marks: []),
+            .text("outer inner tail", marks: [.bold]),
+            .text(" done", marks: [])
+        ])
+
+        let node = NativeEditorDocument.node(from: block)
+        let content = try #require(node.content?.first?.content?.first?.content?.first?.content)
+        #expect(content.map(\.text) == ["Keep ", "outer inner tail", " done"])
+        #expect(content[1].marks == [ProseMirrorMark(type: "bold")])
+    }
 }
