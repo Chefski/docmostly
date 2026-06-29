@@ -14,18 +14,27 @@ extension NativeRichEditorViewModel {
             return
         }
 
+        let slashContext = activeSlashCommandContext
         performUndoableEdit {
             guard let index = activeBlockIndex else { return }
 
             if let replacementBlock = command.replacementBlock(reusing: document.blocks[index].id) {
+                if let slashContext, slashContext.range.lowerBound != document.blocks[index].text.startIndex {
+                    document.blocks[index].text.replaceSubrange(slashContext.range, with: AttributedString(""))
+                    let insertedBlock = command.replacementBlock(reusing: UUID()) ?? replacementBlock
+                    let insertionIndex = document.blocks.index(after: index)
+                    document.blocks.insert(insertedBlock, at: insertionIndex)
+                    activeBlockID = insertedBlock.id
+                    return
+                }
+
                 document.blocks[index] = replacementBlock
                 return
             }
 
-            let isReplacingSlashCommand = activeSlashCommandQuery != nil
             document.blocks[index].kind = command.blockKind
-            if isReplacingSlashCommand {
-                document.blocks[index].text = AttributedString("")
+            if let slashContext {
+                document.blocks[index].text.replaceSubrange(slashContext.range, with: AttributedString(""))
                 document.blocks[index].selection = AttributedTextSelection()
             }
         }
@@ -35,11 +44,12 @@ extension NativeRichEditorViewModel {
     private func applyInlineSlashCommand(_ command: NativeEditorCommand, now: Date) -> Bool {
         guard let segment = inlineSegment(for: command, now: now) else { return false }
 
+        let slashContext = activeSlashCommandContext
         performUndoableEdit {
             guard let index = activeBlockIndex else { return }
 
-            if activeSlashCommandQuery != nil {
-                document.blocks[index].text = segment
+            if let slashContext {
+                document.blocks[index].text.replaceSubrange(slashContext.range, with: segment)
             } else {
                 insert(segment, into: &document.blocks[index])
             }
@@ -246,16 +256,44 @@ extension NativeRichEditorViewModel {
     }
 
     var activeSlashCommandQuery: String? {
+        activeSlashCommandContext?.query
+    }
+
+    private var activeSlashCommandContext: NativeEditorSlashCommandContext? {
         guard let index = activeBlockIndex else { return nil }
         guard document.blocks[index].kind.allowsSlashCommands else { return nil }
 
-        let text = String(document.blocks[index].text.characters)
-        guard text.first == "/", text.contains("\n") == false else {
+        let block = document.blocks[index]
+        let insertionIndex: AttributedString.Index
+        switch block.selection.indices(in: block.text) {
+        case .ranges(let ranges):
+            guard ranges.isEmpty else { return nil }
+            insertionIndex = block.text.endIndex
+        case .insertionPoint(let index):
+            insertionIndex = index
+        }
+
+        let prefix = String(block.text.characters[..<insertionIndex])
+        guard let slashIndex = prefix.lastIndex(of: "/") else {
             return nil
         }
 
-        return String(text.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        let queryStartIndex = prefix.index(after: slashIndex)
+        let rawQuery = String(prefix[queryStartIndex...])
+        guard rawQuery.contains("\n") == false else { return nil }
+
+        let slashOffset = prefix.distance(from: prefix.startIndex, to: slashIndex)
+        let slashTextIndex = block.text.characters.index(block.text.startIndex, offsetBy: slashOffset)
+        return NativeEditorSlashCommandContext(
+            query: rawQuery.trimmingCharacters(in: .whitespacesAndNewlines),
+            range: slashTextIndex..<insertionIndex
+        )
     }
+}
+
+private struct NativeEditorSlashCommandContext {
+    var query: String
+    var range: Range<AttributedString.Index>
 }
 
 private extension NativeEditorBlockKind {
