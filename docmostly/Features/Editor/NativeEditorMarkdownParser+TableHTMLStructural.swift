@@ -91,6 +91,8 @@ extension NativeEditorMarkdownParser {
             return htmlTableTransclusionReferenceNode(attrs: attrs)
         case "transclusionSource":
             return htmlTableTransclusionSourceNode(attrs: attrs, body: body)
+        case "pageBreak":
+            return ProseMirrorNode(type: "pageBreak")
         default:
             return ProseMirrorNode(type: "subpages")
         }
@@ -193,7 +195,14 @@ extension NativeEditorMarkdownParser {
 
     private static func htmlTableStructuralDivType(from dataType: String?) -> String? {
         guard let dataType else { return nil }
-        for supportedType in ["mathBlock", "base-embed", "transclusionReference", "transclusionSource", "subpages"]
+        for supportedType in [
+            "mathBlock",
+            "base-embed",
+            "transclusionReference",
+            "transclusionSource",
+            "subpages",
+            "pageBreak"
+        ]
             where dataType.localizedCaseInsensitiveCompare(supportedType) == .orderedSame {
             return supportedType
         }

@@ -84,6 +84,27 @@ struct TableHTMLStructuralImportTests {
         #expect(imported.nodeContent[0].content?.first?.type == "detailsSummary")
         #expect(imported.nodeContent[1].content?.map(\.type) == ["column", "column"])
     }
+
+    @Test func docmostHTMLTableCellPreservesPageBreakBlocks() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <div data-type="pageBreak" class="page-break"></div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let imported = try importedStructuralTableCell(from: markdown)
+        let preservedContent = try #require(imported.cell.preservedContent)
+
+        #expect(preservedContent.map(\.type) == ["pageBreak"])
+        #expect(preservedContent.first?.attrs == nil)
+        #expect(imported.nodeContent.map(\.type) == ["pageBreak"])
+    }
 }
 
 @MainActor
