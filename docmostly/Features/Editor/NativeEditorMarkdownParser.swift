@@ -37,6 +37,12 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if let blockquote = blockquoteBlock(in: lines, startingAt: index) {
+                blocks.append(blockquote.block)
+                index = blockquote.endIndex
+                continue
+            }
+
             if let paragraph = paragraphBlock(in: lines, startingAt: index) {
                 blocks.append(paragraph.block)
                 index = paragraph.endIndex
@@ -96,7 +102,7 @@ enum NativeEditorMarkdownParser {
         )
     }
 
-    private static func multilineParagraphText(from lines: [String]) -> AttributedString {
+    static func multilineParagraphText(from lines: [String]) -> AttributedString {
         lines.enumerated().reduce(into: AttributedString("")) { result, item in
             if item.offset > 0 {
                 result += AttributedString("\n")
@@ -376,7 +382,7 @@ enum NativeEditorMarkdownParser {
         case .taskListItem(let isChecked):
             return "\(indent)- [\(isChecked ? "x" : " ")] \(text)"
         case .blockquote:
-            return "> \(text)"
+            return blockquoteMarkdown(from: text)
         case .codeBlock(let language):
             return codeMarkdown(language: language, text: plainText)
         case .divider:
