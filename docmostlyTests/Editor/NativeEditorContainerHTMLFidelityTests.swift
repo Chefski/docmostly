@@ -93,4 +93,26 @@ struct NativeEditorContainerHTMLFidelityTests {
         <div data-type="mathBlock" data-katex="true">E = mc^2</div>
         """)
     }
+
+    @Test func exportsIconlessNativeCalloutAsDocmostHTML() {
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(
+                kind: .callout(NativeEditorCalloutBlock(
+                    style: "info",
+                    icon: nil,
+                    previewText: "Check migration plan"
+                )),
+                text: AttributedString("Check migration plan"),
+                alignment: .left
+            )
+        ])
+        viewModel.resetEditingHistory()
+
+        #expect(viewModel.markdownForDocument() == """
+        <div data-type="callout" data-callout-type="info">
+        Check migration plan
+        </div>
+        """)
+    }
 }
