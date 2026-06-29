@@ -51,6 +51,55 @@ struct NativeEditorContainerHTMLFidelityTests {
         #expect(blocks[2].rawNode?.attrs?["text"] == .string("E = mc^2"))
     }
 
+    @Test func importedDocmostDetailsPreservesStructuredContentBlocks() throws {
+        let markdown = """
+        <details open="">
+        <summary data-type="detailsSummary">Release notes</summary>
+        <div data-type="detailsContent">
+        <p>Ship build</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Confirm smoke test</p>
+        </div>
+        </details>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .details(let details) = block.kind else {
+            Issue.record("Expected Docmost details HTML to import as a native details block.")
+            return
+        }
+
+        let contentNode = try #require(block.rawNode?.content?.first { $0.type == "detailsContent" })
+        let childTypes = contentNode.content?.map(\.type)
+
+        #expect(details.summary == "Release notes")
+        #expect(details.previewText == "Ship build\nConfirm smoke test")
+        #expect(childTypes == ["paragraph", "pageBreak", "paragraph"])
+    }
+
+    @Test func importedDocmostCalloutPreservesStructuredContentBlocks() throws {
+        let markdown = """
+        <div data-type="callout" data-callout-type="warning" data-callout-icon="rocket">
+        <p>Check migration plan</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Confirm rollback owner</p>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .callout(let callout) = block.kind else {
+            Issue.record("Expected Docmost callout HTML to import as a native callout block.")
+            return
+        }
+
+        let childTypes = block.rawNode?.content?.map(\.type)
+
+        #expect(callout.style == "warning")
+        #expect(callout.icon == "rocket")
+        #expect(callout.previewText == "Check migration plan\nConfirm rollback owner")
+        #expect(childTypes == ["paragraph", "pageBreak", "paragraph"])
+    }
+
     @Test func exportsNativeCalloutDetailsAsDocmostHTMLAndMathAsFenceMarkdown() {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [

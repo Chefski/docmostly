@@ -41,15 +41,16 @@ extension NativeEditorMarkdownParser {
         let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div")
         guard let body else { return nil }
 
+        let contentNodes = containerContentNodes(from: body.lines)
         let callout = NativeEditorCalloutBlock(
             style: sanitizedContainerCalloutStyle(attributes["data-callout-type"] ?? "info"),
             icon: nonEmptyContainerHTMLAttribute(attributes["data-callout-icon"]),
-            previewText: containerBodyText(from: body.lines)
+            previewText: containerPreviewText(from: contentNodes)
         )
         return (
             containerBlock(
                 kind: .callout(callout),
-                rawNode: NativeEditorRichBlockNodeFactory.calloutNode(from: callout)
+                rawNode: calloutHTMLNode(from: callout, content: contentNodes)
             ),
             body.endIndex
         )
@@ -65,44 +66,28 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        var summary = "Details"
-        var contentLines: [String] = []
-        var isInDetailsContent = false
-        var currentIndex = lines.index(after: index)
-
-        while currentIndex < lines.endIndex {
-            let currentLine = lines[currentIndex]
-            let trimmedLine = currentLine.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if containsHTMLClosingTag(in: trimmedLine, tagName: "details") {
-                let details = NativeEditorDetailsBlock(
-                    summary: summary,
-                    previewText: containerBodyText(from: contentLines),
-                    isOpen: attributes.keys.contains("open")
-                )
-                return (
-                    containerBlock(
-                        kind: .details(details),
-                        rawNode: NativeEditorRichBlockNodeFactory.detailsNode(from: details)
-                    ),
-                    lines.index(after: currentIndex)
-                )
-            }
-
-            if let parsedSummary = containerSummaryText(from: trimmedLine) {
-                summary = parsedSummary
-            } else if isDetailsContentOpeningLine(trimmedLine) {
-                isInDetailsContent = true
-            } else if isInDetailsContent, containsHTMLClosingTag(in: trimmedLine, tagName: "div") {
-                isInDetailsContent = false
-            } else if isInDetailsContent || trimmedLine.isEmpty == false {
-                contentLines.append(currentLine)
-            }
-
-            currentIndex = lines.index(after: currentIndex)
+        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "details") else {
+            return nil
         }
 
-        return nil
+        let detailsHTML = body.lines.joined(separator: "\n")
+        let contentLines = containerDivBody(in: detailsHTML, dataType: "detailsContent")
+            .map(containerBodyLines(from:)) ?? []
+        let contentNodes = containerContentNodes(from: contentLines)
+        let summary = containerSummaryText(in: body.lines) ?? "Details"
+        let details = NativeEditorDetailsBlock(
+            summary: summary,
+            previewText: containerPreviewText(from: contentNodes),
+            isOpen: attributes.keys.contains("open")
+        )
+
+        return (
+            containerBlock(
+                kind: .details(details),
+                rawNode: detailsHTMLNode(from: details, content: contentNodes)
+            ),
+            body.endIndex
+        )
     }
 
     private static func mathBlockHTMLBlock(
@@ -169,10 +154,12 @@ extension NativeEditorMarkdownParser {
         }
 
         var bodyLines: [String] = []
+        var depth = 1
         var currentIndex = lines.index(after: index)
         while currentIndex < lines.endIndex {
             let currentLine = lines[currentIndex]
-            if containsHTMLClosingTag(in: currentLine, tagName: tagName) {
+            let nextDepth = depth + htmlTagDepthDelta(in: currentLine, tagName: tagName)
+            if nextDepth <= 0 {
                 if let bodyPrefix = htmlLinePrefixBeforeClosingTag(in: currentLine, tagName: tagName) {
                     bodyLines.append(bodyPrefix)
                 }
@@ -180,6 +167,7 @@ extension NativeEditorMarkdownParser {
             }
 
             bodyLines.append(currentLine)
+            depth = nextDepth
             currentIndex = lines.index(after: currentIndex)
         }
 
@@ -224,14 +212,6 @@ extension NativeEditorMarkdownParser {
         return unescapedInlineHTMLText(String(line[contentStart..<closingRange.lowerBound]))
     }
 
-    private static func isDetailsContentOpeningLine(_ line: String) -> Bool {
-        guard let attributes = htmlTagAttributes(from: line, tagName: "div") else {
-            return false
-        }
-
-        return attributes["data-type"]?.localizedCaseInsensitiveCompare("detailsContent") == .orderedSame
-    }
-
     private static func containerBodyText(from lines: [String]) -> String {
         lines.compactMap(containerBodyLineText(from:))
             .joined(separator: "\n")
@@ -267,6 +247,147 @@ extension NativeEditorMarkdownParser {
         let contentStart = line.index(after: openingEnd)
         guard contentStart <= closingRange.lowerBound else { return "" }
         return unescapedInlineHTMLText(String(line[contentStart..<closingRange.lowerBound]))
+    }
+
+    private static func containerSummaryText(in lines: [String]) -> String? {
+        lines.lazy
+            .compactMap { line in
+                containerSummaryText(from: line.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            .first
+    }
+
+    private static func containerContentNodes(from lines: [String]) -> [ProseMirrorNode] {
+        let html = lines.joined(separator: "\n")
+        if let nodes = htmlTablePreservedContent(from: html, dropsSinglePlainParagraph: false) {
+            return nodes
+        }
+
+        let text = containerBodyText(from: lines)
+        guard text.isEmpty == false else { return [] }
+        return [containerParagraphNode(text)]
+    }
+
+    private static func containerPreviewText(from nodes: [ProseMirrorNode]) -> String {
+        nodes.map { NativeEditorDocument.plainText(in: [$0]) }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.isEmpty == false }
+            .joined(separator: "\n")
+    }
+
+    private static func calloutHTMLNode(
+        from callout: NativeEditorCalloutBlock,
+        content: [ProseMirrorNode]
+    ) -> ProseMirrorNode {
+        var attrs: [String: ProseMirrorJSONValue] = ["type": .string(callout.style)]
+        if let icon = callout.icon {
+            attrs["icon"] = .string(icon)
+        }
+
+        return ProseMirrorNode(
+            type: "callout",
+            attrs: attrs,
+            content: content.isEmpty ? [containerParagraphNode(callout.previewText)] : content
+        )
+    }
+
+    private static func detailsHTMLNode(
+        from details: NativeEditorDetailsBlock,
+        content: [ProseMirrorNode]
+    ) -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "details",
+            attrs: ["open": .bool(details.isOpen)],
+            content: [
+                ProseMirrorNode(
+                    type: "detailsSummary",
+                    content: NativeEditorDocument.inlineNodes(from: inlineText(from: details.summary))
+                ),
+                ProseMirrorNode(
+                    type: "detailsContent",
+                    content: content.isEmpty ? [containerParagraphNode(details.previewText)] : content
+                )
+            ]
+        )
+    }
+
+    private static func containerParagraphNode(_ text: String) -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "paragraph",
+            content: NativeEditorDocument.inlineNodes(from: inlineText(from: text))
+        )
+    }
+
+    private static func containerDivBody(in html: String, dataType: String) -> String? {
+        let tags = htmlRegexMatches(pattern: #"</?div\b[^>]*>"#, in: html)
+        for (index, tag) in tags.enumerated() {
+            guard let tagText = htmlRegexString(match: tag, captureIndex: 0, in: html),
+                  containerDivTagIsClosing(tagText) == false,
+                  containerDivTagIsSelfClosing(tagText) == false else {
+                continue
+            }
+
+            let attrs = docmostInlineHTMLAttributes(from: tagText)
+            guard attrs["data-type"]?.localizedCaseInsensitiveCompare(dataType) == .orderedSame else {
+                continue
+            }
+
+            return containerDivBody(in: html, tags: tags, openingTagIndex: index)
+        }
+
+        return nil
+    }
+
+    private static func containerDivBody(
+        in html: String,
+        tags: [NSTextCheckingResult],
+        openingTagIndex: Int
+    ) -> String? {
+        let openingTag = tags[openingTagIndex]
+        var depth = 0
+
+        for currentTag in tags[openingTagIndex...] {
+            guard let tagText = htmlRegexString(match: currentTag, captureIndex: 0, in: html) else {
+                continue
+            }
+
+            if containerDivTagIsClosing(tagText) {
+                depth -= 1
+                if depth == 0 {
+                    return containerHTMLBody(in: html, openingTag: openingTag, closingTag: currentTag)
+                }
+            } else if containerDivTagIsSelfClosing(tagText) == false {
+                depth += 1
+            }
+        }
+
+        return nil
+    }
+
+    private static func containerHTMLBody(
+        in html: String,
+        openingTag: NSTextCheckingResult,
+        closingTag: NSTextCheckingResult
+    ) -> String? {
+        guard let bodyStart = Range(openingTag.range, in: html)?.upperBound,
+              let bodyEnd = Range(closingTag.range, in: html)?.lowerBound,
+              bodyStart <= bodyEnd else {
+            return nil
+        }
+
+        return String(html[bodyStart..<bodyEnd])
+    }
+
+    private static func containerBodyLines(from html: String) -> [String] {
+        html.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
+    private static func containerDivTagIsClosing(_ tagText: String) -> Bool {
+        tagText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("</")
+    }
+
+    private static func containerDivTagIsSelfClosing(_ tagText: String) -> Bool {
+        tagText.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("/>")
     }
 
     private static func containerBlock(kind: NativeEditorBlockKind, rawNode: ProseMirrorNode) -> NativeEditorBlock {

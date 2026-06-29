@@ -140,7 +140,7 @@ extension NativeEditorMarkdownParser {
         return NativeEditorTextAlignment(rawValue: value.lowercased())
     }
 
-    private static func htmlTablePreservedContent(
+    static func htmlTablePreservedContent(
         from html: String,
         dropsSinglePlainParagraph: Bool = true
     ) -> [ProseMirrorNode]? {
