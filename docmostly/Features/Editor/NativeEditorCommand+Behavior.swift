@@ -29,7 +29,7 @@ extension NativeEditorCommand {
             return 0
         }
 
-        if title.localizedStandardContains(query) || title.fuzzyMatchesSlashCommandQuery(query) {
+        if title.localizedStandardContains(query) {
             return 1
         }
 
@@ -43,6 +43,10 @@ extension NativeEditorCommand {
 
         if searchTerms.contains(where: { $0.localizedStandardContains(query) }) {
             return 2
+        }
+
+        if title.fuzzyMatchesSlashCommandQuery(query) {
+            return 3
         }
 
         return nil
