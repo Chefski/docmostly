@@ -4,6 +4,25 @@ import Testing
 
 @MainActor
 struct NativeEditorLinkFidelityTests {
+    @Test func importsDocmostHTMLAnchorsAsNativeLinkMarks() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(
+            from: #"Review <a href="/p/roadmap-abc123#shipping" data-internal="true">Roadmap</a> today."#
+        )
+        let document = NativeEditorDocument(blocks: blocks)
+
+        let inlineNodes = document.proseMirrorDocument.content.first?.content ?? []
+        #expect(inlineNodes.map(\.text) == ["Review ", "Roadmap", " today."])
+
+        let linkMark = try #require(inlineNodes[1].marks?.first)
+        #expect(linkMark == ProseMirrorMark(
+            type: "link",
+            attrs: [
+                "href": .string("/p/roadmap-abc123#shipping"),
+                "internal": .bool(true)
+            ]
+        ))
+    }
+
     @Test func preservesDocmostRelativeInternalLinksFromProseMirror() throws {
         let document = try NativeEditorDocument(proseMirrorJSONData: Data("""
         {

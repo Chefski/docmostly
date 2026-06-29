@@ -100,6 +100,8 @@ extension NativeEditorMarkdownParser {
             remaining = remaining[htmlMention.range.upperBound...]
         }
 
+        if consumeDocmostAnchorHTML(in: &remaining, appendingTo: &result) { didAppendAtom = true }
+
         while let link = nextDocmostPageMarkdownLink(in: remaining) {
             appendMarkdownTextWithBareDocmostPageLinks(
                 String(remaining[..<link.range.lowerBound]),
