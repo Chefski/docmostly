@@ -85,6 +85,12 @@ enum NativeEditorTableLayout {
     }
 
     nonisolated private static func cssColorComponent(from value: String) -> Double? {
+        if value.hasSuffix("%") {
+            let percentageText = value.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let percentage = Double(percentageText) else { return nil }
+            return min(max(percentage / 100, 0), 1) * 255
+        }
+
         guard let component = Double(value) else { return nil }
         return min(max(component, 0), 255)
     }
