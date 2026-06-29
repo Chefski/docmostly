@@ -43,6 +43,12 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if let listItem = listItemBlock(in: lines, startingAt: index) {
+                blocks.append(listItem.block)
+                index = listItem.endIndex
+                continue
+            }
+
             if let paragraph = paragraphBlock(in: lines, startingAt: index) {
                 blocks.append(paragraph.block)
                 index = paragraph.endIndex
@@ -376,11 +382,15 @@ enum NativeEditorMarkdownParser {
         case .heading(let level):
             return "\(String(repeating: "#", count: max(level, 1))) \(text)"
         case .bulletListItem:
-            return "\(indent)- \(text)"
+            return listItemMarkdown(prefix: "\(indent)- ", continuationPrefix: "\(indent)  ", text: text)
         case .orderedListItem(let ordinal):
-            return "\(indent)\(ordinal). \(text)"
+            let prefix = "\(indent)\(ordinal). "
+            let continuationPrefix = indent + String(repeating: " ", count: "\(ordinal). ".count)
+            return listItemMarkdown(prefix: prefix, continuationPrefix: continuationPrefix, text: text)
         case .taskListItem(let isChecked):
-            return "\(indent)- [\(isChecked ? "x" : " ")] \(text)"
+            let prefix = "\(indent)- [\(isChecked ? "x" : " ")] "
+            let continuationPrefix = indent + String(repeating: " ", count: "- [ ] ".count)
+            return listItemMarkdown(prefix: prefix, continuationPrefix: continuationPrefix, text: text)
         case .blockquote:
             return blockquoteMarkdown(from: text)
         case .codeBlock(let language):

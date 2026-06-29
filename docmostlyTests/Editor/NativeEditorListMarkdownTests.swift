@@ -4,6 +4,63 @@ import Testing
 
 @MainActor
 struct NativeEditorListMarkdownTests {
+    @Test func bulletListMarkdownExportPrefixesContinuationLines() throws {
+        let block = NativeEditorBlock(
+            kind: .bulletListItem,
+            text: AttributedString("First line\nSecond line"),
+            alignment: .left
+        )
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+
+        #expect(markdown == """
+        - First line
+          Second line
+        """)
+
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        #expect(importedBlock.kind == .bulletListItem)
+        #expect(String(importedBlock.text.characters) == "First line\nSecond line")
+    }
+
+    @Test func orderedListMarkdownExportPrefixesContinuationLines() throws {
+        let block = NativeEditorBlock(
+            kind: .orderedListItem(ordinal: 12),
+            text: AttributedString("First line\nSecond line"),
+            alignment: .left
+        )
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+
+        #expect(markdown == """
+        12. First line
+            Second line
+        """)
+
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        #expect(importedBlock.kind == .orderedListItem(ordinal: 12))
+        #expect(String(importedBlock.text.characters) == "First line\nSecond line")
+    }
+
+    @Test func taskListMarkdownExportPrefixesContinuationLines() throws {
+        let block = NativeEditorBlock(
+            kind: .taskListItem(isChecked: false),
+            text: AttributedString("First line\nSecond line"),
+            alignment: .left
+        )
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+
+        #expect(markdown == """
+        - [ ] First line
+              Second line
+        """)
+
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        #expect(importedBlock.kind == .taskListItem(isChecked: false))
+        #expect(String(importedBlock.text.characters) == "First line\nSecond line")
+    }
+
     @Test func markdownImportSupportsPlusListMarkers() throws {
         let blocks = NativeEditorMarkdownParser.blocks(from: """
         + Release notes
