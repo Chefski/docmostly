@@ -147,7 +147,11 @@ nonisolated extension NativeEditorDocument {
     private static func append(_ nestedList: ProseMirrorNode, toLastItemIn itemNodes: inout [ProseMirrorNode]) {
         guard var lastItem = itemNodes.popLast() else { return }
         var content = lastItem.content ?? []
-        content.append(nestedList)
+        if let nestedIndex = content.firstIndex(where: \.isListContainer) {
+            content[nestedIndex] = nestedList
+        } else {
+            content.append(nestedList)
+        }
         lastItem.content = content
         itemNodes.append(lastItem)
     }
@@ -272,15 +276,103 @@ nonisolated extension NativeEditorDocument {
     }
 
     private static func listItemNode(from block: NativeEditorBlock) -> ProseMirrorNode {
-        ProseMirrorNode(type: "listItem", content: [textContainerNode(type: "paragraph", block: block)])
+        ProseMirrorNode(
+            type: "listItem",
+            attrs: preservedListItemAttrs(type: "listItem", block: block),
+            content: listItemContent(type: "listItem", block: block)
+        )
     }
 
     private static func taskItemNode(from block: NativeEditorBlock) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "taskItem",
-            attrs: ["checked": .bool(taskItemCheckedState(from: block))],
-            content: [textContainerNode(type: "paragraph", block: block)]
+            attrs: taskItemAttrs(from: block),
+            content: listItemContent(type: "taskItem", block: block)
         )
+    }
+
+    private static func preservedListItemAttrs(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [String: ProseMirrorJSONValue]? {
+        guard block.rawNode?.type == type else { return nil }
+        let attrs = block.rawNode?.attrs ?? [:]
+        return attrs.isEmpty ? nil : attrs
+    }
+
+    private static func taskItemAttrs(from block: NativeEditorBlock) -> [String: ProseMirrorJSONValue] {
+        var attrs = block.rawNode?.type == "taskItem" ? block.rawNode?.attrs ?? [:] : [:]
+        attrs["checked"] = .bool(taskItemCheckedState(from: block))
+        return attrs
+    }
+
+    private static func listItemContent(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [ProseMirrorNode] {
+        let textNode = listItemTextContainerNode(type: type, block: block)
+        guard block.rawNode?.type == type, var content = block.rawNode?.content else {
+            return [textNode]
+        }
+
+        if let textIndex = content.firstIndex(where: isListItemTextContainer) {
+            content[textIndex] = textNode
+        } else {
+            content.insert(textNode, at: content.startIndex)
+        }
+
+        return content
+    }
+
+    private static func listItemTextContainerNode(
+        type: String,
+        block: NativeEditorBlock
+    ) -> ProseMirrorNode {
+        let originalNode = originalListItemTextContainer(type: type, block: block)
+        let nodeType = originalNode?.type ?? "paragraph"
+        var attrs = originalNode?.attrs ?? [:]
+
+        if let alignment = block.alignment.proseMirrorValue {
+            attrs["textAlign"] = alignment
+        } else {
+            attrs.removeValue(forKey: "textAlign")
+        }
+
+        return ProseMirrorNode(
+            type: nodeType,
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: listItemTextContainerContent(type: nodeType, block: block)
+        )
+    }
+
+    private static func originalListItemTextContainer(
+        type: String,
+        block: NativeEditorBlock
+    ) -> ProseMirrorNode? {
+        if block.rawNode?.type == type {
+            return block.rawNode?.content?.first(where: isListItemTextContainer)
+        }
+
+        if let rawNode = block.rawNode, isListItemTextContainer(rawNode) {
+            return rawNode
+        }
+
+        return nil
+    }
+
+    private static func listItemTextContainerContent(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [ProseMirrorNode] {
+        if type == "codeBlock" {
+            return plainTextNodes(from: String(block.text.characters))
+        }
+
+        return block.inlineContent.map(inlineNodes(from:)) ?? inlineNodes(from: block.text)
+    }
+
+    private static func isListItemTextContainer(_ node: ProseMirrorNode) -> Bool {
+        node.type == "paragraph" || node.type == "heading" || node.type == "codeBlock"
     }
 
     private static func taskItemCheckedState(from block: NativeEditorBlock) -> Bool {

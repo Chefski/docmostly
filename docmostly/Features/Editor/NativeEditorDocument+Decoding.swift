@@ -138,8 +138,13 @@ nonisolated extension NativeEditorDocument {
         item: ProseMirrorNode,
         indentLevel: Int
     ) -> [NativeEditorBlock] {
-        var block = textBlock(kind: kind, node: firstTextContainer(in: item) ?? item)
+        let textContainer = firstTextContainer(in: item) ?? item
+        var block = textBlock(kind: kind, node: textContainer)
         block.indentLevel = indentLevel
+
+        if listItemNeedsRawPreservation(kind: kind, item: item) {
+            block.rawNode = item
+        }
 
         let nestedBlocks: [NativeEditorBlock] = (item.content ?? []).flatMap { child in
             if child.isListContainer {
@@ -150,6 +155,32 @@ nonisolated extension NativeEditorDocument {
         }
 
         return [block] + nestedBlocks
+    }
+
+    private static func listItemNeedsRawPreservation(
+        kind: NativeEditorBlockKind,
+        item: ProseMirrorNode
+    ) -> Bool {
+        listItemAttrsNeedRawPreservation(kind: kind, item: item) ||
+            listItemHasAdditionalNonListContent(item)
+    }
+
+    private static func listItemAttrsNeedRawPreservation(
+        kind: NativeEditorBlockKind,
+        item: ProseMirrorNode
+    ) -> Bool {
+        guard let attrs = item.attrs, attrs.isEmpty == false else { return false }
+
+        if case .taskListItem = kind {
+            return attrs.keys.contains { $0 != "checked" }
+        }
+
+        return true
+    }
+
+    private static func listItemHasAdditionalNonListContent(_ item: ProseMirrorNode) -> Bool {
+        let nonListContent = (item.content ?? []).filter { $0.isListContainer == false }
+        return nonListContent.count > 1
     }
 
     private static func orderedListOrdinal(start: Int, offset: Int) -> Int {
