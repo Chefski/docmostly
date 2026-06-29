@@ -107,6 +107,7 @@ struct NativeEditorTablePayloadTests {
         #expect(encodedCell.attrs?["backgroundColorName"] == .string("yellow"))
     }
 
+    @MainActor
     @Test func tableCellBackgroundRespectsRGBAAlphaPercentages() {
         let components = NativeEditorTableLayout.cssRGBAComponents(from: "rgba(255, 0, 0, 50%)")
 
