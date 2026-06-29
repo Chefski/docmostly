@@ -371,9 +371,13 @@ enum NativeEditorMarkdownParser {
             } else if let mention = run[NativeEditorMentionAttribute.self] {
                 runMarkdown = mentionMarkdown(from: mention, fallbackText: runText)
             } else {
-                let coloredMarkdown = textColorMarkdown(
+                let scriptMarkdown = scriptUnderlineMarkdown(
                     from: run,
                     body: inlineRunMarkdown(from: run, text: runText)
+                )
+                let coloredMarkdown = textColorMarkdown(
+                    from: run,
+                    body: scriptMarkdown
                 )
                 runMarkdown = highlightMarkdown(from: run, body: coloredMarkdown)
             }

@@ -52,6 +52,24 @@ extension NativeEditorMarkdownParser {
         return output
     }
 
+    static func scriptUnderlineMarkdown(
+        from run: AttributedString.Runs.Run,
+        body: String
+    ) -> String {
+        var output = body
+
+        if let baselineOffset = run.baselineOffset, baselineOffset != 0 {
+            let tagName = baselineOffset > 0 ? "sup" : "sub"
+            output = "<\(tagName)>\(output)</\(tagName)>"
+        }
+
+        if run.underlineStyle != nil {
+            output = "<u>\(output)</u>"
+        }
+
+        return output
+    }
+
     private static func codeMarkdown(from text: String) -> String {
         let delimiter = text.contains("`") ? "``" : "`"
         return "\(delimiter)\(text)\(delimiter)"
