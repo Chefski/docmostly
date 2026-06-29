@@ -493,6 +493,7 @@ private struct SlashCommandExpectation {
     let label: String
 }
 
+@MainActor
 private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
     viewModel.document.proseMirrorDocument.content.first?.content ?? []
 }
