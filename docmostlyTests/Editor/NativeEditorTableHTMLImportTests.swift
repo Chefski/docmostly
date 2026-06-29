@@ -226,4 +226,42 @@ struct NativeEditorTableHTMLImportTests {
         #expect(cellContent[1].attrs?["start"] == .int(3))
         #expect(cellContent[2].content?.first?.attrs?["checked"] == .bool(true))
     }
+
+    @Test func docmostHTMLTableCellPreservesCalloutContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <div data-type="callout" data-callout-type="warning" data-callout-icon="rocket">
+        <p>Check launch notes</p>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText == "Check launch notes")
+        #expect(preservedContent.map(\.type) == ["callout"])
+        #expect(preservedContent[0].attrs?["type"] == .string("warning"))
+        #expect(preservedContent[0].attrs?["icon"] == .string("rocket"))
+        #expect(preservedContent[0].content?.first?.type == "paragraph")
+        #expect(preservedContent[0].content?.first?.content?.first?.text == "Check launch notes")
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["callout"])
+        #expect(cellContent[0].attrs?["type"] == .string("warning"))
+        #expect(cellContent[0].attrs?["icon"] == .string("rocket"))
+        #expect(cellContent[0].content?.first?.content?.first?.text == "Check launch notes")
+    }
 }

@@ -144,11 +144,13 @@ extension NativeEditorMarkdownParser {
         from html: String,
         dropsSinglePlainParagraph: Bool = true
     ) -> [ProseMirrorNode]? {
-        let listMatches = htmlTableListContentMatches(from: html)
-        let listRanges = listMatches.map(\.range)
+        let calloutMatches = htmlTableCalloutContentMatches(from: html)
+        let calloutRanges = calloutMatches.map(\.range)
+        let listMatches = htmlTableListContentMatches(from: html, excluding: calloutRanges)
+        let containerRanges = calloutRanges + listMatches.map(\.range)
         let textBlockMatches = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
-                guard htmlTableRange(match.range, isNestedIn: listRanges) == false else {
+                guard htmlTableRange(match.range, isNestedIn: containerRanges) == false else {
                     return nil
                 }
                 guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
@@ -167,7 +169,7 @@ extension NativeEditorMarkdownParser {
             in: html
         )
         .compactMap { match -> HTMLTableContentMatch? in
-            guard htmlTableRange(match.range, isNestedIn: listRanges) == false else {
+            guard htmlTableRange(match.range, isNestedIn: containerRanges) == false else {
                 return nil
             }
             guard let preAttributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
@@ -185,7 +187,7 @@ extension NativeEditorMarkdownParser {
                 )
             )
         }
-        let nodes = (textBlockMatches + codeBlockMatches + listMatches)
+        let nodes = (textBlockMatches + codeBlockMatches + listMatches + calloutMatches)
             .sorted { $0.range.location < $1.range.location }
             .map(\.node)
 
@@ -199,9 +201,35 @@ extension NativeEditorMarkdownParser {
         return nodes
     }
 
-    private static func htmlTableListContentMatches(from html: String) -> [HTMLTableContentMatch] {
+    private static func htmlTableCalloutContentMatches(from html: String) -> [HTMLTableContentMatch] {
+        htmlRegexMatches(pattern: #"<div\b([^>]*)>(.*?)</div>"#, in: html)
+            .compactMap { match -> HTMLTableContentMatch? in
+                guard let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
+                      let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
+                    return nil
+                }
+
+                let attrs = docmostInlineHTMLAttributes(from: "<div\(attributeText)>")
+                guard attrs["data-type"]?.compare("callout", options: .caseInsensitive) == .orderedSame else {
+                    return nil
+                }
+
+                return HTMLTableContentMatch(
+                    range: match.range,
+                    node: htmlTableCalloutNode(attrs: attrs, body: body)
+                )
+            }
+    }
+
+    private static func htmlTableListContentMatches(
+        from html: String,
+        excluding excludedRanges: [NSRange]
+    ) -> [HTMLTableContentMatch] {
         htmlRegexMatches(pattern: #"<(ul|ol)\b([^>]*)>(.*?)</\1>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
+                guard htmlTableRange(match.range, isNestedIn: excludedRanges) == false else {
+                    return nil
+                }
                 guard let tagName = htmlRegexString(match: match, captureIndex: 1, in: html),
                       let attributeText = htmlRegexString(match: match, captureIndex: 2, in: html),
                       let body = htmlRegexString(match: match, captureIndex: 3, in: html) else {
@@ -242,6 +270,45 @@ extension NativeEditorMarkdownParser {
             attrs: htmlTableContentAttrs(baseAttrs: [:], htmlAttrs: attrs),
             content: content
         )
+    }
+
+    private static func htmlTableCalloutNode(
+        attrs: [String: String],
+        body: String
+    ) -> ProseMirrorNode {
+        var nodeAttrs: [String: ProseMirrorJSONValue] = [
+            "type": .string(htmlTableSanitizedCalloutStyle(attrs["data-callout-type"] ?? "info"))
+        ]
+        if let icon = nonEmptyHTMLTableAttribute(attrs["data-callout-icon"]) {
+            nodeAttrs["icon"] = .string(icon)
+        }
+
+        return ProseMirrorNode(
+            type: "callout",
+            attrs: nodeAttrs,
+            content: htmlTableContainerContent(from: body)
+        )
+    }
+
+    private static func htmlTableContainerContent(from html: String) -> [ProseMirrorNode] {
+        if let preservedContent = htmlTablePreservedContent(from: html, dropsSinglePlainParagraph: false) {
+            return preservedContent
+        }
+
+        return [
+            ProseMirrorNode(
+                type: "paragraph",
+                content: NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: html)))
+            )
+        ]
+    }
+
+    private static func htmlTableSanitizedCalloutStyle(_ value: String) -> String {
+        let sanitizedScalars = value.lowercased().unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0)
+        }
+        let sanitized = String(String.UnicodeScalarView(sanitizedScalars))
+        return sanitized.isEmpty ? "info" : sanitized
     }
 
     private static func htmlTableListNode(
@@ -296,16 +363,7 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func htmlTableListItemContent(from html: String) -> [ProseMirrorNode] {
-        if let preservedContent = htmlTablePreservedContent(from: html, dropsSinglePlainParagraph: false) {
-            return preservedContent
-        }
-
-        return [
-            ProseMirrorNode(
-                type: "paragraph",
-                content: NativeEditorDocument.inlineNodes(from: inlineText(from: htmlTableInlineMarkdown(from: html)))
-            )
-        ]
+        htmlTableContainerContent(from: html)
     }
 
     private static func htmlTableTaskItemIsChecked(attributeText: String, body: String) -> Bool {
