@@ -102,7 +102,7 @@ extension NativeEditorMarkdownParser {
     private static func embeddedMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .embed(let embed):
-            embedHTMLMarkdown(from: embed) ?? embedMarkdown(from: embed)
+            youtubeHTMLMarkdown(from: block.rawNode) ?? embedHTMLMarkdown(from: embed) ?? embedMarkdown(from: embed)
         case .drawio(let diagram):
             diagramMarkdown(from: diagram, type: "drawio")
         case .excalidraw(let diagram):

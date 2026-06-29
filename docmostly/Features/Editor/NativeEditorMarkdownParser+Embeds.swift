@@ -7,6 +7,10 @@ extension NativeEditorMarkdownParser {
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
         let line = lines[index]
 
+        if let youtube = youtubeHTMLBlock(in: lines, startingAt: index) {
+            return youtube
+        }
+
         if let iframe = iframeHTMLBlock(in: lines, startingAt: index) {
             return iframe
         }
