@@ -356,4 +356,54 @@ struct NativeEditorTableHTMLImportTests {
         #expect(cellContent[0].attrs?["attachmentId"] == .string("video-1"))
         #expect(cellContent[1].attrs?["attachmentId"] == .string("audio-1"))
     }
+
+    @Test func docmostHTMLTableCellPreservesPDFAndAttachmentContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <div data-type="pdf" src="/api/files/pdf-1/Spec.pdf" data-name="Spec.pdf"
+        data-attachment-id="pdf-1" data-size="16384" width="800" height="600">
+        <iframe src="/api/files/pdf-1/Spec.pdf" width="800" height="600"></iframe>
+        </div>
+        <div data-type="attachment" data-attachment-url="/api/files/file-1/Archive.zip"
+        data-attachment-name="Archive.zip" data-attachment-mime="application/zip"
+        data-attachment-size="1024" data-attachment-id="file-1">
+        <a href="/api/files/file-1/Archive.zip" class="attachment" target="blank">Archive.zip</a>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(cell.plainText.isEmpty)
+        #expect(preservedContent.map(\.type) == ["pdf", "attachment"])
+        #expect(preservedContent[0].attrs?["src"] == .string("/api/files/pdf-1/Spec.pdf"))
+        #expect(preservedContent[0].attrs?["name"] == .string("Spec.pdf"))
+        #expect(preservedContent[0].attrs?["attachmentId"] == .string("pdf-1"))
+        #expect(preservedContent[0].attrs?["size"] == .int(16_384))
+        #expect(preservedContent[0].attrs?["width"] == .int(800))
+        #expect(preservedContent[0].attrs?["height"] == .int(600))
+        #expect(preservedContent[1].attrs?["url"] == .string("/api/files/file-1/Archive.zip"))
+        #expect(preservedContent[1].attrs?["name"] == .string("Archive.zip"))
+        #expect(preservedContent[1].attrs?["mime"] == .string("application/zip"))
+        #expect(preservedContent[1].attrs?["size"] == .int(1_024))
+        #expect(preservedContent[1].attrs?["attachmentId"] == .string("file-1"))
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["pdf", "attachment"])
+        #expect(cellContent[0].attrs?["attachmentId"] == .string("pdf-1"))
+        #expect(cellContent[1].attrs?["attachmentId"] == .string("file-1"))
+    }
 }
