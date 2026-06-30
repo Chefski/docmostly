@@ -115,14 +115,18 @@ final class NativeRichEditorViewModel {
     var filteredSlashCommands: [NativeEditorCommand] {
         guard let slashCommandQuery = activeSlashCommandQuery else { return [] }
 
-        let matches = NativeEditorCommand.slashMenuCases.compactMap { command in
+        let matches = NativeEditorCommand.slashMenuCases.enumerated().compactMap { index, command in
             command.matchPriority(query: slashCommandQuery).map { priority in
-                (command: command, priority: priority)
+                (command: command, priority: priority, index: index)
             }
         }
 
-        guard let bestPriority = matches.map(\.priority).min() else { return [] }
-        return matches.filter { $0.priority == bestPriority }.map(\.command)
+        return matches.sorted { lhs, rhs in
+            if lhs.priority != rhs.priority {
+                return lhs.priority < rhs.priority
+            }
+            return lhs.index < rhs.index
+        }.map(\.command)
     }
 
     var canSave: Bool {
