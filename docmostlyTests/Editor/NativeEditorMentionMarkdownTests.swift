@@ -64,7 +64,8 @@ struct NativeEditorMentionMarkdownTests {
 
         #expect(mentionIdentifiers.count == 2)
         #expect(Set(mentionIdentifiers).count == 2)
-        #expect(mentionIdentifiers.allSatisfy(\.isDocmostMentionNodeIdentifier))
+        let allIdentifiersUseDocmostShape = mentionIdentifiers.allSatisfy(\.isDocmostMentionNodeIdentifier)
+        #expect(allIdentifiersUseDocmostShape)
     }
 
     @Test func pasteMarkdownPageMentionsPreservesSurroundingInlineMarks() {
