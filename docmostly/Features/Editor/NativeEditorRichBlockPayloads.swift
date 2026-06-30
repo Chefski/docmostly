@@ -125,6 +125,8 @@ nonisolated struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
 nonisolated extension NativeEditorPDFBlock {
     static let defaultWidth = "800"
     static let defaultHeight = "600"
+    static let defaultWidthValue = 800
+    static let defaultHeightValue = 600
 
     static let placeholder = NativeEditorPDFBlock(
         source: nil,

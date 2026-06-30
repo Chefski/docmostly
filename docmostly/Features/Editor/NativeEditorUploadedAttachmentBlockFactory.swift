@@ -90,14 +90,16 @@ enum NativeEditorAttachmentBlockFactory {
     private static func pdfBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
         attrs["name"] = .string(context.attachment.fileName)
+        attrs["width"] = .int(NativeEditorPDFBlock.defaultWidthValue)
+        attrs["height"] = .int(NativeEditorPDFBlock.defaultHeightValue)
 
         let kind = NativeEditorBlockKind.pdf(NativeEditorPDFBlock(
             source: context.source,
             name: context.attachment.fileName,
             attachmentID: context.attachment.id,
             sizeInBytes: context.size,
-            width: nil,
-            height: nil
+            width: NativeEditorPDFBlock.defaultWidth,
+            height: NativeEditorPDFBlock.defaultHeight
         ))
 
         return rawBlock(id: id, kind: kind, type: "pdf", attrs: attrs)
