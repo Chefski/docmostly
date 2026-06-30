@@ -152,6 +152,17 @@ nonisolated struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
 nonisolated struct NativeEditorColumnsBlock: Hashable, Sendable {
     static let maximumColumnCount = 5
     static let defaultWidthMode = "normal"
+    static let supportedLayouts = [
+        "two_equal",
+        "two_left_sidebar",
+        "two_right_sidebar",
+        "three_equal",
+        "three_left_wide",
+        "three_right_wide",
+        "three_with_sidebars",
+        "four_equal",
+        "five_equal"
+    ]
     static let supportedWidthModes = ["normal", "wide"]
 
     var layout: String

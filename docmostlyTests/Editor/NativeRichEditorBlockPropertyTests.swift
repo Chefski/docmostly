@@ -62,6 +62,36 @@ struct NativeRichEditorBlockPropertyTests {
         #expect(viewModel.isDirty == true)
     }
 
+    @Test func columnsEditorOffersDocmostLayoutsAndMaximumColumnCount() throws {
+        let editor = NativeEditorColumnsEditor(
+            blockID: UUID(),
+            columns: NativeEditorColumnsBlock(
+                layout: "two_equal",
+                widthMode: "normal",
+                columnCount: 2,
+                previewText: "Left Right",
+                columnTexts: ["Left", "Right"]
+            ),
+            actions: noOpRichBlockEditingActions()
+        )
+
+        let layouts: [String] = try mirroredProperty("layouts", in: editor)
+        let columnCountRange: ClosedRange<Int> = try mirroredProperty("columnCountRange", in: editor)
+
+        #expect(layouts == [
+            "two_equal",
+            "two_left_sidebar",
+            "two_right_sidebar",
+            "three_equal",
+            "three_left_wide",
+            "three_right_wide",
+            "three_with_sidebars",
+            "four_equal",
+            "five_equal"
+        ])
+        #expect(columnCountRange.upperBound == NativeEditorColumnsBlock.maximumColumnCount)
+    }
+
     private func richBlockViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [
@@ -153,5 +183,35 @@ struct NativeRichEditorBlockPropertyTests {
             alignment: .left,
             rawNode: ProseMirrorNode(type: "excalidraw")
         )
+    }
+
+    private func mirroredProperty<Value>(_ label: String, in value: Any) throws -> Value {
+        for child in Mirror(reflecting: value).children where child.label == label {
+            return try #require(child.value as? Value)
+        }
+
+        Issue.record("Expected \(label) to be stored on \(type(of: value)).")
+        throw MirroredPropertyError.missing(label)
+    }
+
+    private func noOpRichBlockEditingActions() -> NativeEditorRichBlockEditingActions {
+        NativeEditorRichBlockEditingActions(
+            updateCallout: { _, _, _, _ in },
+            updateDetails: { _, _, _, _ in },
+            updateColumns: { _, _, _, _ in },
+            updateTransclusionSource: { _, _, _ in },
+            updateTransclusionReference: { _, _, _ in },
+            updateMediaBlock: { _, _ in },
+            updatePDFBlock: { _, _, _, _, _ in },
+            updateAttachmentBlock: { _, _, _, _ in },
+            updateEmbed: { _, _, _ in },
+            updateDrawio: { _, _, _, _ in },
+            updateExcalidraw: { _, _, _, _ in },
+            updateMathBlock: { _, _ in }
+        )
+    }
+
+    private enum MirroredPropertyError: Error {
+        case missing(String)
     }
 }
