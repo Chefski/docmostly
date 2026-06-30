@@ -75,6 +75,8 @@ nonisolated extension NativeEditorDocument {
             modeledKeys = ["indent", "textAlign"]
         case .heading:
             modeledKeys = ["indent", "level", "textAlign"]
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            modeledKeys = ["textAlign"]
         default:
             return false
         }

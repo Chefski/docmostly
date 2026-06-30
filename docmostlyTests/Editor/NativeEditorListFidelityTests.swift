@@ -18,10 +18,12 @@ struct NativeEditorListFidelityTests {
                       "content": [
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "launchlistid" },
                           "content": [{ "type": "text", "text": "Launch checklist" }]
                         },
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "rolloutnotes" },
                           "content": [{ "type": "text", "text": "Keep rollout notes attached" }]
                         }
                       ]

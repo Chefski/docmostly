@@ -287,6 +287,7 @@ enum NativeEditorInlineFixtures {
           "content": [
             {
               "type": "paragraph",
+              "attrs": { "id": "richinlineid" },
               "content": [
                 {
                   "type": "text",
@@ -343,6 +344,7 @@ enum NativeEditorNestedListFixtures {
                   "content": [
                     {
                       "type": "paragraph",
+                      "attrs": { "id": "parentnodeid" },
                       "content": [{ "type": "text", "text": "Parent" }]
                     },
                     {
@@ -353,6 +355,7 @@ enum NativeEditorNestedListFixtures {
                           "content": [
                             {
                               "type": "paragraph",
+                              "attrs": { "id": "childnodeidx" },
                               "content": [{ "type": "text", "text": "Child" }]
                             }
                           ]
