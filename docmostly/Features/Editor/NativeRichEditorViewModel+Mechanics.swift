@@ -3,7 +3,7 @@ import SwiftUI
 
 extension NativeRichEditorViewModel {
     func pasteMarkdown(_ markdown: String) {
-        let pastedBlocks = NativeEditorMarkdownParser.blocks(from: markdown)
+        let pastedBlocks = Self.blocksForMarkdownInsertion(markdown)
         guard pastedBlocks.isEmpty == false else { return }
 
         performUndoableEdit {
@@ -21,7 +21,7 @@ extension NativeRichEditorViewModel {
 
     func dropMarkdown(_ markdown: String, before targetBlockID: UUID) -> Bool {
         guard canEdit else { return false }
-        let droppedBlocks = NativeEditorMarkdownParser.blocks(from: markdown)
+        let droppedBlocks = Self.blocksForMarkdownInsertion(markdown)
         guard
             droppedBlocks.isEmpty == false,
             let targetIndex = document.blocks.firstIndex(where: { $0.id == targetBlockID })
@@ -128,6 +128,87 @@ extension NativeRichEditorViewModel {
 
         let text = String(document.blocks[index].text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? index : nil
+    }
+
+    private static let defaultPasteTableWidth = 150
+    private static let fallbackPasteTableWidth = 100
+
+    private static func blocksForMarkdownInsertion(_ markdown: String) -> [NativeEditorBlock] {
+        NativeEditorMarkdownParser.blocks(from: markdown).map(blockWithMarkdownInsertionTableWidths)
+    }
+
+    private static func blockWithMarkdownInsertionTableWidths(_ block: NativeEditorBlock) -> NativeEditorBlock {
+        guard case .table(var table) = block.kind,
+              table.rows.isEmpty == false,
+              table.columnCount > 0 else {
+            return block
+        }
+
+        let columnWidths = markdownInsertionTableColumnWidths(from: table)
+        guard columnWidths.isEmpty == false else { return block }
+
+        var normalizedBlock = block
+        var columnIndex = 0
+        for cellIndex in table.rows[0].cells.indices {
+            let columnSpan = max(table.rows[0].cells[cellIndex].columnSpan, 1)
+            defer { columnIndex += columnSpan }
+
+            if table.rows[0].cells[cellIndex].columnWidths.isEmpty == false {
+                continue
+            }
+
+            let cellWidths = Array(columnWidths.dropFirst(columnIndex).prefix(columnSpan))
+            guard cellWidths.isEmpty == false else { continue }
+
+            table.rows[0].cells[cellIndex].columnWidth = cellWidths.first
+            table.rows[0].cells[cellIndex].columnWidths = cellWidths
+        }
+
+        normalizedBlock.kind = .table(table)
+        normalizedBlock.rawNode = NativeEditorTableNodeFactory.node(from: table)
+        return normalizedBlock
+    }
+
+    private static func markdownInsertionTableColumnWidths(from table: NativeEditorTable) -> [Int] {
+        var derivedWidths: [Int?] = []
+        var hasExistingWidth = false
+
+        guard let firstRow = table.rows.first else { return [] }
+
+        for cell in firstRow.cells {
+            let columnSpan = max(cell.columnSpan, 1)
+            let cellWidths = cell.columnWidths.isEmpty ? [] : cell.columnWidths
+            if cellWidths.isEmpty {
+                derivedWidths.append(contentsOf: Array(repeating: nil, count: columnSpan))
+                continue
+            }
+
+            hasExistingWidth = true
+            let normalizedWidths = normalizedCellWidths(cellWidths, columnSpan: columnSpan)
+            derivedWidths.append(contentsOf: normalizedWidths.map(Optional.some))
+        }
+
+        if hasExistingWidth {
+            return derivedWidths.map { $0 ?? fallbackPasteTableWidth }
+        }
+
+        return Array(
+            repeating: defaultPasteTableWidth,
+            count: table.columnCount
+        )
+    }
+
+    private static func normalizedCellWidths(_ widths: [Int], columnSpan: Int) -> [Int] {
+        var normalizedWidths = Array(widths.prefix(columnSpan))
+        if normalizedWidths.count < columnSpan {
+            normalizedWidths.append(
+                contentsOf: Array(
+                    repeating: fallbackPasteTableWidth,
+                    count: columnSpan - normalizedWidths.count
+                )
+            )
+        }
+        return normalizedWidths
     }
 
     private func adjustActiveBlockIndent(by delta: Int) {

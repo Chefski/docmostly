@@ -295,9 +295,10 @@ struct NativeRichEditorMechanicsTests {
         let bodyHeaderFlags = table.rows.dropFirst().flatMap { $0.cells.map(\.isHeader) }
         #expect(headerFlags == Array(repeating: true, count: headerFlags.count))
         #expect(bodyHeaderFlags == Array(repeating: false, count: bodyHeaderFlags.count))
-        #expect(table.rows.allSatisfy { row in
-            row.cells.allSatisfy { $0.columnWidths == [150] }
-        })
+        let firstRow = try #require(table.rows.first)
+        #expect(firstRow.cells.map(\.columnWidth) == [150, 150])
+        #expect(firstRow.cells.map(\.columnWidths) == [[150], [150]])
+        #expect(table.rows.dropFirst().flatMap(\.cells).allSatisfy { $0.columnWidths.isEmpty })
 
         let tableNode = viewModel.document.proseMirrorDocument.content.last
         #expect(tableNode?.type == "table")
