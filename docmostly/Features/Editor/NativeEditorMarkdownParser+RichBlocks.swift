@@ -249,7 +249,8 @@ extension NativeEditorMarkdownParser {
             openDestinationIndex < line.endIndex,
             line[openDestinationIndex] == "(",
             let closeDestinationIndex = line.lastIndex(of: ")"),
-            closeDestinationIndex > openDestinationIndex
+            closeDestinationIndex > openDestinationIndex,
+            closeDestinationIndex == line.index(before: line.endIndex)
         else {
             return nil
         }
