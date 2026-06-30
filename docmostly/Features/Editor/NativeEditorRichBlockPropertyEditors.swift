@@ -5,7 +5,7 @@ struct NativeEditorCalloutEditor: View {
     let callout: NativeEditorCalloutBlock
     let actions: NativeEditorRichBlockEditingActions
 
-    private let styles = ["info", "tip", "warning", "success", "error"]
+    private let styles = ["default", "info", "note", "success", "warning", "danger"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -96,8 +96,9 @@ struct NativeEditorColumnsEditor: View {
     let columns: NativeEditorColumnsBlock
     let actions: NativeEditorRichBlockEditingActions
 
-    private let layouts = ["two_equal", "two_left_sidebar", "two_right_sidebar", "three_equal"]
-    private let widthModes = ["normal", "wide", "full"]
+    private let layouts = NativeEditorColumnsBlock.supportedLayouts
+    private let widthModes = NativeEditorColumnsBlock.supportedWidthModes
+    private let columnCountRange = 1...NativeEditorColumnsBlock.maximumColumnCount
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -119,7 +120,7 @@ struct NativeEditorColumnsEditor: View {
                 }
             }
 
-            Stepper("Columns: \(columnTexts.count)", value: columnCountBinding, in: 1...4)
+            Stepper("Columns: \(columnTexts.count)", value: columnCountBinding, in: columnCountRange)
 
             ForEach(columnTexts.indices, id: \.self) { index in
                 TextField("Column \(index + 1)", text: columnTextBinding(index: index), axis: .vertical)

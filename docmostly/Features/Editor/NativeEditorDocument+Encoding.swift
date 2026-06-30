@@ -20,10 +20,10 @@ nonisolated extension NativeEditorDocument {
         }
 
         if let rawNode = block.rawNode {
-            return rawNode
+            return nodeByAddingDocmostNodeIDs(rawNode, blockID: block.id)
         }
 
-        return richFallbackNode(from: block)
+        return nodeByAddingDocmostNodeIDs(richFallbackNode(from: block), blockID: block.id)
     }
 
     static func textContainerNode(
@@ -31,9 +31,23 @@ nonisolated extension NativeEditorDocument {
         block: NativeEditorBlock,
         attrs: [String: ProseMirrorJSONValue] = [:]
     ) -> ProseMirrorNode {
-        var mergedAttrs = attrs
+        var mergedAttrs = preservedEditableAttrs(type: type, block: block)
+        for attr in attrs {
+            mergedAttrs[attr.key] = attr.value
+        }
+
+        addDocmostNodeIDIfNeeded(type: type, block: block, attrs: &mergedAttrs)
+
         if let alignment = block.alignment.proseMirrorValue {
             mergedAttrs["textAlign"] = alignment
+        } else {
+            mergedAttrs.removeValue(forKey: "textAlign")
+        }
+
+        if let indent = editableIndentValue(from: block) {
+            mergedAttrs["indent"] = .int(indent)
+        } else if blockSupportsEditableIndent(block) {
+            mergedAttrs.removeValue(forKey: "indent")
         }
 
         return ProseMirrorNode(
@@ -41,6 +55,29 @@ nonisolated extension NativeEditorDocument {
             attrs: mergedAttrs.isEmpty ? nil : mergedAttrs,
             content: block.inlineContent.map(inlineNodes(from:)) ?? inlineNodes(from: block.text)
         )
+    }
+
+    private static func preservedEditableAttrs(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [String: ProseMirrorJSONValue] {
+        guard block.rawNode?.type == type else { return [:] }
+        return block.rawNode?.attrs ?? [:]
+    }
+
+    private static func editableIndentValue(from block: NativeEditorBlock) -> Int? {
+        guard blockSupportsEditableIndent(block) else { return nil }
+        let clampedIndent = min(max(block.indentLevel, 0), 8)
+        return clampedIndent > 0 ? clampedIndent : nil
+    }
+
+    private static func blockSupportsEditableIndent(_ block: NativeEditorBlock) -> Bool {
+        switch block.kind {
+        case .paragraph, .heading:
+            true
+        default:
+            false
+        }
     }
 
     static func inlineNodes(from attributedText: AttributedString) -> [ProseMirrorNode] {
@@ -133,7 +170,11 @@ nonisolated extension NativeEditorDocument {
     private static func append(_ nestedList: ProseMirrorNode, toLastItemIn itemNodes: inout [ProseMirrorNode]) {
         guard var lastItem = itemNodes.popLast() else { return }
         var content = lastItem.content ?? []
-        content.append(nestedList)
+        if let nestedIndex = content.firstIndex(where: \.isListContainer) {
+            content[nestedIndex] = nestedList
+        } else {
+            content.append(nestedList)
+        }
         lastItem.content = content
         itemNodes.append(lastItem)
     }
@@ -166,7 +207,7 @@ nonisolated extension NativeEditorDocument {
         case .heading(let level):
             textContainerNode(type: "heading", block: block, attrs: ["level": .int(level)])
         case .blockquote:
-            ProseMirrorNode(type: "blockquote", content: [textContainerNode(type: "paragraph", block: block)])
+            blockquoteNode(from: block)
         case .codeBlock(let language):
             codeBlockNode(language: language, block: block)
         case .bulletListItem, .orderedListItem, .taskListItem:
@@ -177,11 +218,23 @@ nonisolated extension NativeEditorDocument {
     }
 
     private static func codeBlockNode(language: String?, block: NativeEditorBlock) -> ProseMirrorNode {
-        ProseMirrorNode(
+        var attrs = preservedCodeBlockAttrs(from: block)
+        if let language {
+            attrs["language"] = .string(language)
+        } else {
+            attrs.removeValue(forKey: "language")
+        }
+
+        return ProseMirrorNode(
             type: "codeBlock",
-            attrs: language.map { ["language": .string($0)] },
+            attrs: attrs.isEmpty ? nil : attrs,
             content: plainTextNodes(from: String(block.text.characters))
         )
+    }
+
+    private static func preservedCodeBlockAttrs(from block: NativeEditorBlock) -> [String: ProseMirrorJSONValue] {
+        guard block.rawNode?.type == "codeBlock" else { return [:] }
+        return block.rawNode?.attrs ?? [:]
     }
 
     private static func richFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode {
@@ -217,10 +270,10 @@ nonisolated extension NativeEditorDocument {
 
     private static func structuralFallbackNode(from block: NativeEditorBlock) -> ProseMirrorNode? {
         switch block.kind {
-        case .callout:
-            ProseMirrorNode(type: "callout", content: [textContainerNode(type: "paragraph", block: block)])
-        case .details:
-            ProseMirrorNode(type: "details")
+        case .callout(let callout):
+            NativeEditorRichBlockNodeFactory.calloutNode(from: callout)
+        case .details(let details):
+            NativeEditorRichBlockNodeFactory.detailsNode(from: details)
         case .pageBreak:
             ProseMirrorNode(type: "pageBreak")
         case .divider:
@@ -258,15 +311,105 @@ nonisolated extension NativeEditorDocument {
     }
 
     private static func listItemNode(from block: NativeEditorBlock) -> ProseMirrorNode {
-        ProseMirrorNode(type: "listItem", content: [textContainerNode(type: "paragraph", block: block)])
+        ProseMirrorNode(
+            type: "listItem",
+            attrs: preservedListItemAttrs(type: "listItem", block: block),
+            content: listItemContent(type: "listItem", block: block)
+        )
     }
 
     private static func taskItemNode(from block: NativeEditorBlock) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "taskItem",
-            attrs: ["checked": .bool(taskItemCheckedState(from: block))],
-            content: [textContainerNode(type: "paragraph", block: block)]
+            attrs: taskItemAttrs(from: block),
+            content: listItemContent(type: "taskItem", block: block)
         )
+    }
+
+    private static func preservedListItemAttrs(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [String: ProseMirrorJSONValue]? {
+        guard block.rawNode?.type == type else { return nil }
+        let attrs = block.rawNode?.attrs ?? [:]
+        return attrs.isEmpty ? nil : attrs
+    }
+
+    private static func taskItemAttrs(from block: NativeEditorBlock) -> [String: ProseMirrorJSONValue] {
+        var attrs = block.rawNode?.type == "taskItem" ? block.rawNode?.attrs ?? [:] : [:]
+        attrs["checked"] = .bool(taskItemCheckedState(from: block))
+        return attrs
+    }
+
+    private static func listItemContent(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [ProseMirrorNode] {
+        let textNode = listItemTextContainerNode(type: type, block: block)
+        guard block.rawNode?.type == type, var content = block.rawNode?.content else {
+            return [textNode]
+        }
+
+        if let textIndex = content.firstIndex(where: isListItemTextContainer) {
+            content[textIndex] = textNode
+        } else {
+            content.insert(textNode, at: content.startIndex)
+        }
+
+        return content
+    }
+
+    private static func listItemTextContainerNode(
+        type: String,
+        block: NativeEditorBlock
+    ) -> ProseMirrorNode {
+        let originalNode = originalListItemTextContainer(type: type, block: block)
+        let nodeType = originalNode?.type ?? "paragraph"
+        var attrs = originalNode?.attrs ?? [:]
+
+        addDocmostNodeIDIfNeeded(type: nodeType, block: block, attrs: &attrs)
+
+        if let alignment = block.alignment.proseMirrorValue {
+            attrs["textAlign"] = alignment
+        } else {
+            attrs.removeValue(forKey: "textAlign")
+        }
+
+        return ProseMirrorNode(
+            type: nodeType,
+            attrs: attrs.isEmpty ? nil : attrs,
+            content: listItemTextContainerContent(type: nodeType, block: block)
+        )
+    }
+
+    private static func originalListItemTextContainer(
+        type: String,
+        block: NativeEditorBlock
+    ) -> ProseMirrorNode? {
+        if block.rawNode?.type == type {
+            return block.rawNode?.content?.first(where: isListItemTextContainer)
+        }
+
+        if let rawNode = block.rawNode, isListItemTextContainer(rawNode) {
+            return rawNode
+        }
+
+        return nil
+    }
+
+    private static func listItemTextContainerContent(
+        type: String,
+        block: NativeEditorBlock
+    ) -> [ProseMirrorNode] {
+        if type == "codeBlock" {
+            return plainTextNodes(from: String(block.text.characters))
+        }
+
+        return block.inlineContent.map(inlineNodes(from:)) ?? inlineNodes(from: block.text)
+    }
+
+    private static func isListItemTextContainer(_ node: ProseMirrorNode) -> Bool {
+        node.type == "paragraph" || node.type == "heading" || node.type == "codeBlock"
     }
 
     private static func taskItemCheckedState(from block: NativeEditorBlock) -> Bool {
@@ -346,29 +489,48 @@ nonisolated extension NativeEditorDocument {
 
     private static func inlineAtom(from run: AttributedString.Runs.Run) -> InlineAtomEncoding? {
         if let mention = run[NativeEditorMentionAttribute.self] {
+            var node = ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+            node.marks = atomMarks(from: run, presentationMarkType: nil)
             return InlineAtomEncoding(
                 displayText: mention.displayText,
-                node: ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
+                node: node
             )
         }
 
         if let status = run[NativeEditorStatusAttribute.self] {
+            var node = ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
+            node.marks = atomMarks(from: run, presentationMarkType: "bold")
             return InlineAtomEncoding(
-                displayText: status.text,
-                node: ProseMirrorNode(type: "status", attrs: statusAttrs(from: status)),
+                displayText: status.displayText,
+                node: node,
                 presentationMarkType: "bold"
             )
         }
 
         if let math = run[NativeEditorMathInlineAttribute.self] {
+            var node = ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+            node.marks = atomMarks(from: run, presentationMarkType: "code")
             return InlineAtomEncoding(
                 displayText: math.text,
-                node: ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)]),
+                node: node,
                 presentationMarkType: "code"
             )
         }
 
         return nil
+    }
+
+    private static func atomMarks(
+        from run: AttributedString.Runs.Run,
+        presentationMarkType: String?
+    ) -> [ProseMirrorMark]? {
+        guard var marks = marks(from: run) else { return nil }
+
+        if let presentationMarkType {
+            marks.removeAll { $0.type == presentationMarkType }
+        }
+
+        return marks.isEmpty ? nil : marks
     }
 
     private static func marksForTextSurroundingAtom(
@@ -390,12 +552,24 @@ nonisolated extension NativeEditorDocument {
             ProseMirrorNode(type: "text", marks: proseMirrorMarks(from: marks), text: text)
         case .hardBreak:
             ProseMirrorNode(type: "hardBreak")
-        case .mention(let mention):
-            ProseMirrorNode(type: "mention", attrs: attrs(from: mention))
-        case .status(let status):
-            ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
-        case .mathInline(let math):
-            ProseMirrorNode(type: "mathInline", attrs: ["text": .string(math.text)])
+        case .mention(let mention, let marks):
+            ProseMirrorNode(
+                type: "mention",
+                attrs: attrs(from: mention),
+                marks: proseMirrorMarks(from: marks)
+            )
+        case .status(let status, let marks):
+            ProseMirrorNode(
+                type: "status",
+                attrs: statusAttrs(from: status),
+                marks: proseMirrorMarks(from: marks)
+            )
+        case .mathInline(let math, let marks):
+            ProseMirrorNode(
+                type: "mathInline",
+                attrs: ["text": .string(math.text)],
+                marks: proseMirrorMarks(from: marks)
+            )
         case .unsupported(let node):
             node
         }

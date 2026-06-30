@@ -3,6 +3,7 @@ import SwiftUI
 struct NativeEditorSlashCommandMenu: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
+    var applyCommand: ((NativeEditorCommand) -> Void)?
 
     var body: some View {
         let commands = viewModel.filteredSlashCommands
@@ -24,6 +25,8 @@ struct NativeEditorSlashCommandMenu: View {
                     Button {
                         if let importKind = command.attachmentImportKind {
                             importAttachment(importKind)
+                        } else if let applyCommand {
+                            applyCommand(command)
                         } else {
                             viewModel.applySlashCommand(command)
                         }

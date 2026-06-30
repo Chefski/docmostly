@@ -68,6 +68,155 @@ struct NativeRichEditorMechanicsTests {
         #expect(viewModel.markdownForDocument() == "---")
     }
 
+    @Test func markdownInputRuleSupportsDocmostDetailsShortcut() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString(":::details ")
+        viewModel.handleDocumentChanged()
+
+        guard case .details(let details) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost details shortcut to create a native details block.")
+            return
+        }
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Details")
+
+        let node = viewModel.document.proseMirrorDocument.content[0]
+        #expect(node.type == "details")
+        #expect(node.attrs?["open"] == .bool(true))
+        #expect(node.content?.first?.type == "detailsSummary")
+        #expect(node.content?.first?.content?.first?.text == "Details")
+        #expect(node.content?[1].type == "detailsContent")
+        #expect(node.content?[1].content?.first?.content?.first?.text == "Details")
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
+    @Test func markdownImportSupportsDocmostDetailsShortcutAfterLineTrimming() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: ":::details ").first)
+
+        guard case .details(let details) = block.kind else {
+            Issue.record("Expected imported Docmost details shortcut to create a native details block.")
+            return
+        }
+
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(NativeEditorDocument.node(from: block).type == "details")
+    }
+
+    @Test func markdownInputRuleSupportsDocmostDefaultCalloutShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("::: ")
+        viewModel.handleDocumentChanged()
+
+        guard case .callout(let callout) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost callout shortcut to create a native callout block.")
+            return
+        }
+        #expect(callout.style == "info")
+        #expect(callout.previewText == "Callout")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].type == "callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["type"] == .string("info"))
+    }
+
+    @Test func markdownInputRuleSupportsDocmostTypedCalloutShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString(":::warning ")
+        viewModel.handleDocumentChanged()
+
+        guard case .callout(let callout) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost typed callout shortcut to create a native callout block.")
+            return
+        }
+        #expect(callout.style == "warning")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Callout")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["type"] == .string("warning"))
+    }
+
+    @Test func markdownInputRuleSupportsDocmostMathBlockShortcut() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("$$$E = mc^2$$$")
+        viewModel.handleDocumentChanged()
+
+        guard case .mathBlock(let math) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected Docmost math shortcut to create a native math block.")
+            return
+        }
+        #expect(math.text == "E = mc^2")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "E = mc^2")
+        #expect(viewModel.document.proseMirrorDocument.content[0].type == "mathBlock")
+        #expect(viewModel.document.proseMirrorDocument.content[0].attrs?["text"] == .string("E = mc^2"))
+    }
+
+    @Test func markdownInputRuleSupportsDocmostInlineMathShortcut() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Area $$A = pi r^2$$")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Area A = pi r^2")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.map(\.type) == ["text", "mathInline"])
+        #expect(inlineNodes[0].text == "Area ")
+        #expect(inlineNodes[1].attrs?["text"] == .string("A = pi r^2"))
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
+    @Test func markdownInputRuleSupportsDocmostInlineMarkShortcuts() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Use **bold** *italic* `code` and ~~strike~~")
+        viewModel.handleDocumentChanged()
+
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Use bold italic code and strike")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.contains {
+            $0.text == "bold" && $0.marks?.contains(ProseMirrorMark(type: "bold")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "italic" && $0.marks?.contains(ProseMirrorMark(type: "italic")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "code" && $0.marks?.contains(ProseMirrorMark(type: "code")) == true
+        })
+        #expect(inlineNodes.contains {
+            $0.text == "strike" && $0.marks?.contains(ProseMirrorMark(type: "strike")) == true
+        })
+
+        viewModel.undo()
+
+        #expect(viewModel.document.blocks[0].kind == .paragraph)
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+    }
+
     @Test func pasteMarkdownInsertsNativeBlocksAfterActiveBlock() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
@@ -131,7 +280,8 @@ struct NativeRichEditorMechanicsTests {
 
         #expect(viewModel.document.blocks.count == 2)
 
-        guard case .table(let table) = viewModel.document.blocks[1].kind else {
+        let tableBlock = try #require(viewModel.document.blocks.dropFirst().first)
+        guard case .table(let table) = tableBlock.kind else {
             Issue.record("Expected pasted Markdown table to become a native table block.")
             return
         }
@@ -145,18 +295,49 @@ struct NativeRichEditorMechanicsTests {
         let bodyHeaderFlags = table.rows.dropFirst().flatMap { $0.cells.map(\.isHeader) }
         #expect(headerFlags == Array(repeating: true, count: headerFlags.count))
         #expect(bodyHeaderFlags == Array(repeating: false, count: bodyHeaderFlags.count))
+        let firstRow = try #require(table.rows.first)
+        #expect(firstRow.cells.map(\.columnWidth) == [150, 150])
+        #expect(firstRow.cells.map(\.columnWidths) == [[150], [150]])
+        #expect(table.rows.dropFirst().flatMap(\.cells).allSatisfy { $0.columnWidths.isEmpty })
 
         let tableNode = viewModel.document.proseMirrorDocument.content.last
         #expect(tableNode?.type == "table")
         #expect(tableNode?.content?.first?.content?.first?.type == "tableHeader")
+        #expect(tableNode?.content?.first?.content?.first?.attrs?["colwidth"] == .array([.int(150)]))
         #expect(tableNode?.content?.dropFirst().first?.content?.first?.type == "tableCell")
-        #expect(viewModel.markdownForDocument() == """
-        Intro
-        | Feature | Status |
+        #expect(viewModel.markdownForDocument().contains(#"colwidth="150""#))
+    }
+
+    @Test func pasteMarkdownTablePreservesInlineMarksInCells() throws {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown("""
+        | Feature | Source |
         | --- | --- |
-        | Tables | Native |
-        | Paste | Done |
+        | **Tables** | [Spec](https://example.com/spec) |
         """)
+
+        guard case .table(let table) = viewModel.document.blocks[1].kind else {
+            Issue.record("Expected pasted Markdown table to become a native table block.")
+            return
+        }
+
+        #expect(table.rows[1].cells.map(\.plainText) == ["Tables", "Spec"])
+
+        let bodyRow = try #require(viewModel.document.proseMirrorDocument.content.last?.content?.dropFirst().first)
+        let firstCellText = try #require(bodyRow.content?[0].content?.first?.content?.first)
+        let secondCellText = try #require(bodyRow.content?[1].content?.first?.content?.first)
+
+        #expect(firstCellText.text == "Tables")
+        #expect(firstCellText.marks?.contains(ProseMirrorMark(type: "bold")) == true)
+        #expect(secondCellText.text == "Spec")
+        #expect(
+            secondCellText.marks?.contains(
+                ProseMirrorMark(type: "link", attrs: ["href": .string("https://example.com/spec")])
+            ) == true
+        )
     }
 
     @Test func pasteMarkdownRichBlocksCreatesNativeBlocks() throws {

@@ -2,11 +2,12 @@ import SwiftUI
 
 struct NativeEditorBlockCommandToolbarGroup: View {
     @Bindable var viewModel: NativeRichEditorViewModel
+    var applyCommand: ((NativeEditorCommand) -> Void)?
 
     var body: some View {
         ForEach(NativeEditorCommand.primaryCases) { command in
             Button {
-                viewModel.applySlashCommand(command)
+                apply(command)
             } label: {
                 Label(command.title, systemImage: command.systemImage)
             }
@@ -16,7 +17,7 @@ struct NativeEditorBlockCommandToolbarGroup: View {
         Menu {
             ForEach(NativeEditorCommand.richCases) { command in
                 Button {
-                    viewModel.applySlashCommand(command)
+                    apply(command)
                 } label: {
                     Label(command.title, systemImage: command.systemImage)
                 }
@@ -25,5 +26,13 @@ struct NativeEditorBlockCommandToolbarGroup: View {
             Label("Rich Blocks", systemImage: "square.grid.2x2")
         }
         .accessibilityLabel("Rich Blocks")
+    }
+
+    private func apply(_ command: NativeEditorCommand) {
+        if let applyCommand {
+            applyCommand(command)
+        } else {
+            viewModel.applySlashCommand(command)
+        }
     }
 }

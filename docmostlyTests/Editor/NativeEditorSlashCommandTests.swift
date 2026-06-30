@@ -5,6 +5,11 @@ import Testing
 
 @MainActor
 struct NativeEditorSlashCommandTests {
+    @Test func slashCommandMenuExposesGenericEmbedCommand() {
+        #expect(NativeEditorCommand.slashMenuCases.contains(.embed))
+        #expect(slashCommandTitles(for: "embed").contains("Embed"))
+    }
+
     @Test func slashCommandInventoryIncludesBaseColumnsAndProviderEmbeds() {
         let titles = NativeEditorCommand.allCases.map(\.title)
 
@@ -26,7 +31,182 @@ struct NativeEditorSlashCommandTests {
         #expect(titles.contains("Google Sheets"))
     }
 
-    @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
+    @Test func slashCommandInventoryUsesDocmostWebCommandTitles() {
+        let titles = NativeEditorCommand.allCases.map(\.title)
+        let expectedTitles = [
+            "Text",
+            "To-do list",
+            "Heading 1",
+            "Heading 2",
+            "Heading 3",
+            "Bullet list",
+            "Numbered list",
+            "Quote",
+            "Code",
+            "Divider",
+            "Page break",
+            "Image",
+            "Video",
+            "Audio",
+            "Embed PDF",
+            "File attachment",
+            "Table",
+            "Base (Inline)",
+            "Kanban",
+            "Toggle block",
+            "Callout",
+            "Math inline",
+            "Math block",
+            "Mermaid diagram",
+            "Draw.io (diagrams.net)",
+            "Excalidraw (Whiteboard)",
+            "Date",
+            "Time",
+            "Status",
+            "Emoji",
+            "Subpages (Child pages)",
+            "Synced block",
+            "2 Columns",
+            "3 Columns",
+            "4 Columns",
+            "5 Columns",
+            "Embed",
+            "Iframe embed",
+            "Airtable",
+            "Loom",
+            "Figma",
+            "Typeform",
+            "Miro",
+            "YouTube",
+            "Vimeo",
+            "Framer",
+            "Google Drive",
+            "Google Sheets"
+        ]
+
+        for expectedTitle in expectedTitles {
+            #expect(titles.contains(expectedTitle))
+        }
+    }
+
+    @Test func slashCommandInventoryFollowsDocmostWebMenuOrder() {
+        #expect(slashCommandTitles(for: "") == [
+            "Text",
+            "To-do list",
+            "Heading 1",
+            "Heading 2",
+            "Heading 3",
+            "Bullet list",
+            "Numbered list",
+            "Quote",
+            "Code",
+            "Divider",
+            "Page break",
+            "Image",
+            "Video",
+            "Audio",
+            "Embed PDF",
+            "File attachment",
+            "Table",
+            "Base (Inline)",
+            "Kanban",
+            "Toggle block",
+            "Callout",
+            "Math inline",
+            "Math block",
+            "Mermaid diagram",
+            "Draw.io (diagrams.net)",
+            "Excalidraw (Whiteboard)",
+            "Date",
+            "Time",
+            "Status",
+            "Emoji",
+            "Subpages (Child pages)",
+            "Synced block",
+            "2 Columns",
+            "3 Columns",
+            "4 Columns",
+            "5 Columns",
+            "Embed",
+            "Iframe embed",
+            "Airtable",
+            "Loom",
+            "Figma",
+            "Typeform",
+            "Miro",
+            "YouTube",
+            "Vimeo",
+            "Framer",
+            "Google Drive",
+            "Google Sheets"
+        ])
+    }
+
+    @Test func slashCommandFilteringUsesDocmostSearchTerms() {
+        let expectations = [
+            SlashCommandFilterExpectation(query: "today", title: "Date"),
+            SlashCommandFilterExpectation(query: "now", title: "Time"),
+            SlashCommandFilterExpectation(query: "checkbox", title: "To-do list"),
+            SlashCommandFilterExpectation(query: "hr", title: "Divider"),
+            SlashCommandFilterExpectation(query: "pagebreak", title: "Page break"),
+            SlashCommandFilterExpectation(query: "latex", title: "Math inline"),
+            SlashCommandFilterExpectation(query: "lozenge", title: "Status"),
+            SlashCommandFilterExpectation(query: "reaction", title: "Emoji"),
+            SlashCommandFilterExpectation(query: "table", title: "Base (Inline)")
+        ]
+
+        for expectation in expectations {
+            let titles = slashCommandTitles(for: expectation.query)
+            #expect(titles.contains(expectation.title))
+        }
+    }
+
+    @Test func slashCommandFilteringUsesDocmostFuzzyTitleMatching() {
+        let expectations = [
+            SlashCommandFilterExpectation(query: "tdl", title: "To-do list"),
+            SlashCommandFilterExpectation(query: "nb", title: "Numbered list"),
+            SlashCommandFilterExpectation(query: "pgb", title: "Page break")
+        ]
+
+        for expectation in expectations {
+            let titles = slashCommandTitles(for: expectation.query)
+            #expect(titles.contains(expectation.title))
+        }
+    }
+
+    @Test func slashCommandTitleWordStartPriorityScansPastMidWordMatches() {
+        #expect(NativeEditorCommand.iframeEmbed.matchPriority(query: "e") == 0)
+    }
+
+    @Test func slashCommandMenuIsDisabledInsideCodeBlocks() {
+        let block = NativeEditorBlock(
+            kind: .codeBlock(language: nil),
+            text: AttributedString("/table"),
+            alignment: .left
+        )
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        #expect(viewModel.isShowingSlashCommands == false)
+        #expect(viewModel.filteredSlashCommands.isEmpty)
+    }
+
+    @Test func applyingCodeBlockSlashCommandClearsSlashToken() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/code"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.applySlashCommand(.codeBlock)
+
+        #expect(viewModel.document.blocks[0].kind == .codeBlock(language: nil))
+        #expect(String(viewModel.document.blocks[0].text.characters).isEmpty)
+        #expect(viewModel.isShowingSlashCommands == false)
+        #expect(viewModel.isDirty == true)
+    }
+
+    @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() throws {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
             ColumnCommandExpectation(command: .columns3, layout: "three_equal", columnCount: 3),
@@ -45,10 +225,114 @@ struct NativeEditorSlashCommandTests {
 
             let node = viewModel.document.proseMirrorDocument.content.first
             #expect(columns.layout == expectation.layout)
+            #expect(columns.widthMode == "normal")
             #expect(columns.columnCount == expectation.columnCount)
-            #expect(node?.type == "columns")
-            #expect(node?.attrs?["layout"] == .string(expectation.layout))
-            #expect(node?.content?.count == expectation.columnCount)
+            #expect(columns.columnTexts == Array(repeating: "", count: expectation.columnCount))
+            #expect(String(block.text.characters).isEmpty)
+
+            let columnsNode = try #require(node)
+            let columnNodes = try #require(columnsNode.content)
+            #expect(columnsNode.type == "columns")
+            #expect(columnsNode.attrs?["layout"] == .string(expectation.layout))
+            #expect(columnsNode.attrs?["widthMode"] == .string("normal"))
+            #expect(columnNodes.count == expectation.columnCount)
+
+            for columnNode in columnNodes {
+                let paragraph = try #require(columnNode.content?.first)
+                #expect(columnNode.type == "column")
+                #expect(columnNode.attrs?["width"] == .null)
+                #expect(paragraph.type == "paragraph")
+                #expect((paragraph.content ?? []).isEmpty)
+            }
+        }
+    }
+
+    @Test func applyingCalloutSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.callout)
+        let block = viewModel.document.blocks[0]
+
+        guard case .callout(let callout) = block.kind else {
+            Issue.record("Expected callout block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let paragraph = try #require(node.content?.first)
+        #expect(callout.style == "info")
+        #expect(callout.icon == nil)
+        #expect(String(block.text.characters) == "Callout")
+        #expect(node.type == "callout")
+        #expect(node.attrs?["type"] == .string("info"))
+        #expect(node.attrs?["icon"] == nil)
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
+    }
+
+    @Test func applyingDetailsSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.details)
+        let block = viewModel.document.blocks[0]
+
+        guard case .details(let details) = block.kind else {
+            Issue.record("Expected details block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let summary = try #require(node.content?.first)
+        let content = try #require(node.content?.dropFirst().first)
+        let paragraph = try #require(content.content?.first)
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(details.isOpen == true)
+        #expect(String(block.text.characters) == "Details")
+        #expect(node.type == "details")
+        #expect(node.attrs?["open"] == .bool(true))
+        #expect(summary.type == "detailsSummary")
+        #expect((summary.content ?? []).isEmpty)
+        #expect(content.type == "detailsContent")
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
+    }
+
+    @Test func applyingMathBlockSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.mathBlock)
+        let block = viewModel.document.blocks[0]
+
+        guard case .mathBlock(let math) = block.kind else {
+            Issue.record("Expected math block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        #expect(math.text.isEmpty)
+        #expect(String(block.text.characters).isEmpty)
+        #expect(node.type == "mathBlock")
+        #expect(node.attrs?["text"] == .string(""))
+    }
+
+    @Test func applyingDiagramSlashCommandsUseDocmostDefaultNodeShape() throws {
+        let expectations = [
+            DiagramCommandExpectation(command: .drawio, nodeType: "drawio"),
+            DiagramCommandExpectation(command: .excalidraw, nodeType: "excalidraw")
+        ]
+
+        for expectation in expectations {
+            let viewModel = viewModelAfterApplying(expectation.command)
+            let block = viewModel.document.blocks[0]
+
+            guard block.kind.isDiagramBlock else {
+                Issue.record("Expected diagram block")
+                continue
+            }
+
+            let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+            #expect(node.type == expectation.nodeType)
+            #expect(node.attrs?["src"] == .string(""))
+            #expect(node.attrs?["width"] == .null)
+            #expect(node.attrs?["height"] == .null)
+            #expect(node.attrs?["size"] == .null)
+            #expect(node.attrs?["aspectRatio"] == .null)
+            #expect(node.attrs?["align"] == .string("center"))
         }
     }
 
@@ -78,8 +362,15 @@ struct NativeEditorSlashCommandTests {
 
             let node = viewModel.document.proseMirrorDocument.content.first
             #expect(embed.provider == expectation.provider)
+            #expect(embed.alignment == NativeEditorEmbedBlock.defaultAlignment)
+            #expect(embed.width == NativeEditorEmbedBlock.defaultWidth)
+            #expect(embed.height == NativeEditorEmbedBlock.defaultHeight)
             #expect(node?.type == "embed")
+            #expect(node?.attrs?["src"] == .string(""))
             #expect(node?.attrs?["provider"] == .string(expectation.provider))
+            #expect(node?.attrs?["align"] == .string(NativeEditorEmbedBlock.defaultAlignment))
+            #expect(node?.attrs?["width"] == .int(NativeEditorEmbedBlock.defaultWidthValue))
+            #expect(node?.attrs?["height"] == .int(NativeEditorEmbedBlock.defaultHeightValue))
         }
     }
 
@@ -106,6 +397,30 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func applyingSyncedBlockSlashCommandCreatesDocmostNodeID() throws {
+        let viewModel = viewModelAfterApplying(.syncedBlock)
+        let block = viewModel.document.blocks[0]
+
+        guard case .transclusionSource(let source) = block.kind else {
+            Issue.record("Expected synced block slash command to create a transclusion source")
+            return
+        }
+
+        let identifier = try #require(source.identifier)
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let paragraph = try #require(node.content?.first)
+
+        #expect(identifier.count == 12)
+        #expect(identifier.unicodeScalars.allSatisfy { (97...122).contains(Int($0.value)) })
+        #expect(source.previewText.isEmpty)
+        #expect(String(block.text.characters).isEmpty)
+        #expect(node.type == "transclusionSource")
+        #expect(node.attrs?["id"] == .string(identifier))
+        #expect(node.content?.count == 1)
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
+    }
+
     private func viewModelAfterApplying(_ command: NativeEditorCommand) -> NativeRichEditorViewModel {
         let block = NativeEditorBlock(
             kind: .paragraph,
@@ -119,6 +434,15 @@ struct NativeEditorSlashCommandTests {
         viewModel.applySlashCommand(command)
 
         return viewModel
+    }
+
+    private func slashCommandTitles(for query: String) -> [String] {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/\(query)"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        return viewModel.filteredSlashCommands.map(\.title)
     }
 }
 
@@ -137,4 +461,25 @@ private struct EmbedCommandExpectation {
 private struct BaseCommandExpectation {
     let command: NativeEditorCommand
     let previewText: String
+}
+
+private struct DiagramCommandExpectation {
+    let command: NativeEditorCommand
+    let nodeType: String
+}
+
+private struct SlashCommandFilterExpectation {
+    let query: String
+    let title: String
+}
+
+private extension NativeEditorBlockKind {
+    var isDiagramBlock: Bool {
+        switch self {
+        case .drawio, .excalidraw:
+            true
+        default:
+            false
+        }
+    }
 }

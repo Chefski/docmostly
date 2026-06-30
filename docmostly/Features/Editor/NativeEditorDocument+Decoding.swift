@@ -16,13 +16,16 @@ nonisolated extension NativeEditorDocument {
     static func textBlock(kind: NativeEditorBlockKind, node: ProseMirrorNode) -> NativeEditorBlock {
         let inlineContent = inlineContent(from: node.content ?? [])
         let needsRawPreservation = inlineContent.contains(where: \.requiresRawPreservation)
+        let needsAttrPreservation = editableAttrsNeedRawPreservation(kind: kind, node: node)
+        let rawNode = needsRawPreservation || needsAttrPreservation ? node : nil
 
         return NativeEditorBlock(
             kind: kind,
             text: attributedText(from: inlineContent),
             alignment: NativeEditorTextAlignment(attrs: node.attrs),
+            indentLevel: editableIndentLevel(kind: kind, attrs: node.attrs),
             inlineContent: needsRawPreservation ? inlineContent : nil,
-            rawNode: needsRawPreservation ? node : nil
+            rawNode: rawNode
         )
     }
 
@@ -57,6 +60,39 @@ nonisolated extension NativeEditorDocument {
             } else {
                 result += plainText(in: node.content ?? [])
             }
+        }
+    }
+
+    private static func editableAttrsNeedRawPreservation(
+        kind: NativeEditorBlockKind,
+        node: ProseMirrorNode
+    ) -> Bool {
+        guard let attrs = node.attrs, attrs.isEmpty == false else { return false }
+
+        let modeledKeys: Set<String>
+        switch kind {
+        case .paragraph:
+            modeledKeys = ["indent", "textAlign"]
+        case .heading:
+            modeledKeys = ["indent", "level", "textAlign"]
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            modeledKeys = ["textAlign"]
+        default:
+            return false
+        }
+
+        return attrs.keys.contains { modeledKeys.contains($0) == false }
+    }
+
+    private static func editableIndentLevel(
+        kind: NativeEditorBlockKind,
+        attrs: [String: ProseMirrorJSONValue]?
+    ) -> Int {
+        switch kind {
+        case .paragraph, .heading:
+            min(max(attrs?["indent"]?.intValue ?? 0, 0), 8)
+        default:
+            0
         }
     }
 
@@ -117,8 +153,13 @@ nonisolated extension NativeEditorDocument {
         item: ProseMirrorNode,
         indentLevel: Int
     ) -> [NativeEditorBlock] {
-        var block = textBlock(kind: kind, node: firstTextContainer(in: item) ?? item)
+        let textContainer = firstTextContainer(in: item) ?? item
+        var block = textBlock(kind: kind, node: textContainer)
         block.indentLevel = indentLevel
+
+        if listItemNeedsRawPreservation(kind: kind, item: item) {
+            block.rawNode = item
+        }
 
         let nestedBlocks: [NativeEditorBlock] = (item.content ?? []).flatMap { child in
             if child.isListContainer {
@@ -129,6 +170,32 @@ nonisolated extension NativeEditorDocument {
         }
 
         return [block] + nestedBlocks
+    }
+
+    private static func listItemNeedsRawPreservation(
+        kind: NativeEditorBlockKind,
+        item: ProseMirrorNode
+    ) -> Bool {
+        listItemAttrsNeedRawPreservation(kind: kind, item: item) ||
+            listItemHasAdditionalNonListContent(item)
+    }
+
+    private static func listItemAttrsNeedRawPreservation(
+        kind: NativeEditorBlockKind,
+        item: ProseMirrorNode
+    ) -> Bool {
+        guard let attrs = item.attrs, attrs.isEmpty == false else { return false }
+
+        if case .taskListItem = kind {
+            return attrs.keys.contains { $0 != "checked" }
+        }
+
+        return true
+    }
+
+    private static func listItemHasAdditionalNonListContent(_ item: ProseMirrorNode) -> Bool {
+        let nonListContent = (item.content ?? []).filter { $0.isListContainer == false }
+        return nonListContent.count > 1
     }
 
     private static func orderedListOrdinal(start: Int, offset: Int) -> Int {
@@ -143,16 +210,38 @@ nonisolated extension NativeEditorDocument {
         case "heading":
             textBlock(kind: .heading(level: node.attrs?["level"]?.intValue ?? 1), node: node)
         case "blockquote":
-            textBlock(kind: .blockquote, node: firstTextContainer(in: node) ?? node)
+            blockquoteBlock(from: node)
         case "codeBlock":
             NativeEditorBlock(
                 kind: .codeBlock(language: node.attrs?["language"]?.stringValue),
                 text: AttributedString(plainText(in: node.content ?? [])),
-                alignment: .left
+                alignment: .left,
+                rawNode: codeBlockAttrsNeedRawPreservation(node) ? node : nil
             )
         default:
             nil
         }
+    }
+
+    private static func blockquoteBlock(from node: ProseMirrorNode) -> NativeEditorBlock {
+        var block = textBlock(kind: .blockquote, node: firstTextContainer(in: node) ?? node)
+        if blockquoteNeedsRawPreservation(node) {
+            block.rawNode = node
+        }
+        return block
+    }
+
+    private static func blockquoteNeedsRawPreservation(_ node: ProseMirrorNode) -> Bool {
+        if let attrs = node.attrs, attrs.isEmpty == false {
+            return true
+        }
+
+        return (node.content ?? []).count != 1
+    }
+
+    private static func codeBlockAttrsNeedRawPreservation(_ node: ProseMirrorNode) -> Bool {
+        guard let attrs = node.attrs, attrs.isEmpty == false else { return false }
+        return attrs.keys.contains { $0 != "language" }
     }
 
     private static func richBlock(from node: ProseMirrorNode) -> NativeEditorBlock? {

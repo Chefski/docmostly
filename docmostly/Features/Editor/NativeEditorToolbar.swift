@@ -12,6 +12,7 @@ struct NativeEditorToolbar: View {
 
     let isUploadingAttachment: Bool
     let importAttachment: (NativeEditorAttachmentImportKind) -> Void
+    let applyCommand: ((NativeEditorCommand) -> Void)?
     let showMentionPicker: () -> Void
     let showInlineCommentComposer: () -> Void
     let dismissKeyboard: () -> Void
@@ -20,6 +21,7 @@ struct NativeEditorToolbar: View {
         viewModel: NativeRichEditorViewModel,
         isUploadingAttachment: Bool = false,
         importAttachment: @escaping (NativeEditorAttachmentImportKind) -> Void = { _ in },
+        applyCommand: ((NativeEditorCommand) -> Void)? = nil,
         showMentionPicker: @escaping () -> Void = {},
         showInlineCommentComposer: @escaping () -> Void = {},
         dismissKeyboard: @escaping () -> Void
@@ -27,6 +29,7 @@ struct NativeEditorToolbar: View {
         self.viewModel = viewModel
         self.isUploadingAttachment = isUploadingAttachment
         self.importAttachment = importAttachment
+        self.applyCommand = applyCommand
         self.showMentionPicker = showMentionPicker
         self.showInlineCommentComposer = showInlineCommentComposer
         self.dismissKeyboard = dismissKeyboard
@@ -45,7 +48,7 @@ struct NativeEditorToolbar: View {
                     Divider()
                         .frame(height: 28)
 
-                    NativeEditorBlockCommandToolbarGroup(viewModel: viewModel)
+                    NativeEditorBlockCommandToolbarGroup(viewModel: viewModel, applyCommand: applyCommand)
 
                     Divider()
                         .frame(height: 28)

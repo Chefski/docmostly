@@ -1,6 +1,14 @@
+import Foundation
 import SwiftUI
 
 enum NativeEditorTableLayout {
+    struct CSSRGBAComponents {
+        var red: Double
+        var green: Double
+        var blue: Double
+        var opacity: Double
+    }
+
     static let minimumColumnWidth: CGFloat = 128
     static let defaultColumnWidth: CGFloat = 184
     static let compactColumnWidth: CGFloat = 176
@@ -25,12 +33,77 @@ enum NativeEditorTableLayout {
     }
 
     static func cellBackground(for cell: NativeEditorTableCell) -> Color {
+        if let backgroundColor = cell.backgroundColor,
+           let cssBackground = cssBackgroundColor(from: backgroundColor) {
+            return cssBackground
+        }
+
         if let backgroundColorName = cell.backgroundColorName,
            let namedBackground = backgroundColor(for: backgroundColorName) {
             return namedBackground
         }
 
         return cell.isHeader ? Color.secondary.opacity(0.12) : Color.clear
+    }
+
+    private static func cssBackgroundColor(from value: String) -> Color? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hexColor = Color(docmostlyHex: trimmedValue) {
+            return hexColor
+        }
+
+        guard let components = cssRGBAComponents(from: trimmedValue) else { return nil }
+        return Color(
+            red: components.red / 255,
+            green: components.green / 255,
+            blue: components.blue / 255,
+            opacity: components.opacity
+        )
+    }
+
+    nonisolated static func cssRGBAComponents(from value: String) -> CSSRGBAComponents? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercasedValue = trimmedValue.lowercased()
+        guard lowercasedValue.hasPrefix("rgb(") || lowercasedValue.hasPrefix("rgba("),
+              let openParen = trimmedValue.firstIndex(of: "("),
+              let closeParen = trimmedValue.lastIndex(of: ")") else {
+            return nil
+        }
+
+        let components = trimmedValue[trimmedValue.index(after: openParen)..<closeParen]
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard components.count >= 3,
+              let red = cssColorComponent(from: components[0]),
+              let green = cssColorComponent(from: components[1]),
+              let blue = cssColorComponent(from: components[2]) else {
+            return nil
+        }
+
+        let opacity = components.indices.contains(3) ? cssAlphaComponent(from: components[3]) ?? 1 : 1
+        return CSSRGBAComponents(red: red, green: green, blue: blue, opacity: opacity)
+    }
+
+    nonisolated private static func cssColorComponent(from value: String) -> Double? {
+        if value.hasSuffix("%") {
+            let percentageText = value.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let percentage = Double(percentageText) else { return nil }
+            return min(max(percentage / 100, 0), 1) * 255
+        }
+
+        guard let component = Double(value) else { return nil }
+        return min(max(component, 0), 255)
+    }
+
+    nonisolated private static func cssAlphaComponent(from value: String) -> Double? {
+        if value.hasSuffix("%") {
+            let percentageText = value.dropLast().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let percentage = Double(percentageText) else { return nil }
+            return min(max(percentage / 100, 0), 1)
+        }
+
+        guard let alpha = Double(value) else { return nil }
+        return min(max(alpha, 0), 1)
     }
 
     private static func backgroundColor(for name: String) -> Color? {

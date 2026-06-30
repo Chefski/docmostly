@@ -132,7 +132,7 @@ nonisolated extension NativeEditorRichBlockNodeFactory {
         if let alternativeText = media.alternativeText {
             attrs["alt"] = .string(alternativeText)
         }
-        if let title = media.title {
+        if type == "video", let title = media.title {
             attrs["title"] = .string(title)
         }
         appendDimensions(width: media.width, height: media.height, aspectRatio: media.aspectRatio, to: &attrs)
@@ -197,14 +197,26 @@ nonisolated extension NativeEditorRichBlockNodeFactory {
         aspectRatio: String?,
         to attrs: inout [String: ProseMirrorJSONValue]
     ) {
-        if let width = width.flatMap(Int.init) {
-            attrs["width"] = .int(width)
+        if let width = width.flatMap(proseMirrorDimension(from:)) {
+            attrs["width"] = width
         }
-        if let height = height.flatMap(Int.init) {
-            attrs["height"] = .int(height)
+        if let height = height.flatMap(proseMirrorDimension(from:)) {
+            attrs["height"] = height
         }
         if let aspectRatio = aspectRatio.flatMap(Double.init) {
             attrs["aspectRatio"] = .double(aspectRatio)
         }
+    }
+
+    private static func proseMirrorDimension(from value: String) -> ProseMirrorJSONValue? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedValue.isEmpty == false else { return nil }
+        if let intValue = Int(trimmedValue) {
+            return .int(intValue)
+        }
+        if let doubleValue = Double(trimmedValue) {
+            return .double(doubleValue)
+        }
+        return .string(trimmedValue)
     }
 }

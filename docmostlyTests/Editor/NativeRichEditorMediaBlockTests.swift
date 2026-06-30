@@ -62,6 +62,9 @@ struct NativeRichEditorMediaBlockTests {
         #expect(nodes[3].attrs?["width"] == .int(1280))
         #expect(nodes[3].attrs?["height"] == .int(720))
         #expect(nodes[3].attrs?["align"] == .string("right"))
+        if case .video(let media) = viewModel.document.blocks[3].kind {
+            #expect(media.title == "Demo original.mp4")
+        }
 
         #expect(nodes[1].type == "pdf")
         #expect(nodes[1].attrs?["src"] == .string("/files/spec-v2.pdf"))

@@ -22,9 +22,9 @@ extension NativeEditorCommand {
         case .codeBlock:
             .codeBlock(language: nil)
         case .image:
-            .image(NativeEditorMediaBlock.placeholder)
+            .image(NativeEditorMediaBlock.centeredPlaceholder)
         case .video:
-            .video(NativeEditorMediaBlock.placeholder)
+            .video(NativeEditorMediaBlock.centeredPlaceholder)
         case .audio:
             .audio(NativeEditorMediaBlock.placeholder)
         case .pdf:
@@ -38,7 +38,7 @@ extension NativeEditorCommand {
         case .kanban:
             .base(NativeEditorBaseBlock(pageID: nil, pendingKey: nil, previewText: "Kanban"))
         case .callout:
-            .callout(NativeEditorCalloutBlock(style: "info", icon: "lightbulb", previewText: "Callout"))
+            .callout(NativeEditorCalloutBlock(style: "info", icon: nil, previewText: "Callout"))
         case .details:
             .details(NativeEditorDetailsBlock(summary: "Details", previewText: "Details", isOpen: true))
         case .mathInline:
@@ -60,15 +60,15 @@ extension NativeEditorCommand {
         case .syncedBlock:
             .transclusionSource(NativeEditorTransclusionSourceBlock(
                 identifier: "sync",
-                previewText: "Synced block"
+                previewText: ""
             ))
         case .embed:
             .embed(NativeEditorEmbedBlock(
                 source: "https://example.com",
                 provider: "Embed",
-                alignment: nil,
-                width: nil,
-                height: nil
+                alignment: NativeEditorEmbedBlock.defaultAlignment,
+                width: NativeEditorEmbedBlock.defaultWidth,
+                height: NativeEditorEmbedBlock.defaultHeight
             ))
         case .iframeEmbed:
             embedBlock(provider: "iframe")
@@ -93,7 +93,7 @@ extension NativeEditorCommand {
         case .googleSheetsEmbed:
             embedBlock(provider: "gsheets")
         case .mathBlock:
-            .mathBlock(NativeEditorMathBlock(text: "E = mc^2"))
+            .mathBlock(NativeEditorMathBlock(text: ""))
         case .mermaid:
             .codeBlock(language: "mermaid")
         case .drawio:
@@ -106,13 +106,12 @@ extension NativeEditorCommand {
     }
 
     private func columnsBlock(layout: String, columnCount: Int) -> NativeEditorBlockKind {
-        let labels = (1...columnCount).map { "Column \($0)" }
-        return .columns(NativeEditorColumnsBlock(
+        .columns(NativeEditorColumnsBlock(
             layout: layout,
-            widthMode: "wide",
+            widthMode: "normal",
             columnCount: columnCount,
-            previewText: labels.joined(separator: " "),
-            columnTexts: labels
+            previewText: "",
+            columnTexts: Array(repeating: "", count: columnCount)
         ))
     }
 
@@ -120,9 +119,9 @@ extension NativeEditorCommand {
         .embed(NativeEditorEmbedBlock(
             source: nil,
             provider: provider,
-            alignment: nil,
-            width: nil,
-            height: nil
+            alignment: NativeEditorEmbedBlock.defaultAlignment,
+            width: NativeEditorEmbedBlock.defaultWidth,
+            height: NativeEditorEmbedBlock.defaultHeight
         ))
     }
 }

@@ -18,6 +18,18 @@ extension NativeEditorCommand {
         return textReplacementBlock(reusing: id)
     }
 
+    func serverBackedBaseReplacementBlock(reusing id: UUID, pendingKey: String) -> NativeEditorBlock? {
+        guard case .base(var base) = blockKind else { return nil }
+
+        base.pageID = nil
+        base.pendingKey = pendingKey
+        return richBlock(
+            id: id,
+            kind: .base(base),
+            rawNode: NativeEditorRichBlockNodeFactory.baseNode(from: base)
+        )
+    }
+
     private func mediaReplacementBlock(reusing id: UUID) -> NativeEditorBlock? {
         switch self {
         case .image:
@@ -102,22 +114,24 @@ extension NativeEditorCommand {
         return NativeEditorBlock(
             id: id,
             kind: .codeBlock(language: "mermaid"),
-            text: AttributedString("graph TD; A-->B"),
+            text: AttributedString("flowchart LR\n    A --> B"),
             alignment: .left
         )
     }
 
     var defaultTableRows: [NativeEditorTableRow] {
-        [
-            NativeEditorTableRow(cells: [
-                NativeEditorTableCell(plainText: "Column 1", isHeader: true, backgroundColorName: nil),
-                NativeEditorTableCell(plainText: "Column 2", isHeader: true, backgroundColorName: nil)
-            ]),
-            NativeEditorTableRow(cells: [
-                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil),
-                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil)
-            ])
+        let columnCount = 3
+        return [
+            tableRow(columnCount: columnCount, isHeader: true),
+            tableRow(columnCount: columnCount, isHeader: false),
+            tableRow(columnCount: columnCount, isHeader: false)
         ]
+    }
+
+    private func tableRow(columnCount: Int, isHeader: Bool) -> NativeEditorTableRow {
+        NativeEditorTableRow(cells: (0..<columnCount).map { _ in
+            NativeEditorTableCell(plainText: "", isHeader: isHeader, backgroundColorName: nil)
+        })
     }
 
     private var baseBlock: NativeEditorBaseBlock {
@@ -129,8 +143,14 @@ extension NativeEditorCommand {
     }
 
     private var defaultSyncedBlockID: String {
-        "sync-\(UUID().uuidString)"
+        var generator = SystemRandomNumberGenerator()
+        return String((0..<Self.docmostNodeIDLength).map { _ in
+            Self.docmostNodeIDAlphabet.randomElement(using: &generator) ?? "a"
+        })
     }
+
+    private static let docmostNodeIDAlphabet = Array("abcdefghijklmnopqrstuvwxyz")
+    private static let docmostNodeIDLength = 12
 
     private func richBlock(id: UUID, kind: NativeEditorBlockKind, rawNode: ProseMirrorNode) -> NativeEditorBlock {
         NativeEditorBlock(
@@ -143,10 +163,18 @@ extension NativeEditorCommand {
     }
 
     private func mediaBlock(id: UUID, type: String, kind: NativeEditorBlockKind) -> NativeEditorBlock {
-        richBlock(
+        let media: NativeEditorMediaBlock
+        switch kind {
+        case .image(let mediaPayload), .video(let mediaPayload), .audio(let mediaPayload):
+            media = mediaPayload
+        default:
+            media = .placeholder
+        }
+
+        return richBlock(
             id: id,
             kind: kind,
-            rawNode: NativeEditorRichBlockNodeFactory.mediaNode(from: .placeholder, type: type)
+            rawNode: NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: type)
         )
     }
 
@@ -155,19 +183,16 @@ extension NativeEditorCommand {
     }
 
     private var tableNode: ProseMirrorNode {
-        ProseMirrorNode(type: "table", content: [
-            tableRowNode(cellType: "tableHeader", texts: ["Column 1", "Column 2"]),
-            tableRowNode(cellType: "tableCell", texts: ["", ""])
-        ])
+        ProseMirrorNode(type: "table", content: defaultTableRows.map(tableRowNode))
     }
 
-    private func tableRowNode(cellType: String, texts: [String]) -> ProseMirrorNode {
+    private func tableRowNode(from row: NativeEditorTableRow) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "tableRow",
-            content: texts.map { text in
+            content: row.cells.map { cell in
                 ProseMirrorNode(
-                    type: cellType,
-                    content: [paragraphNode(text)]
+                    type: cell.isHeader ? "tableHeader" : "tableCell",
+                    content: [paragraphNode(cell.plainText)]
                 )
             }
         )
@@ -176,8 +201,8 @@ extension NativeEditorCommand {
     private var calloutNode: ProseMirrorNode {
         ProseMirrorNode(
             type: "callout",
-            attrs: ["type": .string("info"), "icon": .string("lightbulb")],
-            content: [paragraphNode("Callout")]
+            attrs: ["type": .string("info")],
+            content: [paragraphNode("")]
         )
     }
 
@@ -186,11 +211,8 @@ extension NativeEditorCommand {
             type: "details",
             attrs: ["open": .bool(true)],
             content: [
-                ProseMirrorNode(
-                    type: "detailsSummary",
-                    content: NativeEditorDocument.inlineNodes(from: AttributedString("Details"))
-                ),
-                ProseMirrorNode(type: "detailsContent", content: [paragraphNode("Details")])
+                ProseMirrorNode(type: "detailsSummary"),
+                ProseMirrorNode(type: "detailsContent", content: [paragraphNode("")])
             ]
         )
     }
@@ -202,10 +224,10 @@ extension NativeEditorCommand {
 
         return NativeEditorColumnsBlock(
             layout: "two_equal",
-            widthMode: "wide",
+            widthMode: "normal",
             columnCount: 2,
-            previewText: "Column 1 Column 2",
-            columnTexts: ["Column 1", "Column 2"]
+            previewText: "",
+            columnTexts: ["", ""]
         )
     }
 
@@ -215,7 +237,7 @@ extension NativeEditorCommand {
             id: id,
             kind: .transclusionSource(NativeEditorTransclusionSourceBlock(
                 identifier: identifier,
-                previewText: "Synced block"
+                previewText: ""
             )),
             rawNode: syncedBlockNode(identifier: identifier)
         )
@@ -225,7 +247,7 @@ extension NativeEditorCommand {
         ProseMirrorNode(
             type: "transclusionSource",
             attrs: ["id": .string(identifier)],
-            content: [paragraphNode("Synced block")]
+            content: [paragraphNode("")]
         )
     }
 
@@ -237,14 +259,14 @@ extension NativeEditorCommand {
         return NativeEditorEmbedBlock(
             source: nil,
             provider: "Embed",
-            alignment: nil,
-            width: nil,
-            height: nil
+            alignment: NativeEditorEmbedBlock.defaultAlignment,
+            width: NativeEditorEmbedBlock.defaultWidth,
+            height: NativeEditorEmbedBlock.defaultHeight
         )
     }
 
     private var mathBlockNode: ProseMirrorNode {
-        ProseMirrorNode(type: "mathBlock", attrs: ["text": .string("E = mc^2")])
+        ProseMirrorNode(type: "mathBlock", attrs: ["text": .string("")])
     }
 
     private func diagramNode(type: String) -> ProseMirrorNode {

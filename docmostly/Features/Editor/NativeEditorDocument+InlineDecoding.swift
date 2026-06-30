@@ -8,11 +8,14 @@ nonisolated extension NativeEditorDocument {
         case "hardBreak":
             [.hardBreak]
         case "mention":
-            [.mention(mention(from: node))]
+            [.mention(mention(from: node), marks: textMarks(from: node.marks ?? []))]
         case "status":
-            [.status(statusBadge(from: node))]
+            [.status(statusBadge(from: node), marks: textMarks(from: node.marks ?? []))]
         case "mathInline":
-            [.mathInline(NativeEditorMathInline(text: node.attrs?["text"]?.stringValue ?? ""))]
+            [.mathInline(
+                NativeEditorMathInline(text: node.attrs?["text"]?.stringValue ?? ""),
+                marks: textMarks(from: node.marks ?? [])
+            )]
         default:
             nestedInlineContent(from: node)
         }
@@ -34,19 +37,22 @@ nonisolated extension NativeEditorDocument {
             return segment
         case .hardBreak:
             return AttributedString("\n")
-        case .mention(let mention):
+        case .mention(let mention, let marks):
             var segment = AttributedString(mention.displayText)
             segment[NativeEditorMentionAttribute.self] = mention
             segment.foregroundColor = DocmostlyTheme.primary
+            apply(marks, to: &segment)
             return segment
-        case .status(let status):
-            var segment = AttributedString(status.text)
+        case .status(let status, let marks):
+            var segment = AttributedString(status.displayText)
             segment[NativeEditorStatusAttribute.self] = status
+            apply(marks, to: &segment)
             return segment
-        case .mathInline(let math):
-            var segment = AttributedString(math.text)
+        case .mathInline(let math, let marks):
+            var segment = AttributedString(math.displayText)
             segment[NativeEditorMathInlineAttribute.self] = math
             segment.inlinePresentationIntent = .code
+            apply(marks, to: &segment)
             return segment
         case .unsupported(let node):
             return AttributedString(node.text ?? "")
@@ -89,7 +95,10 @@ nonisolated extension NativeEditorDocument {
     static func richTextMark(from mark: ProseMirrorMark) -> NativeEditorTextMark {
         switch mark.type {
         case "link":
-            .link(href: mark.attrs?["href"]?.stringValue ?? "")
+            .link(
+                href: mark.attrs?["href"]?.stringValue ?? "",
+                isInternal: mark.attrs?["internal"]?.boolValue ?? false
+            )
         case "highlight":
             .highlight(
                 color: mark.attrs?["color"]?.stringValue,
@@ -148,8 +157,8 @@ nonisolated extension NativeEditorDocument {
         switch mark {
         case .underline:
             text.underlineStyle = .single
-        case .link(let href):
-            text.link = Self.safeLinkURL(from: href)
+        case .link(let href, let isInternal):
+            applyLinkMark(href: href, isInternal: isInternal, to: &text)
         case .highlight(let color, let colorName):
             if let color {
                 text[NativeEditorHighlightColorAttribute.self] = color
@@ -178,11 +187,77 @@ nonisolated extension NativeEditorDocument {
         }
     }
 
+    static func applyLinkMark(href: String, isInternal: Bool, to text: inout AttributedString) {
+        guard let link = preservedLink(href: href, isInternal: isInternal) else { return }
+        text[NativeEditorLinkAttribute.self] = link
+        text.link = safeLinkURL(from: href)
+    }
+
     static func safeLinkURL(from href: String) -> URL? {
         guard let url = URL(string: href) else { return nil }
         let allowedSchemes = ["https", "http", "mailto"]
         guard let scheme = url.scheme?.lowercased() else { return nil }
         return allowedSchemes.contains(scheme) ? url : nil
+    }
+
+    static func normalizedSafeWebLink(from href: String) -> (href: String, url: URL)? {
+        if let url = safeLinkURL(from: href) {
+            return (href, url)
+        }
+
+        guard isProtocolLessWebLink(href) else {
+            return nil
+        }
+
+        let normalizedHref = "http://\(href)"
+        guard let url = safeLinkURL(from: normalizedHref) else { return nil }
+        return (normalizedHref, url)
+    }
+
+    private static func isProtocolLessWebLink(_ href: String) -> Bool {
+        guard href.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              href.contains("://") == false
+        else {
+            return false
+        }
+
+        let hostEnd = href.firstIndex { "/?#".contains($0) } ?? href.endIndex
+        let host = href[..<hostEnd]
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2,
+              labels.allSatisfy({ $0.isEmpty == false }),
+              let topLevelDomain = labels.last,
+              topLevelDomain.count >= 2,
+              topLevelDomain.allSatisfy(\.isLetter)
+        else {
+            return false
+        }
+
+        return labels.allSatisfy(isValidDomainLabel)
+    }
+
+    private static func isValidDomainLabel(_ label: Substring) -> Bool {
+        guard let first = label.first,
+              let last = label.last,
+              first.isLetter || first.isNumber,
+              last.isLetter || last.isNumber
+        else {
+            return false
+        }
+
+        return label.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "-"
+        }
+    }
+
+    static func preservedLink(href: String, isInternal: Bool = false) -> NativeEditorLink? {
+        guard href.isEmpty == false else { return nil }
+
+        if safeLinkURL(from: href) != nil || href.hasPrefix("/") || href.hasPrefix("#") {
+            return NativeEditorLink(href: href, isInternal: isInternal)
+        }
+
+        return nil
     }
 
     static func insertPresentationIntent(

@@ -51,6 +51,41 @@ struct EndpointTests {
         #expect(request.httpBody == nil)
     }
 
+    @Test func buildsBaseCreateRequestWithKanbanTemplate() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.createBase(parentPageId: "page-1", template: .kanban)
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/bases/create")
+
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+        #expect(object["parentPageId"] == "page-1")
+        #expect(object["template"] == "kanban")
+    }
+
+    @Test func buildsMentionSuggestionsRequestForUsersAndPages() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.searchSuggestions(
+            query: "road",
+            includeUsers: true,
+            includePages: true,
+            spaceId: "space-1",
+            limit: 10
+        )
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/search/suggest")
+
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(object["query"] as? String == "road")
+        #expect(object["includeUsers"] as? Bool == true)
+        #expect(object["includePages"] as? Bool == true)
+        #expect(object["spaceId"] as? String == "space-1")
+        #expect(object["limit"] as? Int == 10)
+    }
+
     @Test func buildsInlineCommentCreateRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let yjsSelection = NativeEditorYjsSelection(

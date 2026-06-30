@@ -38,7 +38,7 @@ struct NativeRichEditorViewModelTests {
 
         #expect(viewModel.isShowingSlashCommands == true)
         #expect(viewModel.slashCommandQuery == "to")
-        #expect(viewModel.filteredSlashCommands.map(\.title) == ["To-do List"])
+        #expect(Array(viewModel.filteredSlashCommands.map(\.title).prefix(2)) == ["To-do list", "Toggle block"])
     }
 
     @Test func slashCommandFilteringUsesSubtitlesWhenTitlesDoNotMatch() {
@@ -48,8 +48,8 @@ struct NativeRichEditorViewModelTests {
         viewModel.focus(blockID: block.id)
 
         let titles = viewModel.filteredSlashCommands.map(\.title)
-        #expect(titles.contains("Math Inline"))
-        #expect(titles.contains("Math Block"))
+        #expect(titles.contains("Math inline"))
+        #expect(titles.contains("Math block"))
     }
 
     @Test func applyingSlashCommandTransformsActiveBlockAndClearsSlashToken() {
@@ -92,10 +92,10 @@ struct NativeRichEditorViewModelTests {
             Issue.record("Expected table block")
             return
         }
-        #expect(table.rows.count == 2)
+        expectDocmostDefaultTableShape(table)
         #expect(viewModel.document.blocks[0].isEditable == false)
         #expect(viewModel.document.proseMirrorDocument.content.first?.type == "table")
-        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 2)
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.count == 3)
     }
 
     @Test func slashCommandInventoryIncludesMediaFileAndDiagramBlocks() {
@@ -104,10 +104,10 @@ struct NativeRichEditorViewModelTests {
         #expect(titles.contains("Image"))
         #expect(titles.contains("Video"))
         #expect(titles.contains("Audio"))
-        #expect(titles.contains("PDF"))
-        #expect(titles.contains("File"))
-        #expect(titles.contains("Draw.io"))
-        #expect(titles.contains("Excalidraw"))
+        #expect(titles.contains("Embed PDF"))
+        #expect(titles.contains("File attachment"))
+        #expect(titles.contains("Draw.io (diagrams.net)"))
+        #expect(titles.contains("Excalidraw (Whiteboard)"))
     }
 
     @Test func slashCommandInventoryIncludesInlineEverydayCommands() {
@@ -117,7 +117,7 @@ struct NativeRichEditorViewModelTests {
         #expect(titles.contains("Time"))
         #expect(titles.contains("Status"))
         #expect(titles.contains("Emoji"))
-        #expect(titles.contains("Math Inline"))
+        #expect(titles.contains("Math inline"))
     }
 
     @Test func mediaSlashCommandsMapToAttachmentImportKinds() {
@@ -168,10 +168,13 @@ struct NativeRichEditorViewModelTests {
 
         viewModel.applySlashCommand(.mermaid)
 
+        let mermaidSeed = "flowchart LR\n    A --> B"
         #expect(viewModel.document.blocks[0].kind == .codeBlock(language: "mermaid"))
+        #expect(String(viewModel.document.blocks[0].text.characters) == mermaidSeed)
         #expect(viewModel.document.blocks[0].isEditable == true)
         #expect(viewModel.document.proseMirrorDocument.content.first?.type == "codeBlock")
         #expect(viewModel.document.proseMirrorDocument.content.first?.attrs?["language"] == .string("mermaid"))
+        #expect(viewModel.document.proseMirrorDocument.content.first?.content?.first?.text == mermaidSeed)
     }
 
     @Test func applyingDateTimeAndEmojiSlashCommandsReplacesSlashToken() throws {
@@ -198,7 +201,7 @@ struct NativeRichEditorViewModelTests {
         #expect(emojiText == ":")
     }
 
-    @Test func applyingStatusSlashCommandCreatesInlineStatusAtom() {
+    @Test func applyingStatusSlashCommandCreatesDocmostEmptyStatusAtom() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/status"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
@@ -209,8 +212,9 @@ struct NativeRichEditorViewModelTests {
         viewModel.applySlashCommand(.status)
 
         let inlineNodes = proseMirrorInlineNodes(from: viewModel)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "SET STATUS")
         #expect(inlineNodes.map(\.type) == ["status"])
-        #expect(inlineNodes.first?.attrs?["text"] == .string("Status"))
+        #expect(inlineNodes.first?.attrs?["text"] == .string(""))
         #expect(inlineNodes.first?.attrs?["color"] == .string("gray"))
     }
 
@@ -220,13 +224,14 @@ struct NativeRichEditorViewModelTests {
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        #expect(viewModel.filteredSlashCommands.map(\.title).contains("Math Inline"))
+        #expect(viewModel.filteredSlashCommands.map(\.title).contains("Math inline"))
 
         viewModel.applySlashCommand(.mathInline)
 
         let inlineNodes = proseMirrorInlineNodes(from: viewModel)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "SET EQUATION")
         #expect(inlineNodes.map(\.type) == ["mathInline"])
-        #expect(inlineNodes.first?.attrs?["text"] == .string("x = y"))
+        #expect(inlineNodes.first?.attrs?["text"] == .string(""))
     }
 
     @Test func insertingUploadedImageReplacesActiveBlockWithDocmostNode() {
@@ -400,30 +405,6 @@ struct NativeRichEditorViewModelTests {
         )))
     }
 
-    @Test func insertsStatusAndMentionInlineAtoms() {
-        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("State "), alignment: .left)
-        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
-        viewModel.document = NativeEditorDocument(blocks: [block])
-        viewModel.focus(blockID: block.id)
-
-        viewModel.insertStatusBadge(text: "Ship", color: "green")
-        viewModel.insertMention(NativeEditorMention(
-            identifier: "mention-1",
-            label: "Roadmap",
-            entityType: "page",
-            entityID: "page-2",
-            slugID: "roadmap-abc"
-        ))
-
-        let inlineNodes = proseMirrorInlineNodes(from: viewModel)
-        #expect(inlineNodes.map(\.type) == ["text", "status", "mention"])
-        #expect(inlineNodes[1].attrs?["text"] == .string("Ship"))
-        #expect(inlineNodes[1].attrs?["color"] == .string("green"))
-        #expect(inlineNodes[2].attrs?["label"] == .string("Roadmap"))
-        #expect(inlineNodes[2].attrs?["entityType"] == .string("page"))
-        #expect(inlineNodes[2].attrs?["slugId"] == .string("roadmap-abc"))
-    }
-
     @Test func decodesRichInlineAtomsAsEditableAttributedText() throws {
         let proseMirrorDocument = try JSONDecoder().decode(
             ProseMirrorDocument.self,
@@ -443,10 +424,6 @@ struct NativeRichEditorViewModelTests {
 
     private func proseMirrorTextMarks(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorMark] {
         proseMirrorInlineNodes(from: viewModel).flatMap { $0.marks ?? [] }
-    }
-
-    private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
-        viewModel.document.proseMirrorDocument.content.first?.content ?? []
     }
 
     private func inlineSlashCommandText(
@@ -492,4 +469,16 @@ private struct SlashCommandExpectation {
     let command: NativeEditorCommand
     let nodeType: String
     let label: String
+}
+
+@MainActor
+private func proseMirrorInlineNodes(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorNode] {
+    viewModel.document.proseMirrorDocument.content.first?.content ?? []
+}
+
+private func expectDocmostDefaultTableShape(_ table: NativeEditorTable) {
+    #expect(table.rows.count == 3)
+    #expect(table.columnCount == 3)
+    #expect(table.rows.first?.cells.allSatisfy(\.isHeader) == true)
+    #expect(table.rows.dropFirst().flatMap(\.cells).allSatisfy { $0.isHeader == false })
 }

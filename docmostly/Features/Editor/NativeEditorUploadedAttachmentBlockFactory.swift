@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import ImageIO
 
 enum NativeEditorAttachmentBlockFactory {
@@ -12,7 +13,7 @@ enum NativeEditorAttachmentBlockFactory {
             attachment: attachment,
             source: "/api/files/\(attachment.id)/\(attachment.fileName)",
             size: attachment.fileSize ?? localFileSize(for: sourceFileURL),
-            imageDimensions: importKind == .image ? imageDimensions(for: sourceFileURL) : nil
+            mediaDimensions: mediaDimensions(for: sourceFileURL, importKind: importKind)
         )
 
         switch importKind {
@@ -32,19 +33,28 @@ enum NativeEditorAttachmentBlockFactory {
     private static func imageBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         mediaBlock(
             id: id,
-            kind: .image(context.mediaPayload),
+            kind: .image(context.mediaPayload(alignment: NativeEditorMediaBlock.defaultAlignment)),
             type: "image",
             context: context,
-            dimensions: context.imageDimensions
+            alignment: NativeEditorMediaBlock.defaultAlignment,
+            dimensions: context.mediaDimensions
         )
     }
 
     private static func videoBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         mediaBlock(
             id: id,
-            kind: .video(context.mediaPayload(title: context.attachment.fileName)),
+            kind: .video(
+                context.mediaPayload(
+                    title: context.attachment.fileName,
+                    alignment: NativeEditorMediaBlock.defaultAlignment
+                )
+            ),
             type: "video",
-            context: context
+            context: context,
+            title: context.attachment.fileName,
+            alignment: NativeEditorMediaBlock.defaultAlignment,
+            dimensions: context.mediaDimensions
         )
     }
 
@@ -57,11 +67,16 @@ enum NativeEditorAttachmentBlockFactory {
         kind: NativeEditorBlockKind,
         type: String,
         context: NativeEditorAttachmentContext,
+        title: String? = nil,
+        alignment: String? = nil,
         dimensions: NativeEditorMediaDimensions? = nil
     ) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
-        if let title = kind.mediaTitle {
+        if let title {
             attrs["title"] = .string(title)
+        }
+        if let alignment {
+            attrs["align"] = .string(alignment)
         }
         if let dimensions {
             attrs["width"] = .int(dimensions.width)
@@ -75,14 +90,16 @@ enum NativeEditorAttachmentBlockFactory {
     private static func pdfBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
         attrs["name"] = .string(context.attachment.fileName)
+        attrs["width"] = .int(NativeEditorPDFBlock.defaultWidthValue)
+        attrs["height"] = .int(NativeEditorPDFBlock.defaultHeightValue)
 
         let kind = NativeEditorBlockKind.pdf(NativeEditorPDFBlock(
             source: context.source,
             name: context.attachment.fileName,
             attachmentID: context.attachment.id,
             sizeInBytes: context.size,
-            width: nil,
-            height: nil
+            width: NativeEditorPDFBlock.defaultWidth,
+            height: NativeEditorPDFBlock.defaultHeight
         ))
 
         return rawBlock(id: id, kind: kind, type: "pdf", attrs: attrs)
@@ -141,6 +158,42 @@ enum NativeEditorAttachmentBlockFactory {
         )
     }
 
+    private static func mediaDimensions(
+        for fileURL: URL?,
+        importKind: NativeEditorAttachmentImportKind
+    ) -> NativeEditorMediaDimensions? {
+        switch importKind {
+        case .image:
+            imageDimensions(for: fileURL)
+        case .video:
+            videoDimensions(for: fileURL)
+        case .audio, .pdf, .file:
+            nil
+        }
+    }
+
+    private static func videoDimensions(for fileURL: URL?) -> NativeEditorMediaDimensions? {
+        guard let fileURL else { return nil }
+
+        let asset = AVURLAsset(url: fileURL)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            return nil
+        }
+
+        let displaySize = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
+        let width = Int(abs(displaySize.width).rounded())
+        let height = Int(abs(displaySize.height).rounded())
+        guard height > 0, width > 0 else {
+            return nil
+        }
+
+        return NativeEditorMediaDimensions(
+            width: width,
+            height: height,
+            aspectRatio: Double(width) / Double(height)
+        )
+    }
+
     private static func intValue(_ value: Any?) -> Int? {
         if let int = value as? Int {
             return int
@@ -154,38 +207,30 @@ enum NativeEditorAttachmentBlockFactory {
     }
 }
 
-private extension NativeEditorBlockKind {
-    var mediaTitle: String? {
-        switch self {
-        case .image(let media), .video(let media), .audio(let media):
-            media.title
-        default:
-            nil
-        }
-    }
-}
-
 private struct NativeEditorAttachmentContext {
     let attachment: DocmostAttachment
     let source: String
     let size: Int?
-    let imageDimensions: NativeEditorMediaDimensions?
+    let mediaDimensions: NativeEditorMediaDimensions?
 
     var mediaPayload: NativeEditorMediaBlock {
-        mediaPayload(title: nil)
+        mediaPayload()
     }
 
-    func mediaPayload(title: String?) -> NativeEditorMediaBlock {
+    func mediaPayload(
+        title: String? = nil,
+        alignment: String? = nil
+    ) -> NativeEditorMediaBlock {
         NativeEditorMediaBlock(
             source: source,
             alternativeText: nil,
             title: title,
             attachmentID: attachment.id,
             sizeInBytes: size,
-            width: imageDimensions?.width.description,
-            height: imageDimensions?.height.description,
-            aspectRatio: imageDimensions?.aspectRatio.description,
-            alignment: nil
+            width: mediaDimensions?.width.description,
+            height: mediaDimensions?.height.description,
+            aspectRatio: mediaDimensions?.aspectRatio.description,
+            alignment: alignment
         )
     }
 

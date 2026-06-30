@@ -3,6 +3,25 @@ import Testing
 @testable import docmostly
 
 struct NativeEditorInlineAtomEncodingTests {
+    @Test func emptyDocmostInlineMathAtomSurvivesNativeRoundTrip() throws {
+        let paragraph = ProseMirrorNode(
+            type: "paragraph",
+            content: [
+                ProseMirrorNode(type: "mathInline", attrs: ["text": .string("")])
+            ]
+        )
+
+        let block = try #require(NativeEditorDocument.blocks(from: paragraph).first)
+        let mathRun = try #require(block.text.runs.first { run in
+            run[NativeEditorMathInlineAttribute.self] != nil
+        })
+
+        let inlineNodes = try #require(NativeEditorDocument.node(from: block).content)
+        #expect(String(block.text[mathRun.range].characters) == "SET EQUATION")
+        #expect(inlineNodes.map(\.type) == ["mathInline"])
+        #expect(inlineNodes.first?.attrs?["text"] == .string(""))
+    }
+
     @Test func encodesInlineAtomRunsWithoutSwallowingSurroundingText() {
         let math = NativeEditorMathInline(text: "E = mc^2")
         var text = AttributedString("Formula E = mc^2 today")

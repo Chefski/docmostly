@@ -65,6 +65,7 @@ enum NativeEditorRichBlockFixtures {
                       "content": [
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "featurecellx" },
                           "content": [{ "type": "text", "text": "Feature" }]
                         }
                       ]
@@ -75,6 +76,7 @@ enum NativeEditorRichBlockFixtures {
                       "content": [
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "statuscellid" },
                           "content": [{ "type": "text", "text": "Status" }]
                         }
                       ]
@@ -90,6 +92,7 @@ enum NativeEditorRichBlockFixtures {
                       "content": [
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "nativecellid" },
                           "content": [{ "type": "text", "text": "Native editor" }]
                         }
                       ]
@@ -100,6 +103,7 @@ enum NativeEditorRichBlockFixtures {
                       "content": [
                         {
                           "type": "paragraph",
+                          "attrs": { "id": "progresscell" },
                           "content": [{ "type": "text", "text": "In progress" }]
                         }
                       ]
@@ -167,6 +171,7 @@ enum NativeEditorRichBlockFixtures {
               "content": [
                 {
                   "type": "paragraph",
+                  "attrs": { "id": "calloutbodyx" },
                   "content": [{ "type": "text", "text": "Check migration plan" }]
                 }
               ]
@@ -184,6 +189,7 @@ enum NativeEditorRichBlockFixtures {
                   "content": [
                     {
                       "type": "paragraph",
+                      "attrs": { "id": "detailsbodyx" },
                       "content": [{ "type": "text", "text": "QA on simulator" }]
                     }
                   ]
@@ -202,6 +208,7 @@ enum NativeEditorRichBlockFixtures {
                   "content": [
                     {
                       "type": "paragraph",
+                      "attrs": { "id": "leftcolumnid" },
                       "content": [{ "type": "text", "text": "Left" }]
                     }
                   ]
@@ -212,6 +219,7 @@ enum NativeEditorRichBlockFixtures {
                   "content": [
                     {
                       "type": "paragraph",
+                      "attrs": { "id": "rightcolumnx" },
                       "content": [{ "type": "text", "text": "Right" }]
                     }
                   ]
@@ -225,6 +233,7 @@ enum NativeEditorRichBlockFixtures {
               "content": [
                 {
                   "type": "paragraph",
+                  "attrs": { "id": "sharedblockx" },
                   "content": [{ "type": "text", "text": "Shared" }]
                 }
               ]
@@ -287,6 +296,7 @@ enum NativeEditorInlineFixtures {
           "content": [
             {
               "type": "paragraph",
+              "attrs": { "id": "richinlineid" },
               "content": [
                 {
                   "type": "text",
@@ -343,6 +353,7 @@ enum NativeEditorNestedListFixtures {
                   "content": [
                     {
                       "type": "paragraph",
+                      "attrs": { "id": "parentnodeid" },
                       "content": [{ "type": "text", "text": "Parent" }]
                     },
                     {
@@ -353,6 +364,7 @@ enum NativeEditorNestedListFixtures {
                           "content": [
                             {
                               "type": "paragraph",
+                              "attrs": { "id": "childnodeidx" },
                               "content": [{ "type": "text", "text": "Child" }]
                             }
                           ]

@@ -104,7 +104,7 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .paragraph:
-            "Paragraph"
+            "Text"
         case .heading1:
             "Heading 1"
         case .heading2:
@@ -112,15 +112,15 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .heading3:
             "Heading 3"
         case .bulletedList:
-            "Bulleted List"
+            "Bullet list"
         case .numberedList:
-            "Numbered List"
+            "Numbered list"
         case .todoList:
-            "To-do List"
+            "To-do list"
         case .quote:
             "Quote"
         case .codeBlock:
-            "Code Block"
+            "Code"
         case .image:
             "Image"
         case .video:
@@ -128,9 +128,9 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .audio:
             "Audio"
         case .pdf:
-            "PDF"
+            "Embed PDF"
         case .fileAttachment:
-            "File"
+            "File attachment"
         case .table:
             "Table"
         case .baseInline:
@@ -140,11 +140,11 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .callout:
             "Callout"
         case .details:
-            "Details"
+            "Toggle block"
         case .mathInline:
-            "Math Inline"
+            "Math inline"
         case .pageBreak:
-            "Page Break"
+            "Page break"
         case .divider:
             "Divider"
         case .columns:
@@ -156,9 +156,9 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .columns5:
             "5 Columns"
         case .subpages:
-            "Subpages"
+            "Subpages (Child pages)"
         case .syncedBlock:
-            "Synced Block"
+            "Synced block"
         case .embed:
             "Embed"
         case .iframeEmbed:
@@ -184,13 +184,13 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .googleSheetsEmbed:
             "Google Sheets"
         case .mathBlock:
-            "Math Block"
+            "Math block"
         case .mermaid:
-            "Mermaid"
+            "Mermaid diagram"
         case .drawio:
-            "Draw.io"
+            "Draw.io (diagrams.net)"
         case .excalidraw:
-            "Excalidraw"
+            "Excalidraw (Whiteboard)"
         case .date:
             "Date"
         case .time:
@@ -229,9 +229,9 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .audio:
             "Audio placeholder"
         case .pdf:
-            "PDF placeholder"
+            "Upload and embed a PDF file"
         case .fileAttachment:
-            "File attachment placeholder"
+            "Upload any file from your device"
         case .table:
             "Two-column table"
         case .baseInline:
@@ -241,7 +241,7 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         case .callout:
             "Highlighted note"
         case .details:
-            "Collapsible detail section"
+            "Insert collapsible block"
         case .mathInline:
             "Inline equation"
         case .pageBreak:

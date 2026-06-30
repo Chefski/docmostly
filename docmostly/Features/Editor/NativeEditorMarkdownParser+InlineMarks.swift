@@ -1,11 +1,30 @@
 import Foundation
 
 extension NativeEditorMarkdownParser {
-    static func attributedInlineMarkdown(from markdown: String) -> AttributedString {
+    static func inlineMarkdownInputRuleText(from text: String) -> AttributedString? {
+        if let inlineMathText = inlineMathInputRuleText(from: text) {
+            return inlineMathText
+        }
+
+        let attributedText = attributedInlineMarkdown(
+            from: text,
+            autolinksBareWebURLs: text.last?.isWhitespace == true
+        )
+        guard inlineMarkdownInputRuleChanged(attributedText, from: text) else { return nil }
+        return attributedText
+    }
+
+    static func attributedInlineMarkdown(
+        from markdown: String,
+        autolinksBareWebURLs: Bool = true
+    ) -> AttributedString {
         var output = AttributedString("")
         var remaining = markdown[...]
 
-        while let match = nextInlineMarkdownMatch(in: remaining) {
+        while let match = nextInlineMarkdownMatch(
+            in: remaining,
+            autolinksBareWebURLs: autolinksBareWebURLs
+        ) {
             output += AttributedString(String(remaining[..<match.range.lowerBound]))
             output += match.text
             remaining = remaining[match.range.upperBound...]
@@ -35,16 +54,50 @@ extension NativeEditorMarkdownParser {
             }
         }
 
-        if let href = run.link?.absoluteString {
+        if let href = run[NativeEditorLinkAttribute.self]?.href ?? run.link?.absoluteString {
             output = "[\(escapedMarkdownLinkLabel(output))](\(href))"
         }
 
         return output
     }
 
+    static func scriptUnderlineMarkdown(
+        from run: AttributedString.Runs.Run,
+        body: String
+    ) -> String {
+        var output = body
+
+        if let baselineOffset = run.baselineOffset, baselineOffset != 0 {
+            let tagName = baselineOffset > 0 ? "sup" : "sub"
+            output = "<\(tagName)>\(output)</\(tagName)>"
+        }
+
+        if run.underlineStyle != nil {
+            output = "<u>\(output)</u>"
+        }
+
+        return output
+    }
+
     private static func codeMarkdown(from text: String) -> String {
-        let delimiter = text.contains("`") ? "``" : "`"
+        let delimiter = String(repeating: "`", count: longestBacktickRunLength(in: text) + 1)
         return "\(delimiter)\(text)\(delimiter)"
+    }
+
+    private static func longestBacktickRunLength(in text: String) -> Int {
+        var longestRunLength = 0
+        var currentRunLength = 0
+
+        for character in text {
+            if character == "`" {
+                currentRunLength += 1
+                longestRunLength = max(longestRunLength, currentRunLength)
+            } else {
+                currentRunLength = 0
+            }
+        }
+
+        return longestRunLength
     }
 
     private static func escapedMarkdownLinkLabel(_ text: String) -> String {
@@ -54,19 +107,41 @@ extension NativeEditorMarkdownParser {
             .replacing("]", with: "\\]")
     }
 
+    private static func inlineMarkdownInputRuleChanged(
+        _ attributedText: AttributedString,
+        from text: String
+    ) -> Bool {
+        if String(attributedText.characters) != text {
+            return true
+        }
+
+        return attributedText.runs.contains { run in
+            run[NativeEditorLinkAttribute.self] != nil || run.link != nil
+        }
+    }
+
     private struct InlineMarkdownMatch {
         var range: Range<String.Index>
         var text: AttributedString
         var priority: Int
     }
 
-    private static func nextInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
+    private static func nextInlineMarkdownMatch(
+        in markdown: Substring,
+        autolinksBareWebURLs: Bool
+    ) -> InlineMarkdownMatch? {
         [
             codeInlineMarkdownMatch(in: markdown),
             linkedInlineMarkdownMatch(in: markdown),
             delimitedInlineMarkdownMatch(
                 in: markdown,
                 delimiter: "**",
+                intent: .stronglyEmphasized,
+                priority: 2
+            ),
+            delimitedInlineMarkdownMatch(
+                in: markdown,
+                delimiter: "__",
                 intent: .stronglyEmphasized,
                 priority: 2
             ),
@@ -81,7 +156,14 @@ extension NativeEditorMarkdownParser {
                 delimiter: "*",
                 intent: .emphasized,
                 priority: 4
-            )
+            ),
+            delimitedInlineMarkdownMatch(
+                in: markdown,
+                delimiter: "_",
+                intent: .emphasized,
+                priority: 4
+            ),
+            autolinksBareWebURLs ? bareWebURLInlineMarkdownMatch(in: markdown) : nil
         ]
         .compactMap { $0 }
         .min { lhs, rhs in
@@ -94,24 +176,52 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func codeInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
-        guard
-            let openIndex = markdown.firstIndex(of: "`"),
-            let closeIndex = markdown[markdown.index(after: openIndex)...].firstIndex(of: "`")
-        else {
-            return nil
-        }
+        guard let openingRun = nextBacktickRun(in: markdown, startingAt: markdown.startIndex),
+              let closingRun = nextMatchingBacktickRun(in: markdown, after: openingRun) else { return nil }
 
-        let contentStart = markdown.index(after: openIndex)
-        let content = String(markdown[contentStart..<closeIndex])
+        let content = String(markdown[openingRun.upperBound..<closingRun.lowerBound])
         guard content.isEmpty == false else { return nil }
 
         var text = AttributedString(content)
         text.inlinePresentationIntent = .code
         return InlineMarkdownMatch(
-            range: openIndex..<markdown.index(after: closeIndex),
+            range: openingRun.lowerBound..<closingRun.upperBound,
             text: text,
             priority: 0
         )
+    }
+
+    private static func nextMatchingBacktickRun(
+        in markdown: Substring,
+        after openingRun: Range<String.Index>
+    ) -> Range<String.Index>? {
+        var searchStart = openingRun.upperBound
+
+        while let run = nextBacktickRun(in: markdown, startingAt: searchStart) {
+            if markdown.distance(from: run.lowerBound, to: run.upperBound) ==
+                markdown.distance(from: openingRun.lowerBound, to: openingRun.upperBound) {
+                return run
+            }
+
+            searchStart = run.upperBound
+        }
+
+        return nil
+    }
+
+    private static func nextBacktickRun(
+        in markdown: Substring,
+        startingAt searchStart: String.Index
+    ) -> Range<String.Index>? {
+        guard searchStart < markdown.endIndex,
+              let runStart = markdown[searchStart...].firstIndex(of: "`") else { return nil }
+
+        var runEnd = runStart
+        while runEnd < markdown.endIndex, markdown[runEnd] == "`" {
+            runEnd = markdown.index(after: runEnd)
+        }
+
+        return runStart..<runEnd
     }
 
     private static func linkedInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
@@ -128,9 +238,10 @@ extension NativeEditorMarkdownParser {
                 let closeLabelIndex = markdown[markdown.index(after: openLabelIndex)...].firstIndex(of: "]"),
                 markdown.index(after: closeLabelIndex) < markdown.endIndex,
                 markdown[markdown.index(after: closeLabelIndex)] == "(",
-                let closeDestinationIndex = markdown[
-                    markdown.index(after: markdown.index(after: closeLabelIndex))...
-                ].firstIndex(of: ")")
+                let closeDestinationIndex = closingMarkdownLinkDestinationIndex(
+                    in: markdown,
+                    startingAt: markdown.index(after: markdown.index(after: closeLabelIndex))
+                )
             else {
                 return nil
             }
@@ -138,7 +249,7 @@ extension NativeEditorMarkdownParser {
             let labelStartIndex = markdown.index(after: openLabelIndex)
             let destinationStartIndex = markdown.index(after: markdown.index(after: closeLabelIndex))
             let label = String(markdown[labelStartIndex..<closeLabelIndex])
-            let destination = markdownLinkDestination(
+            let destination = markdownLinkSource(
                 from: String(markdown[destinationStartIndex..<closeDestinationIndex])
             )
 
@@ -149,6 +260,9 @@ extension NativeEditorMarkdownParser {
 
             var text = attributedInlineMarkdown(from: label)
             text.link = url
+            if let link = NativeEditorDocument.preservedLink(href: destination) {
+                text[NativeEditorLinkAttribute.self] = link
+            }
             return InlineMarkdownMatch(
                 range: openLabelIndex..<markdown.index(after: closeDestinationIndex),
                 text: text,
@@ -172,7 +286,7 @@ extension NativeEditorMarkdownParser {
             return nil
         }
 
-        if delimiter == "*", isPartOfStrongDelimiter(openRange, in: markdown) {
+        if delimiter.count == 1, isPartOfRepeatedDelimiter(openRange, delimiter: delimiter, in: markdown) {
             return nil
         }
 
@@ -188,32 +302,262 @@ extension NativeEditorMarkdownParser {
         )
     }
 
+    private static func bareWebURLInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
+        var searchStart = markdown.startIndex
+
+        while searchStart < markdown.endIndex {
+            defer { searchStart = markdown.index(after: searchStart) }
+
+            guard isBareWebURLStartCharacter(markdown[searchStart]),
+                  isBareWebURLBoundaryBefore(searchStart, in: markdown) else {
+                continue
+            }
+
+            let rawEnd = bareWebURLCandidateEnd(in: markdown, startingAt: searchStart)
+            let urlEnd = trimmingBareWebURLTrailingPunctuation(
+                in: markdown,
+                range: searchStart..<rawEnd
+            )
+            guard urlEnd > searchStart else {
+                continue
+            }
+
+            let visibleHref = String(markdown[searchStart..<urlEnd])
+            guard let link = NativeEditorDocument.normalizedSafeWebLink(from: visibleHref) else {
+                continue
+            }
+
+            var text = AttributedString(visibleHref)
+            NativeEditorDocument.applyLinkMark(href: link.href, isInternal: false, to: &text)
+            return InlineMarkdownMatch(
+                range: searchStart..<urlEnd,
+                text: text,
+                priority: 5
+            )
+        }
+
+        return nil
+    }
+
+    private static func isBareWebURLStartCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber
+    }
+
+    private static func isBareWebURLBoundaryBefore(_ index: String.Index, in markdown: Substring) -> Bool {
+        guard index > markdown.startIndex else { return true }
+
+        let previousCharacter = markdown[markdown.index(before: index)]
+        return previousCharacter.isWhitespace || "([{\"'<".contains(previousCharacter)
+    }
+
+    private static func bareWebURLCandidateEnd(
+        in markdown: Substring,
+        startingAt urlStart: String.Index
+    ) -> String.Index {
+        var urlEnd = urlStart
+        while urlEnd < markdown.endIndex, isBareWebURLCharacter(markdown[urlEnd]) {
+            urlEnd = markdown.index(after: urlEnd)
+        }
+
+        return urlEnd
+    }
+
+    private static func isBareWebURLCharacter(_ character: Character) -> Bool {
+        if character.isWhitespace {
+            return false
+        }
+
+        return "<>\"".contains(character) == false
+    }
+
+    private static func trimmingBareWebURLTrailingPunctuation(
+        in markdown: Substring,
+        range: Range<String.Index>
+    ) -> String.Index {
+        var endIndex = range.upperBound
+
+        while endIndex > range.lowerBound {
+            let lastIndex = markdown.index(before: endIndex)
+            let lastCharacter = markdown[lastIndex]
+
+            if ".,;:!?".contains(lastCharacter) ||
+                hasUnbalancedTrailingDelimiter(lastCharacter, in: markdown, range: range.lowerBound..<endIndex) {
+                endIndex = lastIndex
+            } else {
+                break
+            }
+        }
+
+        return endIndex
+    }
+
+    private static func hasUnbalancedTrailingDelimiter(
+        _ character: Character,
+        in markdown: Substring,
+        range: Range<String.Index>
+    ) -> Bool {
+        let delimiterPair: (opening: Character, closing: Character)? = switch character {
+        case ")":
+            ("(", ")")
+        case "]":
+            ("[", "]")
+        case "}":
+            ("{", "}")
+        default:
+            nil
+        }
+
+        guard let delimiterPair else { return false }
+
+        let slice = markdown[range]
+        let openingCount = slice.filter { $0 == delimiterPair.opening }.count
+        let closingCount = slice.filter { $0 == delimiterPair.closing }.count
+        return closingCount > openingCount
+    }
+
     private static func isImageMarker(before index: String.Index, in markdown: Substring) -> Bool {
         guard index > markdown.startIndex else { return false }
         return markdown[markdown.index(before: index)] == "!"
     }
 
-    private static func markdownLinkDestination(from destination: String) -> String {
-        let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmedDestination.hasPrefix("<"),
-           let closeIndex = trimmedDestination.firstIndex(of: ">") {
-            let sourceStartIndex = trimmedDestination.index(after: trimmedDestination.startIndex)
-            return String(trimmedDestination[sourceStartIndex..<closeIndex])
-        }
-
-        return trimmedDestination.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
+    static func closingMarkdownLinkDestinationIndex(
+        in markdown: Substring,
+        startingAt destinationStartIndex: String.Index
+    ) -> String.Index? {
+        var scanner = MarkdownLinkDestinationScanner(
+            markdown: markdown,
+            destinationStartIndex: destinationStartIndex
+        )
+        return scanner.closingIndex()
     }
 
-    private static func isPartOfStrongDelimiter(
+    private static func isPartOfRepeatedDelimiter(
         _ range: Range<String.Index>,
+        delimiter: String,
         in markdown: Substring
     ) -> Bool {
+        guard let delimiterCharacter = delimiter.first else { return false }
+
         if range.lowerBound > markdown.startIndex,
-           markdown[markdown.index(before: range.lowerBound)] == "*" {
+           markdown[markdown.index(before: range.lowerBound)] == delimiterCharacter {
             return true
         }
 
-        return range.upperBound < markdown.endIndex && markdown[range.upperBound] == "*"
+        return range.upperBound < markdown.endIndex && markdown[range.upperBound] == delimiterCharacter
+    }
+
+}
+
+private struct MarkdownLinkDestinationScanner {
+    var markdown: Substring
+    var index: String.Index
+    var nestedParenthesisCount = 0
+    var quoteDelimiter: Character?
+    var isInsideAngleDestination = false
+    var hasReadNonWhitespaceDestinationCharacter = false
+
+    init(markdown: Substring, destinationStartIndex: String.Index) {
+        self.markdown = markdown
+        index = destinationStartIndex
+    }
+
+    mutating func closingIndex() -> String.Index? {
+        while index < markdown.endIndex {
+            let character = markdown[index]
+            defer { index = markdown.index(after: index) }
+
+            if consumesEscapedCharacter(character) || consumesQuotedCharacter(character) ||
+                consumesAngleDestinationCharacter(character) || consumesOpeningAngleDestination(character) ||
+                consumesTitleQuote(character) {
+                continue
+            }
+
+            if let closingIndex = consumeParenthesis(character) {
+                return closingIndex
+            }
+
+            markDestinationCharacter(character)
+        }
+
+        return nil
+    }
+
+    mutating private func consumesEscapedCharacter(_ character: Character) -> Bool {
+        guard isEscapedCharacter(at: index) else { return false }
+        markDestinationCharacter(character)
+        return true
+    }
+
+    mutating private func consumesQuotedCharacter(_ character: Character) -> Bool {
+        guard let delimiter = quoteDelimiter else { return false }
+        if character == delimiter {
+            quoteDelimiter = nil
+        }
+        return true
+    }
+
+    mutating private func consumesAngleDestinationCharacter(_ character: Character) -> Bool {
+        guard isInsideAngleDestination else { return false }
+        if character == ">" {
+            isInsideAngleDestination = false
+        }
+        return true
+    }
+
+    mutating private func consumesOpeningAngleDestination(_ character: Character) -> Bool {
+        guard character == "<", hasReadNonWhitespaceDestinationCharacter == false else { return false }
+        isInsideAngleDestination = true
+        hasReadNonWhitespaceDestinationCharacter = true
+        return true
+    }
+
+    mutating private func consumesTitleQuote(_ character: Character) -> Bool {
+        guard isMarkdownLinkTitleQuote(character) else { return false }
+        quoteDelimiter = character
+        return true
+    }
+
+    mutating private func consumeParenthesis(_ character: Character) -> String.Index? {
+        switch character {
+        case "(":
+            nestedParenthesisCount += 1
+            return nil
+        case ")":
+            guard nestedParenthesisCount > 0 else { return index }
+            nestedParenthesisCount -= 1
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    mutating private func markDestinationCharacter(_ character: Character) {
+        if character.isWhitespace == false {
+            hasReadNonWhitespaceDestinationCharacter = true
+        }
+    }
+
+    private func isMarkdownLinkTitleQuote(_ character: Character) -> Bool {
+        guard character == "\"" || character == "'",
+              index > markdown.startIndex else {
+            return false
+        }
+
+        return markdown[markdown.index(before: index)].isWhitespace
+    }
+
+    private func isEscapedCharacter(at index: String.Index) -> Bool {
+        var backslashCount = 0
+        var currentIndex = index
+
+        while currentIndex > markdown.startIndex {
+            let previousIndex = markdown.index(before: currentIndex)
+            guard markdown[previousIndex] == "\\" else { break }
+
+            backslashCount += 1
+            currentIndex = previousIndex
+        }
+
+        return backslashCount.isMultiple(of: 2) == false
     }
 }

@@ -69,12 +69,20 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Create iOS simulator
+        id: ios-simulator
+        run: |
+          set -euo pipefail
+          destination="$(python3 .github/scripts/create-ios-simulator-destination.py)"
+          echo "Using $destination"
+          echo "destination=$destination" >> "$GITHUB_OUTPUT"
+
       - name: Test
         run: |
           xcodebuild test \
             -project docmostly.xcodeproj \
             -scheme docmostly \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            -destination '${{ steps.ios-simulator.outputs.destination }}' \
             CODE_SIGNING_ALLOWED=NO
 
   ipad-build:
@@ -92,7 +100,7 @@ jobs:
           xcodebuild build \
             -project docmostly.xcodeproj \
             -scheme docmostly \
-            -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5),OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
 
   macos-unit-tests:

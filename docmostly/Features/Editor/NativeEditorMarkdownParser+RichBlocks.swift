@@ -13,16 +13,51 @@ extension NativeEditorMarkdownParser {
             return calloutBlock
         }
 
+        if let mediaBlock = mediaHTMLBlock(in: lines, startingAt: index) {
+            return mediaBlock
+        }
+
+        if let diagramBlock = diagramHTMLBlock(in: lines, startingAt: index) {
+            return diagramBlock
+        }
+
+        if let containerBlock = docmostContainerHTMLBlock(in: lines, startingAt: index) {
+            return containerBlock
+        }
+
+        if let structuralBlock = docmostStructuralHTMLBlock(in: lines, startingAt: index) {
+            return structuralBlock
+        }
+
+        if let columnsBlock = columnsHTMLBlock(in: lines, startingAt: index) {
+            return columnsBlock
+        }
+
+        if let pageBreakBlock = pageBreakHTMLBlock(from: lines[index]) {
+            return (pageBreakBlock, lines.index(after: index))
+        }
+
+        if let unsupportedBlock = unsupportedDocmostHTMLBlock(in: lines, startingAt: index) {
+            return unsupportedBlock
+        }
+
         return detailsHTMLBlock(in: lines, startingAt: index)
     }
 
     static func singleLineRichBlock(from line: String) -> NativeEditorBlock? {
-        imageMarkdownBlock(from: line) ?? linkedFileMarkdownBlock(from: line)
+        editableHTMLBlock(from: line) ?? singleLineMathFenceBlock(from: line) ?? pageBreakHTMLBlock(from: line) ??
+            imageMarkdownBlock(from: line) ??
+            iframeEmbedMarkdownBlock(from: line) ??
+            linkedFileMarkdownBlock(from: line)
     }
 
     static func richMarkdownLine(from block: NativeEditorBlock) -> String? {
         if let mediaMarkdown = mediaMarkdownLine(from: block) {
             return mediaMarkdown
+        }
+
+        if let containerMarkdown = docmostContainerHTMLMarkdown(from: block) {
+            return containerMarkdown
         }
 
         if let structuralMarkdown = structuralMarkdownLine(from: block) {
@@ -35,36 +70,39 @@ extension NativeEditorMarkdownParser {
     private static func mediaMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .image(let media):
-            imageMarkdown(from: media)
+            mediaHTMLMarkdown(from: media, type: "image") ?? imageMarkdown(from: media)
         case .video(let media):
-            mediaLinkMarkdown(from: media, fallbackTitle: "Video")
+            mediaHTMLMarkdown(from: media, type: "video") ?? mediaLinkMarkdown(from: media, fallbackTitle: "Video")
         case .audio(let media):
-            mediaLinkMarkdown(from: media, fallbackTitle: "Audio")
+            mediaHTMLMarkdown(from: media, type: "audio") ?? mediaLinkMarkdown(from: media, fallbackTitle: "Audio")
         case .pdf(let pdf):
-            linkMarkdown(title: pdf.name ?? pdf.source ?? "PDF", url: pdf.source)
+            pdfHTMLMarkdown(from: pdf) ??
+                linkMarkdown(title: pdf.name ?? markdownLinkDisplayName(from: pdf.source) ?? "PDF", url: pdf.source)
         case .attachment(let attachment):
-            linkMarkdown(title: attachment.name ?? attachment.url ?? "Attachment", url: attachment.url)
+            attachmentHTMLMarkdown(from: attachment) ??
+                linkMarkdown(
+                    title: attachment.name ?? markdownLinkDisplayName(from: attachment.url) ?? "Attachment",
+                    url: attachment.url
+                )
         default:
             nil
         }
     }
 
     private static func structuralMarkdownLine(from block: NativeEditorBlock) -> String? {
-        switch block.kind {
+        if let structuralHTML = docmostStructuralHTMLMarkdown(from: block) {
+            return structuralHTML
+        }
+
+        return switch block.kind {
         case .callout(let callout):
             calloutMarkdown(from: callout)
         case .details(let details):
             detailsMarkdown(from: details)
         case .pageBreak:
-            #"<div style="page-break-after: always;"></div>"#
+            #"<div data-type="pageBreak" class="page-break"></div>"#
         case .columns(let columns):
-            columnsMarkdown(from: columns)
-        case .subpages:
-            "<!-- Docmost subpages block -->"
-        case .transclusionSource(let source):
-            transclusionSourceMarkdown(from: source)
-        case .transclusionReference(let reference):
-            transclusionReferenceMarkdown(from: reference)
+            rawColumnsMarkdown(from: block.rawNode) ?? columnsMarkdown(from: columns)
         default:
             nil
         }
@@ -73,15 +111,15 @@ extension NativeEditorMarkdownParser {
     private static func embeddedMarkdownLine(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .embed(let embed):
-            linkMarkdown(title: embed.provider ?? embed.source ?? "Embed", url: embed.source)
+            youtubeHTMLMarkdown(from: block.rawNode) ?? embedHTMLMarkdown(from: embed) ?? embedMarkdown(from: embed)
         case .drawio(let diagram):
-            diagramMarkdown(from: diagram, fallbackTitle: "Draw.io diagram")
+            diagramMarkdown(from: diagram, type: "drawio")
         case .excalidraw(let diagram):
-            diagramMarkdown(from: diagram, fallbackTitle: "Excalidraw diagram")
+            diagramMarkdown(from: diagram, type: "excalidraw")
         case .mathBlock(let math):
             mathMarkdown(from: math)
         case .unsupported:
-            String(block.text.characters)
+            block.rawNode.map(rawProseMirrorHTMLMarkdown(from:)) ?? String(block.text.characters)
         default:
             nil
         }
@@ -198,7 +236,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func imageMarkdownBlock(from line: String) -> NativeEditorBlock? {
+    static func imageMarkdownBlock(from line: String) -> NativeEditorBlock? {
         guard
             line.hasPrefix("!["),
             let closeAltIndex = line.firstIndex(of: "]")
@@ -211,7 +249,8 @@ extension NativeEditorMarkdownParser {
             openDestinationIndex < line.endIndex,
             line[openDestinationIndex] == "(",
             let closeDestinationIndex = line.lastIndex(of: ")"),
-            closeDestinationIndex > openDestinationIndex
+            closeDestinationIndex > openDestinationIndex,
+            closeDestinationIndex == line.index(before: line.endIndex)
         else {
             return nil
         }
@@ -221,13 +260,15 @@ extension NativeEditorMarkdownParser {
         let destinationStartIndex = line.index(after: openDestinationIndex)
         let destination = String(line[destinationStartIndex..<closeDestinationIndex])
         let source = markdownLinkSource(from: destination)
+        let title = markdownLinkTitle(from: destination)
+        let attachmentID = docmostAttachmentID(from: source)
         guard source.isEmpty == false else { return nil }
 
         let media = NativeEditorMediaBlock(
             source: source,
             alternativeText: altText.isEmpty ? nil : altText,
-            title: nil,
-            attachmentID: nil,
+            title: title,
+            attachmentID: attachmentID,
             sizeInBytes: nil,
             width: nil,
             height: nil,
@@ -273,13 +314,14 @@ extension NativeEditorMarkdownParser {
     private static func linkedFileBlockKind(title: String, source: String) -> NativeEditorBlockKind? {
         guard let fileExtension = markdownLinkFileExtension(from: source) else { return nil }
         let title = title.isEmpty ? nil : title
+        let attachmentID = docmostAttachmentID(from: source)
 
         if videoFileExtensions.contains(fileExtension) {
             return .video(NativeEditorMediaBlock(
                 source: source,
                 alternativeText: nil,
                 title: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil,
@@ -293,7 +335,7 @@ extension NativeEditorMarkdownParser {
                 source: source,
                 alternativeText: nil,
                 title: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil,
@@ -306,7 +348,7 @@ extension NativeEditorMarkdownParser {
             return .pdf(NativeEditorPDFBlock(
                 source: source,
                 name: title,
-                attachmentID: nil,
+                attachmentID: attachmentID,
                 sizeInBytes: nil,
                 width: nil,
                 height: nil
@@ -318,7 +360,7 @@ extension NativeEditorMarkdownParser {
             name: title,
             mimeType: nil,
             sizeInBytes: nil,
-            attachmentID: nil
+            attachmentID: attachmentID
         ))
     }
 
@@ -351,11 +393,13 @@ extension NativeEditorMarkdownParser {
             return media.alternativeText ?? "Image"
         }
 
-        return "![\(escapedMarkdownLinkText(media.alternativeText ?? ""))](\(source))"
+        let titlePart = markdownLinkTitlePart(from: media.title)
+        return "![\(escapedMarkdownLinkText(media.alternativeText ?? ""))](\(source)\(titlePart))"
     }
 
     private static func mediaLinkMarkdown(from media: NativeEditorMediaBlock, fallbackTitle: String) -> String {
-        linkMarkdown(title: media.alternativeText ?? media.title ?? media.source ?? fallbackTitle, url: media.source)
+        let title = media.alternativeText ?? media.title ?? markdownLinkDisplayName(from: media.source) ?? fallbackTitle
+        return linkMarkdown(title: title, url: media.source)
     }
 
     private static func calloutMarkdown(from callout: NativeEditorCalloutBlock) -> String {
@@ -377,33 +421,12 @@ extension NativeEditorMarkdownParser {
         """
     }
 
-    private static func columnsMarkdown(from columns: NativeEditorColumnsBlock) -> String {
-        let columnTexts = columns.columnTexts.isEmpty ? [columns.previewText] : columns.columnTexts
-        return columnTexts.enumerated().map { index, text in
-            "### Column \(index + 1)\n\(text.trimmedMarkdownBlockText)"
-        }.joined(separator: "\n\n")
-    }
-
-    private static func transclusionSourceMarkdown(from source: NativeEditorTransclusionSourceBlock) -> String {
-        if let identifier = source.identifier, identifier.isEmpty == false {
-            return "<!-- Docmost synced block: \(identifier) -->\n\(source.previewText.trimmedMarkdownBlockText)"
+    private static func embedMarkdown(from embed: NativeEditorEmbedBlock) -> String {
+        if embed.provider == "iframe", let source = embed.source, source.isEmpty == false {
+            return linkMarkdown(title: source, url: source)
         }
 
-        return source.previewText.trimmedMarkdownBlockText
-    }
-
-    private static func transclusionReferenceMarkdown(
-        from reference: NativeEditorTransclusionReferenceBlock
-    ) -> String {
-        let identifier = reference.transclusionID ?? reference.sourcePageID ?? "unknown"
-        return "<!-- Docmost synced block reference: \(identifier) -->"
-    }
-
-    private static func diagramMarkdown(from diagram: NativeEditorDiagramBlock, fallbackTitle: String) -> String {
-        linkMarkdown(
-            title: diagram.title ?? diagram.alternativeText ?? diagram.source ?? fallbackTitle,
-            url: diagram.source
-        )
+        return linkMarkdown(title: embed.provider ?? embed.source ?? "Embed", url: embed.source)
     }
 
     private static func mathMarkdown(from math: NativeEditorMathBlock) -> String {
@@ -419,12 +442,25 @@ extension NativeEditorMarkdownParser {
         return "[\(escapedMarkdownLinkText(title))](\(url))"
     }
 
+    private static func markdownLinkDisplayName(from source: String?) -> String? {
+        guard let source, source.isEmpty == false else { return nil }
+        let path = markdownLinkPath(from: source)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/\\"))
+        guard path.isEmpty == false else { return nil }
+
+        let separatorIndex = path.lastIndex { $0 == "/" || $0 == "\\" }
+        let nameStart = separatorIndex.map { path.index(after: $0) } ?? path.startIndex
+        let name = String(path[nameStart...])
+        return name.isEmpty ? nil : name
+    }
+
     private static func sanitizedCalloutStyle(_ value: String) -> String {
         let sanitizedScalars = value.lowercased().unicodeScalars.filter {
             CharacterSet.alphanumerics.contains($0)
         }
         let sanitized = String(String.UnicodeScalarView(sanitizedScalars))
-        return sanitized.isEmpty ? "info" : sanitized
+        let validStyles: Set<String> = ["default", "info", "note", "success", "warning", "danger"]
+        return validStyles.contains(sanitized) ? sanitized : "info"
     }
 
     private static func summaryText(from line: String) -> String? {
@@ -457,35 +493,8 @@ extension NativeEditorMarkdownParser {
         return unescapedHTMLText(String(line[contentStart..<contentEnd]))
     }
 
-    private static func markdownLinkSource(from destination: String) -> String {
-        var source = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if source.hasPrefix("<"), source.hasSuffix(">") {
-            source.removeFirst()
-            source.removeLast()
-        }
-
-        if let titleRange = source.range(of: " \"") {
-            source = String(source[..<titleRange.lowerBound])
-        }
-
-        return source.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private static func markdownLinkFileExtension(from source: String) -> String? {
-        let pathSource: String
-        if let components = URLComponents(string: source), components.scheme != nil {
-            guard let componentPath = components.path.nonEmpty else { return nil }
-            pathSource = componentPath
-        } else {
-            pathSource = source
-        }
-
-        let path = pathSource.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-            .first?
-            .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
-            .first
-            .map(String.init) ?? pathSource
+        let path = markdownLinkPath(from: source)
         guard
             let fileExtension = path.split(separator: ".").last?.lowercased(),
             fileExtension != path.lowercased()

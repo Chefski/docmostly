@@ -384,6 +384,37 @@ final class AppState {
         }
     }
 
+    func searchMentionSuggestions(
+        query: String,
+        spaceId: String?,
+        limit: Int = 10
+    ) async throws -> DocmostMentionSuggestionResponse {
+        guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return DocmostMentionSuggestionResponse()
+        }
+
+        guard let apiClient else {
+            return try await cachedMentionSuggestions(query: query)
+        }
+
+        do {
+            let response: DocmostMentionSuggestionResponse = try await apiClient.send(.searchSuggestions(
+                query: query,
+                includeUsers: true,
+                includePages: true,
+                spaceId: spaceId,
+                limit: limit
+            ))
+            isOffline = false
+            return response
+        } catch {
+            isOffline = true
+            statusMessage = error.localizedDescription
+            guard canUseOfflineCache(after: error) else { throw error }
+            return try await cachedMentionSuggestions(query: query)
+        }
+    }
+
     func attachmentLinks(pageId: String) async -> [DocmostAttachmentLink] {
         guard let cacheScope else { return [] }
         if let cacheReader {
@@ -483,6 +514,11 @@ final class AppState {
             return try await cacheReader.searchCachedPages(query: query, limit: 100, scope: scope)
         }
         return try cacheRepository?.searchCachedPages(query: query, limit: 100, scope: scope) ?? []
+    }
+
+    private func cachedMentionSuggestions(query: String) async throws -> DocmostMentionSuggestionResponse {
+        let pages = try await searchCachedPages(query: query).map(DocmostMentionPageSuggestion.init(searchResult:))
+        return DocmostMentionSuggestionResponse(pages: pages)
     }
 
     private func updateCacheScope() {

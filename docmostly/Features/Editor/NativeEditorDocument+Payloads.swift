@@ -70,13 +70,15 @@ nonisolated extension NativeEditorDocument {
     static func columnsBlock(from node: ProseMirrorNode) -> NativeEditorColumnsBlock {
         let columns = (node.content ?? []).filter { $0.type == "column" }
         let columnTexts = columns.map { plainText(in: $0.content ?? []) }
+        let columnWidths = columns.map { columnWidth(from: $0.attrs) }
 
         return NativeEditorColumnsBlock(
             layout: node.attrs?["layout"]?.stringValue ?? "two_equal",
             widthMode: node.attrs?["widthMode"]?.stringValue ?? "normal",
             columnCount: columns.count,
             previewText: columnTexts.joined(separator: " "),
-            columnTexts: columnTexts
+            columnTexts: columnTexts,
+            columnWidths: columnWidths
         )
     }
 
@@ -162,9 +164,15 @@ nonisolated extension NativeEditorDocument {
             .prefix(NativeEditorTable.maximumColumnCount)
             .map { cell in
                 let columnWidths = tableColumnWidths(from: cell.attrs)
+                let cellContent = cell.content ?? []
+                let inlineContent = inlineContent(from: cellContent)
                 return NativeEditorTableCell(
-                    plainText: plainText(in: cell.content ?? []),
+                    plainText: inlineContent.plainText,
+                    inlineContent: inlineContent.preservedForTableCell,
+                    preservedContent: preservedTableCellContent(from: cellContent, inlineContent: inlineContent),
                     isHeader: cell.type == "tableHeader",
+                    textAlignment: tableCellTextAlignment(from: cellContent),
+                    backgroundColor: cell.attrs?["backgroundColor"]?.stringValue,
                     backgroundColorName: cell.attrs?["backgroundColorName"]?.stringValue,
                     columnWidth: columnWidths.first,
                     columnSpan: normalizedTableSpan(cell.attrs?["colspan"]?.intValue),
@@ -172,6 +180,39 @@ nonisolated extension NativeEditorDocument {
                     columnWidths: columnWidths
                 )
             }
+    }
+
+    private static func tableCellTextAlignment(from content: [ProseMirrorNode]) -> NativeEditorTextAlignment? {
+        guard
+            let firstNode = content.first,
+            firstNode.type == "paragraph",
+            let attrs = firstNode.attrs,
+            attrs.keys.contains("textAlign")
+        else {
+            return nil
+        }
+
+        return NativeEditorTextAlignment(attrs: attrs)
+    }
+
+    private static func preservedTableCellContent(
+        from content: [ProseMirrorNode],
+        inlineContent: [NativeEditorInlineContent]
+    ) -> [ProseMirrorNode]? {
+        guard content.isEmpty == false else { return nil }
+
+        let hasBlockContent = content.count != 1 || content.first?.type != "paragraph"
+        let hasParagraphAttrs = content.first?.type == "paragraph" &&
+            content.first?.attrs?.isEmpty == false
+        let hasUnsupportedInlineContent = inlineContent.contains { item in
+            if case .unsupported = item {
+                return true
+            }
+
+            return false
+        }
+
+        return hasBlockContent || hasParagraphAttrs || hasUnsupportedInlineContent ? content : nil
     }
 
     private static func tableColumnWidths(from attrs: [String: ProseMirrorJSONValue]?) -> [Int] {
@@ -184,6 +225,21 @@ nonisolated extension NativeEditorDocument {
             return values.compactMap(\.intValue)
         default:
             return value.intValue.map { [$0] } ?? []
+        }
+    }
+
+    private static func columnWidth(from attrs: [String: ProseMirrorJSONValue]?) -> Double? {
+        guard let value = attrs?["width"] else { return nil }
+
+        switch value {
+        case .int(let width):
+            return Double(width)
+        case .double(let width):
+            return width
+        case .string(let width):
+            return Double(width)
+        case .bool, .object, .array, .null:
+            return nil
         }
     }
 

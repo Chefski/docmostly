@@ -74,7 +74,9 @@ nonisolated extension NativeEditorDocument {
         from run: AttributedString.Runs.Run,
         to marks: inout [ProseMirrorMark]
     ) {
-        if let href = run.link?.absoluteString {
+        if let link = run[NativeEditorLinkAttribute.self] {
+            appendMarkIfMissing(linkProseMirrorMark(href: link.href, isInternal: link.isInternal), to: &marks)
+        } else if let href = run.link?.absoluteString {
             appendMarkIfMissing(ProseMirrorMark(type: "link", attrs: ["href": .string(href)]), to: &marks)
         }
     }
@@ -144,8 +146,8 @@ nonisolated extension NativeEditorDocument {
 
     private static func richProseMirrorMark(from mark: NativeEditorTextMark) -> ProseMirrorMark {
         switch mark {
-        case .link(let href):
-            ProseMirrorMark(type: "link", attrs: ["href": .string(href)])
+        case .link(let href, let isInternal):
+            linkProseMirrorMark(href: href, isInternal: isInternal)
         case .highlight(let color, let colorName):
             ProseMirrorMark(type: "highlight", attrs: optionalAttrs(markAttrs(color, colorName)))
         case .textColor(let color):
@@ -157,6 +159,14 @@ nonisolated extension NativeEditorDocument {
         default:
             ProseMirrorMark(type: "unknown")
         }
+    }
+
+    private static func linkProseMirrorMark(href: String, isInternal: Bool) -> ProseMirrorMark {
+        var attrs: [String: ProseMirrorJSONValue] = ["href": .string(href)]
+        if isInternal {
+            attrs["internal"] = .bool(true)
+        }
+        return ProseMirrorMark(type: "link", attrs: attrs)
     }
 
     private static func markAttrs(_ color: String?, _ colorName: String?) -> [String: String?] {

@@ -15,6 +15,16 @@ enum NativeEditorTextColorAttribute: CodableAttributedStringKey {
     static let name = "docmostly.textColor"
 }
 
+nonisolated struct NativeEditorLink: Equatable, Hashable, Sendable, Codable {
+    var href: String
+    var isInternal: Bool
+}
+
+enum NativeEditorLinkAttribute: CodableAttributedStringKey {
+    typealias Value = NativeEditorLink
+    static let name = "docmostly.link"
+}
+
 enum NativeEditorCommentIDAttribute: CodableAttributedStringKey {
     typealias Value = String
     static let name = "docmostly.commentID"
