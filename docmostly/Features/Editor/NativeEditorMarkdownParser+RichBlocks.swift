@@ -450,7 +450,8 @@ extension NativeEditorMarkdownParser {
             CharacterSet.alphanumerics.contains($0)
         }
         let sanitized = String(String.UnicodeScalarView(sanitizedScalars))
-        return sanitized.isEmpty ? "info" : sanitized
+        let validStyles: Set<String> = ["default", "info", "note", "success", "warning", "danger"]
+        return validStyles.contains(sanitized) ? sanitized : "info"
     }
 
     private static func summaryText(from line: String) -> String? {
