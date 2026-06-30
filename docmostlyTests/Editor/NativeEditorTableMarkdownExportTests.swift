@@ -187,6 +187,43 @@ struct NativeEditorTableMarkdownExportTests {
         #expect(preservedContent[1].attrs?["attachmentId"] == .string("image-1"))
     }
 
+    @Test func markdownExportPreservesUncheckedDocmostTaskItemsInsideRichTableCells() throws {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Content", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Confirm docs",
+                    preservedContent: [
+                        ProseMirrorNode(
+                            type: "taskList",
+                            content: [
+                                ProseMirrorNode(
+                                    type: "taskItem",
+                                    attrs: ["checked": .bool(false)],
+                                    content: [
+                                        ProseMirrorNode(
+                                            type: "paragraph",
+                                            content: [ProseMirrorNode(type: "text", text: "Confirm docs")]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+
+        #expect(markdown.contains(#"<li data-type="taskItem" data-checked="false"><p>Confirm docs</p></li>"#))
+    }
+
     @Test func markdownExportRoundTripsBlockquotesInsideDocmostTableCells() throws {
         let table = NativeEditorTable(rows: [
             NativeEditorTableRow(cells: [
