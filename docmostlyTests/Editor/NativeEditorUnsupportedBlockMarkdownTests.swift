@@ -47,4 +47,49 @@ struct NativeUnsupportedMarkdownTests {
         #expect(block.rawNode?.content?.first?.type == "paragraph")
         #expect(block.rawNode?.content?.first?.content?.first?.text == "Spec")
     }
+
+    @Test func unsupportedDocmostHTMLMapsKebabDataAttributesToProseMirrorKeys() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: #"""
+        <div data-type="bookmark" data-attachment-id="attachment-1"
+        data-source-page-id="source-page-1"><p>Spec</p></div>
+        """#).first)
+
+        guard case .unsupported(let type) = block.kind else {
+            Issue.record("Expected unknown Docmost data-type HTML to import as an unsupported raw block.")
+            return
+        }
+
+        #expect(type == "bookmark")
+        #expect(block.rawNode?.attrs?["attachmentId"] == .string("attachment-1"))
+        #expect(block.rawNode?.attrs?["sourcePageId"] == .string("source-page-1"))
+        #expect(block.rawNode?.attrs?["attachment-id"] == nil)
+        #expect(block.rawNode?.attrs?["source-page-id"] == nil)
+    }
+
+    @Test func unsupportedRawBlockExportsProseMirrorKeysAsDocmostDataAttributes() {
+        let rawNode = ProseMirrorNode(
+            type: "bookmark",
+            attrs: [
+                "attachmentId": .string("attachment-1"),
+                "sourcePageId": .string("source-page-1")
+            ],
+            content: [
+                ProseMirrorNode(
+                    type: "paragraph",
+                    content: [ProseMirrorNode(type: "text", text: "Spec")]
+                )
+            ]
+        )
+        let block = NativeEditorBlock(
+            kind: .unsupported(type: "bookmark"),
+            text: AttributedString("Unsupported bookmark block"),
+            alignment: .left,
+            rawNode: rawNode
+        )
+
+        let expectedMarkdown = #"<div data-type="bookmark" data-attachment-id="attachment-1" "# +
+            #"data-source-page-id="source-page-1"><p>Spec</p></div>"#
+
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == expectedMarkdown)
+    }
 }

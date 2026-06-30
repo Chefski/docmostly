@@ -456,7 +456,8 @@ extension NativeEditorMarkdownParser {
                 return
             }
 
-            let key = String(attribute.key.dropFirst("data-".count))
+            let dataAttributeName = String(attribute.key.dropFirst("data-".count))
+            let key = proseMirrorAttrName(fromDocmostDataAttributeName: dataAttributeName)
             guard key.isEmpty == false else { return }
             result[key] = .string(attribute.value)
         }

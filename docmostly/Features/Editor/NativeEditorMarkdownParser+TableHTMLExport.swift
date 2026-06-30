@@ -503,7 +503,8 @@ extension NativeEditorMarkdownParser {
     static func rawProseMirrorHTMLMarkdown(from node: ProseMirrorNode) -> String {
         let attrs = node.attrs?.compactMap { key, value -> String? in
             guard let text = value.htmlAttributeValue else { return nil }
-            return #"data-\#(key)="\#(escapedInlineHTMLAttribute(text))""#
+            let attributeName = docmostDataAttributeName(fromProseMirrorAttrName: key)
+            return #"data-\#(attributeName)="\#(escapedInlineHTMLAttribute(text))""#
         }
         .sorted()
         .joined(separator: " ") ?? ""
