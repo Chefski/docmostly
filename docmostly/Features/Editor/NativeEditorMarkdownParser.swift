@@ -25,6 +25,8 @@ enum NativeEditorMarkdownParser {
                 continue
             }
 
+            if appendImageMarkdownBlocksWithTrailingText(in: lines, startingAt: &index, to: &blocks) { continue }
+
             if let richBlock = richBlock(in: lines, startingAt: index) {
                 blocks.append(richBlock.block)
                 index = richBlock.endIndex

@@ -7,10 +7,16 @@ struct NativeEditorDocmostFilesImportTests {
     @Test func imageMarkdownWithTrailingTextDoesNotDropTextDuringImport() throws {
         let blocks = NativeEditorMarkdownParser.blocks(from: "![Hero](/files/image-1/Hero.png) ships today")
 
-        let block = try #require(blocks.first)
-        #expect(blocks.count == 1)
-        #expect(block.kind == .paragraph)
-        #expect(String(block.text.characters) == "![Hero](/files/image-1/Hero.png) ships today")
+        try #require(blocks.count == 2)
+        guard case .image(let image) = blocks[0].kind else {
+            Issue.record("Expected leading image Markdown to stay as a native image block.")
+            return
+        }
+        #expect(image.source == "/files/image-1/Hero.png")
+        #expect(image.alternativeText == "Hero")
+        #expect(image.attachmentID == "image-1")
+        #expect(blocks[1].kind == .paragraph)
+        #expect(String(blocks[1].text.characters) == "ships today")
     }
 
     @Test func importsDocmostFilesShorthandURLsWithAttachmentIDs() throws {

@@ -236,7 +236,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func imageMarkdownBlock(from line: String) -> NativeEditorBlock? {
+    static func imageMarkdownBlock(from line: String) -> NativeEditorBlock? {
         guard
             line.hasPrefix("!["),
             let closeAltIndex = line.firstIndex(of: "]")
