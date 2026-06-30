@@ -22,9 +22,9 @@ extension NativeEditorCommand {
         case .codeBlock:
             .codeBlock(language: nil)
         case .image:
-            .image(NativeEditorMediaBlock.placeholder)
+            .image(NativeEditorMediaBlock.centeredPlaceholder)
         case .video:
-            .video(NativeEditorMediaBlock.placeholder)
+            .video(NativeEditorMediaBlock.centeredPlaceholder)
         case .audio:
             .audio(NativeEditorMediaBlock.placeholder)
         case .pdf:

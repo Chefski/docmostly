@@ -78,6 +78,8 @@ nonisolated struct NativeEditorMediaBlock: Equatable, Hashable, Sendable {
 }
 
 nonisolated extension NativeEditorMediaBlock {
+    static let defaultAlignment = "center"
+
     static let placeholder = NativeEditorMediaBlock(
         source: nil,
         alternativeText: nil,
@@ -88,6 +90,18 @@ nonisolated extension NativeEditorMediaBlock {
         height: nil,
         aspectRatio: nil,
         alignment: nil
+    )
+
+    static let centeredPlaceholder = NativeEditorMediaBlock(
+        source: nil,
+        alternativeText: nil,
+        title: nil,
+        attachmentID: nil,
+        sizeInBytes: nil,
+        width: nil,
+        height: nil,
+        aspectRatio: nil,
+        alignment: defaultAlignment
     )
 }
 
@@ -109,13 +123,16 @@ nonisolated struct NativeEditorPDFBlock: Equatable, Hashable, Sendable {
 }
 
 nonisolated extension NativeEditorPDFBlock {
+    static let defaultWidth = "800"
+    static let defaultHeight = "600"
+
     static let placeholder = NativeEditorPDFBlock(
         source: nil,
         name: nil,
         attachmentID: nil,
         sizeInBytes: nil,
-        width: nil,
-        height: nil
+        width: defaultWidth,
+        height: defaultHeight
     )
 }
 

@@ -163,10 +163,18 @@ extension NativeEditorCommand {
     }
 
     private func mediaBlock(id: UUID, type: String, kind: NativeEditorBlockKind) -> NativeEditorBlock {
-        richBlock(
+        let media: NativeEditorMediaBlock
+        switch kind {
+        case .image(let mediaPayload), .video(let mediaPayload), .audio(let mediaPayload):
+            media = mediaPayload
+        default:
+            media = .placeholder
+        }
+
+        return richBlock(
             id: id,
             kind: kind,
-            rawNode: NativeEditorRichBlockNodeFactory.mediaNode(from: .placeholder, type: type)
+            rawNode: NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: type)
         )
     }
 
