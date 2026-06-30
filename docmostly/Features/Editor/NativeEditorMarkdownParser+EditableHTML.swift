@@ -31,6 +31,7 @@ extension NativeEditorMarkdownParser {
             kind: editableHTMLBlockKind(from: match.tagName),
             text: text,
             alignment: NativeEditorTextAlignment(attrs: rawNode.attrs),
+            indentLevel: editableHTMLIndentLevel(from: rawNode.attrs),
             rawNode: rawNode
         )
     }
@@ -125,8 +126,9 @@ extension NativeEditorMarkdownParser {
         if let id = rawAttrs?["id"]?.stringValue, id.isEmpty == false {
             attrs.append(("id", id))
         }
-        if let indent = rawAttrs?["indent"]?.intValue, indent > 0 {
-            attrs.append(("data-indent", String(min(max(indent, 0), 8))))
+        let indent = min(max(block.indentLevel, 0), 8)
+        if indent > 0 {
+            attrs.append(("data-indent", String(indent)))
         }
         if block.alignment != .left {
             attrs.append(("style", "text-align: \(block.alignment.rawValue)"))
@@ -142,6 +144,10 @@ extension NativeEditorMarkdownParser {
         }
 
         return min(max(indent, 0), 8)
+    }
+
+    private static func editableHTMLIndentLevel(from attrs: [String: ProseMirrorJSONValue]?) -> Int {
+        min(max(attrs?["indent"]?.intValue ?? 0, 0), 8)
     }
 
     private static func editableHTMLAlignment(from attrs: [String: String]) -> NativeEditorTextAlignment? {

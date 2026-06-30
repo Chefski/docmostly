@@ -23,6 +23,7 @@ nonisolated extension NativeEditorDocument {
             kind: kind,
             text: attributedText(from: inlineContent),
             alignment: NativeEditorTextAlignment(attrs: node.attrs),
+            indentLevel: editableIndentLevel(kind: kind, attrs: node.attrs),
             inlineContent: needsRawPreservation ? inlineContent : nil,
             rawNode: rawNode
         )
@@ -71,14 +72,26 @@ nonisolated extension NativeEditorDocument {
         let modeledKeys: Set<String>
         switch kind {
         case .paragraph:
-            modeledKeys = ["textAlign"]
+            modeledKeys = ["indent", "textAlign"]
         case .heading:
-            modeledKeys = ["level", "textAlign"]
+            modeledKeys = ["indent", "level", "textAlign"]
         default:
             return false
         }
 
         return attrs.keys.contains { modeledKeys.contains($0) == false }
+    }
+
+    private static func editableIndentLevel(
+        kind: NativeEditorBlockKind,
+        attrs: [String: ProseMirrorJSONValue]?
+    ) -> Int {
+        switch kind {
+        case .paragraph, .heading:
+            min(max(attrs?["indent"]?.intValue ?? 0, 0), 8)
+        default:
+            0
+        }
     }
 
     private static func editableBlocks(from node: ProseMirrorNode) -> [NativeEditorBlock]? {

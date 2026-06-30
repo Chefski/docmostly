@@ -42,6 +42,12 @@ nonisolated extension NativeEditorDocument {
             mergedAttrs.removeValue(forKey: "textAlign")
         }
 
+        if let indent = editableIndentValue(from: block) {
+            mergedAttrs["indent"] = .int(indent)
+        } else if blockSupportsEditableIndent(block) {
+            mergedAttrs.removeValue(forKey: "indent")
+        }
+
         return ProseMirrorNode(
             type: type,
             attrs: mergedAttrs.isEmpty ? nil : mergedAttrs,
@@ -55,6 +61,21 @@ nonisolated extension NativeEditorDocument {
     ) -> [String: ProseMirrorJSONValue] {
         guard block.rawNode?.type == type else { return [:] }
         return block.rawNode?.attrs ?? [:]
+    }
+
+    private static func editableIndentValue(from block: NativeEditorBlock) -> Int? {
+        guard blockSupportsEditableIndent(block) else { return nil }
+        let clampedIndent = min(max(block.indentLevel, 0), 8)
+        return clampedIndent > 0 ? clampedIndent : nil
+    }
+
+    private static func blockSupportsEditableIndent(_ block: NativeEditorBlock) -> Bool {
+        switch block.kind {
+        case .paragraph, .heading:
+            true
+        default:
+            false
+        }
     }
 
     static func inlineNodes(from attributedText: AttributedString) -> [ProseMirrorNode] {
