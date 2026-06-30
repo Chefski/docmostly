@@ -117,20 +117,17 @@ extension NativeEditorMarkdownParser {
         startingAt index: Array<String>.Index
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
         guard
-            let attributes = htmlTagAttributes(from: lines[index], tagName: "div"),
-            let type = nonEmptyContainerHTMLAttribute(attributes["data-type"])
+            let container = htmlContainerElement(in: lines, startingAt: index, tagName: "div"),
+            let type = nonEmptyContainerHTMLAttribute(container.attributes["data-type"]),
+            isKnownDocmostHTMLDataType(type) == false
         else {
             return nil
         }
 
-        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div") else {
-            return nil
-        }
-
-        let contentNodes = containerContentNodes(from: body.lines)
+        let contentNodes = containerContentNodes(from: container.bodyLines)
         let rawNode = ProseMirrorNode(
             type: type,
-            attrs: unsupportedDocmostHTMLAttrs(from: attributes),
+            attrs: unsupportedDocmostHTMLAttrs(from: container.attributes),
             content: contentNodes.isEmpty ? nil : contentNodes
         )
         return (
@@ -140,7 +137,7 @@ extension NativeEditorMarkdownParser {
                 alignment: .left,
                 rawNode: rawNode
             ),
-            body.endIndex
+            container.endIndex
         )
     }
 
@@ -463,6 +460,115 @@ extension NativeEditorMarkdownParser {
         }
 
         return rawAttrs.isEmpty ? nil : rawAttrs
+    }
+
+    private struct HTMLContainerElement {
+        var attributes: [String: String]
+        var bodyLines: [String]
+        var endIndex: Array<String>.Index
+    }
+
+    private struct NormalizedHTMLContainerLines {
+        var attributes: [String: String]
+        var lines: [String]
+        var openingEndIndex: Array<String>.Index
+    }
+
+    private static func htmlContainerElement(
+        in lines: [String],
+        startingAt index: Array<String>.Index,
+        tagName: String
+    ) -> HTMLContainerElement? {
+        guard let normalized = normalizedHTMLContainerLines(in: lines, startingAt: index, tagName: tagName),
+              let body = htmlContainerBody(
+                in: normalized.lines,
+                startingAt: normalized.lines.startIndex,
+                tagName: tagName
+              )
+        else {
+            return nil
+        }
+
+        let endIndex = normalized.openingEndIndex + body.endIndex
+        guard endIndex <= lines.endIndex else { return nil }
+        return HTMLContainerElement(
+            attributes: normalized.attributes,
+            bodyLines: body.lines,
+            endIndex: endIndex
+        )
+    }
+
+    private static func normalizedHTMLContainerLines(
+        in lines: [String],
+        startingAt index: Array<String>.Index,
+        tagName: String
+    ) -> NormalizedHTMLContainerLines? {
+        guard lineStartsWithOpeningHTMLTag(lines[index], tagName: tagName) else {
+            return nil
+        }
+
+        var openingLines: [String] = []
+        var currentIndex = index
+
+        while currentIndex < lines.endIndex {
+            openingLines.append(lines[currentIndex].trimmingCharacters(in: .whitespacesAndNewlines))
+            let normalizedOpeningLine = openingLines.joined(separator: " ")
+            if let attributes = htmlTagAttributes(from: normalizedOpeningLine, tagName: tagName) {
+                var normalizedLines = [normalizedOpeningLine]
+                normalizedLines.append(contentsOf: lines[lines.index(after: currentIndex)..<lines.endIndex])
+                return NormalizedHTMLContainerLines(
+                    attributes: attributes,
+                    lines: normalizedLines,
+                    openingEndIndex: currentIndex
+                )
+            }
+
+            currentIndex = lines.index(after: currentIndex)
+        }
+
+        return nil
+    }
+
+    private static func isKnownDocmostHTMLDataType(_ type: String) -> Bool {
+        knownDocmostHTMLDataTypes.contains {
+            $0.localizedCaseInsensitiveCompare(type) == .orderedSame
+        }
+    }
+
+    private static func lineStartsWithOpeningHTMLTag(_ line: String, tagName: String) -> Bool {
+        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercasedLine = trimmedLine.lowercased()
+        let prefix = "<\(tagName.lowercased())"
+        guard lowercasedLine.hasPrefix(prefix) else { return false }
+
+        let boundaryIndex = trimmedLine.index(trimmedLine.startIndex, offsetBy: prefix.count)
+        return boundaryIndex == trimmedLine.endIndex ||
+            trimmedLine[boundaryIndex].isWhitespace ||
+            trimmedLine[boundaryIndex] == ">" ||
+            trimmedLine[boundaryIndex] == "/"
+    }
+
+    private static var knownDocmostHTMLDataTypes: [String] {
+        [
+            "attachment",
+            "base-embed",
+            "callout",
+            "column",
+            "columns",
+            "detailsContent",
+            "detailsSummary",
+            "drawio",
+            "embed",
+            "excalidraw",
+            "mathBlock",
+            "pageBreak",
+            "pdf",
+            "subpages",
+            "taskItem",
+            "taskList",
+            "transclusionReference",
+            "transclusionSource"
+        ]
     }
 
     private static func sanitizedContainerCalloutStyle(_ value: String) -> String {
