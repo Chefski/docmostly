@@ -187,6 +187,37 @@ struct NativeEditorTableMarkdownExportTests {
         #expect(preservedContent[1].attrs?["attachmentId"] == .string("image-1"))
     }
 
+    @Test func markdownExportPreservesColoredTableCellsAsDocmostHTML() throws {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Status",
+                    isHeader: true,
+                    backgroundColor: "#DBEAFE",
+                    backgroundColorName: "Blue"
+                )
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Ready",
+                    isHeader: false,
+                    backgroundColor: "#FEF3C7",
+                    backgroundColorName: "Yellow"
+                )
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+
+        #expect(markdown.contains(#"style="background-color: #DBEAFE""#))
+        #expect(markdown.contains(#"style="background-color: #FEF3C7""#))
+        #expect(markdown.contains(#"data-background-color="#DBEAFE""#))
+        #expect(markdown.contains(#"data-background-color="#FEF3C7""#))
+        #expect(markdown.contains(#"data-background-color-name="blue""#))
+        #expect(markdown.contains(#"data-background-color-name="yellow""#))
+    }
+
     @Test func markdownExportPreservesUncheckedDocmostTaskItemsInsideRichTableCells() throws {
         let table = NativeEditorTable(rows: [
             NativeEditorTableRow(cells: [
