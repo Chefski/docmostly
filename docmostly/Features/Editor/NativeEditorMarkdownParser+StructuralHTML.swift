@@ -204,45 +204,7 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func structuralContentHTMLMarkdown(from node: ProseMirrorNode) -> String {
-        switch node.type {
-        case "paragraph":
-            "<p>\(structuralInlineHTMLMarkdown(from: node.content ?? []))</p>"
-        case "heading":
-            structuralHeadingHTMLMarkdown(from: node)
-        case "pageBreak":
-            #"<div data-type="pageBreak" class="page-break"></div>"#
-        case "horizontalRule":
-            "<hr>"
-        case "codeBlock":
-            structuralCodeBlockHTMLMarkdown(from: node)
-        default:
-            escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
-        }
-    }
-
-    private static func structuralHeadingHTMLMarkdown(from node: ProseMirrorNode) -> String {
-        let level = min(max(node.attrs?["level"]?.intValue ?? 1, 1), 6)
-        return "<h\(level)>\(structuralInlineHTMLMarkdown(from: node.content ?? []))</h\(level)>"
-    }
-
-    private static func structuralCodeBlockHTMLMarkdown(from node: ProseMirrorNode) -> String {
-        let language = node.attrs?["language"]?.stringValue
-            .map { #" class="language-\#(escapedInlineHTMLAttribute($0))""# } ?? ""
-        return "<pre><code\(language)>\(escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node])))</code></pre>"
-    }
-
-    private static func structuralInlineHTMLMarkdown(from nodes: [ProseMirrorNode]) -> String {
-        nodes.map { node in
-            switch node.type {
-            case "text":
-                escapedInlineHTMLText(node.text ?? "")
-            case "hardBreak":
-                "<br>"
-            default:
-                escapedInlineHTMLText(NativeEditorDocument.plainText(in: [node]))
-            }
-        }
-        .joined()
+        htmlTableCellContentMarkdown(from: node)
     }
 
     private static func structuralHTMLTag(_ name: String, attributes: [(String, String?)]) -> String {

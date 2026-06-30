@@ -66,4 +66,24 @@ struct NativeEditorStructuralHTMLFidelityTests {
         #expect(block.rawNode?.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
         #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
     }
+
+    @Test func importedDocmostTransclusionSourceExportsTaskListContent() throws {
+        let markdown = """
+        <div data-type="transclusionSource" data-id="sync-1">
+        <ul data-type="taskList">
+        <li data-type="taskItem" data-checked="true"><p>Confirm daily editing</p></li>
+        </ul>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .transclusionSource(let source) = block.kind else {
+            Issue.record("Expected Docmost transclusion source HTML to import as a native synced block.")
+            return
+        }
+
+        #expect(source.previewText == "Confirm daily editing")
+        #expect(block.rawNode?.content?.map(\.type) == ["taskList"])
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
 }

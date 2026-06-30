@@ -108,7 +108,7 @@ extension NativeEditorMarkdownParser {
         return "<p>\(escapedInlineHTMLText(cell.plainText))</p>"
     }
 
-    private static func htmlTableCellContentMarkdown(from node: ProseMirrorNode) -> String {
+    static func htmlTableCellContentMarkdown(from node: ProseMirrorNode) -> String {
         if let textContent = htmlTableTextContentMarkdown(from: node) {
             return textContent
         }
