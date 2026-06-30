@@ -66,9 +66,9 @@ extension NativeEditorCommand {
             .embed(NativeEditorEmbedBlock(
                 source: "https://example.com",
                 provider: "Embed",
-                alignment: nil,
-                width: nil,
-                height: nil
+                alignment: NativeEditorEmbedBlock.defaultAlignment,
+                width: NativeEditorEmbedBlock.defaultWidth,
+                height: NativeEditorEmbedBlock.defaultHeight
             ))
         case .iframeEmbed:
             embedBlock(provider: "iframe")
@@ -120,9 +120,9 @@ extension NativeEditorCommand {
         .embed(NativeEditorEmbedBlock(
             source: nil,
             provider: provider,
-            alignment: nil,
-            width: nil,
-            height: nil
+            alignment: NativeEditorEmbedBlock.defaultAlignment,
+            width: NativeEditorEmbedBlock.defaultWidth,
+            height: NativeEditorEmbedBlock.defaultHeight
         ))
     }
 }

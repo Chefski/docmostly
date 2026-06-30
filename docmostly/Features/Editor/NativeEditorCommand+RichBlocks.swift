@@ -242,9 +242,9 @@ extension NativeEditorCommand {
         return NativeEditorEmbedBlock(
             source: nil,
             provider: "Embed",
-            alignment: nil,
-            width: nil,
-            height: nil
+            alignment: NativeEditorEmbedBlock.defaultAlignment,
+            width: NativeEditorEmbedBlock.defaultWidth,
+            height: NativeEditorEmbedBlock.defaultHeight
         )
     }
 

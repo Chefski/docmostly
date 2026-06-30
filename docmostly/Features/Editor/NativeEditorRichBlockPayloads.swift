@@ -223,6 +223,14 @@ nonisolated struct NativeEditorEmbedBlock: Equatable, Hashable, Sendable {
     var height: String?
 }
 
+nonisolated extension NativeEditorEmbedBlock {
+    static let defaultAlignment = "center"
+    static let defaultWidthValue = 800
+    static let defaultHeightValue = 600
+    static let defaultWidth = "800"
+    static let defaultHeight = "600"
+}
+
 nonisolated struct NativeEditorDiagramBlock: Equatable, Hashable, Sendable {
     var source: String?
     var title: String?

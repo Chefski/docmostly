@@ -257,8 +257,15 @@ struct NativeEditorSlashCommandTests {
 
             let node = viewModel.document.proseMirrorDocument.content.first
             #expect(embed.provider == expectation.provider)
+            #expect(embed.alignment == NativeEditorEmbedBlock.defaultAlignment)
+            #expect(embed.width == NativeEditorEmbedBlock.defaultWidth)
+            #expect(embed.height == NativeEditorEmbedBlock.defaultHeight)
             #expect(node?.type == "embed")
+            #expect(node?.attrs?["src"] == .string(""))
             #expect(node?.attrs?["provider"] == .string(expectation.provider))
+            #expect(node?.attrs?["align"] == .string(NativeEditorEmbedBlock.defaultAlignment))
+            #expect(node?.attrs?["width"] == .int(NativeEditorEmbedBlock.defaultWidthValue))
+            #expect(node?.attrs?["height"] == .int(NativeEditorEmbedBlock.defaultHeightValue))
         }
     }
 

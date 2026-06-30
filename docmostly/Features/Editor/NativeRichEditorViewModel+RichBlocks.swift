@@ -268,19 +268,13 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
     }
 
     static func embedNode(from embed: NativeEditorEmbedBlock) -> ProseMirrorNode {
-        var attrs: [String: ProseMirrorJSONValue] = [
+        let attrs: [String: ProseMirrorJSONValue] = [
             "src": .string(embed.source ?? ""),
-            "provider": .string(embed.provider ?? "")
+            "provider": .string(embed.provider ?? ""),
+            "align": .string(embed.alignment ?? NativeEditorEmbedBlock.defaultAlignment),
+            "width": .int(embed.width.flatMap(Int.init) ?? NativeEditorEmbedBlock.defaultWidthValue),
+            "height": .int(embed.height.flatMap(Int.init) ?? NativeEditorEmbedBlock.defaultHeightValue)
         ]
-        if let alignment = embed.alignment {
-            attrs["align"] = .string(alignment)
-        }
-        if let width = embed.width.flatMap(Int.init) {
-            attrs["width"] = .int(width)
-        }
-        if let height = embed.height.flatMap(Int.init) {
-            attrs["height"] = .int(height)
-        }
 
         return ProseMirrorNode(type: "embed", attrs: attrs)
     }
