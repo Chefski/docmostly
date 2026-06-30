@@ -7,8 +7,12 @@ extension NativeRichEditorViewModel {
         guard pastedBlocks.isEmpty == false else { return }
 
         performUndoableEdit {
-            let insertionIndex = markdownPasteIndex()
-            document.blocks.insert(contentsOf: pastedBlocks, at: insertionIndex)
+            if let placeholderIndex = singleEmptyPlaceholderPasteIndex() {
+                document.blocks.replaceSubrange(placeholderIndex...placeholderIndex, with: pastedBlocks)
+            } else {
+                let insertionIndex = markdownPasteIndex()
+                document.blocks.insert(contentsOf: pastedBlocks, at: insertionIndex)
+            }
             activeBlockID = pastedBlocks.last?.id
             selectedBlockID = nil
             visibleBlockControlsID = nil
@@ -110,6 +114,20 @@ extension NativeRichEditorViewModel {
         }
 
         return document.blocks.index(after: index)
+    }
+
+    private func singleEmptyPlaceholderPasteIndex() -> Array<NativeEditorBlock>.Index? {
+        guard document.blocks.count == 1,
+              let index = document.blocks.indices.first,
+              activeBlockID == document.blocks[index].id,
+              document.blocks[index].kind == .paragraph,
+              document.blocks[index].inlineContent == nil
+        else {
+            return nil
+        }
+
+        let text = String(document.blocks[index].text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? index : nil
     }
 
     private func adjustActiveBlockIndent(by delta: Int) {
