@@ -19,12 +19,24 @@ extension NativeEditorMarkdownParser {
     static func docmostContainerHTMLMarkdown(from block: NativeEditorBlock) -> String? {
         switch block.kind {
         case .callout(let callout):
-            callout.icon == nil ? nil : calloutHTMLMarkdown(from: callout)
+            calloutNeedsDocmostHTMLMarkdown(callout) ? calloutHTMLMarkdown(from: callout) : nil
         case .details(let details):
             detailsHTMLMarkdown(from: details)
         default:
             nil
         }
+    }
+
+    private static func calloutNeedsDocmostHTMLMarkdown(_ callout: NativeEditorCalloutBlock) -> Bool {
+        guard callout.icon == nil else { return true }
+        return calloutFenceCannotPreserveStyle(callout.style)
+    }
+
+    private static func calloutFenceCannotPreserveStyle(_ style: String) -> Bool {
+        let sanitizedStyle = sanitizedContainerCalloutStyle(style)
+        let docmostCalloutStyles: Set<String> = ["default", "info", "note", "success", "warning", "danger"]
+        let docmostFenceStyles: Set<String> = ["info", "success", "warning", "danger"]
+        return docmostCalloutStyles.contains(sanitizedStyle) && docmostFenceStyles.contains(sanitizedStyle) == false
     }
 
     private static func calloutHTMLBlock(
