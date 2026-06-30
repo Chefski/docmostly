@@ -33,9 +33,10 @@ enum NativeEditorAttachmentBlockFactory {
     private static func imageBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         mediaBlock(
             id: id,
-            kind: .image(context.mediaPayload),
+            kind: .image(context.mediaPayload(alignment: NativeEditorMediaBlock.defaultAlignment)),
             type: "image",
             context: context,
+            alignment: NativeEditorMediaBlock.defaultAlignment,
             dimensions: context.mediaDimensions
         )
     }
@@ -43,10 +44,16 @@ enum NativeEditorAttachmentBlockFactory {
     private static func videoBlock(id: UUID, context: NativeEditorAttachmentContext) -> NativeEditorBlock {
         mediaBlock(
             id: id,
-            kind: .video(context.mediaPayload(title: context.attachment.fileName)),
+            kind: .video(
+                context.mediaPayload(
+                    title: context.attachment.fileName,
+                    alignment: NativeEditorMediaBlock.defaultAlignment
+                )
+            ),
             type: "video",
             context: context,
             title: context.attachment.fileName,
+            alignment: NativeEditorMediaBlock.defaultAlignment,
             dimensions: context.mediaDimensions
         )
     }
@@ -61,11 +68,15 @@ enum NativeEditorAttachmentBlockFactory {
         type: String,
         context: NativeEditorAttachmentContext,
         title: String? = nil,
+        alignment: String? = nil,
         dimensions: NativeEditorMediaDimensions? = nil
     ) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
         if let title {
             attrs["title"] = .string(title)
+        }
+        if let alignment {
+            attrs["align"] = .string(alignment)
         }
         if let dimensions {
             attrs["width"] = .int(dimensions.width)
@@ -201,10 +212,13 @@ private struct NativeEditorAttachmentContext {
     let mediaDimensions: NativeEditorMediaDimensions?
 
     var mediaPayload: NativeEditorMediaBlock {
-        mediaPayload(title: nil)
+        mediaPayload()
     }
 
-    func mediaPayload(title: String?) -> NativeEditorMediaBlock {
+    func mediaPayload(
+        title: String? = nil,
+        alignment: String? = nil
+    ) -> NativeEditorMediaBlock {
         NativeEditorMediaBlock(
             source: source,
             alternativeText: nil,
@@ -214,7 +228,7 @@ private struct NativeEditorAttachmentContext {
             width: mediaDimensions?.width.description,
             height: mediaDimensions?.height.description,
             aspectRatio: mediaDimensions?.aspectRatio.description,
-            alignment: nil
+            alignment: alignment
         )
     }
 
