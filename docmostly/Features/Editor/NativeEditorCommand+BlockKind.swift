@@ -60,7 +60,7 @@ extension NativeEditorCommand {
         case .syncedBlock:
             .transclusionSource(NativeEditorTransclusionSourceBlock(
                 identifier: "sync",
-                previewText: "Synced block"
+                previewText: ""
             ))
         case .embed:
             .embed(NativeEditorEmbedBlock(

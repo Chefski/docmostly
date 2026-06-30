@@ -217,7 +217,7 @@ extension NativeEditorCommand {
             id: id,
             kind: .transclusionSource(NativeEditorTransclusionSourceBlock(
                 identifier: identifier,
-                previewText: "Synced block"
+                previewText: ""
             )),
             rawNode: syncedBlockNode(identifier: identifier)
         )
@@ -227,7 +227,7 @@ extension NativeEditorCommand {
         ProseMirrorNode(
             type: "transclusionSource",
             attrs: ["id": .string(identifier)],
-            content: [paragraphNode("Synced block")]
+            content: [paragraphNode("")]
         )
     }
 

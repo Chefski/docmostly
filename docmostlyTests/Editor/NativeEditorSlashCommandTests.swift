@@ -407,11 +407,17 @@ struct NativeEditorSlashCommandTests {
 
         let identifier = try #require(source.identifier)
         let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let paragraph = try #require(node.content?.first)
 
         #expect(identifier.count == 12)
         #expect(identifier.unicodeScalars.allSatisfy { (97...122).contains(Int($0.value)) })
+        #expect(source.previewText.isEmpty)
+        #expect(String(block.text.characters).isEmpty)
         #expect(node.type == "transclusionSource")
         #expect(node.attrs?["id"] == .string(identifier))
+        #expect(node.content?.count == 1)
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
     }
 
     private func viewModelAfterApplying(_ command: NativeEditorCommand) -> NativeRichEditorViewModel {
