@@ -192,7 +192,7 @@ struct PageReaderView: View {
         .fileImporter(
             isPresented: $isShowingAttachmentImporter,
             allowedContentTypes: attachmentAllowedContentTypes,
-            allowsMultipleSelection: false,
+            allowsMultipleSelection: true,
             onCompletion: handleAttachmentImport
         )
         .alert("Attachment Upload Failed", isPresented: attachmentUploadFailedBinding) {

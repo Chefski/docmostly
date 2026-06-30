@@ -86,14 +86,21 @@ extension PageReaderView {
         attachmentImportKind = nil
 
         do {
-            guard let fileURL = try result.get().first else { return }
-            uploadImportedAttachment(fileURL: fileURL, importKind: importKind)
+            let fileURLs = try result.get()
+            guard fileURLs.isEmpty == false else { return }
+            uploadImportedAttachments(fileURLs: fileURLs, importKind: importKind)
         } catch {
             attachmentUploadErrorMessage = error.localizedDescription
         }
     }
 
     func uploadImportedAttachment(fileURL: URL, importKind: NativeEditorAttachmentImportKind) {
+        uploadImportedAttachments(fileURLs: [fileURL], importKind: importKind)
+    }
+
+    func uploadImportedAttachments(fileURLs: [URL], importKind: NativeEditorAttachmentImportKind) {
+        guard fileURLs.isEmpty == false else { return }
+
         Task {
             guard let editorViewModel else { return }
 
@@ -103,31 +110,46 @@ extension PageReaderView {
                 isUploadingAttachment = false
             }
 
-            let didStartScopedAccess = fileURL.startAccessingSecurityScopedResource()
+            var scopedFileURLs: [URL] = []
             defer {
-                if didStartScopedAccess {
+                for fileURL in scopedFileURLs.reversed() {
                     fileURL.stopAccessingSecurityScopedResource()
                 }
             }
 
-            do {
-                let attachment = try await appState.uploadAttachment(
-                    fileURL: fileURL,
-                    pageId: editorViewModel.currentPageID
-                )
-                editorViewModel.insertUploadedAttachment(
-                    attachment,
-                    as: importKind,
-                    sourceFileURL: fileURL
-                )
+            var uploadedAttachments: [(attachment: DocmostAttachment, sourceFileURL: URL?)] = []
+            var uploadErrorMessage: String?
 
-                if await editorViewModel.save(appState: appState) {
-                    await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
-                } else if let saveErrorMessage = editorViewModel.saveErrorMessage {
-                    attachmentUploadErrorMessage = saveErrorMessage
+            for fileURL in fileURLs {
+                if fileURL.startAccessingSecurityScopedResource() {
+                    scopedFileURLs.append(fileURL)
                 }
-            } catch {
-                attachmentUploadErrorMessage = error.localizedDescription
+
+                do {
+                    let attachment = try await appState.uploadAttachment(
+                        fileURL: fileURL,
+                        pageId: editorViewModel.currentPageID
+                    )
+                    uploadedAttachments.append((attachment: attachment, sourceFileURL: fileURL))
+                } catch {
+                    uploadErrorMessage = error.localizedDescription
+                }
+            }
+
+            guard uploadedAttachments.isEmpty == false else {
+                attachmentUploadErrorMessage = uploadErrorMessage
+                return
+            }
+
+            editorViewModel.insertUploadedAttachments(uploadedAttachments, as: importKind)
+
+            if await editorViewModel.save(appState: appState) {
+                await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
+                attachmentUploadErrorMessage = uploadErrorMessage
+            } else if let saveErrorMessage = editorViewModel.saveErrorMessage {
+                attachmentUploadErrorMessage = saveErrorMessage
+            } else if let uploadErrorMessage {
+                attachmentUploadErrorMessage = uploadErrorMessage
             }
         }
     }
