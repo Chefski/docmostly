@@ -96,4 +96,63 @@ struct NativeEditorEditableBlockIDTests {
         #expect(paragraphAttrs["indent"] == nil)
         #expect(paragraphContent.first?["text"] as? String == "Updated body")
     }
+
+    @Test func encodesStableDocmostIDsForNativeEditableBlocks() throws {
+        let paragraphID = try #require(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
+        let headingID = try #require(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))
+        let quoteID = try #require(UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+        let listID = try #require(UUID(uuidString: "44444444-4444-4444-4444-444444444444"))
+        let document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(
+                id: paragraphID,
+                kind: .paragraph,
+                text: AttributedString("Body"),
+                alignment: .left
+            ),
+            NativeEditorBlock(
+                id: headingID,
+                kind: .heading(level: 2),
+                text: AttributedString("Plan"),
+                alignment: .left
+            ),
+            NativeEditorBlock(
+                id: quoteID,
+                kind: .blockquote,
+                text: AttributedString("Quote"),
+                alignment: .left
+            ),
+            NativeEditorBlock(
+                id: listID,
+                kind: .bulletListItem,
+                text: AttributedString("Checklist"),
+                alignment: .left
+            )
+        ])
+
+        let firstEncoding = document.proseMirrorDocument
+        let secondEncoding = document.proseMirrorDocument
+        let paragraphNode = try #require(firstEncoding.content.first)
+        let headingNode = try #require(firstEncoding.content.dropFirst().first)
+        let quoteParagraph = try #require(firstEncoding.content.dropFirst(2).first?.content?.first)
+        let listParagraph = try #require(
+            firstEncoding.content.dropFirst(3).first?.content?.first?.content?.first
+        )
+
+        let paragraphNodeID = try expectDocmostNodeID(paragraphNode.attrs?["id"])
+        let headingNodeID = try expectDocmostNodeID(headingNode.attrs?["id"])
+        let quoteNodeID = try expectDocmostNodeID(quoteParagraph.attrs?["id"])
+        let listNodeID = try expectDocmostNodeID(listParagraph.attrs?["id"])
+
+        #expect(headingNode.attrs?["level"] == .int(2))
+        #expect(paragraphNodeID != headingNodeID)
+        #expect(Set([paragraphNodeID, headingNodeID, quoteNodeID, listNodeID]).count == 4)
+        #expect(secondEncoding == firstEncoding)
+    }
+}
+
+private func expectDocmostNodeID(_ value: ProseMirrorJSONValue?) throws -> String {
+    let nodeID = try #require(value?.stringValue)
+    #expect(nodeID.count == 12)
+    #expect(Set(nodeID).isSubset(of: Set("abcdefghijklmnopqrstuvwxyz")))
+    return nodeID
 }

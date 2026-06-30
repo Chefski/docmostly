@@ -36,6 +36,8 @@ nonisolated extension NativeEditorDocument {
             mergedAttrs[attr.key] = attr.value
         }
 
+        addDocmostNodeIDIfNeeded(type: type, block: block, attrs: &mergedAttrs)
+
         if let alignment = block.alignment.proseMirrorValue {
             mergedAttrs["textAlign"] = alignment
         } else {
@@ -364,6 +366,8 @@ nonisolated extension NativeEditorDocument {
         let originalNode = originalListItemTextContainer(type: type, block: block)
         let nodeType = originalNode?.type ?? "paragraph"
         var attrs = originalNode?.attrs ?? [:]
+
+        addDocmostNodeIDIfNeeded(type: nodeType, block: block, attrs: &attrs)
 
         if let alignment = block.alignment.proseMirrorValue {
             attrs["textAlign"] = alignment
