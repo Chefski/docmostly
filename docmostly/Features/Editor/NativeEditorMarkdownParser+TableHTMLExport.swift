@@ -76,8 +76,9 @@ extension NativeEditorMarkdownParser {
 
     private static func htmlTableCellAttributes(from cell: NativeEditorTableCell) -> String {
         var attrs: [(String, String?)] = []
+        attrs.append(("style", cell.backgroundColor.map { "background-color: \($0)" }))
         attrs.append(("data-background-color", cell.backgroundColor))
-        attrs.append(("data-background-color-name", cell.backgroundColorName))
+        attrs.append(("data-background-color-name", cell.backgroundColorName?.lowercased()))
         if cell.columnSpan > 1 {
             attrs.append(("colspan", "\(cell.columnSpan)"))
         }
