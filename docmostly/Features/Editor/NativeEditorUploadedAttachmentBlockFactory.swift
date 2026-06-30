@@ -60,9 +60,6 @@ enum NativeEditorAttachmentBlockFactory {
         dimensions: NativeEditorMediaDimensions? = nil
     ) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
-        if let title = kind.mediaTitle {
-            attrs["title"] = .string(title)
-        }
         if let dimensions {
             attrs["width"] = .int(dimensions.width)
             attrs["height"] = .int(dimensions.height)
@@ -151,17 +148,6 @@ enum NativeEditorAttachmentBlockFactory {
         }
 
         return nil
-    }
-}
-
-private extension NativeEditorBlockKind {
-    var mediaTitle: String? {
-        switch self {
-        case .image(let media), .video(let media), .audio(let media):
-            media.title
-        default:
-            nil
-        }
     }
 }
 

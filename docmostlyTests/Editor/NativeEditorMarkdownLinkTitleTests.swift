@@ -21,7 +21,7 @@ struct NativeEditorMarkdownLinkTitleTests {
 
             #expect(image.source == "/files/image.png")
             #expect(image.title == "System diagram")
-            #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
+            #expect(block.rawNode?.attrs?["title"] == nil)
         }
     }
 

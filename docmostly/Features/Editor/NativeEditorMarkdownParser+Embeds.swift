@@ -294,7 +294,7 @@ extension NativeEditorMarkdownParser {
         return NativeEditorMediaBlock(
             source: source,
             alternativeText: mediaAlternativeText(from: attributes, type: type),
-            title: nonEmptyHTMLAttribute(attributes["title"]),
+            title: nil,
             attachmentID: mediaAttachmentID(from: attributes, source: source),
             sizeInBytes: nonEmptyHTMLAttribute(attributes["data-size"]).flatMap(Int.init),
             width: nonEmptyHTMLAttribute(attributes["width"]),
@@ -360,7 +360,6 @@ extension NativeEditorMarkdownParser {
         htmlTag("img", attributes: [
             ("src", media.source),
             ("alt", media.alternativeText),
-            ("title", media.title),
             ("width", media.width),
             ("height", media.height),
             ("data-align", media.alignment),

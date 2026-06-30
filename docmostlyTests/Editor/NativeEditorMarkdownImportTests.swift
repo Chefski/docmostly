@@ -147,7 +147,7 @@ struct NativeEditorMarkdownImportTests {
         #expect(image.source == "/files/image.png")
         #expect(image.alternativeText == "Architecture")
         #expect(image.title == "System diagram")
-        #expect(block.rawNode?.attrs?["title"] == .string("System diagram"))
+        #expect(block.rawNode?.attrs?["title"] == nil)
     }
 
     @Test func docmostPageBreakHTMLImportsAsNativePageBreakBlock() throws {
