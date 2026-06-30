@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import ImageIO
 
 enum NativeEditorAttachmentBlockFactory {
@@ -12,7 +13,7 @@ enum NativeEditorAttachmentBlockFactory {
             attachment: attachment,
             source: "/api/files/\(attachment.id)/\(attachment.fileName)",
             size: attachment.fileSize ?? localFileSize(for: sourceFileURL),
-            imageDimensions: importKind == .image ? imageDimensions(for: sourceFileURL) : nil
+            mediaDimensions: mediaDimensions(for: sourceFileURL, importKind: importKind)
         )
 
         switch importKind {
@@ -35,7 +36,7 @@ enum NativeEditorAttachmentBlockFactory {
             kind: .image(context.mediaPayload),
             type: "image",
             context: context,
-            dimensions: context.imageDimensions
+            dimensions: context.mediaDimensions
         )
     }
 
@@ -45,7 +46,8 @@ enum NativeEditorAttachmentBlockFactory {
             kind: .video(context.mediaPayload(title: context.attachment.fileName)),
             type: "video",
             context: context,
-            title: context.attachment.fileName
+            title: context.attachment.fileName,
+            dimensions: context.mediaDimensions
         )
     }
 
@@ -143,6 +145,42 @@ enum NativeEditorAttachmentBlockFactory {
         )
     }
 
+    private static func mediaDimensions(
+        for fileURL: URL?,
+        importKind: NativeEditorAttachmentImportKind
+    ) -> NativeEditorMediaDimensions? {
+        switch importKind {
+        case .image:
+            imageDimensions(for: fileURL)
+        case .video:
+            videoDimensions(for: fileURL)
+        case .audio, .pdf, .file:
+            nil
+        }
+    }
+
+    private static func videoDimensions(for fileURL: URL?) -> NativeEditorMediaDimensions? {
+        guard let fileURL else { return nil }
+
+        let asset = AVURLAsset(url: fileURL)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            return nil
+        }
+
+        let displaySize = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
+        let width = Int(abs(displaySize.width).rounded())
+        let height = Int(abs(displaySize.height).rounded())
+        guard height > 0, width > 0 else {
+            return nil
+        }
+
+        return NativeEditorMediaDimensions(
+            width: width,
+            height: height,
+            aspectRatio: Double(width) / Double(height)
+        )
+    }
+
     private static func intValue(_ value: Any?) -> Int? {
         if let int = value as? Int {
             return int
@@ -160,7 +198,7 @@ private struct NativeEditorAttachmentContext {
     let attachment: DocmostAttachment
     let source: String
     let size: Int?
-    let imageDimensions: NativeEditorMediaDimensions?
+    let mediaDimensions: NativeEditorMediaDimensions?
 
     var mediaPayload: NativeEditorMediaBlock {
         mediaPayload(title: nil)
@@ -173,9 +211,9 @@ private struct NativeEditorAttachmentContext {
             title: title,
             attachmentID: attachment.id,
             sizeInBytes: size,
-            width: imageDimensions?.width.description,
-            height: imageDimensions?.height.description,
-            aspectRatio: imageDimensions?.aspectRatio.description,
+            width: mediaDimensions?.width.description,
+            height: mediaDimensions?.height.description,
+            aspectRatio: mediaDimensions?.aspectRatio.description,
             alignment: nil
         )
     }
