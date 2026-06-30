@@ -30,6 +30,30 @@ struct NativeEditorMentionSearchTests {
         #expect(mention.displayText == "@Taylor")
     }
 
+    @Test func buildsPageMentionFromSuggestionResult() {
+        let page = DocmostMentionPageSuggestion(
+            id: "page-1",
+            slugId: "roadmap-abc123",
+            title: "Roadmap",
+            icon: nil,
+            spaceId: "space-1",
+            space: DocmostMentionSpaceSuggestion(
+                id: "space-1",
+                name: "Product",
+                slug: "product",
+                icon: nil
+            )
+        )
+        let mention = NativeEditorMention(pageSuggestion: page, creatorID: "current-user")
+
+        #expect(mention.label == "Roadmap")
+        #expect(mention.entityType == "page")
+        #expect(mention.entityID == "page-1")
+        #expect(mention.slugID == "roadmap-abc123")
+        #expect(mention.creatorID == "current-user")
+        #expect(mention.displayText == "Roadmap")
+    }
+
     @Test func decodesDocmostMentionSuggestionResponse() throws {
         let data = Data("""
         {
