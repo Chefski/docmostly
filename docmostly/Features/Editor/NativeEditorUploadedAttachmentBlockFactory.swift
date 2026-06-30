@@ -44,7 +44,8 @@ enum NativeEditorAttachmentBlockFactory {
             id: id,
             kind: .video(context.mediaPayload(title: context.attachment.fileName)),
             type: "video",
-            context: context
+            context: context,
+            title: context.attachment.fileName
         )
     }
 
@@ -57,9 +58,13 @@ enum NativeEditorAttachmentBlockFactory {
         kind: NativeEditorBlockKind,
         type: String,
         context: NativeEditorAttachmentContext,
+        title: String? = nil,
         dimensions: NativeEditorMediaDimensions? = nil
     ) -> NativeEditorBlock {
         var attrs = context.sourceAttrs
+        if let title {
+            attrs["title"] = .string(title)
+        }
         if let dimensions {
             attrs["width"] = .int(dimensions.width)
             attrs["height"] = .int(dimensions.height)

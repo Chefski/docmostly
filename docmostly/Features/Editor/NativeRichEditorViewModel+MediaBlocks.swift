@@ -132,6 +132,9 @@ nonisolated extension NativeEditorRichBlockNodeFactory {
         if let alternativeText = media.alternativeText {
             attrs["alt"] = .string(alternativeText)
         }
+        if type == "video", let title = media.title {
+            attrs["title"] = .string(title)
+        }
         appendDimensions(width: media.width, height: media.height, aspectRatio: media.aspectRatio, to: &attrs)
         if let alignment = media.alignment {
             attrs["align"] = .string(alignment)

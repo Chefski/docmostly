@@ -310,7 +310,7 @@ struct NativeRichEditorViewModelTests {
         #expect(String(updatedBlock.text.characters) == "Launch demo.mp4")
         #expect(node?.type == "video")
         #expect(node?.attrs?["src"] == .string("/api/files/attachment-1/Launch demo.mp4"))
-        #expect(node?.attrs?["title"] == nil)
+        #expect(node?.attrs?["title"] == .string("Launch demo.mp4"))
         #expect(node?.attrs?["attachmentId"] == .string("attachment-1"))
         #expect(node?.attrs?["size"] == .int(4096))
     }

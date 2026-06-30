@@ -56,7 +56,7 @@ struct NativeRichEditorMediaBlockTests {
         #expect(nodes[3].type == "video")
         #expect(nodes[3].attrs?["src"] == .string("/files/demo-v2.mp4"))
         #expect(nodes[3].attrs?["alt"] == .string("Launch demo"))
-        #expect(nodes[3].attrs?["title"] == nil)
+        #expect(nodes[3].attrs?["title"] == .string("Demo original.mp4"))
         #expect(nodes[3].attrs?["attachmentId"] == .string("video-1"))
         #expect(nodes[3].attrs?["size"] == .int(8192))
         #expect(nodes[3].attrs?["width"] == .int(1280))
