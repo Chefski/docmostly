@@ -92,6 +92,18 @@ struct NativeRichEditorBlockPropertyTests {
         #expect(columnCountRange.upperBound == NativeEditorColumnsBlock.maximumColumnCount)
     }
 
+    @Test func calloutEditorOffersDocmostWebCalloutTypes() throws {
+        let editor = NativeEditorCalloutEditor(
+            blockID: UUID(),
+            callout: NativeEditorCalloutBlock(style: "info", icon: nil, previewText: "Check rollout"),
+            actions: noOpRichBlockEditingActions()
+        )
+
+        let styles: [String] = try mirroredProperty("styles", in: editor)
+
+        #expect(styles == ["default", "info", "note", "success", "warning", "danger"])
+    }
+
     private func richBlockViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [

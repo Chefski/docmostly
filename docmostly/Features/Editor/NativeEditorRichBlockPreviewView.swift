@@ -238,6 +238,8 @@ struct NativeEditorRichBlockPreviewView: View {
 
     private func calloutSystemImage(for style: String) -> String {
         switch style {
+        case "note":
+            "note.text"
         case "warning":
             "exclamationmark.triangle"
         case "success":

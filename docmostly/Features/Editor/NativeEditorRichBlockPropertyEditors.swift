@@ -5,7 +5,7 @@ struct NativeEditorCalloutEditor: View {
     let callout: NativeEditorCalloutBlock
     let actions: NativeEditorRichBlockEditingActions
 
-    private let styles = ["info", "tip", "warning", "success", "error"]
+    private let styles = ["default", "info", "note", "success", "warning", "danger"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
