@@ -495,46 +495,6 @@ extension NativeEditorMarkdownParser {
         return fileExtension
     }
 
-    static func docmostAttachmentID(from source: String) -> String? {
-        let pathComponents = markdownLinkPath(from: source)
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .map(String.init)
-        guard
-            let apiIndex = pathComponents.firstIndex(of: "api"),
-            pathComponents.indices.contains(pathComponents.index(after: apiIndex))
-        else {
-            return nil
-        }
-
-        let filesIndex = pathComponents.index(after: apiIndex)
-        guard pathComponents[filesIndex] == "files" else { return nil }
-
-        let attachmentIndex = pathComponents.index(after: filesIndex)
-        guard pathComponents.indices.contains(attachmentIndex) else { return nil }
-
-        let filenameIndex = pathComponents.index(after: attachmentIndex)
-        guard pathComponents.indices.contains(filenameIndex) else { return nil }
-
-        let attachmentID = pathComponents[attachmentIndex]
-        guard attachmentID.isEmpty == false else { return nil }
-        return attachmentID.removingPercentEncoding ?? attachmentID
-    }
-
-    private static func markdownLinkPath(from source: String) -> String {
-        let pathSource: String
-        if let components = URLComponents(string: source), components.scheme != nil {
-            pathSource = components.path.nonEmpty ?? ""
-        } else {
-            pathSource = source
-        }
-
-        return pathSource.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-            .first?
-            .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
-            .first
-            .map(String.init) ?? pathSource
-    }
-
     private static func escapedMarkdownLinkText(_ text: String) -> String {
         text.replacing("\\", with: "\\\\")
             .replacing("[", with: "\\[")
