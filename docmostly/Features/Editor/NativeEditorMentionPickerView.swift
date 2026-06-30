@@ -7,6 +7,7 @@ struct NativeEditorMentionPickerView: View {
     @State private var query = ""
     @State private var suggestions = DocmostMentionSuggestionResponse()
     @State private var isSearching = false
+    @State private var isCreatingPage = false
     @State private var errorMessage: String?
     @State private var searchTask: Task<Void, Never>?
 
@@ -47,11 +48,23 @@ struct NativeEditorMentionPickerView: View {
                         }
                     }
                 }
+
+                if let createPageTitle {
+                    Section("Create") {
+                        Button {
+                            createPageMention(title: createPageTitle)
+                        } label: {
+                            NativeEditorCreateMentionPageRow(title: createPageTitle, isCreatingPage: isCreatingPage)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isCreatingPage)
+                    }
+                }
             }
             .overlay {
                 if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ContentUnavailableView("Search people and pages", systemImage: "at")
-                } else if suggestions.isEmpty && isSearching == false && errorMessage == nil {
+                } else if suggestions.isEmpty && isSearching == false && errorMessage == nil && createPageTitle == nil {
                     ContentUnavailableView("No mention results", systemImage: "doc.text.magnifyingglass")
                 }
             }
@@ -108,7 +121,7 @@ struct NativeEditorMentionPickerView: View {
         do {
             let fetchedSuggestions = try await appState.searchMentionSuggestions(
                 query: trimmed,
-                spaceId: appState.selectedSpaceID
+                spaceId: currentSpaceID
             )
             guard Task.isCancelled == false else { return }
             guard trimmed == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
@@ -118,6 +131,19 @@ struct NativeEditorMentionPickerView: View {
             suggestions = DocmostMentionSuggestionResponse()
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var currentSpaceID: String? {
+        viewModel.currentSpaceID ?? appState.selectedSpaceID
+    }
+
+    private var createPageTitle: String? {
+        guard currentSpaceID != nil, trimmedQuery.isEmpty == false else { return nil }
+        return trimmedQuery
     }
 
     private func insertMention(_ user: DocmostMentionUserSuggestion) {
@@ -134,6 +160,33 @@ struct NativeEditorMentionPickerView: View {
             creatorID: appState.currentUser?.user.id
         ))
         dismiss()
+    }
+
+    private func createPageMention(title: String) {
+        guard isCreatingPage == false, let currentSpaceID else { return }
+        let parentPageID = viewModel.currentPageID
+
+        Task {
+            await createPageMention(title: title, spaceID: currentSpaceID, parentPageID: parentPageID)
+        }
+    }
+
+    @MainActor
+    private func createPageMention(title: String, spaceID: String, parentPageID: String) async {
+        isCreatingPage = true
+        errorMessage = nil
+
+        do {
+            let page = try await appState.createPage(spaceId: spaceID, parentPageId: parentPageID, title: title)
+            viewModel.insertMention(NativeEditorMention(
+                createdPage: page,
+                creatorID: appState.currentUser?.user.id
+            ))
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isCreatingPage = false
+        }
     }
 }
 
@@ -181,6 +234,31 @@ private struct NativeEditorMentionPageSuggestionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+    }
+}
+
+private struct NativeEditorCreateMentionPageRow: View {
+    let title: String
+    let isCreatingPage: Bool
+
+    var body: some View {
+        Label {
+            HStack {
+                Text("Create page: \(title)")
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if isCreatingPage {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        } icon: {
+            Image(systemName: "plus.circle")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)

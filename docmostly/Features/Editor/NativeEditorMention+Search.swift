@@ -23,6 +23,17 @@ extension NativeEditorMention {
         )
     }
 
+    init(createdPage page: DocmostPage, creatorID: String?, identifier: String = UUID().uuidString) {
+        self.init(
+            identifier: identifier,
+            label: page.title.isEmpty ? "Untitled" : page.title,
+            entityType: "page",
+            entityID: page.id,
+            slugID: page.slugId,
+            creatorID: creatorID
+        )
+    }
+
     init(userSuggestion user: DocmostMentionUserSuggestion, creatorID: String?) {
         self.init(
             identifier: user.id,

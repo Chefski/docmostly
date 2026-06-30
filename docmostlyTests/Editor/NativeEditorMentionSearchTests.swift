@@ -54,6 +54,22 @@ struct NativeEditorMentionSearchTests {
         #expect(mention.displayText == "Roadmap")
     }
 
+    @Test func buildsPageMentionFromCreatedPageResult() {
+        let mention = NativeEditorMention(
+            createdPage: createdPage(title: "Release Notes"),
+            creatorID: "current-user",
+            identifier: "mention-1"
+        )
+
+        #expect(mention.identifier == "mention-1")
+        #expect(mention.label == "Release Notes")
+        #expect(mention.entityType == "page")
+        #expect(mention.entityID == "page-2")
+        #expect(mention.slugID == "release-notes-abc123")
+        #expect(mention.creatorID == "current-user")
+        #expect(mention.displayText == "Release Notes")
+    }
+
     @Test func decodesDocmostMentionSuggestionResponse() throws {
         let data = Data("""
         {
@@ -103,6 +119,33 @@ struct NativeEditorMentionSearchTests {
             rank: nil,
             highlight: nil,
             space: SearchResultSpace(id: "space-1", name: "Product", slug: "product", icon: nil)
+        )
+    }
+
+    private func createdPage(title: String) -> DocmostPage {
+        DocmostPage(
+            id: "page-2",
+            slugId: "release-notes-abc123",
+            title: title,
+            content: nil,
+            icon: nil,
+            coverPhoto: nil,
+            parentPageId: "page-1",
+            creatorId: nil,
+            spaceId: "space-1",
+            workspaceId: nil,
+            isLocked: nil,
+            lastUpdatedById: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            deletedAt: nil,
+            position: nil,
+            hasChildren: false,
+            permissions: nil,
+            creator: nil,
+            lastUpdatedBy: nil,
+            contributors: nil,
+            space: nil
         )
     }
 }
