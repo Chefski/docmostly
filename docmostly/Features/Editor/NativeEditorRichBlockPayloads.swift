@@ -150,7 +150,7 @@ nonisolated struct NativeEditorDetailsBlock: Equatable, Hashable, Sendable {
 }
 
 nonisolated struct NativeEditorColumnsBlock: Hashable, Sendable {
-    private static let maximumColumnCount = 5
+    static let maximumColumnCount = 5
 
     var layout: String
     var widthMode: String

@@ -153,7 +153,7 @@ extension NativeRichEditorViewModel {
     }
 
     private static func normalizedColumnTexts(_ columnTexts: [String]) -> [String] {
-        let limitedTexts = Array(columnTexts.prefix(4))
+        let limitedTexts = Array(columnTexts.prefix(NativeEditorColumnsBlock.maximumColumnCount))
         return limitedTexts.isEmpty ? [""] : limitedTexts
     }
 

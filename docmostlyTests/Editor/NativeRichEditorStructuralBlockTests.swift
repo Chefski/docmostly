@@ -25,6 +25,24 @@ struct NativeRichEditorStructuralBlockTests {
         #expect(node.content?[2].content?.first?.content?.first?.text == "Ship")
     }
 
+    @Test func updatesFiveColumnBlockWithoutDroppingFinalColumn() {
+        let viewModel = structuralBlockViewModel()
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.updateColumns(
+            blockID: blockID,
+            layout: "five_equal",
+            widthMode: "normal",
+            columnTexts: ["Plan", "Build", "Review", "Launch", "Measure"]
+        )
+
+        let node = viewModel.document.proseMirrorDocument.content[0]
+        #expect(node.type == "columns")
+        #expect(node.attrs?["layout"] == .string("five_equal"))
+        #expect(node.content?.count == 5)
+        #expect(node.content?[4].content?.first?.content?.first?.text == "Measure")
+    }
+
     @Test func columnsNodePadsTextsAndWidthsToColumnCount() {
         let columns = NativeEditorColumnsBlock(
             layout: "three_equal",
