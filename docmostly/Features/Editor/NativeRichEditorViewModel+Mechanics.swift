@@ -169,13 +169,13 @@ extension NativeRichEditorViewModel {
         let href = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard href.isEmpty == false,
               href.unicodeScalars.contains(where: { CharacterSet.newlines.contains($0) }) == false,
-              let url = NativeEditorDocument.safeLinkURL(from: href),
-              let link = NativeEditorDocument.preservedLink(href: url.absoluteString)
+              let normalizedLink = NativeEditorDocument.normalizedSafeWebLink(from: href),
+              let link = NativeEditorDocument.preservedLink(href: normalizedLink.href)
         else {
             return nil
         }
 
-        return (url, link)
+        return (normalizedLink.url, link)
     }
 
     private static let defaultPasteTableWidth = 150

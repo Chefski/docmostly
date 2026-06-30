@@ -306,31 +306,31 @@ extension NativeEditorMarkdownParser {
         var searchStart = markdown.startIndex
 
         while searchStart < markdown.endIndex,
-              let schemeRange = nextBareWebURLSchemeRange(in: markdown, startingAt: searchStart) {
-            defer { searchStart = schemeRange.upperBound }
+              let prefixRange = nextBareWebURLPrefixRange(in: markdown, startingAt: searchStart) {
+            defer { searchStart = prefixRange.upperBound }
 
-            guard isBareWebURLBoundaryBefore(schemeRange.lowerBound, in: markdown) else {
+            guard isBareWebURLBoundaryBefore(prefixRange.lowerBound, in: markdown) else {
                 continue
             }
 
-            let rawEnd = bareWebURLCandidateEnd(in: markdown, startingAt: schemeRange.lowerBound)
+            let rawEnd = bareWebURLCandidateEnd(in: markdown, startingAt: prefixRange.lowerBound)
             let urlEnd = trimmingBareWebURLTrailingPunctuation(
                 in: markdown,
-                range: schemeRange.lowerBound..<rawEnd
+                range: prefixRange.lowerBound..<rawEnd
             )
-            guard urlEnd > schemeRange.upperBound else {
+            guard urlEnd > prefixRange.upperBound else {
                 continue
             }
 
-            let href = String(markdown[schemeRange.lowerBound..<urlEnd])
-            guard NativeEditorDocument.safeLinkURL(from: href) != nil else {
+            let visibleHref = String(markdown[prefixRange.lowerBound..<urlEnd])
+            guard let link = NativeEditorDocument.normalizedSafeWebLink(from: visibleHref) else {
                 continue
             }
 
-            var text = AttributedString(href)
-            NativeEditorDocument.applyLinkMark(href: href, isInternal: false, to: &text)
+            var text = AttributedString(visibleHref)
+            NativeEditorDocument.applyLinkMark(href: link.href, isInternal: false, to: &text)
             return InlineMarkdownMatch(
-                range: schemeRange.lowerBound..<urlEnd,
+                range: prefixRange.lowerBound..<urlEnd,
                 text: text,
                 priority: 5
             )
@@ -339,7 +339,7 @@ extension NativeEditorMarkdownParser {
         return nil
     }
 
-    private static func nextBareWebURLSchemeRange(
+    private static func nextBareWebURLPrefixRange(
         in markdown: Substring,
         startingAt searchStart: String.Index
     ) -> Range<String.Index>? {
@@ -348,17 +348,11 @@ extension NativeEditorMarkdownParser {
         let searchRange = searchStart..<markdown.endIndex
         let httpRange = markdown.range(of: "http://", options: .caseInsensitive, range: searchRange)
         let httpsRange = markdown.range(of: "https://", options: .caseInsensitive, range: searchRange)
+        let wwwRange = markdown.range(of: "www.", options: .caseInsensitive, range: searchRange)
 
-        switch (httpRange, httpsRange) {
-        case (.some(let httpRange), .some(let httpsRange)):
-            return httpRange.lowerBound < httpsRange.lowerBound ? httpRange : httpsRange
-        case (.some(let httpRange), nil):
-            return httpRange
-        case (nil, .some(let httpsRange)):
-            return httpsRange
-        case (nil, nil):
-            return nil
-        }
+        return [httpRange, httpsRange, wwwRange]
+            .compactMap { $0 }
+            .min { $0.lowerBound < $1.lowerBound }
     }
 
     private static func isBareWebURLBoundaryBefore(_ index: String.Index, in markdown: Substring) -> Bool {

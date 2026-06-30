@@ -200,6 +200,23 @@ nonisolated extension NativeEditorDocument {
         return allowedSchemes.contains(scheme) ? url : nil
     }
 
+    static func normalizedSafeWebLink(from href: String) -> (href: String, url: URL)? {
+        if let url = safeLinkURL(from: href) {
+            return (href, url)
+        }
+
+        guard href.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              href.lowercased().hasPrefix("www."),
+              href.dropFirst(4).contains(".")
+        else {
+            return nil
+        }
+
+        let normalizedHref = "http://\(href)"
+        guard let url = safeLinkURL(from: normalizedHref) else { return nil }
+        return (normalizedHref, url)
+    }
+
     static func preservedLink(href: String, isInternal: Bool = false) -> NativeEditorLink? {
         guard href.isEmpty == false else { return nil }
 
