@@ -500,7 +500,7 @@ extension NativeEditorMarkdownParser {
         ]
     }
 
-    private static func htmlTableUnsupportedNodeMarkdown(from node: ProseMirrorNode) -> String {
+    static func rawProseMirrorHTMLMarkdown(from node: ProseMirrorNode) -> String {
         let attrs = node.attrs?.compactMap { key, value -> String? in
             guard let text = value.htmlAttributeValue else { return nil }
             return #"data-\#(key)="\#(escapedInlineHTMLAttribute(text))""#
@@ -511,6 +511,10 @@ extension NativeEditorMarkdownParser {
         let body = node.content?.map(htmlTableCellContentMarkdown).joined() ??
             escapedInlineHTMLText(node.text ?? NativeEditorDocument.plainText(in: [node]))
         return #"<div data-type="\#(escapedInlineHTMLAttribute(node.type))"\#(attrText)>\#(body)</div>"#
+    }
+
+    private static func htmlTableUnsupportedNodeMarkdown(from node: ProseMirrorNode) -> String {
+        rawProseMirrorHTMLMarkdown(from: node)
     }
 
     private static func htmlTableTextAlignAttribute(from node: ProseMirrorNode) -> String {

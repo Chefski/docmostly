@@ -112,6 +112,38 @@ extension NativeEditorMarkdownParser {
         )
     }
 
+    static func unsupportedDocmostHTMLBlock(
+        in lines: [String],
+        startingAt index: Array<String>.Index
+    ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
+        guard
+            let attributes = htmlTagAttributes(from: lines[index], tagName: "div"),
+            let type = nonEmptyContainerHTMLAttribute(attributes["data-type"])
+        else {
+            return nil
+        }
+
+        guard let body = htmlContainerBody(in: lines, startingAt: index, tagName: "div") else {
+            return nil
+        }
+
+        let contentNodes = containerContentNodes(from: body.lines)
+        let rawNode = ProseMirrorNode(
+            type: type,
+            attrs: unsupportedDocmostHTMLAttrs(from: attributes),
+            content: contentNodes.isEmpty ? nil : contentNodes
+        )
+        return (
+            NativeEditorBlock(
+                kind: .unsupported(type: type),
+                text: AttributedString(NativeEditorDocument.previewText(for: .unsupported(type: type))),
+                alignment: .left,
+                rawNode: rawNode
+            ),
+            body.endIndex
+        )
+    }
+
     private static func calloutHTMLMarkdown(from callout: NativeEditorCalloutBlock) -> String {
         let openingTag = containerHTMLTag("div", attributes: [
             ("data-type", "callout"),
@@ -413,6 +445,23 @@ extension NativeEditorMarkdownParser {
             return nil
         }
         return value
+    }
+
+    private static func unsupportedDocmostHTMLAttrs(
+        from attributes: [String: String]
+    ) -> [String: ProseMirrorJSONValue]? {
+        let rawAttrs = attributes.reduce(into: [String: ProseMirrorJSONValue]()) { result, attribute in
+            guard attribute.key.hasPrefix("data-"),
+                  attribute.key != "data-type" else {
+                return
+            }
+
+            let key = String(attribute.key.dropFirst("data-".count))
+            guard key.isEmpty == false else { return }
+            result[key] = .string(attribute.value)
+        }
+
+        return rawAttrs.isEmpty ? nil : rawAttrs
     }
 
     private static func sanitizedContainerCalloutStyle(_ value: String) -> String {

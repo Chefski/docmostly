@@ -33,6 +33,14 @@ extension NativeEditorMarkdownParser {
             return columnsBlock
         }
 
+        if let pageBreakBlock = pageBreakHTMLBlock(from: lines[index]) {
+            return (pageBreakBlock, lines.index(after: index))
+        }
+
+        if let unsupportedBlock = unsupportedDocmostHTMLBlock(in: lines, startingAt: index) {
+            return unsupportedBlock
+        }
+
         return detailsHTMLBlock(in: lines, startingAt: index)
     }
 
@@ -111,7 +119,7 @@ extension NativeEditorMarkdownParser {
         case .mathBlock(let math):
             mathMarkdown(from: math)
         case .unsupported:
-            String(block.text.characters)
+            block.rawNode.map(rawProseMirrorHTMLMarkdown(from:)) ?? String(block.text.characters)
         default:
             nil
         }
