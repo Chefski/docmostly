@@ -97,7 +97,7 @@ struct NativeEditorColumnsEditor: View {
     let actions: NativeEditorRichBlockEditingActions
 
     private let layouts = ["two_equal", "two_left_sidebar", "two_right_sidebar", "three_equal"]
-    private let widthModes = ["normal", "wide", "full"]
+    private let widthModes = NativeEditorColumnsBlock.supportedWidthModes
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

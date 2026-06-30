@@ -11,14 +11,14 @@ struct NativeRichEditorStructuralBlockTests {
         viewModel.updateColumns(
             blockID: blockID,
             layout: "three_equal",
-            widthMode: "full",
+            widthMode: "wide",
             columnTexts: ["Plan", "Build", "Ship"]
         )
 
         let node = viewModel.document.proseMirrorDocument.content[0]
         #expect(node.type == "columns")
         #expect(node.attrs?["layout"] == .string("three_equal"))
-        #expect(node.attrs?["widthMode"] == .string("full"))
+        #expect(node.attrs?["widthMode"] == .string("wide"))
         #expect(node.content?.count == 3)
         #expect(node.content?[0].content?.first?.content?.first?.text == "Plan")
         #expect(node.content?[1].content?.first?.content?.first?.text == "Build")
@@ -41,6 +41,21 @@ struct NativeRichEditorStructuralBlockTests {
         #expect(node.attrs?["layout"] == .string("five_equal"))
         #expect(node.content?.count == 5)
         #expect(node.content?[4].content?.first?.content?.first?.text == "Measure")
+    }
+
+    @Test func updateColumnsNormalizesUnsupportedWidthModeToDocmostDefault() {
+        let viewModel = structuralBlockViewModel()
+        let blockID = viewModel.document.blocks[0].id
+
+        viewModel.updateColumns(
+            blockID: blockID,
+            layout: "two_equal",
+            widthMode: "full",
+            columnTexts: ["Plan", "Ship"]
+        )
+
+        let node = viewModel.document.proseMirrorDocument.content[0]
+        #expect(node.attrs?["widthMode"] == .string("normal"))
     }
 
     @Test func columnsNodePadsTextsAndWidthsToColumnCount() {

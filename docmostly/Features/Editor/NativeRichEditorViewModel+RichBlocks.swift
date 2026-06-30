@@ -35,7 +35,7 @@ extension NativeRichEditorViewModel {
             }
             let columns = NativeEditorColumnsBlock(
                 layout: layout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "two_equal" : layout,
-                widthMode: widthMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "normal" : widthMode,
+                widthMode: Self.normalizedColumnsWidthMode(widthMode),
                 columnCount: normalizedColumnTexts.count,
                 previewText: normalizedColumnTexts.joined(separator: " "),
                 columnTexts: normalizedColumnTexts,
@@ -155,6 +155,14 @@ extension NativeRichEditorViewModel {
     private static func normalizedColumnTexts(_ columnTexts: [String]) -> [String] {
         let limitedTexts = Array(columnTexts.prefix(NativeEditorColumnsBlock.maximumColumnCount))
         return limitedTexts.isEmpty ? [""] : limitedTexts
+    }
+
+    private static func normalizedColumnsWidthMode(_ widthMode: String) -> String {
+        let trimmedWidthMode = widthMode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard NativeEditorColumnsBlock.supportedWidthModes.contains(trimmedWidthMode) else {
+            return NativeEditorColumnsBlock.defaultWidthMode
+        }
+        return trimmedWidthMode
     }
 
     private static func normalizedColumnWidths(_ columnWidths: [Double?], count: Int) -> [Double?] {
