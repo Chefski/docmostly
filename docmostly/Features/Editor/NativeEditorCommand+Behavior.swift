@@ -85,7 +85,7 @@ extension NativeEditorCommand {
         case .table:
             ["rows", "columns"]
         case .baseInline:
-            ["base", "database", "grid", "spreadsheet"]
+            ["base", "database", "table", "grid", "spreadsheet"]
         case .kanban:
             ["board", "cards", "status", "task", "database"]
         case .callout:

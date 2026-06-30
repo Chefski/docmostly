@@ -151,7 +151,8 @@ struct NativeEditorSlashCommandTests {
             SlashCommandFilterExpectation(query: "pagebreak", title: "Page break"),
             SlashCommandFilterExpectation(query: "latex", title: "Math inline"),
             SlashCommandFilterExpectation(query: "lozenge", title: "Status"),
-            SlashCommandFilterExpectation(query: "reaction", title: "Emoji")
+            SlashCommandFilterExpectation(query: "reaction", title: "Emoji"),
+            SlashCommandFilterExpectation(query: "table", title: "Base (Inline)")
         ]
 
         for expectation in expectations {
