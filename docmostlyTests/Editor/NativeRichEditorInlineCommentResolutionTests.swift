@@ -63,6 +63,34 @@ struct NativeInlineCommentResolutionTests {
         ])
     }
 
+    @Test func updatesInlineCommentResolvedMarksInsideTableCells() throws {
+        let block = tableBlockWithCommentedCell()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+
+        viewModel.setInlineCommentResolved(commentID: "comment-1", isResolved: true)
+
+        let marks = try #require(tableCellTextMarks(from: viewModel))
+        #expect(marks == [
+            ProseMirrorMark(type: "comment", attrs: ["commentId": .string("comment-1"), "resolved": .bool(true)])
+        ])
+    }
+
+    @Test func removesInlineCommentMarksInsideTableCells() throws {
+        let block = tableBlockWithCommentedCell()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+
+        viewModel.removeInlineComment(commentID: "comment-1")
+
+        let marks = tableCellTextMarks(from: viewModel)
+        let containsRemovedComment = marks?.contains(ProseMirrorMark(
+            type: "comment",
+            attrs: ["commentId": .string("comment-1"), "resolved": .bool(false)]
+        )) ?? false
+        #expect(containsRemovedComment == false)
+    }
+
     @Test func remoteResolutionUpdatesInlineCommentMarksWhileReadOnly() {
         let block = NativeEditorBlock(
             kind: .paragraph,
@@ -183,6 +211,22 @@ struct NativeInlineCommentResolutionTests {
         return attributedText
     }
 
+    private func tableBlockWithCommentedCell() -> NativeEditorBlock {
+        let commentMark = NativeEditorTextMark.comment(commentID: "comment-1", isResolved: false)
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Table note",
+                    inlineContent: [.text("Table note", marks: [commentMark])],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+
+        return NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+    }
+
     private func overlappingMarkedText(_ text: String) -> AttributedString {
         var attributedText = AttributedString(text)
         attributedText[NativeEditorCommentIDAttribute.self] = "comment-1"
@@ -203,5 +247,14 @@ struct NativeInlineCommentResolutionTests {
         viewModel.document.proseMirrorDocument.content.first?.content?.flatMap { node in
             node.marks ?? []
         } ?? []
+    }
+
+    private func tableCellTextMarks(from viewModel: NativeRichEditorViewModel) -> [ProseMirrorMark]? {
+        viewModel.document.proseMirrorDocument.content.first?
+            .content?.first?
+            .content?.first?
+            .content?.first?
+            .content?.first?
+            .marks
     }
 }

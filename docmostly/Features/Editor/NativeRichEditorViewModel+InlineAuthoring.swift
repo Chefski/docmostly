@@ -157,63 +157,6 @@ extension NativeRichEditorViewModel {
         }
     }
 
-    private static func updateInlineCommentResolved(
-        commentID: String,
-        isResolved: Bool,
-        in document: inout NativeEditorDocument
-    ) -> Bool {
-        var didUpdate = false
-
-        for index in document.blocks.indices {
-            let ranges = document.blocks[index].text.runs.compactMap { run in
-                run.hasNativeEditorInlineComment(commentID: commentID) ? run.range : nil
-            }
-            guard ranges.isEmpty == false else { continue }
-
-            didUpdate = true
-            for range in ranges {
-                let comments = document.blocks[index].text[range]
-                    .nativeEditorInlineComments
-                    .updatingNativeEditorInlineComment(NativeEditorInlineCommentMark(
-                        commentID: commentID,
-                        isResolved: isResolved
-                    ))
-                document.blocks[index].text.setNativeEditorInlineComments(comments, in: range)
-            }
-        }
-
-        return didUpdate
-    }
-
-    private static func removeInlineComment(
-        commentID: String,
-        from document: inout NativeEditorDocument
-    ) -> Bool {
-        var didUpdate = false
-
-        for index in document.blocks.indices {
-            let ranges = document.blocks[index].text.runs.compactMap { run in
-                run.hasNativeEditorInlineComment(commentID: commentID) ? run.range : nil
-            }
-            guard ranges.isEmpty == false else { continue }
-
-            didUpdate = true
-            for range in ranges {
-                let highlightColor = document.blocks[index].text[range][NativeEditorHighlightColorAttribute.self]
-                let comments = document.blocks[index].text[range]
-                    .nativeEditorInlineComments
-                    .removingNativeEditorInlineComment(commentID: commentID)
-                document.blocks[index].text.setNativeEditorInlineComments(
-                    comments,
-                    in: range,
-                    fallbackBackgroundColor: highlightColor.flatMap { Color(docmostlyHex: $0) }
-                )
-            }
-        }
-
-        return didUpdate
-    }
-
     func insertStatusBadge(text: String, color: String) {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedText.isEmpty == false else { return }
@@ -278,32 +221,5 @@ extension NativeRichEditorViewModel {
 
             document.blocks[index].selection = AttributedTextSelection()
         }
-    }
-}
-
-private extension AttributedString {
-    mutating func setNativeEditorInlineComments(
-        _ comments: [NativeEditorInlineCommentMark],
-        in range: Range<AttributedString.Index>,
-        fallbackBackgroundColor: Color? = nil
-    ) {
-        let normalizedComments = comments.normalizedNativeEditorInlineComments
-        self[range][NativeEditorCommentMarksAttribute.self] = normalizedComments.isEmpty ? nil : normalizedComments
-        self[range][NativeEditorCommentIDAttribute.self] = normalizedComments.first?.commentID
-        self[range][NativeEditorCommentResolvedAttribute.self] = normalizedComments.first?.isResolved
-        self[range].backgroundColor = backgroundColor(
-            for: normalizedComments,
-            fallbackBackgroundColor: fallbackBackgroundColor
-        )
-    }
-
-    private func backgroundColor(
-        for comments: [NativeEditorInlineCommentMark],
-        fallbackBackgroundColor: Color?
-    ) -> Color? {
-        guard comments.isEmpty == false else { return fallbackBackgroundColor }
-        return comments.contains { $0.isResolved == false }
-            ? .yellow.opacity(0.28)
-            : .gray.opacity(0.16)
     }
 }
