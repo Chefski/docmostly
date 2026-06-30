@@ -20,10 +20,10 @@ nonisolated extension NativeEditorDocument {
         }
 
         if let rawNode = block.rawNode {
-            return rawNode
+            return nodeByAddingDocmostNodeIDs(rawNode, blockID: block.id)
         }
 
-        return richFallbackNode(from: block)
+        return nodeByAddingDocmostNodeIDs(richFallbackNode(from: block), blockID: block.id)
     }
 
     static func textContainerNode(
