@@ -46,6 +46,29 @@ struct NativeRichEditorUploadedMediaTests {
         #expect(node?.attrs?["align"] == .string("center"))
     }
 
+    @Test func insertingUploadedPDFUsesDocmostDefaultDimensions() {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/pdf"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.insertUploadedAttachment(
+            uploadedAttachment(fileName: "Spec.pdf", mimeType: "application/pdf", fileExt: "pdf"),
+            as: .pdf
+        )
+
+        guard case .pdf(let pdf) = viewModel.document.blocks[0].kind else {
+            Issue.record("Expected uploaded PDF to become a PDF block.")
+            return
+        }
+
+        let node = viewModel.document.proseMirrorDocument.content.first
+        #expect(pdf.width == NativeEditorPDFBlock.defaultWidth)
+        #expect(pdf.height == NativeEditorPDFBlock.defaultHeight)
+        #expect(node?.attrs?["width"] == .int(800))
+        #expect(node?.attrs?["height"] == .int(600))
+    }
+
     private func uploadedAttachment(
         fileName: String,
         mimeType: String,
