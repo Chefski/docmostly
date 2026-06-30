@@ -21,7 +21,7 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func cellRequiresHTMLMarkdown(_ cell: NativeEditorTableCell) -> Bool {
-        if let preservedContent = cell.preservedContent, preservedContent.isEmpty == false {
+        if tableCellPreservedContentRequiresHTML(cell) {
             return true
         }
 
@@ -30,6 +30,31 @@ extension NativeEditorMarkdownParser {
             cell.columnSpan > 1 ||
             cell.rowSpan > 1 ||
             cell.columnWidths.isEmpty == false
+    }
+
+    private static func tableCellPreservedContentRequiresHTML(_ cell: NativeEditorTableCell) -> Bool {
+        guard let preservedContent = cell.preservedContent, preservedContent.isEmpty == false else {
+            return false
+        }
+
+        let hasUnsupportedInlineContent = cell.inlineContent?.contains(where: isUnsupportedInlineContent) ?? false
+        guard preservedContent.count == 1,
+              let paragraph = preservedContent.first,
+              paragraph.type == "paragraph",
+              hasUnsupportedInlineContent == false else {
+            return true
+        }
+
+        let attrs = paragraph.attrs ?? [:]
+        return attrs.keys.allSatisfy { $0 == "textAlign" } == false
+    }
+
+    private static func isUnsupportedInlineContent(_ item: NativeEditorInlineContent) -> Bool {
+        if case .unsupported = item {
+            return true
+        }
+
+        return false
     }
 
     private static func htmlTableRowMarkdown(from row: NativeEditorTableRow) -> String {
