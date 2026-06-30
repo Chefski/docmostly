@@ -284,7 +284,14 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
     }
 
     static func diagramNode(from diagram: NativeEditorDiagramBlock, type: String) -> ProseMirrorNode {
-        var attrs = [String: ProseMirrorJSONValue]()
+        var attrs: [String: ProseMirrorJSONValue] = [
+            "src": .string(diagram.source ?? ""),
+            "width": .null,
+            "height": .null,
+            "size": .null,
+            "aspectRatio": .null,
+            "align": .string(diagram.alignment ?? "center")
+        ]
         if let source = diagram.source, source.isEmpty == false {
             attrs["src"] = .string(source)
         }
@@ -313,7 +320,7 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
             attrs["align"] = .string(alignment)
         }
 
-        return ProseMirrorNode(type: type, attrs: attrs.isEmpty ? nil : attrs)
+        return ProseMirrorNode(type: type, attrs: attrs)
     }
 
     private static func paragraphNode(_ text: String) -> ProseMirrorNode {

@@ -294,6 +294,32 @@ struct NativeEditorSlashCommandTests {
         #expect(node.attrs?["text"] == .string(""))
     }
 
+    @Test func applyingDiagramSlashCommandsUseDocmostDefaultNodeShape() throws {
+        let expectations = [
+            DiagramCommandExpectation(command: .drawio, nodeType: "drawio"),
+            DiagramCommandExpectation(command: .excalidraw, nodeType: "excalidraw")
+        ]
+
+        for expectation in expectations {
+            let viewModel = viewModelAfterApplying(expectation.command)
+            let block = viewModel.document.blocks[0]
+
+            guard block.kind.isDiagramBlock else {
+                Issue.record("Expected diagram block")
+                continue
+            }
+
+            let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+            #expect(node.type == expectation.nodeType)
+            #expect(node.attrs?["src"] == .string(""))
+            #expect(node.attrs?["width"] == .null)
+            #expect(node.attrs?["height"] == .null)
+            #expect(node.attrs?["size"] == .null)
+            #expect(node.attrs?["aspectRatio"] == .null)
+            #expect(node.attrs?["align"] == .string("center"))
+        }
+    }
+
     @Test func applyingProviderEmbedSlashCommandsCreatesProviderSpecificEmbedNodes() {
         let expectations = [
             EmbedCommandExpectation(command: .iframeEmbed, title: "Iframe embed", provider: "iframe"),
@@ -415,7 +441,23 @@ private struct BaseCommandExpectation {
     let previewText: String
 }
 
+private struct DiagramCommandExpectation {
+    let command: NativeEditorCommand
+    let nodeType: String
+}
+
 private struct SlashCommandFilterExpectation {
     let query: String
     let title: String
+}
+
+private extension NativeEditorBlockKind {
+    var isDiagramBlock: Bool {
+        switch self {
+        case .drawio, .excalidraw:
+            true
+        default:
+            false
+        }
+    }
 }
