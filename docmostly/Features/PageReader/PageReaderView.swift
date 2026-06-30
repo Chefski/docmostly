@@ -66,7 +66,8 @@ struct PageReaderView: View {
                             viewModel: editorViewModel,
                             focusedField: $editorFocusedField,
                             isAuthoringEnabled: readerMode == .edit,
-                            importAttachment: beginAttachmentImport
+                            importAttachment: beginAttachmentImport,
+                            applyCommand: applyEditorCommand
                         )
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
@@ -177,6 +178,7 @@ struct PageReaderView: View {
                         viewModel: editorViewModel,
                         isUploadingAttachment: isUploadingAttachment,
                         importAttachment: beginAttachmentImport,
+                        applyCommand: applyEditorCommand,
                         showMentionPicker: beginMentionSearch,
                         showInlineCommentComposer: beginInlineComment
                     ) {

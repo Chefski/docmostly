@@ -51,6 +51,19 @@ struct EndpointTests {
         #expect(request.httpBody == nil)
     }
 
+    @Test func buildsBaseCreateRequestWithKanbanTemplate() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.createBase(parentPageId: "page-1", template: .kanban)
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/bases/create")
+
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+        #expect(object["parentPageId"] == "page-1")
+        #expect(object["template"] == "kanban")
+    }
+
     @Test func buildsInlineCommentCreateRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let yjsSelection = NativeEditorYjsSelection(

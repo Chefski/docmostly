@@ -114,6 +114,16 @@ extension AppState {
         return page
     }
 
+    func createBase(parentPageId: String, template: DocmostBaseTemplate? = nil) async throws -> DocmostBase {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Creating bases requires a network connection.")
+        }
+
+        let base: DocmostBase = try await apiClient.send(.createBase(parentPageId: parentPageId, template: template))
+        isOffline = false
+        return base
+    }
+
     func createSpace(name: String, description: String?, slug: String) async throws -> DocmostSpace {
         guard let apiClient else {
             throw APIError.connectionFailed("Creating spaces requires a network connection.")

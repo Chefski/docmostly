@@ -18,6 +18,24 @@ extension NativeEditorCommand {
         }
     }
 
+    var baseCreationTemplate: DocmostBaseTemplate? {
+        switch self {
+        case .kanban:
+            .kanban
+        default:
+            nil
+        }
+    }
+
+    var requiresServerBackedBaseCreation: Bool {
+        switch self {
+        case .baseInline, .kanban:
+            true
+        default:
+            false
+        }
+    }
+
     func matches(query: String) -> Bool {
         matchPriority(query: query) != nil
     }

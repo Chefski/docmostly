@@ -18,6 +18,18 @@ extension NativeEditorCommand {
         return textReplacementBlock(reusing: id)
     }
 
+    func serverBackedBaseReplacementBlock(reusing id: UUID, pendingKey: String) -> NativeEditorBlock? {
+        guard case .base(var base) = blockKind else { return nil }
+
+        base.pageID = nil
+        base.pendingKey = pendingKey
+        return richBlock(
+            id: id,
+            kind: .base(base),
+            rawNode: NativeEditorRichBlockNodeFactory.baseNode(from: base)
+        )
+    }
+
     private func mediaReplacementBlock(reusing id: UUID) -> NativeEditorBlock? {
         switch self {
         case .image:

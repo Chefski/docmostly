@@ -83,6 +83,7 @@ nonisolated enum Endpoint: Sendable {
     case unwatchSpace(spaceId: String)
     case spaceWatchStatus(spaceId: String)
     case search(query: String, spaceId: String? = nil, limit: Int = 20)
+    case createBase(parentPageId: String, template: DocmostBaseTemplate? = nil)
     case updatePage(
         pageId: String,
         title: String? = nil,
@@ -233,6 +234,8 @@ nonisolated enum Endpoint: Sendable {
             "spaces/watch-status"
         case .search:
             "search"
+        case .createBase:
+            "bases/create"
         case .updatePage:
             "pages/update"
         case .comments:
@@ -411,6 +414,8 @@ nonisolated enum Endpoint: Sendable {
             return try encode(SpaceInfoRequest(spaceId: spaceId))
         case .search(let query, let spaceId, let limit):
             return try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
+        case .createBase(let parentPageId, let template):
+            return try encode(CreateBaseRequest(parentPageId: parentPageId, template: template))
         case .updatePage(let pageId, let title, let content, let format, let operation):
             let hasContent: Bool
             if case .some = content {
@@ -694,6 +699,11 @@ nonisolated private struct SearchRequest: Encodable {
     let query: String
     let spaceId: String?
     let limit: Int
+}
+
+nonisolated private struct CreateBaseRequest: Encodable {
+    let parentPageId: String
+    let template: DocmostBaseTemplate?
 }
 
 nonisolated private struct UpdatePageRequest: Encodable {

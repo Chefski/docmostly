@@ -66,6 +66,21 @@ extension PageReaderView {
         isShowingMentionPicker = true
     }
 
+    func applyEditorCommand(_ command: NativeEditorCommand) {
+        guard command.requiresServerBackedBaseCreation else {
+            editorViewModel?.applySlashCommand(command)
+            return
+        }
+
+        Task {
+            guard let editorViewModel else { return }
+            await editorViewModel.applyServerBackedBaseSlashCommand(command) { parentPageID, template in
+                let base = try await appState.createBase(parentPageId: parentPageID, template: template)
+                return base.id
+            }
+        }
+    }
+
     func handleAttachmentImport(_ result: Result<[URL], any Error>) {
         guard let importKind = attachmentImportKind else { return }
         attachmentImportKind = nil

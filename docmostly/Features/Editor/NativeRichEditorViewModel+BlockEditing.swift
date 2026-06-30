@@ -40,6 +40,99 @@ extension NativeRichEditorViewModel {
         }
     }
 
+    func applyServerBackedBaseSlashCommand(
+        _ command: NativeEditorCommand,
+        createBasePageID: (String, DocmostBaseTemplate?) async throws -> String
+    ) async {
+        guard command.requiresServerBackedBaseCreation else {
+            applySlashCommand(command)
+            return
+        }
+
+        let pendingKey = UUID().uuidString
+        guard let blockID = insertBasePlaceholder(for: command, pendingKey: pendingKey) else { return }
+
+        do {
+            let createdPageID = try await createBasePageID(currentPageID, command.baseCreationTemplate)
+            updateCreatedBasePlaceholder(blockID: blockID, pageID: createdPageID)
+        } catch {
+            removeFailedBasePlaceholder(blockID: blockID, pendingKey: pendingKey)
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func insertBasePlaceholder(for command: NativeEditorCommand, pendingKey: String) -> UUID? {
+        let slashContext = activeSlashCommandContext
+        var insertedBlockID: UUID?
+
+        performUndoableEdit {
+            guard
+                let index = activeBlockIndex,
+                let replacementBlock = command.serverBackedBaseReplacementBlock(
+                    reusing: document.blocks[index].id,
+                    pendingKey: pendingKey
+                )
+            else {
+                return
+            }
+
+            if let slashContext, slashContext.range.lowerBound != document.blocks[index].text.startIndex {
+                document.blocks[index].text.replaceSubrange(slashContext.range, with: AttributedString(""))
+                let insertedBlock = command.serverBackedBaseReplacementBlock(
+                    reusing: UUID(),
+                    pendingKey: pendingKey
+                ) ?? replacementBlock
+                let insertionIndex = document.blocks.index(after: index)
+                document.blocks.insert(insertedBlock, at: insertionIndex)
+                activeBlockID = insertedBlock.id
+                insertedBlockID = insertedBlock.id
+                return
+            }
+
+            document.blocks[index] = replacementBlock
+            insertedBlockID = replacementBlock.id
+        }
+
+        return insertedBlockID
+    }
+
+    private func updateCreatedBasePlaceholder(blockID: UUID, pageID: String) {
+        performUndoableEdit {
+            guard
+                let index = document.blocks.firstIndex(where: { $0.id == blockID }),
+                case .base(var base) = document.blocks[index].kind
+            else {
+                return
+            }
+
+            base.pageID = pageID
+            base.pendingKey = nil
+            document.blocks[index].kind = .base(base)
+            document.blocks[index].rawNode = NativeEditorRichBlockNodeFactory.baseNode(from: base)
+            document.blocks[index].text = AttributedString(base.previewText)
+        }
+    }
+
+    private func removeFailedBasePlaceholder(blockID: UUID, pendingKey: String) {
+        performUndoableEdit {
+            guard
+                let index = document.blocks.firstIndex(where: { $0.id == blockID }),
+                case .base(let base) = document.blocks[index].kind,
+                base.pendingKey == pendingKey
+            else {
+                return
+            }
+
+            document.blocks.remove(at: index)
+            if document.blocks.isEmpty {
+                document.blocks.append(
+                    NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+                )
+            }
+            activeBlockID = document.blocks[min(index, document.blocks.count - 1)].id
+        }
+    }
+
     @discardableResult
     private func applyInlineSlashCommand(_ command: NativeEditorCommand, now: Date) -> Bool {
         guard let segment = inlineSegment(for: command, now: now) else { return false }
