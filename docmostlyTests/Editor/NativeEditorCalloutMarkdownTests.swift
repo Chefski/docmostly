@@ -42,4 +42,22 @@ struct NativeEditorCalloutMarkdownTests {
         :::
         """)
     }
+
+    @Test func markdownExportUsesDocmostHTMLForCalloutStylesThatFencesCannotPreserve() {
+        let block = NativeEditorBlock(
+            kind: .callout(NativeEditorCalloutBlock(
+                style: "note",
+                icon: nil,
+                previewText: "Preserve the note style"
+            )),
+            text: AttributedString("Preserve the note style"),
+            alignment: .left
+        )
+
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == """
+        <div data-type="callout" data-callout-type="note">
+        Preserve the note style
+        </div>
+        """)
+    }
 }
