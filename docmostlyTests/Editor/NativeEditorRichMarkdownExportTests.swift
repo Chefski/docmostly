@@ -127,10 +127,10 @@ struct NativeEditorRichMarkdownExportTests {
         <div data-type="column" data-width="2" style="flex: 2">
         Plan
         </div>
-        <div data-type="column" data-width="1" style="flex: 1">
+        <div data-type="column">
 
         </div>
-        <div data-type="column" data-width="1" style="flex: 1">
+        <div data-type="column">
 
         </div>
         </div>

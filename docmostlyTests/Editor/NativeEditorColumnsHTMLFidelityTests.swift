@@ -55,4 +55,30 @@ struct NativeEditorColumnsHTMLFidelityTests {
 
         #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
     }
+
+    @Test func importedDocmostColumnsPreserveMissingColumnWidths() throws {
+        let markdown = """
+        <div data-type="columns" data-layout="two_equal">
+        <div data-type="column">
+        Plan rollout
+        </div>
+        <div data-type="column">
+        Ship notes
+        </div>
+        </div>
+        """
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        guard case .columns(let columns) = block.kind else {
+            Issue.record("Expected Docmost columns HTML to import as a native columns block.")
+            return
+        }
+
+        let columnNodes = try #require(block.rawNode?.content)
+
+        #expect(columns.widthMode == "normal")
+        #expect(columns.columnWidths == [nil, nil])
+        #expect(columnNodes.map { $0.attrs?["width"] } == [.null, .null])
+        #expect(NativeEditorMarkdownParser.markdown(from: [block]) == markdown)
+    }
 }

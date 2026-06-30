@@ -106,13 +106,12 @@ extension NativeEditorCommand {
     }
 
     private func columnsBlock(layout: String, columnCount: Int) -> NativeEditorBlockKind {
-        let labels = (1...columnCount).map { "Column \($0)" }
-        return .columns(NativeEditorColumnsBlock(
+        .columns(NativeEditorColumnsBlock(
             layout: layout,
-            widthMode: "wide",
+            widthMode: "normal",
             columnCount: columnCount,
-            previewText: labels.joined(separator: " "),
-            columnTexts: labels
+            previewText: "",
+            columnTexts: Array(repeating: "", count: columnCount)
         ))
     }
 

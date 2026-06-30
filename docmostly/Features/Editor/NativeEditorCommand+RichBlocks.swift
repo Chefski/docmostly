@@ -204,10 +204,10 @@ extension NativeEditorCommand {
 
         return NativeEditorColumnsBlock(
             layout: "two_equal",
-            widthMode: "wide",
+            widthMode: "normal",
             columnCount: 2,
-            previewText: "Column 1 Column 2",
-            columnTexts: ["Column 1", "Column 2"]
+            previewText: "",
+            columnTexts: ["", ""]
         )
     }
 

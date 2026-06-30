@@ -333,7 +333,7 @@ nonisolated enum NativeEditorRichBlockNodeFactory {
     private static func columnNode(text: String, width: Double?) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "column",
-            attrs: ["width": proseMirrorNumber(from: width ?? 1)],
+            attrs: ["width": width.map { proseMirrorNumber(from: $0) } ?? .null],
             content: [paragraphNode(text)]
         )
     }

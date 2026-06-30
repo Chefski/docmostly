@@ -38,8 +38,8 @@ struct NativeRichEditorStructuralBlockTests {
 
         #expect(node.content?.count == 3)
         #expect(node.content?[0].attrs?["width"] == .int(2))
-        #expect(node.content?[1].attrs?["width"] == .int(1))
-        #expect(node.content?[2].attrs?["width"] == .int(1))
+        #expect(node.content?[1].attrs?["width"] == .null)
+        #expect(node.content?[2].attrs?["width"] == .null)
         #expect(node.content?[0].content?.first?.content?.first?.text == "Plan")
         #expect(node.content?[1].content?.first?.content?.first?.text == nil)
         #expect(node.content?[2].content?.first?.content?.first?.text == nil)

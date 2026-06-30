@@ -205,7 +205,7 @@ struct NativeEditorSlashCommandTests {
         #expect(viewModel.isDirty == true)
     }
 
-    @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() {
+    @Test func applyingColumnSlashCommandsCreatesDocmostColumnLayouts() throws {
         let expectations = [
             ColumnCommandExpectation(command: .columns, layout: "two_equal", columnCount: 2),
             ColumnCommandExpectation(command: .columns3, layout: "three_equal", columnCount: 3),
@@ -224,10 +224,25 @@ struct NativeEditorSlashCommandTests {
 
             let node = viewModel.document.proseMirrorDocument.content.first
             #expect(columns.layout == expectation.layout)
+            #expect(columns.widthMode == "normal")
             #expect(columns.columnCount == expectation.columnCount)
-            #expect(node?.type == "columns")
-            #expect(node?.attrs?["layout"] == .string(expectation.layout))
-            #expect(node?.content?.count == expectation.columnCount)
+            #expect(columns.columnTexts == Array(repeating: "", count: expectation.columnCount))
+            #expect(String(block.text.characters).isEmpty)
+
+            let columnsNode = try #require(node)
+            let columnNodes = try #require(columnsNode.content)
+            #expect(columnsNode.type == "columns")
+            #expect(columnsNode.attrs?["layout"] == .string(expectation.layout))
+            #expect(columnsNode.attrs?["widthMode"] == .string("normal"))
+            #expect(columnNodes.count == expectation.columnCount)
+
+            for columnNode in columnNodes {
+                let paragraph = try #require(columnNode.content?.first)
+                #expect(columnNode.type == "column")
+                #expect(columnNode.attrs?["width"] == .null)
+                #expect(paragraph.type == "paragraph")
+                #expect((paragraph.content ?? []).isEmpty)
+            }
         }
     }
 
