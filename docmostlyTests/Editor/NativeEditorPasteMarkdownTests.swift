@@ -23,6 +23,33 @@ struct NativeEditorPasteMarkdownTests {
         #expect(viewModel.activeBlockID == viewModel.document.blocks[1].id)
     }
 
+    @Test func pasteMarkdownURLOverSelectedTextAppliesLinkMarkLikeDocmostWeb() throws {
+        let text = AttributedString("Review the spec")
+        let range = try #require(text.range(of: "spec"))
+        let block = NativeEditorBlock(
+            kind: .paragraph,
+            text: text,
+            alignment: .left,
+            selection: AttributedTextSelection(range: range)
+        )
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.pasteMarkdown("https://example.com/spec")
+
+        #expect(viewModel.document.blocks.count == 1)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Review the spec")
+        #expect(viewModel.markdownForDocument() == "Review the [spec](https://example.com/spec)")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.map(\.text) == ["Review the ", "spec"])
+        #expect(
+            inlineNodes[1].marks?.contains(
+                ProseMirrorMark(type: "link", attrs: ["href": .string("https://example.com/spec")])
+            ) == true
+        )
+    }
+
     private func configuredViewModel(blocks: [NativeEditorBlock]) -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: blocks)
