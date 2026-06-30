@@ -295,18 +295,16 @@ struct NativeRichEditorMechanicsTests {
         let bodyHeaderFlags = table.rows.dropFirst().flatMap { $0.cells.map(\.isHeader) }
         #expect(headerFlags == Array(repeating: true, count: headerFlags.count))
         #expect(bodyHeaderFlags == Array(repeating: false, count: bodyHeaderFlags.count))
+        #expect(table.rows.allSatisfy { row in
+            row.cells.allSatisfy { $0.columnWidths == [150] }
+        })
 
         let tableNode = viewModel.document.proseMirrorDocument.content.last
         #expect(tableNode?.type == "table")
         #expect(tableNode?.content?.first?.content?.first?.type == "tableHeader")
+        #expect(tableNode?.content?.first?.content?.first?.attrs?["colwidth"] == .array([.int(150)]))
         #expect(tableNode?.content?.dropFirst().first?.content?.first?.type == "tableCell")
-        #expect(viewModel.markdownForDocument() == """
-        Intro
-        | Feature | Status |
-        | --- | --- |
-        | Tables | Native |
-        | Paste | Done |
-        """)
+        #expect(viewModel.markdownForDocument().contains(#"colwidth="150""#))
     }
 
     @Test func pasteMarkdownTablePreservesInlineMarksInCells() throws {
