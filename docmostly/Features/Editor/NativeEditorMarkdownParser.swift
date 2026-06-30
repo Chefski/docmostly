@@ -317,6 +317,9 @@ enum NativeEditorMarkdownParser {
 
     private static func simpleInputRule(from text: String) -> NativeEditorMarkdownInputRule? {
         let rules: [(String, NativeEditorBlockKind)] = [
+            ("###### ", .heading(level: 6)),
+            ("##### ", .heading(level: 5)),
+            ("#### ", .heading(level: 4)),
             ("### ", .heading(level: 3)),
             ("## ", .heading(level: 2)),
             ("# ", .heading(level: 1)),
