@@ -93,13 +93,13 @@ struct NativeEditorRichMarkdownExportTests {
 
         #expect(viewModel.markdownForDocument() == """
         <div data-type="columns" data-layout="three_equal" data-width-mode="wide">
-        <div data-type="column" data-width="1" style="flex: 1">
+        <div data-type="column">
         Plan
         </div>
-        <div data-type="column" data-width="1" style="flex: 1">
+        <div data-type="column">
         Build
         </div>
-        <div data-type="column" data-width="1" style="flex: 1">
+        <div data-type="column">
         Ship
         </div>
         </div>
