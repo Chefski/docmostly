@@ -17,10 +17,10 @@ struct NativeEditorSlashRangeTests {
         viewModel.applySlashCommand(.status)
 
         let inlineNodes = proseMirrorInlineNodes(from: viewModel)
-        #expect(String(viewModel.document.blocks[0].text.characters) == "Ship Status")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Ship SET STATUS")
         #expect(inlineNodes.map(\.type) == ["text", "status"])
         #expect(inlineNodes.first?.text == "Ship ")
-        #expect(inlineNodes[1].attrs?["text"] == .string("Status"))
+        #expect(inlineNodes[1].attrs?["text"] == .string(""))
         #expect(inlineNodes[1].attrs?["color"] == .string("gray"))
     }
 

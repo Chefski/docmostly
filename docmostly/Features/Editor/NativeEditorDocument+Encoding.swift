@@ -497,7 +497,7 @@ nonisolated extension NativeEditorDocument {
             var node = ProseMirrorNode(type: "status", attrs: statusAttrs(from: status))
             node.marks = atomMarks(from: run, presentationMarkType: "bold")
             return InlineAtomEncoding(
-                displayText: status.text,
+                displayText: status.displayText,
                 node: node,
                 presentationMarkType: "bold"
             )

@@ -201,7 +201,7 @@ struct NativeRichEditorViewModelTests {
         #expect(emojiText == ":")
     }
 
-    @Test func applyingStatusSlashCommandCreatesInlineStatusAtom() {
+    @Test func applyingStatusSlashCommandCreatesDocmostEmptyStatusAtom() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/status"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
@@ -212,8 +212,9 @@ struct NativeRichEditorViewModelTests {
         viewModel.applySlashCommand(.status)
 
         let inlineNodes = proseMirrorInlineNodes(from: viewModel)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "SET STATUS")
         #expect(inlineNodes.map(\.type) == ["status"])
-        #expect(inlineNodes.first?.attrs?["text"] == .string("Status"))
+        #expect(inlineNodes.first?.attrs?["text"] == .string(""))
         #expect(inlineNodes.first?.attrs?["color"] == .string("gray"))
     }
 

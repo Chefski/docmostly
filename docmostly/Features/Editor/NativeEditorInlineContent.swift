@@ -127,8 +127,14 @@ nonisolated struct NativeEditorMention: Equatable, Hashable, Sendable, Codable {
 }
 
 nonisolated struct NativeEditorStatusBadge: Equatable, Hashable, Sendable, Codable {
+    static let emptyDisplayText = "SET STATUS"
+
     var text: String
     var color: String
+
+    var displayText: String {
+        text.isEmpty ? Self.emptyDisplayText : text
+    }
 }
 
 nonisolated struct NativeEditorMathInline: Equatable, Hashable, Sendable, Codable {

@@ -67,7 +67,7 @@ extension NativeRichEditorViewModel {
         case .time:
             AttributedString(now.formatted(date: .omitted, time: .shortened))
         case .status:
-            statusSegment(text: "Status", color: "gray")
+            statusSegment(text: "", color: "gray")
         case .emoji:
             AttributedString(":")
         case .mathInline:
@@ -79,7 +79,7 @@ extension NativeRichEditorViewModel {
 
     private func statusSegment(text: String, color: String) -> AttributedString {
         let status = NativeEditorStatusBadge(text: text, color: color)
-        var segment = AttributedString(text)
+        var segment = AttributedString(status.displayText)
         segment[NativeEditorStatusAttribute.self] = status
         segment.inlinePresentationIntent = .stronglyEmphasized
         return segment

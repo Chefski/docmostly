@@ -44,7 +44,7 @@ nonisolated extension NativeEditorDocument {
             apply(marks, to: &segment)
             return segment
         case .status(let status, let marks):
-            var segment = AttributedString(status.text)
+            var segment = AttributedString(status.displayText)
             segment[NativeEditorStatusAttribute.self] = status
             apply(marks, to: &segment)
             return segment
