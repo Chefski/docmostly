@@ -46,6 +46,27 @@ struct NativeEditorMentionMarkdownTests {
         #expect(attrs["anchorId"] == .string("shipping"))
     }
 
+    @Test func pasteMarkdownRepeatedPageLinksUseUniqueDocmostNodeIdentifiers() {
+        let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [intro])
+        viewModel.focus(blockID: intro.id)
+
+        viewModel.pasteMarkdown(
+            """
+            Discuss [Roadmap](https://docs.example.com/s/product/p/native-roadmap-abc123) and \
+            [Roadmap](https://docs.example.com/s/product/p/native-roadmap-abc123) today
+            """
+        )
+
+        let mentionIdentifiers = viewModel.document.proseMirrorDocument.content.last?.content?
+            .filter { $0.type == "mention" }
+            .compactMap { $0.attrs?["id"]?.stringValue } ?? []
+
+        #expect(mentionIdentifiers.count == 2)
+        #expect(Set(mentionIdentifiers).count == 2)
+        #expect(mentionIdentifiers.allSatisfy(\.isDocmostMentionNodeIdentifier))
+    }
+
     @Test func pasteMarkdownPageMentionsPreservesSurroundingInlineMarks() {
         let intro = NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left)
         let viewModel = configuredViewModel(blocks: [intro])
@@ -164,5 +185,11 @@ struct NativeEditorMentionMarkdownTests {
         viewModel.document = NativeEditorDocument(blocks: blocks)
         viewModel.resetEditingHistory()
         return viewModel
+    }
+}
+
+private extension String {
+    var isDocmostMentionNodeIdentifier: Bool {
+        UUID(uuidString: self) != nil && dropFirst(14).first == "7"
     }
 }

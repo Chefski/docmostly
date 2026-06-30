@@ -228,7 +228,7 @@ extension NativeEditorMarkdownParser {
     ) {
         let displayLabel = plainMarkdownText(from: label).trimmingCharacters(in: .whitespacesAndNewlines)
         let mention = NativeEditorMention(
-            identifier: UUID().uuidString,
+            identifier: NativeEditorMentionNodeID.make(),
             label: displayLabel.isEmpty ? "Untitled" : displayLabel,
             entityType: "page",
             entityID: pageLink.slugID,
