@@ -3,6 +3,10 @@ import SwiftUI
 
 extension NativeRichEditorViewModel {
     func pasteMarkdown(_ markdown: String) {
+        if applySelectedTextLinkPasteIfPossible(markdown) {
+            return
+        }
+
         let pastedBlocks = Self.blocksForMarkdownInsertion(markdown)
         guard pastedBlocks.isEmpty == false else { return }
 
@@ -128,6 +132,50 @@ extension NativeRichEditorViewModel {
 
         let text = String(document.blocks[index].text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? index : nil
+    }
+
+    @discardableResult
+    private func applySelectedTextLinkPasteIfPossible(_ markdown: String) -> Bool {
+        guard
+            let pastedLink = Self.pastedSingleSafeLink(from: markdown),
+            let index = activeBlockIndex,
+            document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text)
+        else {
+            return false
+        }
+
+        performUndoableEdit {
+            guard
+                document.blocks.indices.contains(index),
+                document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text)
+            else {
+                return
+            }
+
+            var selection = document.blocks[index].selection
+            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                attributes.link = pastedLink.url
+                attributes[NativeEditorLinkAttribute.self] = pastedLink.link
+            }
+            document.blocks[index].selection = selection
+            selectedBlockID = nil
+            visibleBlockControlsID = nil
+        }
+
+        return true
+    }
+
+    private static func pastedSingleSafeLink(from markdown: String) -> (url: URL, link: NativeEditorLink)? {
+        let href = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard href.isEmpty == false,
+              href.unicodeScalars.contains(where: { CharacterSet.newlines.contains($0) }) == false,
+              let url = NativeEditorDocument.safeLinkURL(from: href),
+              let link = NativeEditorDocument.preservedLink(href: url.absoluteString)
+        else {
+            return nil
+        }
+
+        return (url, link)
     }
 
     private static let defaultPasteTableWidth = 150
