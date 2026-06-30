@@ -172,6 +172,7 @@ extension NativeRichEditorViewModel {
         var segment = AttributedString(mention.displayText)
         segment[NativeEditorMentionAttribute.self] = mention
         segment.foregroundColor = DocmostlyTheme.primary
+        segment += AttributedString(" ")
         insertInlineSegment(segment)
     }
 
