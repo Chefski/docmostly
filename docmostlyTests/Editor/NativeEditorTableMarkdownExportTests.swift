@@ -90,4 +90,99 @@ struct NativeEditorTableMarkdownExportTests {
                 """
         )
     }
+
+    @Test func markdownExportUsesDocmostHTMLForPreservedRichTableCells() throws {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Name", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Before let value = 1",
+                    preservedContent: [
+                        ProseMirrorNode(
+                            type: "paragraph",
+                            content: [ProseMirrorNode(type: "text", text: "Before")]
+                        ),
+                        ProseMirrorNode(
+                            type: "codeBlock",
+                            attrs: ["language": .string("swift")],
+                            content: [ProseMirrorNode(type: "text", text: "let value = 1")]
+                        )
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let importedTable) = importedBlock.kind else {
+            Issue.record("Expected exported Docmost HTML table to reimport as a table.")
+            return
+        }
+
+        #expect(markdown.contains("<table>"))
+        #expect(markdown.contains("<pre><code class=\"language-swift\">let value = 1</code></pre>"))
+        #expect(importedTable.rows[1].cells[0].preservedContent?.map(\.type) == ["paragraph", "codeBlock"])
+        #expect(importedTable.rows[1].cells[0].preservedContent?[1].attrs?["language"] == .string("swift"))
+    }
+
+    @Test func markdownExportRoundTripsStructuredDocmostTableCellBlocks() throws {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Content", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(
+                    plainText: "Confirm docs",
+                    preservedContent: [
+                        ProseMirrorNode(
+                            type: "taskList",
+                            content: [
+                                ProseMirrorNode(
+                                    type: "taskItem",
+                                    attrs: ["checked": .bool(true)],
+                                    content: [
+                                        ProseMirrorNode(
+                                            type: "paragraph",
+                                            content: [ProseMirrorNode(type: "text", text: "Confirm docs")]
+                                        )
+                                    ]
+                                )
+                            ]
+                        ),
+                        ProseMirrorNode(
+                            type: "image",
+                            attrs: [
+                                "src": .string("/api/attachments/img/image-1.png"),
+                                "alt": .string("Architecture"),
+                                "attachmentId": .string("image-1"),
+                                "width": .int(640)
+                            ]
+                        )
+                    ],
+                    isHeader: false,
+                    backgroundColorName: nil
+                )
+            ])
+        ])
+        let block = NativeEditorBlock(kind: .table(table), text: AttributedString("Table"), alignment: .left)
+
+        let markdown = NativeEditorMarkdownParser.markdown(from: [block])
+        let importedBlock = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let importedTable) = importedBlock.kind else {
+            Issue.record("Expected exported Docmost HTML table to reimport as a table.")
+            return
+        }
+
+        let preservedContent = try #require(importedTable.rows[1].cells[0].preservedContent)
+        #expect(markdown.contains("<ul data-type=\"taskList\">"))
+        #expect(markdown.contains("<img src=\"/api/attachments/img/image-1.png\""))
+        #expect(preservedContent.map(\.type) == ["taskList", "image"])
+        #expect(preservedContent[0].content?.first?.attrs?["checked"] == .bool(true))
+        #expect(preservedContent[1].attrs?["attachmentId"] == .string("image-1"))
+    }
 }

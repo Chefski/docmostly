@@ -66,6 +66,10 @@ extension NativeEditorMarkdownParser {
     }
 
     static func tableMarkdown(from table: NativeEditorTable) -> String {
+        if let htmlTableMarkdown = htmlTableMarkdown(from: table) {
+            return htmlTableMarkdown
+        }
+
         guard let headerRow = table.rows.first else { return "" }
 
         let columnCount = max(table.columnCount, 1)
