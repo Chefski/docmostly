@@ -148,8 +148,16 @@ extension NativeEditorMarkdownParser {
         let structuralRanges = structuralMatches.map(\.range)
         let calloutMatches = htmlTableCalloutContentMatches(from: html, excluding: structuralRanges)
         let calloutRanges = calloutMatches.map(\.range)
-        let listMatches = htmlTableListContentMatches(from: html, excluding: structuralRanges + calloutRanges)
-        let containerRanges = structuralRanges + calloutRanges + listMatches.map(\.range)
+        let blockquoteMatches = htmlTableBlockquoteContentMatches(
+            from: html,
+            excluding: structuralRanges + calloutRanges
+        )
+        let blockquoteRanges = blockquoteMatches.map(\.range)
+        let listMatches = htmlTableListContentMatches(
+            from: html,
+            excluding: structuralRanges + calloutRanges + blockquoteRanges
+        )
+        let containerRanges = structuralRanges + calloutRanges + blockquoteRanges + listMatches.map(\.range)
         let textBlockMatches = htmlRegexMatches(pattern: #"<(p|h[1-6])\b([^>]*)>(.*?)</\1>"#, in: html)
             .compactMap { match -> HTMLTableContentMatch? in
                 guard htmlTableRange(match.range, isNestedIn: containerRanges) == false else {
@@ -191,7 +199,7 @@ extension NativeEditorMarkdownParser {
         }
         let mediaMatches = htmlTableMediaContentMatches(from: html, excluding: containerRanges)
         let preservedMatches = textBlockMatches + codeBlockMatches + mediaMatches +
-            listMatches + calloutMatches + structuralMatches
+            listMatches + blockquoteMatches + calloutMatches + structuralMatches
         let inlineGapMatches = htmlTableInlineGapContentMatches(from: html, between: preservedMatches)
         let nodes = (preservedMatches + inlineGapMatches)
             .sorted { $0.range.location < $1.range.location }
@@ -246,6 +254,27 @@ extension NativeEditorMarkdownParser {
             }
     }
 
+    private static func htmlTableBlockquoteContentMatches(
+        from html: String,
+        excluding excludedRanges: [NSRange]
+    ) -> [HTMLTableContentMatch] {
+        htmlRegexMatches(pattern: #"<blockquote\b([^>]*)>(.*?)</blockquote>"#, in: html)
+            .compactMap { match -> HTMLTableContentMatch? in
+                guard htmlTableRange(match.range, isNestedIn: excludedRanges) == false else {
+                    return nil
+                }
+                guard let attributeText = htmlRegexString(match: match, captureIndex: 1, in: html),
+                      let body = htmlRegexString(match: match, captureIndex: 2, in: html) else {
+                    return nil
+                }
+
+                return HTMLTableContentMatch(
+                    range: match.range,
+                    node: htmlTableBlockquoteNode(attributeText: attributeText, body: body)
+                )
+            }
+    }
+
     static func htmlTableRange(_ range: NSRange, isNestedIn ranges: [NSRange]) -> Bool {
         ranges.contains { container in
             range.location > container.location && NSMaxRange(range) <= NSMaxRange(container)
@@ -273,6 +302,24 @@ extension NativeEditorMarkdownParser {
             attrs: htmlTableContentAttrs(baseAttrs: [:], htmlAttrs: attrs),
             content: content
         )
+    }
+
+    private static func htmlTableBlockquoteNode(attributeText: String, body: String) -> ProseMirrorNode {
+        let attrs = docmostInlineHTMLAttributes(from: "<blockquote\(attributeText)>")
+        return ProseMirrorNode(
+            type: "blockquote",
+            attrs: htmlTableBlockquoteAttrs(from: attrs),
+            content: htmlTableContainerContent(from: body)
+        )
+    }
+
+    private static func htmlTableBlockquoteAttrs(from attrs: [String: String]) -> [String: ProseMirrorJSONValue]? {
+        let dataAttrs = attrs.compactMap { key, value -> (String, ProseMirrorJSONValue)? in
+            guard key.hasPrefix("data-") else { return nil }
+            return (String(key.dropFirst("data-".count)), .string(value))
+        }
+        let nodeAttrs = Dictionary(uniqueKeysWithValues: dataAttrs)
+        return nodeAttrs.isEmpty ? nil : nodeAttrs
     }
 
     private static func htmlTableCalloutNode(

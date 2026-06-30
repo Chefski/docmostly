@@ -4,6 +4,35 @@ import Testing
 
 @MainActor
 struct NativeEditorTableMixedContentTests {
+    @Test func docmostHTMLTableCellPreservesBlockquoteContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td><p>Before quote</p><blockquote><p>Decision context</p></blockquote><p>After quote</p></td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+        guard case .table(let table) = block.kind else {
+            Issue.record("Expected Docmost HTML table to import as a native table block.")
+            return
+        }
+
+        let cell = try #require(table.rows.first?.cells.first)
+        let preservedContent = try #require(cell.preservedContent)
+        #expect(preservedContent.map(\.type) == ["paragraph", "blockquote", "paragraph"])
+        #expect(preservedContent[1].content?.first?.type == "paragraph")
+        #expect(preservedContent[1].content?.first?.content?.first?.text == "Decision context")
+
+        let node = NativeEditorDocument.node(from: block)
+        let cellContent = try #require(node.content?.first?.content?.first?.content)
+        #expect(cellContent.map(\.type) == ["paragraph", "blockquote", "paragraph"])
+        #expect(cellContent[1].content?.first?.content?.first?.text == "Decision context")
+    }
+
     @Test func docmostHTMLTableCellPreservesInlineSiblingsAroundCodeBlock() throws {
         let markdown = """
         <table>

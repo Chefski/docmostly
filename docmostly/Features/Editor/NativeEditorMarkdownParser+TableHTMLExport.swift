@@ -162,6 +162,8 @@ extension NativeEditorMarkdownParser {
         switch node.type {
         case "callout":
             htmlTableCalloutMarkdown(from: node)
+        case "blockquote":
+            htmlTableBlockquoteMarkdown(from: node)
         case "details":
             htmlTableDetailsMarkdown(from: node)
         case "columns":
@@ -266,6 +268,15 @@ extension NativeEditorMarkdownParser {
         \(openingTag)
         \(body)
         </div>
+        """
+    }
+
+    private static func htmlTableBlockquoteMarkdown(from node: ProseMirrorNode) -> String {
+        let body = (node.content ?? []).map(htmlTableCellContentMarkdown).joined(separator: "\n")
+        return """
+        <blockquote>
+        \(body)
+        </blockquote>
         """
     }
 
