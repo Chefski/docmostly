@@ -205,16 +205,49 @@ nonisolated extension NativeEditorDocument {
             return (href, url)
         }
 
-        guard href.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
-              href.lowercased().hasPrefix("www."),
-              href.dropFirst(4).contains(".")
-        else {
+        guard isProtocolLessWebLink(href) else {
             return nil
         }
 
         let normalizedHref = "http://\(href)"
         guard let url = safeLinkURL(from: normalizedHref) else { return nil }
         return (normalizedHref, url)
+    }
+
+    private static func isProtocolLessWebLink(_ href: String) -> Bool {
+        guard href.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              href.contains("://") == false
+        else {
+            return false
+        }
+
+        let hostEnd = href.firstIndex { "/?#".contains($0) } ?? href.endIndex
+        let host = href[..<hostEnd]
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2,
+              labels.allSatisfy({ $0.isEmpty == false }),
+              let topLevelDomain = labels.last,
+              topLevelDomain.count >= 2,
+              topLevelDomain.allSatisfy(\.isLetter)
+        else {
+            return false
+        }
+
+        return labels.allSatisfy(isValidDomainLabel)
+    }
+
+    private static func isValidDomainLabel(_ label: Substring) -> Bool {
+        guard let first = label.first,
+              let last = label.last,
+              first.isLetter || first.isNumber,
+              last.isLetter || last.isNumber
+        else {
+            return false
+        }
+
+        return label.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "-"
+        }
     }
 
     static func preservedLink(href: String, isInternal: Bool = false) -> NativeEditorLink? {
