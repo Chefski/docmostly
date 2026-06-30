@@ -191,11 +191,8 @@ extension NativeEditorCommand {
             type: "details",
             attrs: ["open": .bool(true)],
             content: [
-                ProseMirrorNode(
-                    type: "detailsSummary",
-                    content: NativeEditorDocument.inlineNodes(from: AttributedString("Details"))
-                ),
-                ProseMirrorNode(type: "detailsContent", content: [paragraphNode("Details")])
+                ProseMirrorNode(type: "detailsSummary"),
+                ProseMirrorNode(type: "detailsContent", content: [paragraphNode("")])
             ]
         )
     }

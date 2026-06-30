@@ -252,6 +252,32 @@ struct NativeEditorSlashCommandTests {
         #expect((paragraph.content ?? []).isEmpty)
     }
 
+    @Test func applyingDetailsSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.details)
+        let block = viewModel.document.blocks[0]
+
+        guard case .details(let details) = block.kind else {
+            Issue.record("Expected details block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let summary = try #require(node.content?.first)
+        let content = try #require(node.content?.dropFirst().first)
+        let paragraph = try #require(content.content?.first)
+        #expect(details.summary == "Details")
+        #expect(details.previewText == "Details")
+        #expect(details.isOpen == true)
+        #expect(String(block.text.characters) == "Details")
+        #expect(node.type == "details")
+        #expect(node.attrs?["open"] == .bool(true))
+        #expect(summary.type == "detailsSummary")
+        #expect((summary.content ?? []).isEmpty)
+        #expect(content.type == "detailsContent")
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
+    }
+
     @Test func applyingProviderEmbedSlashCommandsCreatesProviderSpecificEmbedNodes() {
         let expectations = [
             EmbedCommandExpectation(command: .iframeEmbed, title: "Iframe embed", provider: "iframe"),
