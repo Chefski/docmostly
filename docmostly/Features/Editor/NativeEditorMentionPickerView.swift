@@ -5,7 +5,7 @@ struct NativeEditorMentionPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: NativeRichEditorViewModel
     @State private var query = ""
-    @State private var results: [DocmostSearchResult] = []
+    @State private var suggestions = DocmostMentionSuggestionResponse()
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var searchTask: Task<Void, Never>?
@@ -22,24 +22,41 @@ struct NativeEditorMentionPickerView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ForEach(results) { result in
-                    Button {
-                        insertMention(result)
-                    } label: {
-                        NativeEditorMentionResultRow(result: result)
+                if suggestions.users.isEmpty == false {
+                    Section("People") {
+                        ForEach(suggestions.users) { user in
+                            Button {
+                                insertMention(user)
+                            } label: {
+                                NativeEditorMentionUserSuggestionRow(user: user)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
+                }
+
+                if suggestions.pages.isEmpty == false {
+                    Section("Pages") {
+                        ForEach(suggestions.pages) { page in
+                            Button {
+                                insertMention(page)
+                            } label: {
+                                NativeEditorMentionPageSuggestionRow(page: page)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
             .overlay {
                 if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    ContentUnavailableView("Search pages", systemImage: "at")
-                } else if results.isEmpty && isSearching == false && errorMessage == nil {
-                    ContentUnavailableView("No pages found", systemImage: "doc.text.magnifyingglass")
+                    ContentUnavailableView("Search people and pages", systemImage: "at")
+                } else if suggestions.isEmpty && isSearching == false && errorMessage == nil {
+                    ContentUnavailableView("No mention results", systemImage: "doc.text.magnifyingglass")
                 }
             }
-            .navigationTitle("Mention Page")
-            .searchable(text: $query, prompt: "Search pages")
+            .navigationTitle("Mention")
+            .searchable(text: $query, prompt: "Search people and pages")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: dismiss.callAsFunction)
@@ -77,7 +94,7 @@ struct NativeEditorMentionPickerView: View {
     private func search(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
-            results = []
+            suggestions = DocmostMentionSuggestionResponse()
             errorMessage = nil
             return
         }
@@ -89,48 +106,80 @@ struct NativeEditorMentionPickerView: View {
         }
 
         do {
-            let fetchedResults = try await appState.search(query: trimmed, spaceId: appState.selectedSpaceID)
+            let fetchedSuggestions = try await appState.searchMentionSuggestions(
+                query: trimmed,
+                spaceId: appState.selectedSpaceID
+            )
             guard Task.isCancelled == false else { return }
             guard trimmed == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-            results = fetchedResults
+            suggestions = fetchedSuggestions
         } catch {
             guard Task.isCancelled == false else { return }
-            results = []
+            suggestions = DocmostMentionSuggestionResponse()
             errorMessage = error.localizedDescription
         }
     }
 
-    private func insertMention(_ result: DocmostSearchResult) {
-        viewModel.insertMention(NativeEditorMention(pageSearchResult: result))
+    private func insertMention(_ user: DocmostMentionUserSuggestion) {
+        viewModel.insertMention(NativeEditorMention(
+            userSuggestion: user,
+            creatorID: appState.currentUser?.user.id
+        ))
+        dismiss()
+    }
+
+    private func insertMention(_ page: DocmostMentionPageSuggestion) {
+        viewModel.insertMention(NativeEditorMention(
+            pageSuggestion: page,
+            creatorID: appState.currentUser?.user.id
+        ))
         dismiss()
     }
 }
 
-private struct NativeEditorMentionResultRow: View {
-    let result: DocmostSearchResult
+private struct NativeEditorMentionUserSuggestionRow: View {
+    let user: DocmostMentionUserSuggestion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label {
-                Text(result.title.isEmpty ? "Untitled" : result.title)
+                Text(user.name.isEmpty ? "Unnamed person" : user.name)
                     .foregroundStyle(.primary)
             } icon: {
-                if let icon = result.icon, icon.isEmpty == false {
+                Image(systemName: "person.crop.circle")
+            }
+
+            if let email = user.email, email.isEmpty == false {
+                Text(email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+    }
+}
+
+private struct NativeEditorMentionPageSuggestionRow: View {
+    let page: DocmostMentionPageSuggestion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label {
+                Text(page.title.isEmpty ? "Untitled" : page.title)
+                    .foregroundStyle(.primary)
+            } icon: {
+                if let icon = page.icon, icon.isEmpty == false {
                     Text(icon)
                 } else {
                     Image(systemName: "doc.text")
                 }
             }
 
-            Text(result.space.name)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if let highlight = result.highlight, highlight.isEmpty == false {
-                Text(highlight.removingHTMLTags())
-                    .font(.footnote)
+            if let spaceName = page.space?.name, spaceName.isEmpty == false {
+                Text(spaceName)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

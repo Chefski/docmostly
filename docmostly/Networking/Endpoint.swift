@@ -83,6 +83,13 @@ nonisolated enum Endpoint: Sendable {
     case unwatchSpace(spaceId: String)
     case spaceWatchStatus(spaceId: String)
     case search(query: String, spaceId: String? = nil, limit: Int = 20)
+    case searchSuggestions(
+        query: String,
+        includeUsers: Bool = true,
+        includePages: Bool = true,
+        spaceId: String? = nil,
+        limit: Int = 10
+    )
     case createBase(parentPageId: String, template: DocmostBaseTemplate? = nil)
     case updatePage(
         pageId: String,
@@ -234,6 +241,8 @@ nonisolated enum Endpoint: Sendable {
             "spaces/watch-status"
         case .search:
             "search"
+        case .searchSuggestions:
+            "search/suggest"
         case .createBase:
             "bases/create"
         case .updatePage:
@@ -414,6 +423,14 @@ nonisolated enum Endpoint: Sendable {
             return try encode(SpaceInfoRequest(spaceId: spaceId))
         case .search(let query, let spaceId, let limit):
             return try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
+        case .searchSuggestions(let query, let includeUsers, let includePages, let spaceId, let limit):
+            return try encode(SearchSuggestionsRequest(
+                query: query,
+                includeUsers: includeUsers,
+                includePages: includePages,
+                spaceId: spaceId,
+                limit: limit
+            ))
         case .createBase(let parentPageId, let template):
             return try encode(CreateBaseRequest(parentPageId: parentPageId, template: template))
         case .updatePage(let pageId, let title, let content, let format, let operation):
@@ -697,6 +714,14 @@ nonisolated private struct LabelPagesRequest: Encodable {
 
 nonisolated private struct SearchRequest: Encodable {
     let query: String
+    let spaceId: String?
+    let limit: Int
+}
+
+nonisolated private struct SearchSuggestionsRequest: Encodable {
+    let query: String
+    let includeUsers: Bool
+    let includePages: Bool
     let spaceId: String?
     let limit: Int
 }
