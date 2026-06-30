@@ -87,6 +87,41 @@ struct TableHTMLStructuralImportTests {
         #expect(imported.nodeContent[1].content?.map(\.type) == ["column", "column"])
     }
 
+    @Test func docmostHTMLTableCellPreservesStructuredDetailsContent() throws {
+        let markdown = """
+        <table>
+        <tbody>
+        <tr>
+        <td>
+        <details open="">
+        <summary data-type="detailsSummary">Release notes</summary>
+        <div data-type="detailsContent">
+        <p>Ship native table support</p>
+        <div data-type="pageBreak" class="page-break"></div>
+        <p>Confirm paste round trip</p>
+        </div>
+        </details>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        """
+
+        let imported = try importedStructuralTableCell(from: markdown)
+        let details = try #require(imported.cell.preservedContent?.first)
+        let detailsContent = try #require(details.content?.first { $0.type == "detailsContent" })
+
+        #expect(imported.cell.preservedContent?.map(\.type) == ["details"])
+        #expect(detailsContent.content?.map(\.type) == ["paragraph", "pageBreak", "paragraph"])
+        #expect(detailsContent.content?.first?.content?.first?.text == "Ship native table support")
+        #expect(detailsContent.content?[2].content?.first?.text == "Confirm paste round trip")
+        #expect(imported.nodeContent.first?.content?.last?.content?.map(\.type) == [
+            "paragraph",
+            "pageBreak",
+            "paragraph"
+        ])
+    }
+
     @Test func docmostHTMLTableCellPreservesPageBreakBlocks() throws {
         let markdown = """
         <table>

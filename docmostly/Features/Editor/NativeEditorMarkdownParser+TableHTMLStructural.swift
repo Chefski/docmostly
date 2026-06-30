@@ -118,7 +118,7 @@ extension NativeEditorMarkdownParser {
 
     private static func htmlTableDetailsNode(attrs: [String: String], body: String) -> ProseMirrorNode {
         let summary = htmlTableDetailsSummary(from: body)
-        let detailsContent = htmlTableDetailsContent(from: body)
+        let detailsContent = htmlTableDetailsContentNodes(from: body)
 
         return ProseMirrorNode(
             type: "details",
@@ -130,12 +130,7 @@ extension NativeEditorMarkdownParser {
                 ),
                 ProseMirrorNode(
                     type: "detailsContent",
-                    content: [
-                        ProseMirrorNode(
-                            type: "paragraph",
-                            content: NativeEditorDocument.inlineNodes(from: inlineText(from: detailsContent))
-                        )
-                    ]
+                    content: detailsContent
                 )
             ]
         )
@@ -253,12 +248,12 @@ extension NativeEditorMarkdownParser {
         return summary.isEmpty ? "Details" : summary
     }
 
-    private static func htmlTableDetailsContent(from html: String) -> String {
+    private static func htmlTableDetailsContentNodes(from html: String) -> [ProseMirrorNode] {
         guard let detailsContent = htmlTableTypedDivContainers(from: html, dataType: "detailsContent").first else {
-            return ""
+            return []
         }
 
-        return htmlTableStructuralText(from: detailsContent.body)
+        return containerContentNodes(from: containerBodyLines(from: detailsContent.body))
     }
 
     private static func htmlTableDetailsIsOpen(attrs: [String: String]) -> Bool {
