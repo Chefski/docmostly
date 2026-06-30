@@ -49,7 +49,7 @@ nonisolated extension NativeEditorDocument {
             apply(marks, to: &segment)
             return segment
         case .mathInline(let math, let marks):
-            var segment = AttributedString(math.text)
+            var segment = AttributedString(math.displayText)
             segment[NativeEditorMathInlineAttribute.self] = math
             segment.inlinePresentationIntent = .code
             apply(marks, to: &segment)

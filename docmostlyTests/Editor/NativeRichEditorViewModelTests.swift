@@ -229,8 +229,9 @@ struct NativeRichEditorViewModelTests {
         viewModel.applySlashCommand(.mathInline)
 
         let inlineNodes = proseMirrorInlineNodes(from: viewModel)
+        #expect(String(viewModel.document.blocks[0].text.characters) == "SET EQUATION")
         #expect(inlineNodes.map(\.type) == ["mathInline"])
-        #expect(inlineNodes.first?.attrs?["text"] == .string("x = y"))
+        #expect(inlineNodes.first?.attrs?["text"] == .string(""))
     }
 
     @Test func insertingUploadedImageReplacesActiveBlockWithDocmostNode() {

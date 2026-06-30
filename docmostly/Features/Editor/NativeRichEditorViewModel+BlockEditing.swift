@@ -71,7 +71,7 @@ extension NativeRichEditorViewModel {
         case .emoji:
             AttributedString(":")
         case .mathInline:
-            mathInlineSegment(text: "x = y")
+            mathInlineSegment(text: "")
         default:
             nil
         }
@@ -87,7 +87,7 @@ extension NativeRichEditorViewModel {
 
     private func mathInlineSegment(text: String) -> AttributedString {
         let math = NativeEditorMathInline(text: text)
-        var segment = AttributedString(text)
+        var segment = AttributedString(math.displayText)
         segment[NativeEditorMathInlineAttribute.self] = math
         segment.inlinePresentationIntent = .code
         return segment

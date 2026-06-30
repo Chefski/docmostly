@@ -138,5 +138,11 @@ nonisolated struct NativeEditorStatusBadge: Equatable, Hashable, Sendable, Codab
 }
 
 nonisolated struct NativeEditorMathInline: Equatable, Hashable, Sendable, Codable {
+    static let emptyDisplayText = "SET EQUATION"
+
     var text: String
+
+    var displayText: String {
+        text.isEmpty ? Self.emptyDisplayText : text
+    }
 }
