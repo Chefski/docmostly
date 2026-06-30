@@ -4,6 +4,15 @@ import Testing
 
 @MainActor
 struct NativeEditorDocmostFilesImportTests {
+    @Test func imageMarkdownWithTrailingTextDoesNotDropTextDuringImport() throws {
+        let blocks = NativeEditorMarkdownParser.blocks(from: "![Hero](/files/image-1/Hero.png) ships today")
+
+        let block = try #require(blocks.first)
+        #expect(blocks.count == 1)
+        #expect(block.kind == .paragraph)
+        #expect(String(block.text.characters) == "![Hero](/files/image-1/Hero.png) ships today")
+    }
+
     @Test func importsDocmostFilesShorthandURLsWithAttachmentIDs() throws {
         let markdown = """
         ![Hero](/files/image-1/Hero.png)
