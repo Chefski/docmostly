@@ -6,16 +6,25 @@ extension NativeEditorMarkdownParser {
             return inlineMathText
         }
 
-        let attributedText = attributedInlineMarkdown(from: text)
-        guard String(attributedText.characters) != text else { return nil }
+        let attributedText = attributedInlineMarkdown(
+            from: text,
+            autolinksBareWebURLs: text.last?.isWhitespace == true
+        )
+        guard inlineMarkdownInputRuleChanged(attributedText, from: text) else { return nil }
         return attributedText
     }
 
-    static func attributedInlineMarkdown(from markdown: String) -> AttributedString {
+    static func attributedInlineMarkdown(
+        from markdown: String,
+        autolinksBareWebURLs: Bool = true
+    ) -> AttributedString {
         var output = AttributedString("")
         var remaining = markdown[...]
 
-        while let match = nextInlineMarkdownMatch(in: remaining) {
+        while let match = nextInlineMarkdownMatch(
+            in: remaining,
+            autolinksBareWebURLs: autolinksBareWebURLs
+        ) {
             output += AttributedString(String(remaining[..<match.range.lowerBound]))
             output += match.text
             remaining = remaining[match.range.upperBound...]
@@ -98,13 +107,29 @@ extension NativeEditorMarkdownParser {
             .replacing("]", with: "\\]")
     }
 
+    private static func inlineMarkdownInputRuleChanged(
+        _ attributedText: AttributedString,
+        from text: String
+    ) -> Bool {
+        if String(attributedText.characters) != text {
+            return true
+        }
+
+        return attributedText.runs.contains { run in
+            run[NativeEditorLinkAttribute.self] != nil || run.link != nil
+        }
+    }
+
     private struct InlineMarkdownMatch {
         var range: Range<String.Index>
         var text: AttributedString
         var priority: Int
     }
 
-    private static func nextInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
+    private static func nextInlineMarkdownMatch(
+        in markdown: Substring,
+        autolinksBareWebURLs: Bool
+    ) -> InlineMarkdownMatch? {
         [
             codeInlineMarkdownMatch(in: markdown),
             linkedInlineMarkdownMatch(in: markdown),
@@ -137,7 +162,8 @@ extension NativeEditorMarkdownParser {
                 delimiter: "_",
                 intent: .emphasized,
                 priority: 4
-            )
+            ),
+            autolinksBareWebURLs ? bareWebURLInlineMarkdownMatch(in: markdown) : nil
         ]
         .compactMap { $0 }
         .min { lhs, rhs in
@@ -274,6 +300,137 @@ extension NativeEditorMarkdownParser {
             text: text,
             priority: priority
         )
+    }
+
+    private static func bareWebURLInlineMarkdownMatch(in markdown: Substring) -> InlineMarkdownMatch? {
+        var searchStart = markdown.startIndex
+
+        while searchStart < markdown.endIndex,
+              let schemeRange = nextBareWebURLSchemeRange(in: markdown, startingAt: searchStart) {
+            defer { searchStart = schemeRange.upperBound }
+
+            guard isBareWebURLBoundaryBefore(schemeRange.lowerBound, in: markdown) else {
+                continue
+            }
+
+            let rawEnd = bareWebURLCandidateEnd(in: markdown, startingAt: schemeRange.lowerBound)
+            let urlEnd = trimmingBareWebURLTrailingPunctuation(
+                in: markdown,
+                range: schemeRange.lowerBound..<rawEnd
+            )
+            guard urlEnd > schemeRange.upperBound else {
+                continue
+            }
+
+            let href = String(markdown[schemeRange.lowerBound..<urlEnd])
+            guard NativeEditorDocument.safeLinkURL(from: href) != nil else {
+                continue
+            }
+
+            var text = AttributedString(href)
+            NativeEditorDocument.applyLinkMark(href: href, isInternal: false, to: &text)
+            return InlineMarkdownMatch(
+                range: schemeRange.lowerBound..<urlEnd,
+                text: text,
+                priority: 5
+            )
+        }
+
+        return nil
+    }
+
+    private static func nextBareWebURLSchemeRange(
+        in markdown: Substring,
+        startingAt searchStart: String.Index
+    ) -> Range<String.Index>? {
+        guard searchStart < markdown.endIndex else { return nil }
+
+        let searchRange = searchStart..<markdown.endIndex
+        let httpRange = markdown.range(of: "http://", options: .caseInsensitive, range: searchRange)
+        let httpsRange = markdown.range(of: "https://", options: .caseInsensitive, range: searchRange)
+
+        switch (httpRange, httpsRange) {
+        case (.some(let httpRange), .some(let httpsRange)):
+            return httpRange.lowerBound < httpsRange.lowerBound ? httpRange : httpsRange
+        case (.some(let httpRange), nil):
+            return httpRange
+        case (nil, .some(let httpsRange)):
+            return httpsRange
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private static func isBareWebURLBoundaryBefore(_ index: String.Index, in markdown: Substring) -> Bool {
+        guard index > markdown.startIndex else { return true }
+
+        let previousCharacter = markdown[markdown.index(before: index)]
+        return previousCharacter.isWhitespace || "([{\"'<".contains(previousCharacter)
+    }
+
+    private static func bareWebURLCandidateEnd(
+        in markdown: Substring,
+        startingAt urlStart: String.Index
+    ) -> String.Index {
+        var urlEnd = urlStart
+        while urlEnd < markdown.endIndex, isBareWebURLCharacter(markdown[urlEnd]) {
+            urlEnd = markdown.index(after: urlEnd)
+        }
+
+        return urlEnd
+    }
+
+    private static func isBareWebURLCharacter(_ character: Character) -> Bool {
+        if character.isWhitespace {
+            return false
+        }
+
+        return "<>\"".contains(character) == false
+    }
+
+    private static func trimmingBareWebURLTrailingPunctuation(
+        in markdown: Substring,
+        range: Range<String.Index>
+    ) -> String.Index {
+        var endIndex = range.upperBound
+
+        while endIndex > range.lowerBound {
+            let lastIndex = markdown.index(before: endIndex)
+            let lastCharacter = markdown[lastIndex]
+
+            if ".,;:!?".contains(lastCharacter) ||
+                hasUnbalancedTrailingDelimiter(lastCharacter, in: markdown, range: range.lowerBound..<endIndex) {
+                endIndex = lastIndex
+            } else {
+                break
+            }
+        }
+
+        return endIndex
+    }
+
+    private static func hasUnbalancedTrailingDelimiter(
+        _ character: Character,
+        in markdown: Substring,
+        range: Range<String.Index>
+    ) -> Bool {
+        let delimiterPair: (opening: Character, closing: Character)? = switch character {
+        case ")":
+            ("(", ")")
+        case "]":
+            ("[", "]")
+        case "}":
+            ("{", "}")
+        default:
+            nil
+        }
+
+        guard let delimiterPair else { return false }
+
+        let slice = markdown[range]
+        let openingCount = slice.filter { $0 == delimiterPair.opening }.count
+        let closingCount = slice.filter { $0 == delimiterPair.closing }.count
+        return closingCount > openingCount
     }
 
     private static func isImageMarker(before index: String.Index, in markdown: Substring) -> Bool {
