@@ -210,10 +210,10 @@ struct NativeEditorTableMarkdownExportTests {
 
         let markdown = NativeEditorMarkdownParser.markdown(from: [block])
 
-        #expect(markdown.contains(#"style="background-color: #DBEAFE""#))
-        #expect(markdown.contains(#"style="background-color: #FEF3C7""#))
-        #expect(markdown.contains(#"data-background-color="#DBEAFE""#))
-        #expect(markdown.contains(#"data-background-color="#FEF3C7""#))
+        #expect(markdown.contains("style=\"background-color: #DBEAFE\""))
+        #expect(markdown.contains("style=\"background-color: #FEF3C7\""))
+        #expect(markdown.contains("data-background-color=\"#DBEAFE\""))
+        #expect(markdown.contains("data-background-color=\"#FEF3C7\""))
         #expect(markdown.contains(#"data-background-color-name="blue""#))
         #expect(markdown.contains(#"data-background-color-name="yellow""#))
     }
