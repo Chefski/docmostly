@@ -248,7 +248,8 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func htmlTableTaskItemAttrs(from node: ProseMirrorNode) -> [(String, String?)] {
-        [("data-type", "taskItem"), ("data-checked", node.attrs?["checked"]?.boolValue == true ? "true" : nil)]
+        let checked = node.attrs?["checked"]?.boolValue == true ? "true" : "false"
+        return [("data-type", "taskItem"), ("data-checked", checked)]
     }
 
     private static func htmlTableListItemMarkdown(
