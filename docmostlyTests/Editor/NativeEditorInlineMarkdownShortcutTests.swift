@@ -63,6 +63,25 @@ struct NativeEditorInlineMarkdownShortcutTests {
         } != true)
     }
 
+    @Test func markdownInputRuleAutolinksProtocolLessWebURLLikeDocmostWeb() throws {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = configuredViewModel(blocks: [block])
+        viewModel.focus(blockID: block.id)
+
+        viewModel.document.blocks[0].text = AttributedString("Visit www.example.com/docs ")
+        viewModel.handleDocumentChanged()
+
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Visit www.example.com/docs ")
+
+        let inlineNodes = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        #expect(inlineNodes.contains {
+            $0.text == "www.example.com/docs" &&
+                $0.marks?.contains(
+                    ProseMirrorMark(type: "link", attrs: ["href": .string("http://www.example.com/docs")])
+                ) == true
+        })
+    }
+
     private func configuredViewModel(blocks: [NativeEditorBlock]) -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: blocks)
