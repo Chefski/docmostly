@@ -181,8 +181,8 @@ extension NativeEditorCommand {
     private var calloutNode: ProseMirrorNode {
         ProseMirrorNode(
             type: "callout",
-            attrs: ["type": .string("info"), "icon": .string("lightbulb")],
-            content: [paragraphNode("Callout")]
+            attrs: ["type": .string("info")],
+            content: [paragraphNode("")]
         )
     }
 

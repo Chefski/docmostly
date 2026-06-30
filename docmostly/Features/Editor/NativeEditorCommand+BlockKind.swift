@@ -38,7 +38,7 @@ extension NativeEditorCommand {
         case .kanban:
             .base(NativeEditorBaseBlock(pageID: nil, pendingKey: nil, previewText: "Kanban"))
         case .callout:
-            .callout(NativeEditorCalloutBlock(style: "info", icon: "lightbulb", previewText: "Callout"))
+            .callout(NativeEditorCalloutBlock(style: "info", icon: nil, previewText: "Callout"))
         case .details:
             .details(NativeEditorDetailsBlock(summary: "Details", previewText: "Details", isOpen: true))
         case .mathInline:

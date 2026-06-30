@@ -231,6 +231,27 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
+    @Test func applyingCalloutSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.callout)
+        let block = viewModel.document.blocks[0]
+
+        guard case .callout(let callout) = block.kind else {
+            Issue.record("Expected callout block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        let paragraph = try #require(node.content?.first)
+        #expect(callout.style == "info")
+        #expect(callout.icon == nil)
+        #expect(String(block.text.characters) == "Callout")
+        #expect(node.type == "callout")
+        #expect(node.attrs?["type"] == .string("info"))
+        #expect(node.attrs?["icon"] == nil)
+        #expect(paragraph.type == "paragraph")
+        #expect((paragraph.content ?? []).isEmpty)
+    }
+
     @Test func applyingProviderEmbedSlashCommandsCreatesProviderSpecificEmbedNodes() {
         let expectations = [
             EmbedCommandExpectation(command: .iframeEmbed, title: "Iframe embed", provider: "iframe"),
