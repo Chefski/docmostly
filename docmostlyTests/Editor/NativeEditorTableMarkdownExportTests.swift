@@ -125,6 +125,7 @@ struct NativeEditorTableMarkdownExportTests {
         }
 
         #expect(markdown.contains("<table>"))
+        #expect(markdown.contains(#"<div class="tableWrapper">"#))
         #expect(markdown.contains("<pre><code class=\"language-swift\">let value = 1</code></pre>"))
         #expect(importedTable.rows[1].cells[0].preservedContent?.map(\.type) == ["paragraph", "codeBlock"])
         #expect(importedTable.rows[1].cells[0].preservedContent?[1].attrs?["language"] == .string("swift"))

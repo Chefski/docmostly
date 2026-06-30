@@ -6,11 +6,13 @@ extension NativeEditorMarkdownParser {
 
         let rows = table.rows.map(htmlTableRowMarkdown).joined(separator: "\n")
         return """
+        <div class="tableWrapper">
         <table>
         <tbody>
         \(rows)
         </tbody>
         </table>
+        </div>
         """
     }
 
