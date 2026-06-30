@@ -278,6 +278,22 @@ struct NativeEditorSlashCommandTests {
         #expect((paragraph.content ?? []).isEmpty)
     }
 
+    @Test func applyingMathBlockSlashCommandUsesDocmostDefaultNodeShape() throws {
+        let viewModel = viewModelAfterApplying(.mathBlock)
+        let block = viewModel.document.blocks[0]
+
+        guard case .mathBlock(let math) = block.kind else {
+            Issue.record("Expected math block")
+            return
+        }
+
+        let node = try #require(viewModel.document.proseMirrorDocument.content.first)
+        #expect(math.text.isEmpty)
+        #expect(String(block.text.characters).isEmpty)
+        #expect(node.type == "mathBlock")
+        #expect(node.attrs?["text"] == .string(""))
+    }
+
     @Test func applyingProviderEmbedSlashCommandsCreatesProviderSpecificEmbedNodes() {
         let expectations = [
             EmbedCommandExpectation(command: .iframeEmbed, title: "Iframe embed", provider: "iframe"),

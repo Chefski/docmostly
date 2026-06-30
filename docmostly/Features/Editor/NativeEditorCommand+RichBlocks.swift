@@ -246,7 +246,7 @@ extension NativeEditorCommand {
     }
 
     private var mathBlockNode: ProseMirrorNode {
-        ProseMirrorNode(type: "mathBlock", attrs: ["text": .string("E = mc^2")])
+        ProseMirrorNode(type: "mathBlock", attrs: ["text": .string("")])
     }
 
     private func diagramNode(type: String) -> ProseMirrorNode {

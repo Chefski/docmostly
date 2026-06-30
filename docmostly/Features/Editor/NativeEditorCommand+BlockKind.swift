@@ -93,7 +93,7 @@ extension NativeEditorCommand {
         case .googleSheetsEmbed:
             embedBlock(provider: "gsheets")
         case .mathBlock:
-            .mathBlock(NativeEditorMathBlock(text: "E = mc^2"))
+            .mathBlock(NativeEditorMathBlock(text: ""))
         case .mermaid:
             .codeBlock(language: "mermaid")
         case .drawio:
