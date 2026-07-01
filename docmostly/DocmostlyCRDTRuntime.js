@@ -13098,6 +13098,7 @@ ${err.toString()}`);
 
   // src/docmostly-crdt-runtime.js
   var fragmentName = "default";
+  var seedClientID = 1;
   var schema = new Schema2({
     nodes: {
       doc: { content: "block+" },
@@ -13302,7 +13303,7 @@ ${err.toString()}`);
       this.snapshots = [];
       this.ydoc = new Doc();
       this.fragment = this.ydoc.getXmlFragment(fragmentName);
-      this.applyDocument(seed.title, seed.document, this.remoteOrigin);
+      this.applySeedDocument(seed.title, seed.document);
       this.ydoc.on("update", (update, origin) => {
         if (origin === this.localOrigin) {
           this.localUpdates.push(base64FromBytes(update));
@@ -13380,6 +13381,18 @@ ${err.toString()}`);
       this.snapshots = [];
       return snapshots;
     }
+    applySeedDocument(title, document2) {
+      this.title = title;
+      const seedDoc = new Doc();
+      seedDoc.clientID = seedClientID;
+      const seedFragment = seedDoc.getXmlFragment(fragmentName);
+      const nextDoc = schema.nodeFromJSON(normalizedDocument(document2));
+      const transactionTarget = {
+        transact: (operation) => seedDoc.transact(operation, this.remoteOrigin)
+      };
+      updateYFragment(transactionTarget, seedFragment, nextDoc, mappingStateFor(seedFragment));
+      applyUpdate(this.ydoc, encodeStateAsUpdate(seedDoc), this.remoteOrigin);
+    }
     applyDocument(title, document2, origin) {
       this.title = title;
       const nextDoc = schema.nodeFromJSON(normalizedDocument(document2));
@@ -13396,14 +13409,17 @@ ${err.toString()}`);
       });
     }
     mappingState() {
-      const state = initProseMirrorDoc(this.fragment, schema);
-      return {
-        mapping: state.mapping,
-        isOMark: state.meta.isOMark,
-        textBlocks: textBlocks(state.doc)
-      };
+      return mappingStateFor(this.fragment);
     }
   };
+  function mappingStateFor(fragment) {
+    const state = initProseMirrorDoc(fragment, schema);
+    return {
+      mapping: state.mapping,
+      isOMark: state.meta.isOMark,
+      textBlocks: textBlocks(state.doc)
+    };
+  }
   function normalizedDocument(document2) {
     if (!document2 || typeof document2 !== "object") {
       return { type: "doc", content: [{ type: "paragraph" }] };
