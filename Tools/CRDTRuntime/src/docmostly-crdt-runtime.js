@@ -9,6 +9,7 @@ import {
 import { Schema } from "@tiptap/pm/model";
 
 const fragmentName = "default";
+const seedClientID = 1;
 
 const schema = new Schema({
   nodes: {
@@ -222,6 +223,7 @@ class DocmostlyCRDTDocument {
     this.snapshots = [];
     this.ydoc = new Y.Doc();
     this.fragment = this.ydoc.getXmlFragment(fragmentName);
+    this.applySeedDocument(seed.title, seed.document);
     this.ydoc.on("update", (update, origin) => {
       if (origin === this.localOrigin) {
         this.localUpdates.push(base64FromBytes(update));
@@ -313,6 +315,19 @@ class DocmostlyCRDTDocument {
     return snapshots;
   }
 
+  applySeedDocument(title, document) {
+    this.title = title;
+    const seedDoc = new Y.Doc();
+    seedDoc.clientID = seedClientID;
+    const seedFragment = seedDoc.getXmlFragment(fragmentName);
+    const nextDoc = schema.nodeFromJSON(normalizedDocument(document));
+    const transactionTarget = {
+      transact: (operation) => seedDoc.transact(operation, this.remoteOrigin)
+    };
+    updateYFragment(transactionTarget, seedFragment, nextDoc, mappingStateFor(seedFragment));
+    Y.applyUpdate(this.ydoc, Y.encodeStateAsUpdate(seedDoc), this.remoteOrigin);
+  }
+
   applyDocument(title, document, origin) {
     this.title = title;
     const nextDoc = schema.nodeFromJSON(normalizedDocument(document));
@@ -331,13 +346,17 @@ class DocmostlyCRDTDocument {
   }
 
   mappingState() {
-    const state = initProseMirrorDoc(this.fragment, schema);
-    return {
-      mapping: state.mapping,
-      isOMark: state.meta.isOMark,
-      textBlocks: textBlocks(state.doc)
-    };
+    return mappingStateFor(this.fragment);
   }
+}
+
+function mappingStateFor(fragment) {
+  const state = initProseMirrorDoc(fragment, schema);
+  return {
+    mapping: state.mapping,
+    isOMark: state.meta.isOMark,
+    textBlocks: textBlocks(state.doc)
+  };
 }
 
 function normalizedDocument(document) {

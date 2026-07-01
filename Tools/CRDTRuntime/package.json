@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/docmostly-crdt-runtime.js --bundle --format=iife --target=es2020 --banner:js='if (typeof globalThis.crypto === \"undefined\") { globalThis.crypto = { getRandomValues(values) { for (let index = 0; index < values.length; index += 1) values[index] = Math.floor(Math.random() * 256); return values; } }; }' --legal-comments=eof --outfile=../../docmostly/DocmostlyCRDTRuntime.js"
+    "build": "esbuild src/docmostly-crdt-runtime.js --bundle --format=iife --target=es2020 --banner:js='if (typeof globalThis.crypto === \"undefined\") { globalThis.crypto = { getRandomValues(values) { for (let index = 0; index < values.length; index += 1) values[index] = Math.floor(Math.random() * 256); return values; } }; }' --legal-comments=eof --outfile=../../docmostly/DocmostlyCRDTRuntime.js",
+    "test": "node --no-experimental-webstorage --test"
   },
   "dependencies": {
     "@tiptap/pm": "3.27.1",
