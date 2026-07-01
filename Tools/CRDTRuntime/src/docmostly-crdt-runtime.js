@@ -222,6 +222,7 @@ class DocmostlyCRDTDocument {
     this.snapshots = [];
     this.ydoc = new Y.Doc();
     this.fragment = this.ydoc.getXmlFragment(fragmentName);
+    this.applyDocument(seed.title, seed.document, this.remoteOrigin);
     this.ydoc.on("update", (update, origin) => {
       if (origin === this.localOrigin) {
         this.localUpdates.push(base64FromBytes(update));
