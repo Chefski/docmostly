@@ -36,8 +36,14 @@ struct SearchResponseDecodingTests {
         let result = try #require(envelope.data.items.first)
 
         #expect(result.title == "Roadmap")
+        #expect(result.slugId == "abc123")
+        #expect(result.creatorId == "user-1")
         #expect(result.rank == 0.42)
         #expect(result.highlight == "Quarterly <b>roadmap</b>")
+        #expect(result.createdAt != nil)
+        #expect(result.updatedAt != nil)
+        #expect(result.space.id == "space-1")
         #expect(result.space.name == "Product")
+        #expect(result.space.slug == "product")
     }
 }

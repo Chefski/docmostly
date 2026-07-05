@@ -87,91 +87,18 @@ struct PageReaderView: View {
         .safeAreaPadding(.bottom, 72)
         .navigationTitle(pageNavigationTitle)
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                if let editorViewModel, editorViewModel.errorMessage == nil {
-                    Picker("Page Mode", selection: $readerMode) {
-                        ForEach(PageReaderMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-                    .disabled(editorViewModel.canEdit == false)
-
-                    if let pageShareURL {
-                        ShareLink(item: pageShareURL) {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                        }
-                    } else {
-                        Button("Share", systemImage: "square.and.arrow.up") { }
-                            .disabled(true)
-                    }
-
-                    Button("Comments", systemImage: "text.bubble", action: showComments)
-
-                    Button("Table of Contents", systemImage: "list.bullet", action: showTableOfContents)
-
-                    Menu("More", systemImage: "ellipsis") {
-                        Button("Copy Link", systemImage: "link", action: copyPageLink)
-
-                        Button("Copy as Markdown", systemImage: "doc.plaintext", action: copyPageMarkdown)
-
-                        #if os(macOS)
-                        Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
-                        #endif
-
-                        Button(
-                            viewModel.isFavoritePage ? "Remove from Favorites" : "Add to Favorites",
-                            systemImage: viewModel.isFavoritePage ? "star.fill" : "star",
-                            action: toggleFavorite
-                        )
-                        .disabled(viewModel.isTogglingFavorite)
-
-                        Button(
-                            viewModel.isWatchingPage == true ? "Stop Watching" : "Watch Page",
-                            systemImage: viewModel.isWatchingPage == true ? "eye.slash" : "eye",
-                            action: toggleWatch
-                        )
-                        .disabled(viewModel.isTogglingWatch)
-
-                        Divider()
-
-                        Toggle(isOn: $usesFullWidth) {
-                            Label("Full Width", systemImage: "arrow.left.and.right")
-                        }
-
-                        Divider()
-
-                        if editorViewModel.canEdit {
-                            Button("Edit Labels", systemImage: "tag", action: showLabelEditor)
-                        }
-                        if editorViewModel.currentSpaceID != nil {
-                            Button("Move", systemImage: "arrow.right", action: showMoveToSpace)
-                        }
-                        Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
-
-                        Divider()
-
-                        Button("Move to Trash", systemImage: "trash", role: .destructive) {
-                            isConfirmingPageTrash = true
-                        }
-                    }
-                }
-
-                if let editorViewModel, editorViewModel.isSaving {
-                    ProgressView()
-                }
-            }
+            pageReaderToolbar
         }
         .safeAreaInset(edge: .bottom) {
             if let editorViewModel, readerMode == .edit, editorViewModel.isEditing, editorViewModel.canEdit {
                 VStack(spacing: 6) {
                     if isUploadingAttachment {
-                        ProgressView("Uploading attachment")
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.regularMaterial, in: .rect(cornerRadius: 8))
+                        DocmostlyGlassPanel(cornerRadius: 14) {
+                            ProgressView("Uploading attachment")
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                        }
                     }
 
                     NativeEditorToolbar(

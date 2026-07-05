@@ -5,12 +5,12 @@ import Testing
 
 @MainActor
 struct NativeRichEditorAttachmentTests {
-    @Test func insertingMultipleUploadedFilesPreservesEverySelectedAttachment() {
+    @Test func insertingMultipleUploadedFilesPreservesEverySelectedAttachment() async {
         let placeholder = NativeEditorBlock(kind: .paragraph, text: AttributedString(), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [placeholder])
 
-        viewModel.insertUploadedAttachments(
+        await viewModel.insertUploadedAttachments(
             [
                 (
                     attachment: uploadedAttachment(id: "attachment-1", fileName: "Report.pdf"),

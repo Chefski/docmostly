@@ -30,9 +30,13 @@ struct RecentPagesView: View {
         }
         .navigationTitle("Recent")
         .toolbar {
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                Task {
-                    await viewModel.load(appState: appState)
+            ToolbarItem(placement: .primaryAction) {
+                Menu("Recent Actions", systemImage: "ellipsis.circle") {
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task {
+                            await viewModel.load(appState: appState)
+                        }
+                    }
                 }
             }
         }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension NativeEditorMarkdownParser {
     static func singleLineMathFenceBlock(from line: String) -> NativeEditorBlock? {

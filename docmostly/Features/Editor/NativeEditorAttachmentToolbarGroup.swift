@@ -22,5 +22,6 @@ struct NativeEditorAttachmentToolbarGroup: View {
         }
         .accessibilityLabel(isUploading ? "Uploading attachment" : "Attach")
         .disabled(isUploading)
+        .nativeEditorToolbarControlFrame()
     }
 }

@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct NativeRichEditorUploadedVideoTests {
-    @Test func insertingUploadedVideoPreservesDocmostUploadDimensionsFromSourceFile() throws {
+    @Test func insertingUploadedVideoPreservesDocmostUploadDimensionsFromSourceFile() async throws {
         let sourceURL = try writeTinyVideoFixture()
         defer {
             try? FileManager.default.removeItem(at: sourceURL)
@@ -16,7 +16,7 @@ struct NativeRichEditorUploadedVideoTests {
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(
+        await viewModel.insertUploadedAttachment(
             uploadedAttachment(fileName: "Launch demo.mp4", mimeType: "video/mp4", fileExt: "mp4"),
             as: .video,
             sourceFileURL: sourceURL

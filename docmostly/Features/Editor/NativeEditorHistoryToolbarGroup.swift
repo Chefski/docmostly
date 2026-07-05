@@ -11,6 +11,7 @@ struct NativeEditorHistoryToolbarGroup: View {
         }
         .disabled(viewModel.canUndo == false)
         .keyboardShortcut("z", modifiers: .command)
+        .nativeEditorToolbarControlFrame()
 
         Button {
             viewModel.redo()
@@ -19,5 +20,6 @@ struct NativeEditorHistoryToolbarGroup: View {
         }
         .disabled(viewModel.canRedo == false)
         .keyboardShortcut("z", modifiers: [.command, .shift])
+        .nativeEditorToolbarControlFrame()
     }
 }

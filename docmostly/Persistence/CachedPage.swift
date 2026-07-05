@@ -12,6 +12,7 @@ final class CachedPage {
     var proseMirrorJSONData: Data?
     var icon: String?
     var parentPageId: String?
+    var creatorId: String?
     var spaceId: String = ""
     var spaceSlug: String?
     var updatedAt: Date?
@@ -36,6 +37,7 @@ final class CachedPage {
         proseMirrorJSONData = proseMirrorDocument.flatMap { try? JSONEncoder().encode($0) }
         icon = page.icon
         parentPageId = page.parentPageId
+        creatorId = page.creatorId
         spaceId = page.spaceId
         spaceSlug = page.space?.slug
         updatedAt = page.updatedAt
@@ -70,6 +72,7 @@ final class CachedPage {
         self.htmlContent = htmlContent
         icon = page.icon
         parentPageId = page.parentPageId
+        creatorId = page.creatorId
         spaceId = page.spaceId
         spaceSlug = page.space?.slug ?? spaceSlug
         updatedAt = page.updatedAt
@@ -93,6 +96,7 @@ final class CachedPage {
             self.htmlContent == htmlContent &&
             icon == page.icon &&
             parentPageId == page.parentPageId &&
+            creatorId == page.creatorId &&
             spaceId == page.spaceId &&
             (page.space?.slug == nil || spaceSlug == page.space?.slug) &&
             updatedAt == page.updatedAt &&
@@ -143,7 +147,7 @@ final class CachedPage {
             icon: icon,
             coverPhoto: nil,
             parentPageId: parentPageId,
-            creatorId: nil,
+            creatorId: creatorId,
             spaceId: spaceId,
             workspaceId: nil,
             isLocked: nil,

@@ -141,7 +141,7 @@ extension PageReaderView {
                 return
             }
 
-            editorViewModel.insertUploadedAttachments(uploadedAttachments, as: importKind)
+            await editorViewModel.insertUploadedAttachments(uploadedAttachments, as: importKind)
 
             if await editorViewModel.save(appState: appState) {
                 await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)

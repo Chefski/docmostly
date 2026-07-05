@@ -52,6 +52,28 @@ test("seeds independent documents with shared Yjs state so later updates replace
   }]);
 });
 
+test("does not duplicate seed content when another seeded document syncs initial state", () => {
+  const firstDocument = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+  const secondDocument = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+
+  const emptyStateVector = base64FromBytes(Y.encodeStateVector(new Y.Doc()));
+  secondDocument.applyRemoteUpdate(firstDocument.encodeStateAsUpdate(emptyStateVector));
+
+  assert.deepEqual(secondDocument.drainDocumentSnapshots(), [{
+    title: "Page",
+    document: paragraphDocument("Seed"),
+    updatedAt: null
+  }]);
+});
+
 function paragraphDocument(text) {
   return {
     type: "doc",
