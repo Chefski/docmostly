@@ -162,7 +162,7 @@ final class PageReaderViewModel {
 
     func postReply(to parentComment: DocmostComment, pageID: String, appState: AppState) async {
         let draft = replyDraftsByCommentID[parentComment.id] ?? ""
-        guard draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+        guard canSubmitReply(to: parentComment, draft: draft) else {
             return
         }
 
@@ -202,11 +202,20 @@ final class PageReaderViewModel {
         deletingCommentIDs.contains(id)
     }
 
+    func canSubmitReply(to parentComment: DocmostComment, draft: String? = nil) -> Bool {
+        let replyDraft = draft ?? replyDraftsByCommentID[parentComment.id] ?? ""
+        return parentComment.parentCommentId == nil
+            && parentComment.isLocallyQueued == false
+            && postingReplyIDs.contains(parentComment.id) == false
+            && replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
     func replies(for parentCommentID: String) -> [DocmostComment] {
         comments.filter { $0.parentCommentId == parentCommentID }
     }
 
     func beginEditing(_ comment: DocmostComment) {
+        guard comment.isNativelyEditable else { return }
         editDraftsByCommentID[comment.id] = comment.content ?? ""
         editingCommentIDs.insert(comment.id)
     }
@@ -217,6 +226,7 @@ final class PageReaderViewModel {
     }
 
     func updateComment(_ comment: DocmostComment, appState: AppState) async {
+        guard comment.isNativelyEditable else { return }
         let draft = editDraftsByCommentID[comment.id] ?? ""
         guard draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return
@@ -228,14 +238,18 @@ final class PageReaderViewModel {
         defer { updatingCommentIDs.remove(comment.id) }
 
         do {
-            let updatedComment = try await appState.updateComment(commentId: comment.id, text: draft)
+            let updatedComment = try await appState.updateComment(comment, text: draft)
             applyEditedComment(updatedComment)
         } catch {
             commentErrorMessage = error.localizedDescription
         }
     }
 
-    func deleteComment(_ comment: DocmostComment, appState: AppState) async {
+    func deleteComment(
+        _ comment: DocmostComment,
+        appState: AppState,
+        removeInlineComment: ((String) async -> Void)? = nil
+    ) async {
         guard deletingCommentIDs.contains(comment.id) == false else { return }
 
         deletingCommentIDs.insert(comment.id)
@@ -245,6 +259,9 @@ final class PageReaderViewModel {
         do {
             try await appState.deleteComment(commentId: comment.id)
             removeComment(id: comment.id)
+            if comment.type == DocmostCommentType.inline.rawValue {
+                await removeInlineComment?(comment.id)
+            }
         } catch {
             commentErrorMessage = error.localizedDescription
         }

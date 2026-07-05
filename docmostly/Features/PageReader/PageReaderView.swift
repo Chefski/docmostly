@@ -186,6 +186,7 @@ struct PageReaderView: View {
                     tableOfContentsItems: tableOfContentsItems,
                     selectHeading: selectHeading,
                     markInlineCommentResolved: markInlineCommentResolved,
+                    removeInlineComment: removeInlineComment,
                     close: closeSupplementaryPanel
                 )
             }
@@ -201,6 +202,7 @@ struct PageReaderView: View {
                         tableOfContentsItems: tableOfContentsItems,
                         selectHeading: selectHeading,
                         markInlineCommentResolved: markInlineCommentResolved,
+                        removeInlineComment: removeInlineComment,
                         close: closeSupplementaryPanel
                     )
                     .navigationTitle(panel.title)

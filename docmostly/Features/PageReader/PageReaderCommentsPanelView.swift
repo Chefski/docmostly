@@ -8,9 +8,10 @@ struct PageReaderCommentsPanelView: View {
 
     let pageID: String
     let markInlineCommentResolved: (String, Bool) async -> Void
+    let removeInlineComment: (String) async -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading) {
             Picker("Comment Status", selection: $selectedTab) {
                 ForEach(PageReaderCommentTab.allCases) { tab in
                     Text(tabLabel(for: tab)).tag(tab)
@@ -19,7 +20,7 @@ struct PageReaderCommentsPanelView: View {
             .pickerStyle(.segmented)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                LazyVStack(alignment: .leading) {
                     if visibleComments.isEmpty {
                         ContentUnavailableView(
                             emptyTitle,
@@ -30,11 +31,47 @@ struct PageReaderCommentsPanelView: View {
                         .padding(.vertical)
                     } else {
                         ForEach(visibleComments) { comment in
-                            commentThread(for: comment)
+                            CommentThreadView(
+                                comment: comment,
+                                replies: viewModel.replies(for: comment.id),
+                                isResolvingComment: viewModel.isResolvingComment,
+                                canEditComment: canEdit,
+                                canDeleteComment: canDelete,
+                                canToggleResolved: appState.isOffline == false,
+                                isEditingComment: viewModel.isEditingComment,
+                                isUpdatingComment: viewModel.isUpdatingComment,
+                                isDeletingComment: viewModel.isDeletingComment,
+                                editDraft: editDraftBinding,
+                                replyDraft: replyDraftBinding(for: comment.id),
+                                isReplyComposerEnabled: appState.isOffline == false
+                                    && comment.isLocallyQueued == false,
+                                canPostReply: canPostReply(to: comment),
+                                isPostingReply: viewModel.isPostingReply(to: comment.id),
+                                toggleResolved: { _ in
+                                    toggleResolved(comment)
+                                },
+                                beginEditing: { _ in
+                                    viewModel.beginEditing(comment)
+                                },
+                                cancelEditing: { _ in
+                                    viewModel.cancelEditing(commentID: comment.id)
+                                },
+                                saveEditing: { _ in
+                                    updateComment(comment)
+                                },
+                                deleteComment: deleteComment,
+                                postReply: {
+                                    postReply(to: comment)
+                                }
+                            )
                         }
                     }
 
-                    pageCommentComposer
+                    PageCommentComposerView(
+                        draftComment: $viewModel.draftComment,
+                        canPostComment: canPostComment,
+                        postComment: postComment
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -103,101 +140,6 @@ struct PageReaderCommentsPanelView: View {
             && viewModel.isPostingComment == false
     }
 
-    private func commentThread(for comment: DocmostComment) -> some View {
-        DocmostlyGlassPanel(cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 10) {
-                commentRow(for: comment, isReply: false)
-
-                let replies = viewModel.replies(for: comment.id)
-                if replies.isEmpty == false {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(replies) { reply in
-                            commentRow(for: reply, isReply: true)
-                                .padding(.leading)
-                        }
-                    }
-                }
-
-                if comment.isResolved == false {
-                    replyComposer(for: comment)
-                }
-            }
-            .padding(12)
-        }
-    }
-
-    private var pageCommentComposer: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-
-            TextField("New page comment", text: $viewModel.draftComment, axis: .vertical)
-                .lineLimit(3...)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("page-comment-composer-field")
-
-            Button("Add Comment", systemImage: "text.bubble", action: postComment)
-                .buttonStyle(.borderedProminent)
-                .disabled(canPostComment == false)
-                .accessibilityIdentifier("page-comment-submit-button")
-        }
-    }
-
-    private func commentRow(for comment: DocmostComment, isReply: Bool) -> some View {
-        CommentRowView(
-            comment: comment,
-            isReply: isReply,
-            isResolving: viewModel.isResolvingComment(id: comment.id),
-            canToggleResolved: isReply == false && appState.isOffline == false,
-            canEdit: canMutate(comment),
-            canDelete: canMutate(comment) && appState.isOffline == false,
-            isEditing: viewModel.isEditingComment(id: comment.id),
-            isUpdating: viewModel.isUpdatingComment(id: comment.id),
-            isDeleting: viewModel.isDeletingComment(id: comment.id),
-            editDraft: editDraftBinding(for: comment.id),
-            toggleResolved: {
-                toggleResolved(comment)
-            },
-            beginEditing: {
-                viewModel.beginEditing(comment)
-            },
-            cancelEditing: {
-                viewModel.cancelEditing(commentID: comment.id)
-            },
-            saveEditing: {
-                updateComment(comment)
-            },
-            deleteComment: {
-                pendingDeleteComment = comment
-            }
-        )
-    }
-
-    private func replyComposer(for comment: DocmostComment) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-
-            TextField("Write a reply", text: replyDraftBinding(for: comment.id), axis: .vertical)
-                .lineLimit(2...)
-                .textFieldStyle(.roundedBorder)
-                .disabled(appState.isOffline)
-                .accessibilityIdentifier("comment-reply-field-\(comment.id)")
-
-            HStack {
-                Spacer(minLength: 0)
-
-                Button("Post Reply", systemImage: "arrowshape.turn.up.left", action: {
-                    postReply(to: comment)
-                })
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .fixedSize(horizontal: true, vertical: false)
-                .disabled(canPostReply(to: comment) == false)
-                .accessibilityIdentifier("comment-reply-submit-\(comment.id)")
-            }
-        }
-        .padding(.top, 4)
-    }
-
     private func toggleResolved(_ comment: DocmostComment) {
         Task {
             await viewModel.toggleResolved(
@@ -221,20 +163,36 @@ struct PageReaderCommentsPanelView: View {
         }
     }
 
+    private func deleteComment(_ comment: DocmostComment) {
+        pendingDeleteComment = comment
+    }
+
     private func confirmDeleteComment() {
         guard let pendingDeleteComment else { return }
         self.pendingDeleteComment = nil
         Task {
-            await viewModel.deleteComment(pendingDeleteComment, appState: appState)
+            await viewModel.deleteComment(
+                pendingDeleteComment,
+                appState: appState,
+                removeInlineComment: removeInlineComment
+            )
         }
     }
 
     private func canPostReply(to comment: DocmostComment) -> Bool {
         appState.isOffline == false
-            && viewModel.isPostingReply(to: comment.id) == false
-            && (viewModel.replyDraftsByCommentID[comment.id] ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty == false
+            && viewModel.canSubmitReply(to: comment)
+    }
+
+    private func canEdit(_ comment: DocmostComment) -> Bool {
+        appState.isOffline == false
+            && comment.isNativelyEditable
+            && canMutate(comment)
+    }
+
+    private func canDelete(_ comment: DocmostComment) -> Bool {
+        appState.isOffline == false
+            && appState.currentUserCanDeleteComment(comment)
     }
 
     private func canMutate(_ comment: DocmostComment) -> Bool {
@@ -264,6 +222,163 @@ struct PageReaderCommentsPanelView: View {
             if isPresented == false {
                 pendingDeleteComment = nil
             }
+        }
+    }
+}
+
+private struct CommentThreadView: View {
+    let comment: DocmostComment
+    let replies: [DocmostComment]
+    let isResolvingComment: (String) -> Bool
+    let canEditComment: (DocmostComment) -> Bool
+    let canDeleteComment: (DocmostComment) -> Bool
+    let canToggleResolved: Bool
+    let isEditingComment: (String) -> Bool
+    let isUpdatingComment: (String) -> Bool
+    let isDeletingComment: (String) -> Bool
+    let editDraft: (String) -> Binding<String>
+    let replyDraft: Binding<String>
+    let isReplyComposerEnabled: Bool
+    let canPostReply: Bool
+    let isPostingReply: Bool
+    let toggleResolved: (DocmostComment) -> Void
+    let beginEditing: (DocmostComment) -> Void
+    let cancelEditing: (DocmostComment) -> Void
+    let saveEditing: (DocmostComment) -> Void
+    let deleteComment: (DocmostComment) -> Void
+    let postReply: () -> Void
+
+    var body: some View {
+        DocmostlyGlassPanel(cornerRadius: 12) {
+            VStack(alignment: .leading) {
+                CommentRowView(
+                    comment: comment,
+                    isReply: false,
+                    isResolving: isResolvingComment(comment.id),
+                    canToggleResolved: canToggleResolved,
+                    canEdit: canEditComment(comment),
+                    canDelete: canDeleteComment(comment),
+                    isEditing: isEditingComment(comment.id),
+                    isUpdating: isUpdatingComment(comment.id),
+                    isDeleting: isDeletingComment(comment.id),
+                    editDraft: editDraft(comment.id),
+                    toggleResolved: {
+                        toggleResolved(comment)
+                    },
+                    beginEditing: {
+                        beginEditing(comment)
+                    },
+                    cancelEditing: {
+                        cancelEditing(comment)
+                    },
+                    saveEditing: {
+                        saveEditing(comment)
+                    },
+                    deleteComment: {
+                        deleteComment(comment)
+                    }
+                )
+
+                if replies.isEmpty == false {
+                    VStack(alignment: .leading) {
+                        ForEach(replies) { reply in
+                            CommentRowView(
+                                comment: reply,
+                                isReply: true,
+                                isResolving: isResolvingComment(reply.id),
+                                canToggleResolved: false,
+                                canEdit: canEditComment(reply),
+                                canDelete: canDeleteComment(reply),
+                                isEditing: isEditingComment(reply.id),
+                                isUpdating: isUpdatingComment(reply.id),
+                                isDeleting: isDeletingComment(reply.id),
+                                editDraft: editDraft(reply.id),
+                                toggleResolved: {},
+                                beginEditing: {
+                                    beginEditing(reply)
+                                },
+                                cancelEditing: {
+                                    cancelEditing(reply)
+                                },
+                                saveEditing: {
+                                    saveEditing(reply)
+                                },
+                                deleteComment: {
+                                    deleteComment(reply)
+                                }
+                            )
+                            .padding(.leading)
+                        }
+                    }
+                }
+
+                if comment.isResolved == false {
+                    CommentReplyComposerView(
+                        commentID: comment.id,
+                        replyDraft: replyDraft,
+                        isEnabled: isReplyComposerEnabled,
+                        canPostReply: canPostReply,
+                        isPostingReply: isPostingReply,
+                        postReply: postReply
+                    )
+                }
+            }
+            .padding()
+        }
+    }
+}
+
+private struct CommentReplyComposerView: View {
+    let commentID: String
+    let replyDraft: Binding<String>
+    let isEnabled: Bool
+    let canPostReply: Bool
+    let isPostingReply: Bool
+    let postReply: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Divider()
+
+            TextField("Write a reply", text: replyDraft, axis: .vertical)
+                .lineLimit(2...)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isEnabled == false || isPostingReply)
+                .accessibilityIdentifier("comment-reply-field-\(commentID)")
+
+            HStack {
+                Spacer(minLength: 0)
+
+                Button("Post Reply", systemImage: "arrowshape.turn.up.left", action: postReply)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .disabled(canPostReply == false)
+                    .accessibilityIdentifier("comment-reply-submit-\(commentID)")
+            }
+        }
+        .padding(.top)
+    }
+}
+
+private struct PageCommentComposerView: View {
+    let draftComment: Binding<String>
+    let canPostComment: Bool
+    let postComment: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Divider()
+
+            TextField("New page comment", text: draftComment, axis: .vertical)
+                .lineLimit(3...)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("page-comment-composer-field")
+
+            Button("Add Comment", systemImage: "text.bubble", action: postComment)
+                .buttonStyle(.borderedProminent)
+                .disabled(canPostComment == false)
+                .accessibilityIdentifier("page-comment-submit-button")
         }
     }
 }

@@ -18,9 +18,9 @@ struct CommentRowView: View {
     let deleteComment: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading) {
+                HStack {
                     Text(comment.creator?.name ?? "Comment")
                         .font(.subheadline)
                         .bold()
@@ -43,7 +43,7 @@ struct CommentRowView: View {
                         .foregroundStyle(comment.isResolved ? .secondary : .primary)
                 }
 
-                HStack(spacing: 8) {
+                HStack {
                     if let createdAt = comment.createdAt {
                         Text(createdAt.formatted(date: .abbreviated, time: .shortened))
                     }
@@ -56,7 +56,7 @@ struct CommentRowView: View {
                 .foregroundStyle(.secondary)
 
                 if isEditing {
-                    HStack(spacing: 8) {
+                    HStack {
                         Button("Cancel", systemImage: "xmark", action: cancelEditing)
                             .controlSize(.small)
 
@@ -91,7 +91,7 @@ struct CommentRowView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
-                    .frame(width: 34, height: 34)
+                    .padding(.horizontal)
                     .contentShape(.rect)
                     .accessibilityLabel("Comment Actions")
             }

@@ -137,7 +137,11 @@ extension AppState {
         }
     }
 
-    func updateComment(commentId: String, text: String) async throws -> DocmostComment {
+    func updateComment(_ existingComment: DocmostComment, text: String) async throws -> DocmostComment {
+        guard existingComment.isNativelyEditable else {
+            throw CommentMutationAvailabilityError.unsupportedRichContentEdit
+        }
+
         let content = CommentPayload.plainText(text).jsonString
         guard let apiClient else {
             throw CommentMutationAvailabilityError.onlineRequired
@@ -145,7 +149,7 @@ extension AppState {
 
         do {
             let comment: DocmostComment = try await apiClient.send(.updateComment(
-                commentId: commentId,
+                commentId: existingComment.id,
                 content: content
             ))
             applyLocalComment(comment)
@@ -176,6 +180,18 @@ extension AppState {
             statusMessage = error.localizedDescription
             throw CommentMutationAvailabilityError.onlineRequired
         }
+    }
+
+    func currentUserCanDeleteComment(_ comment: DocmostComment) -> Bool {
+        if currentUser?.user.id == comment.creatorId {
+            return true
+        }
+
+        guard let spaceId = comment.spaceId else {
+            return false
+        }
+
+        return spaces.first { $0.id == spaceId }?.membership?.role == "admin"
     }
 
     private func queueComment(
@@ -298,8 +314,14 @@ extension AppState {
 
 private enum CommentMutationAvailabilityError: LocalizedError {
     case onlineRequired
+    case unsupportedRichContentEdit
 
     var errorDescription: String? {
-        "This comment action requires an active connection."
+        switch self {
+        case .onlineRequired:
+            "This comment action requires an active connection."
+        case .unsupportedRichContentEdit:
+            "This comment contains formatting that native editing cannot preserve."
+        }
     }
 }

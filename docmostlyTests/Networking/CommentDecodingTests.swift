@@ -41,6 +41,72 @@ struct CommentDecodingTests {
 
         #expect(comment.content == "DM smoke test")
         #expect(comment.creator?.name == "Chefling")
+        #expect(comment.isNativelyEditable)
+    }
+
+    @Test func richJSONContentIsNotNativelyEditable() throws {
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Docmost",
+                  "marks": [
+                    { "type": "link", "attrs": { "href": "https://docmost.com" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """)
+
+        let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
+
+        #expect(comment.content == "Docmost")
+        #expect(comment.isNativelyEditable == false)
+    }
+
+    @Test func multiParagraphPlainJSONContentIsNativelyEditable() throws {
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "First " },
+                { "type": "text", "text": "paragraph" }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "Second paragraph" }
+              ]
+            }
+          ]
+        }
+        """)
+
+        let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
+
+        #expect(comment.content == "First paragraph\nSecond paragraph")
+        #expect(comment.isNativelyEditable)
+    }
+
+    @Test func plainTextPayloadEncodesLineBreaksAsParagraphs() throws {
+        let data = try #require(
+            CommentPayload.plainText("First paragraph\nSecond paragraph").jsonString.data(using: .utf8)
+        )
+        let payload = try JSONDecoder().decode(EncodedCommentPayload.self, from: data)
+
+        #expect(payload.type == "doc")
+        #expect(payload.content.map(\.text) == ["First paragraph", "Second paragraph"])
     }
 
     @Test func decodesThreadedCommentsFromFlatPageResponse() throws {
@@ -109,6 +175,7 @@ struct CommentDecodingTests {
         let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
 
         #expect(comment.content == nil)
+        #expect(comment.isNativelyEditable == false)
     }
 
     @Test func rejectsOversizedCommentText() throws {
@@ -133,6 +200,7 @@ struct CommentDecodingTests {
         let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
 
         #expect(comment.content == nil)
+        #expect(comment.isNativelyEditable == false)
     }
 
     private func commentData(contentJSON: String) -> Data {
@@ -159,4 +227,21 @@ struct CommentDecodingTests {
         }
         """.utf8)
     }
+}
+
+private struct EncodedCommentPayload: Decodable {
+    let type: String
+    let content: [EncodedCommentParagraph]
+}
+
+private struct EncodedCommentParagraph: Decodable {
+    let content: [EncodedCommentText]
+
+    var text: String {
+        content.map(\.text).joined()
+    }
+}
+
+private struct EncodedCommentText: Decodable {
+    let text: String
 }

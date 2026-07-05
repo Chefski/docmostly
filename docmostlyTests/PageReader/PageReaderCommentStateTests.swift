@@ -147,6 +147,39 @@ struct PageReaderCommentStateTests {
         #expect(viewModel.replyDraftsByCommentID["parent-1"] == nil)
     }
 
+    @Test func replySubmissionDisallowsQueuedParentsRepliesAndDuplicatePosts() throws {
+        let viewModel = PageReaderViewModel()
+        let parent = try comment(id: "parent-1", text: "Parent", resolvedAt: nil)
+        let queuedParent = try comment(id: "offline-comment-1", text: "Queued", resolvedAt: nil)
+        let reply = try comment(id: "reply-1", text: "Reply", resolvedAt: nil, parentCommentId: "parent-1")
+        viewModel.replyDraftsByCommentID[parent.id] = "Reply"
+        viewModel.replyDraftsByCommentID[queuedParent.id] = "Reply"
+        viewModel.replyDraftsByCommentID[reply.id] = "Reply"
+
+        #expect(viewModel.canSubmitReply(to: parent))
+        #expect(viewModel.canSubmitReply(to: queuedParent) == false)
+        #expect(viewModel.canSubmitReply(to: reply) == false)
+
+        viewModel.postingReplyIDs.insert(parent.id)
+
+        #expect(viewModel.canSubmitReply(to: parent) == false)
+    }
+
+    @Test func spaceAdminCanDeleteCommentsByOtherUsers() throws {
+        let appState = AppState()
+        appState.currentUser = try currentUser(id: "admin-user")
+        appState.spaces = [try space(id: "space-1", role: "admin")]
+        let comment = try comment(
+            id: "comment-1",
+            text: "Moderate",
+            resolvedAt: nil,
+            creatorId: "other-user",
+            spaceId: "space-1"
+        )
+
+        #expect(appState.currentUserCanDeleteComment(comment))
+    }
+
     @Test func editingCommentUsesDraftUntilCancelledOrUpdated() throws {
         let viewModel = PageReaderViewModel()
         let existingComment = try comment(id: "comment-1", text: "Original", resolvedAt: nil)
@@ -193,11 +226,21 @@ struct PageReaderCommentStateTests {
     }
 
     private func comment(id: String, text: String, resolvedAt: String?) throws -> DocmostComment {
-        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page", parentCommentId: nil)
+        try comment(
+            id: id,
+            text: text,
+            resolvedAt: resolvedAt,
+            options: CommentFixtureOptions()
+        )
     }
 
     private func comment(id: String, text: String, resolvedAt: String?, type: String) throws -> DocmostComment {
-        try comment(id: id, text: text, resolvedAt: resolvedAt, type: type, parentCommentId: nil)
+        try comment(
+            id: id,
+            text: text,
+            resolvedAt: resolvedAt,
+            options: CommentFixtureOptions(type: type)
+        )
     }
 
     private func comment(
@@ -206,30 +249,51 @@ struct PageReaderCommentStateTests {
         resolvedAt: String?,
         parentCommentId: String?
     ) throws -> DocmostComment {
-        try comment(id: id, text: text, resolvedAt: resolvedAt, type: "page", parentCommentId: parentCommentId)
+        try comment(
+            id: id,
+            text: text,
+            resolvedAt: resolvedAt,
+            options: CommentFixtureOptions(parentCommentId: parentCommentId)
+        )
     }
 
     private func comment(
         id: String,
         text: String,
         resolvedAt: String?,
-        type: String,
-        parentCommentId: String?
+        creatorId: String,
+        spaceId: String?
+    ) throws -> DocmostComment {
+        try comment(
+            id: id,
+            text: text,
+            resolvedAt: resolvedAt,
+            options: CommentFixtureOptions(creatorId: creatorId, spaceId: spaceId)
+        )
+    }
+
+    private func comment(
+        id: String,
+        text: String,
+        resolvedAt: String?,
+        options: CommentFixtureOptions
     ) throws -> DocmostComment {
         let resolvedAtJSON = resolvedAt.map { "\"\($0)\"" } ?? "null"
-        let parentCommentIdJSON = parentCommentId.map { "\"\($0)\"" } ?? "null"
+        let parentCommentIdJSON = options.parentCommentId.map { "\"\($0)\"" } ?? "null"
+        let spaceIdJSON = options.spaceId.map { "\"\($0)\"" } ?? "null"
         let data = Data("""
         {
           "id": "\(id)",
           "content": "\(text)",
           "selection": null,
-          "type": "\(type)",
-          "creatorId": "user-1",
+          "type": "\(options.type)",
+          "creatorId": "\(options.creatorId)",
           "pageId": "page-1",
           "parentCommentId": \(parentCommentIdJSON),
           "resolvedById": null,
           "resolvedAt": \(resolvedAtJSON),
           "workspaceId": "workspace-1",
+          "spaceId": \(spaceIdJSON),
           "createdAt": "2026-06-17T09:00:00.000Z",
           "editedAt": null,
           "deletedAt": null,
@@ -244,6 +308,40 @@ struct PageReaderCommentStateTests {
         return try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
     }
 
+    private func currentUser(id: String) throws -> CurrentUserResponse {
+        let data = Data("""
+        {
+          "user": {
+            "id": "\(id)",
+            "name": "Admin",
+            "email": "admin@example.com"
+          },
+          "workspace": {
+            "id": "workspace-1",
+            "name": "Workspace"
+          }
+        }
+        """.utf8)
+
+        return try DocmostJSONDecoder.make().decode(CurrentUserResponse.self, from: data)
+    }
+
+    private func space(id: String, role: String) throws -> DocmostSpace {
+        let data = Data("""
+        {
+          "id": "\(id)",
+          "name": "Space",
+          "slug": "\(id)",
+          "membership": {
+            "userId": "admin-user",
+            "role": "\(role)"
+          }
+        }
+        """.utf8)
+
+        return try DocmostJSONDecoder.make().decode(DocmostSpace.self, from: data)
+    }
+
     private func markedText(_ text: String, commentID: String) -> AttributedString {
         var attributedText = AttributedString(text)
         attributedText[NativeEditorCommentIDAttribute.self] = commentID
@@ -254,6 +352,13 @@ struct PageReaderCommentStateTests {
 
     private func resolvedDate(_ value: String) throws -> Date {
         try Date(value, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    }
+
+    private struct CommentFixtureOptions {
+        var type = "page"
+        var parentCommentId: String?
+        var creatorId = "user-1"
+        var spaceId: String?
     }
 }
 
