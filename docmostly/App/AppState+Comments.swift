@@ -44,6 +44,31 @@ extension AppState {
         }
     }
 
+    func addCommentReply(pageId: String, parentCommentId: String, text: String) async throws -> DocmostComment {
+        let content = CommentPayload.plainText(text).jsonString
+        guard let apiClient else {
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+
+        do {
+            let comment: DocmostComment = try await apiClient.send(.createComment(
+                pageId: pageId,
+                content: content,
+                type: .page,
+                parentCommentId: parentCommentId
+            ))
+            applyLocalComment(comment)
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return comment
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+    }
+
     func addInlineComment(
         pageId: String,
         text: String,
@@ -112,6 +137,63 @@ extension AppState {
         }
     }
 
+    func updateComment(_ existingComment: DocmostComment, text: String) async throws -> DocmostComment {
+        guard existingComment.isNativelyEditable else {
+            throw CommentMutationAvailabilityError.unsupportedRichContentEdit
+        }
+
+        let content = CommentPayload.plainText(text).jsonString
+        guard let apiClient else {
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+
+        do {
+            let comment: DocmostComment = try await apiClient.send(.updateComment(
+                commentId: existingComment.id,
+                content: content
+            ))
+            applyLocalComment(comment)
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+            return comment
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+    }
+
+    func deleteComment(commentId: String) async throws {
+        guard let apiClient else {
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+
+        do {
+            try await apiClient.sendVoid(.deleteComment(commentId: commentId))
+            removeLocalCommentThread(id: commentId)
+            isOffline = false
+            scheduleOfflineQueueReconciliation()
+        } catch {
+            guard canQueueOfflineMutation(after: error) else { throw error }
+            isOffline = true
+            statusMessage = error.localizedDescription
+            throw CommentMutationAvailabilityError.onlineRequired
+        }
+    }
+
+    func currentUserCanDeleteComment(_ comment: DocmostComment) -> Bool {
+        if currentUser?.user.id == comment.creatorId {
+            return true
+        }
+
+        guard let spaceId = comment.spaceId else {
+            return false
+        }
+
+        return spaces.first { $0.id == spaceId }?.membership?.role == "admin"
+    }
+
     private func queueComment(
         pageId: String,
         text: String,
@@ -168,6 +250,31 @@ extension AppState {
         pageCommentsByID[comment.pageId] = comments
     }
 
+    private func removeLocalCommentThread(id commentId: String) {
+        for pageId in pageCommentsByID.keys {
+            guard var comments = pageCommentsByID[pageId] else { continue }
+            let idsToRemove = Set(commentThreadIDs(rootID: commentId, in: comments))
+            guard idsToRemove.isEmpty == false else { continue }
+            comments.removeAll { idsToRemove.contains($0.id) }
+            pageCommentsByID[pageId] = comments
+        }
+    }
+
+    private func commentThreadIDs(rootID: String, in comments: [DocmostComment]) -> [String] {
+        var ids = [rootID]
+        var pending = [rootID]
+
+        while let parentID = pending.popLast() {
+            let childIDs = comments
+                .filter { $0.parentCommentId == parentID }
+                .map(\.id)
+            ids.append(contentsOf: childIDs)
+            pending.append(contentsOf: childIDs)
+        }
+
+        return ids
+    }
+
     private func projectedResolvedComment(commentId: String, pageId: String, resolved: Bool) -> DocmostComment {
         if let comments = pageCommentsByID[pageId],
            let existing = comments.first(where: { $0.id == commentId }) {
@@ -202,5 +309,19 @@ extension AppState {
             workspaceId: currentUser?.workspace.id,
             resolvedBy: resolved ? currentUser?.user : nil
         )
+    }
+}
+
+private enum CommentMutationAvailabilityError: LocalizedError {
+    case onlineRequired
+    case unsupportedRichContentEdit
+
+    var errorDescription: String? {
+        switch self {
+        case .onlineRequired:
+            "This comment action requires an active connection."
+        case .unsupportedRichContentEdit:
+            "This comment contains formatting that native editing cannot preserve."
+        }
     }
 }

@@ -116,6 +116,7 @@ struct EndpointTests {
             content: #"{"type":"doc","content":[]}"#,
             type: .inline,
             selection: "Selected text",
+            parentCommentId: nil,
             yjsSelection: yjsSelection
         )
         let request = try endpoint.urlRequest(baseURL: baseURL)
@@ -145,6 +146,28 @@ struct EndpointTests {
         #expect(head["assoc"] as? Int == -1)
     }
 
+    @Test func buildsReplyCommentCreateRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.createComment(
+            pageId: "page-1",
+            content: #"{"type":"doc","content":[]}"#,
+            type: .page,
+            selection: nil,
+            parentCommentId: "parent-comment-1"
+        )
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/comments/create")
+
+        let body = try #require(request.httpBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["pageId"] as? String == "page-1")
+        #expect(object?["content"] as? String == #"{"type":"doc","content":[]}"#)
+        #expect(object?["type"] as? String == "page")
+        #expect(object?["parentCommentId"] as? String == "parent-comment-1")
+        #expect(object?.keys.contains("selection") == false)
+    }
+
     @Test func buildsResolveCommentRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let endpoint = Endpoint.resolveComment(commentId: "comment-1", pageId: "page-1", resolved: true)
@@ -157,5 +180,33 @@ struct EndpointTests {
         #expect(object?["commentId"] as? String == "comment-1")
         #expect(object?["pageId"] as? String == "page-1")
         #expect(object?["resolved"] as? Bool == true)
+    }
+
+    @Test func buildsUpdateCommentRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.updateComment(
+            commentId: "comment-1",
+            content: #"{"type":"doc","content":[]}"#
+        )
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/comments/update")
+
+        let body = try #require(request.httpBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["commentId"] as? String == "comment-1")
+        #expect(object?["content"] as? String == #"{"type":"doc","content":[]}"#)
+    }
+
+    @Test func buildsDeleteCommentRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let endpoint = Endpoint.deleteComment(commentId: "comment-1")
+        let request = try endpoint.urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/comments/delete")
+
+        let body = try #require(request.httpBody)
+        let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        #expect(object?["commentId"] as? String == "comment-1")
     }
 }

@@ -1,18 +1,21 @@
 import Foundation
 
-struct CommentPayload: Encodable, Sendable {
+nonisolated struct CommentPayload: Encodable, Sendable {
     let type: String
     let content: [CommentParagraph]
 
     static func plainText(_ text: String) -> CommentPayload {
-        CommentPayload(
-            type: "doc",
-            content: [
+        let paragraphs = text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in
                 CommentParagraph(
                     type: "paragraph",
-                    content: [CommentText(type: "text", text: text)]
+                    content: line.isEmpty ? [] : [CommentText(type: "text", text: String(line))]
                 )
-            ]
+            }
+        return CommentPayload(
+            type: "doc",
+            content: paragraphs.isEmpty ? [CommentParagraph(type: "paragraph", content: [])] : paragraphs
         )
     }
 
@@ -28,12 +31,12 @@ struct CommentPayload: Encodable, Sendable {
     }
 }
 
-struct CommentParagraph: Encodable, Sendable {
+nonisolated struct CommentParagraph: Encodable, Sendable {
     let type: String
     let content: [CommentText]
 }
 
-struct CommentText: Encodable, Sendable {
+nonisolated struct CommentText: Encodable, Sendable {
     let type: String
     let text: String
 }

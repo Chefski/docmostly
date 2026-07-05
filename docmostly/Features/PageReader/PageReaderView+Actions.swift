@@ -448,4 +448,13 @@ extension PageReaderView {
             _ = await editorViewModel.save(appState: appState)
         }
     }
+
+    func removeInlineComment(commentID: String) async {
+        guard let editorViewModel else { return }
+
+        editorViewModel.removeInlineComment(commentID: commentID)
+        if editorViewModel.canSave {
+            _ = await editorViewModel.save(appState: appState)
+        }
+    }
 }

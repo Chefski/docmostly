@@ -8,6 +8,7 @@ struct PageReaderSupplementaryPanelView: View {
     let tableOfContentsItems: [PageReaderTableOfContentsItem]
     let selectHeading: (PageReaderTableOfContentsItem) -> Void
     let markInlineCommentResolved: (String, Bool) async -> Void
+    let removeInlineComment: (String) async -> Void
     let close: () -> Void
 
     var body: some View {
@@ -30,7 +31,8 @@ struct PageReaderSupplementaryPanelView: View {
                 PageReaderCommentsPanelView(
                     viewModel: viewModel,
                     pageID: pageID,
-                    markInlineCommentResolved: markInlineCommentResolved
+                    markInlineCommentResolved: markInlineCommentResolved,
+                    removeInlineComment: removeInlineComment
                 )
             case .tableOfContents:
                 PageReaderTableOfContentsPanelView(
