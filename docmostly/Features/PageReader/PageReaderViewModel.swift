@@ -16,7 +16,13 @@ final class PageReaderViewModel {
     var errorMessage: String?
     var commentErrorMessage: String?
     var draftComment = ""
+    var replyDraftsByCommentID: [String: String] = [:]
+    var editDraftsByCommentID: [String: String] = [:]
     var isPostingComment = false
+    var postingReplyIDs: Set<String> = []
+    var editingCommentIDs: Set<String> = []
+    var updatingCommentIDs: Set<String> = []
+    var deletingCommentIDs: Set<String> = []
     var resolvingCommentIDs: Set<String> = []
     var breadcrumbs: [DocmostPage] = []
     var labels: [DocmostLabel] = []
@@ -154,8 +160,94 @@ final class PageReaderViewModel {
         }
     }
 
+    func postReply(to parentComment: DocmostComment, pageID: String, appState: AppState) async {
+        let draft = replyDraftsByCommentID[parentComment.id] ?? ""
+        guard draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return
+        }
+
+        postingReplyIDs.insert(parentComment.id)
+        commentErrorMessage = nil
+        defer { postingReplyIDs.remove(parentComment.id) }
+
+        do {
+            let reply = try await appState.addCommentReply(
+                pageId: pageID,
+                parentCommentId: parentComment.id,
+                text: draft
+            )
+            applyCreatedReply(reply, parentCommentID: parentComment.id)
+        } catch {
+            commentErrorMessage = error.localizedDescription
+        }
+    }
+
     func isResolvingComment(id: String) -> Bool {
         resolvingCommentIDs.contains(id)
+    }
+
+    func isPostingReply(to commentID: String) -> Bool {
+        postingReplyIDs.contains(commentID)
+    }
+
+    func isEditingComment(id: String) -> Bool {
+        editingCommentIDs.contains(id)
+    }
+
+    func isUpdatingComment(id: String) -> Bool {
+        updatingCommentIDs.contains(id)
+    }
+
+    func isDeletingComment(id: String) -> Bool {
+        deletingCommentIDs.contains(id)
+    }
+
+    func replies(for parentCommentID: String) -> [DocmostComment] {
+        comments.filter { $0.parentCommentId == parentCommentID }
+    }
+
+    func beginEditing(_ comment: DocmostComment) {
+        editDraftsByCommentID[comment.id] = comment.content ?? ""
+        editingCommentIDs.insert(comment.id)
+    }
+
+    func cancelEditing(commentID: String) {
+        editDraftsByCommentID[commentID] = nil
+        editingCommentIDs.remove(commentID)
+    }
+
+    func updateComment(_ comment: DocmostComment, appState: AppState) async {
+        let draft = editDraftsByCommentID[comment.id] ?? ""
+        guard draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return
+        }
+        guard updatingCommentIDs.contains(comment.id) == false else { return }
+
+        updatingCommentIDs.insert(comment.id)
+        commentErrorMessage = nil
+        defer { updatingCommentIDs.remove(comment.id) }
+
+        do {
+            let updatedComment = try await appState.updateComment(commentId: comment.id, text: draft)
+            applyEditedComment(updatedComment)
+        } catch {
+            commentErrorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteComment(_ comment: DocmostComment, appState: AppState) async {
+        guard deletingCommentIDs.contains(comment.id) == false else { return }
+
+        deletingCommentIDs.insert(comment.id)
+        commentErrorMessage = nil
+        defer { deletingCommentIDs.remove(comment.id) }
+
+        do {
+            try await appState.deleteComment(commentId: comment.id)
+            removeComment(id: comment.id)
+        } catch {
+            commentErrorMessage = error.localizedDescription
+        }
     }
 
     func toggleResolved(
@@ -194,21 +286,56 @@ final class PageReaderViewModel {
         }
     }
 
+    func applyCreatedReply(_ reply: DocmostComment, parentCommentID: String) {
+        applyCreatedComment(reply)
+        replyDraftsByCommentID[parentCommentID] = nil
+    }
+
     func applyUpdatedComment(_ comment: DocmostComment) {
         if let index = comments.firstIndex(where: { $0.id == comment.id }) {
             comments[index] = comment
         }
     }
 
+    func applyEditedComment(_ comment: DocmostComment) {
+        applyUpdatedComment(comment)
+        editDraftsByCommentID[comment.id] = nil
+        editingCommentIDs.remove(comment.id)
+    }
+
     func removeComment(id: String) {
-        comments.removeAll { $0.id == id }
-        resolvingCommentIDs.remove(id)
+        let idsToRemove = Set(commentThreadIDs(rootID: id))
+        comments.removeAll { idsToRemove.contains($0.id) }
+        for commentID in idsToRemove {
+            resolvingCommentIDs.remove(commentID)
+            postingReplyIDs.remove(commentID)
+            editingCommentIDs.remove(commentID)
+            updatingCommentIDs.remove(commentID)
+            deletingCommentIDs.remove(commentID)
+            replyDraftsByCommentID[commentID] = nil
+            editDraftsByCommentID[commentID] = nil
+        }
     }
 
     private func rebuildCommentBuckets() {
         let topLevelComments = comments.filter { $0.parentCommentId == nil }
         openComments = topLevelComments.filter { $0.isResolved == false }
         resolvedComments = topLevelComments.filter(\.isResolved)
+    }
+
+    private func commentThreadIDs(rootID: String) -> [String] {
+        var ids = [rootID]
+        var pending = [rootID]
+
+        while let parentID = pending.popLast() {
+            let childIDs = comments
+                .filter { $0.parentCommentId == parentID }
+                .map(\.id)
+            ids.append(contentsOf: childIDs)
+            pending.append(contentsOf: childIDs)
+        }
+
+        return ids
     }
 
     private func fetchEngagement(pageID: String, appState: AppState) async -> PageReaderEngagementSnapshot {

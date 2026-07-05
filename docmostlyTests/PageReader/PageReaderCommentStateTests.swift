@@ -26,7 +26,8 @@ struct PageReaderCommentStateTests {
         let viewModel = PageReaderViewModel()
         viewModel.comments = [
             try comment(id: "comment-1", text: "Keep", resolvedAt: nil),
-            try comment(id: "comment-2", text: "Delete", resolvedAt: nil)
+            try comment(id: "comment-2", text: "Delete", resolvedAt: nil),
+            try comment(id: "reply-1", text: "Reply", resolvedAt: nil, parentCommentId: "comment-2")
         ]
 
         viewModel.removeComment(id: "comment-2")
@@ -120,6 +121,48 @@ struct PageReaderCommentStateTests {
         #expect(viewModel.resolvedComments.map(\.id) == ["resolved-parent"])
         #expect(viewModel.openCommentCount == 1)
         #expect(viewModel.resolvedCommentCount == 1)
+    }
+
+    @Test func repliesAreBucketedUnderTheirParentFromFlatDocmostResponse() throws {
+        let viewModel = PageReaderViewModel()
+        viewModel.comments = [
+            try comment(id: "parent-1", text: "Parent", resolvedAt: nil),
+            try comment(id: "reply-2", text: "Second reply", resolvedAt: nil, parentCommentId: "parent-1"),
+            try comment(id: "parent-2", text: "Other parent", resolvedAt: nil),
+            try comment(id: "reply-1", text: "First reply", resolvedAt: nil, parentCommentId: "parent-1")
+        ]
+
+        #expect(viewModel.replies(for: "parent-1").map(\.id) == ["reply-2", "reply-1"])
+        #expect(viewModel.replies(for: "parent-2").isEmpty)
+    }
+
+    @Test func replyDraftIsClearedWhenReplyIsApplied() throws {
+        let viewModel = PageReaderViewModel()
+        viewModel.replyDraftsByCommentID["parent-1"] = "Thanks"
+        let reply = try comment(id: "reply-1", text: "Thanks", resolvedAt: nil, parentCommentId: "parent-1")
+
+        viewModel.applyCreatedReply(reply, parentCommentID: "parent-1")
+
+        #expect(viewModel.comments.map(\.id) == ["reply-1"])
+        #expect(viewModel.replyDraftsByCommentID["parent-1"] == nil)
+    }
+
+    @Test func editingCommentUsesDraftUntilCancelledOrUpdated() throws {
+        let viewModel = PageReaderViewModel()
+        let existingComment = try comment(id: "comment-1", text: "Original", resolvedAt: nil)
+        let updated = try comment(id: "comment-1", text: "Updated", resolvedAt: nil)
+        viewModel.comments = [existingComment]
+
+        viewModel.beginEditing(existingComment)
+        #expect(viewModel.editDraftsByCommentID["comment-1"] == "Original")
+        #expect(viewModel.isEditingComment(id: "comment-1"))
+
+        viewModel.editDraftsByCommentID["comment-1"] = "Updated"
+        viewModel.applyEditedComment(updated)
+
+        #expect(viewModel.comments.first?.content == "Updated")
+        #expect(viewModel.editDraftsByCommentID["comment-1"] == nil)
+        #expect(viewModel.isEditingComment(id: "comment-1") == false)
     }
 
     @Test func tableOfContentsItemsIncludeNonEmptyHeadingsThroughLevelFour() {

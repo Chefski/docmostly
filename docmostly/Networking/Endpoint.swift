@@ -110,8 +110,11 @@ nonisolated enum Endpoint: Sendable {
         content: String,
         type: DocmostCommentType = .page,
         selection: String? = nil,
+        parentCommentId: String? = nil,
         yjsSelection: NativeEditorYjsSelection? = nil
     )
+    case updateComment(commentId: String, content: String)
+    case deleteComment(commentId: String)
     case resolveComment(commentId: String, pageId: String, resolved: Bool)
     case attachmentInfo(attachmentId: String)
     case workspaceInfo
@@ -257,6 +260,10 @@ nonisolated enum Endpoint: Sendable {
             "comments"
         case .createComment:
             "comments/create"
+        case .updateComment:
+            "comments/update"
+        case .deleteComment:
+            "comments/delete"
         case .resolveComment:
             "comments/resolve"
         case .attachmentInfo:
@@ -461,14 +468,19 @@ nonisolated enum Endpoint: Sendable {
             ))
         case .comments(let pageId, let cursor, let limit):
             return try encode(CommentsRequest(pageId: pageId, cursor: cursor, limit: limit))
-        case .createComment(let pageId, let content, let type, let selection, let yjsSelection):
+        case .createComment(let pageId, let content, let type, let selection, let parentCommentId, let yjsSelection):
             return try encode(CreateCommentRequest(
                 pageId: pageId,
                 content: content,
                 type: type,
                 selection: selection,
+                parentCommentId: parentCommentId,
                 yjsSelection: yjsSelection
             ))
+        case .updateComment(let commentId, let content):
+            return try encode(UpdateCommentRequest(commentId: commentId, content: content))
+        case .deleteComment(let commentId):
+            return try encode(CommentIDRequest(commentId: commentId))
         case .resolveComment(let commentId, let pageId, let resolved):
             return try encode(ResolveCommentRequest(
                 commentId: commentId,
@@ -764,7 +776,17 @@ nonisolated private struct CreateCommentRequest: Encodable {
     let content: String
     let type: DocmostCommentType
     let selection: String?
+    let parentCommentId: String?
     let yjsSelection: NativeEditorYjsSelection?
+}
+
+nonisolated private struct UpdateCommentRequest: Encodable {
+    let commentId: String
+    let content: String
+}
+
+nonisolated private struct CommentIDRequest: Encodable {
+    let commentId: String
 }
 
 nonisolated private struct ResolveCommentRequest: Encodable {
