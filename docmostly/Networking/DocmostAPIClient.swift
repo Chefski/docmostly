@@ -85,6 +85,69 @@ actor DocmostAPIClient {
         return try decodeUploadResponse(from: data)
     }
 
+    func exportPage(
+        pageId: String,
+        format: DocmostPageExportFormat,
+        includeChildren: Bool = false,
+        includeAttachments: Bool = false
+    ) async throws -> DocmostPageExportFile {
+        let endpointRequest = try Endpoint.exportPage(
+            pageId: pageId,
+            format: format,
+            includeChildren: includeChildren,
+            includeAttachments: includeAttachments
+        ).urlRequest(baseURL: baseURL)
+        let request = await authenticatedRequest(endpointRequest)
+        let (data, response) = try await loader.data(for: request)
+        await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
+        try validate(response: response, data: data)
+
+        let httpResponse = response as? HTTPURLResponse
+        return DocmostPageExportFile(
+            data: data,
+            fileName: Self.exportFileName(
+                from: httpResponse?.value(forHTTPHeaderField: "Content-Disposition"),
+                fallbackExtension: format.defaultFilenameExtension
+            ),
+            mimeType: httpResponse?.value(forHTTPHeaderField: "Content-Type")
+        )
+    }
+
+    func importPage(fileURL: URL, spaceId: String) async throws -> DocmostPage {
+        let mimeType = Self.mimeType(for: fileURL)
+        let fileName = fileURL.lastPathComponent.isEmpty ? "import" : fileURL.lastPathComponent
+        let multipartBody = try MultipartFormDataWriter.writeBody(
+            fields: [MultipartFormDataField(name: "spaceId", value: spaceId)],
+            file: MultipartFormDataFile(
+                fieldName: "file",
+                fileURL: fileURL,
+                fileName: fileName,
+                mimeType: mimeType
+            )
+        )
+        defer {
+            try? FileManager.default.removeItem(at: multipartBody.fileURL)
+        }
+
+        var request = URLRequest(url: importPageURL)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = false
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(
+            "multipart/form-data; boundary=\(multipartBody.boundary)",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.setValue(multipartBody.contentLength.description, forHTTPHeaderField: "Content-Length")
+
+        request = await authenticatedRequest(request)
+        let (data, response) = try await loader.upload(for: request, fromFile: multipartBody.fileURL)
+        await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
+        try validate(response: response, data: data)
+        return try decodeImportResponse(from: data)
+    }
+
     private func authenticatedRequest(_ request: URLRequest) async -> URLRequest {
         var request = request
         request.httpShouldHandleCookies = false
@@ -144,12 +207,30 @@ actor DocmostAPIClient {
             .appending(path: "files/upload")
     }
 
+    private var importPageURL: URL {
+        baseURL
+            .appending(path: AppConfig.apiPathPrefix)
+            .appending(path: "pages/import")
+    }
+
     private func decodeUploadResponse(from data: Data) throws -> DocmostAttachment {
         do {
             return try decoder.decode(DocmostAttachment.self, from: data)
         } catch {
             do {
                 return try decoder.decode(APIEnvelope<DocmostAttachment>.self, from: data).data
+            } catch {
+                throw APIError.decodingFailed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func decodeImportResponse(from data: Data) throws -> DocmostPage {
+        do {
+            return try decoder.decode(APIEnvelope<DocmostPage>.self, from: data).data
+        } catch {
+            do {
+                return try decoder.decode(DocmostPage.self, from: data)
             } catch {
                 throw APIError.decodingFailed(error.localizedDescription)
             }
@@ -163,5 +244,32 @@ actor DocmostAPIClient {
         }
 
         return UTType(filenameExtension: pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+    }
+
+    private static func exportFileName(from contentDisposition: String?, fallbackExtension: String) -> String {
+        guard let contentDisposition else {
+            return "docmost-page.\(fallbackExtension)"
+        }
+
+        let fields = contentDisposition
+            .split(separator: ";")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        if let encodedName = fields.compactMap({ field -> String? in
+            guard field.lowercased().hasPrefix("filename*=") else { return nil }
+            let value = field.dropFirst("filename*=".count)
+            return String(value).replacing("UTF-8''", with: "")
+        }).first {
+            return encodedName.removingPercentEncoding ?? encodedName
+        }
+
+        if let fileName = fields.compactMap({ field -> String? in
+            guard field.lowercased().hasPrefix("filename=") else { return nil }
+            return String(field.dropFirst("filename=".count)).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        }).first {
+            return fileName.removingPercentEncoding ?? fileName
+        }
+
+        return "docmost-page.\(fallbackExtension)"
     }
 }

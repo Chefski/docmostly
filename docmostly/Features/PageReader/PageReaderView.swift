@@ -9,13 +9,23 @@ struct PageReaderView: View {
     @Environment(\.dismiss) var dismiss
     @State var viewModel = PageReaderViewModel()
     @State var editorViewModel: NativeRichEditorViewModel?
+    @State var pageHistoryViewModel = PageHistoryViewModel()
+    @State var pageExportViewModel = PageExportViewModel()
+    @State var pageImportViewModel = PageImportViewModel()
     @State var realtimeEventClient = NativeEditorRealtimeEventClient()
     @State var collaborationPresenceClient = NativeEditorCollaborationPresenceClient()
     @State var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State var isShowingAttachmentImporter = false
+    @State var isShowingPageHistory = false
+    @State var isShowingPageExport = false
+    @State var isShowingPageImport = false
+    @State var isShowingPageImporter = false
+    @State var isShowingExportedFileSaver = false
+    @State var exportedPageDocument: DocmostlyExportDocument?
     @State var isShowingMentionPicker = false
     @State var isShowingInlineCommentComposer = false
     @State var isUploadingAttachment = false
+    @State var pageImportTask: Task<Void, Never>?
     @State var attachmentUploadErrorMessage: String?
     @State var inlineCommentContext: NativeEditorInlineCommentContext?
     @State var inlineCommentErrorMessage: String?
@@ -122,6 +132,22 @@ struct PageReaderView: View {
             allowsMultipleSelection: true,
             onCompletion: handleAttachmentImport
         )
+        .fileImporter(
+            isPresented: $isShowingPageImporter,
+            allowedContentTypes: DocmostlyPageImportTypes.supported,
+            allowsMultipleSelection: true,
+            onCompletion: handlePageImport
+        )
+        .fileExporter(
+            isPresented: $isShowingExportedFileSaver,
+            document: exportedPageDocument,
+            contentType: exportedPageDocument?.contentType ?? .data,
+            defaultFilename: exportedPageDocument?.fileName ?? "docmost-page"
+        ) { result in
+            if case .failure(let error) = result {
+                pageActionErrorMessage = error.localizedDescription
+            }
+        }
         .alert("Attachment Upload Failed", isPresented: attachmentUploadFailedBinding) {
             Button("OK", role: .cancel) {
                 attachmentUploadErrorMessage = nil
@@ -175,6 +201,37 @@ struct PageReaderView: View {
                     await moveCurrentPage(to: targetSpaceID)
                 }
             }
+        }
+        .sheet(isPresented: $isShowingPageHistory) {
+            if let editorViewModel {
+                PageHistorySheet(
+                    pageID: editorViewModel.currentPageID,
+                    spaceID: editorViewModel.currentSpaceID,
+                    canRestore: editorViewModel.canEdit,
+                    viewModel: pageHistoryViewModel,
+                    restore: restoreSelectedPageVersion,
+                    close: { isShowingPageHistory = false }
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingPageExport) {
+            if let editorViewModel {
+                PageExportSheet(
+                    pageID: editorViewModel.currentPageID,
+                    viewModel: pageExportViewModel,
+                    close: { isShowingPageExport = false }
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingPageImport) {
+            PageImportSheet(
+                spaceID: editorViewModel?.currentSpaceID,
+                canImport: editorViewModel?.canEdit == true,
+                viewModel: pageImportViewModel,
+                chooseFiles: { isShowingPageImporter = true },
+                cancelImport: cancelPageImport,
+                close: { isShowingPageImport = false }
+            )
         }
         #if os(macOS)
         .inspector(isPresented: activePanelIsPresented) {
@@ -269,6 +326,11 @@ struct PageReaderView: View {
                 pendingInlineCommentID = nil
                 pendingInlineCommentDraft = nil
             }
+        }
+        .onChange(of: pageExportViewModel.exportedFile) { _, document in
+            guard let document else { return }
+            exportedPageDocument = document
+            isShowingExportedFileSaver = true
         }
         .onChange(of: readerMode) { _, mode in
             if mode == .read {

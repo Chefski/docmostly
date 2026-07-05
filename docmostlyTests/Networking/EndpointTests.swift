@@ -231,6 +231,40 @@ struct EndpointTests {
         #expect(body["limit"] as? Int == 25)
     }
 
+    @Test func buildsPageHistoryRequests() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+
+        let list = try Endpoint.pageHistory(pageId: "page-1", cursor: "cursor-1", limit: 20)
+            .urlRequest(baseURL: baseURL)
+        #expect(list.url?.absoluteString == "https://docs.example.com/api/pages/history")
+        let listBody = try jsonBody(list)
+        #expect(listBody["pageId"] as? String == "page-1")
+        #expect(listBody["cursor"] as? String == "cursor-1")
+        #expect(listBody["limit"] as? Int == 20)
+
+        let detail = try Endpoint.pageHistoryInfo(historyId: "history-1").urlRequest(baseURL: baseURL)
+        #expect(detail.url?.absoluteString == "https://docs.example.com/api/pages/history/info")
+        #expect(try jsonBody(detail)["historyId"] as? String == "history-1")
+    }
+
+    @Test func buildsPageExportRequest() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let request = try Endpoint.exportPage(
+            pageId: "page-1",
+            format: .markdown,
+            includeChildren: true,
+            includeAttachments: false
+        )
+        .urlRequest(baseURL: baseURL)
+
+        #expect(request.url?.absoluteString == "https://docs.example.com/api/pages/export")
+        let body = try jsonBody(request)
+        #expect(body["pageId"] as? String == "page-1")
+        #expect(body["format"] as? String == "markdown")
+        #expect(body["includeChildren"] as? Bool == true)
+        #expect(body["includeAttachments"] as? Bool == false)
+    }
+
     @Test func buildsUpdateCommentRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let endpoint = Endpoint.updateComment(
