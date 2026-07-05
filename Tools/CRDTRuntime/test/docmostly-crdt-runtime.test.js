@@ -23,6 +23,35 @@ test("seeds the initial document into Yjs state without broadcasting it as a loc
   assert.deepEqual(yDocToProsemirrorJSON(ydoc, fragmentName), paragraphDocument("Seed"));
 });
 
+test("seeds independent documents with shared Yjs state so later updates replace the seed", () => {
+  const firstDocument = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+  const secondDocument = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+
+  firstDocument.integrateLocalChange({
+    after: {
+      title: "Page",
+      document: paragraphDocument("Shared edit")
+    }
+  });
+  const [update] = firstDocument.drainLocalUpdates();
+
+  secondDocument.applyRemoteUpdate(update);
+
+  assert.deepEqual(secondDocument.drainDocumentSnapshots(), [{
+    title: "Page",
+    document: paragraphDocument("Shared edit"),
+    updatedAt: null
+  }]);
+});
+
 function paragraphDocument(text) {
   return {
     type: "doc",
