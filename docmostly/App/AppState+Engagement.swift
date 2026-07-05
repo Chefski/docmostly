@@ -56,6 +56,55 @@ extension AppState {
         }
     }
 
+    func loadCreatedByPages(
+        userId: String? = nil,
+        spaceId: String? = nil,
+        cursor: String? = nil,
+        limit: Int = 20
+    ) async throws -> PaginatedResponse<DocmostPage> {
+        let resolvedUserID = userId ?? currentUser?.user.id
+
+        guard let apiClient else {
+            let pages = await createdCachedPages(userId: resolvedUserID, spaceId: spaceId, limit: limit)
+            return PaginatedResponse(
+                items: pages,
+                meta: PaginationMeta(
+                    limit: limit,
+                    hasNextPage: false,
+                    hasPrevPage: false,
+                    nextCursor: nil,
+                    prevCursor: nil
+                )
+            )
+        }
+
+        do {
+            let response: PaginatedResponse<DocmostPage> = try await apiClient.send(.createdByUser(
+                userId: userId,
+                spaceId: spaceId,
+                cursor: cursor,
+                limit: limit
+            ))
+            isOffline = false
+            return response
+        } catch {
+            isOffline = true
+            statusMessage = error.localizedDescription
+            guard canUseOfflineCache(after: error) else { throw error }
+            let pages = await createdCachedPages(userId: resolvedUserID, spaceId: spaceId, limit: limit)
+            return PaginatedResponse(
+                items: pages,
+                meta: PaginationMeta(
+                    limit: limit,
+                    hasNextPage: false,
+                    hasPrevPage: false,
+                    nextCursor: nil,
+                    prevCursor: nil
+                )
+            )
+        }
+    }
+
     func loadFavorites(
         type: FavoriteType? = nil,
         spaceId: String? = nil,
@@ -209,6 +258,17 @@ extension AppState {
         let response: UnreadNotificationCountResponse = try await apiClient.send(.unreadNotificationCount)
         isOffline = false
         return response.count
+    }
+
+    private func createdCachedPages(userId: String?, spaceId: String?, limit: Int) async -> [DocmostPage] {
+        guard let userId else { return [] }
+        let candidateLimit = max(limit * 3, limit)
+        return await recentCachedPages(limit: candidateLimit)
+            .filter { page in
+                page.creatorId == userId && (spaceId == nil || page.spaceId == spaceId)
+            }
+            .prefix(limit)
+            .map { $0 }
     }
 
     func markNotificationsRead(notificationIds: [String]) async throws {

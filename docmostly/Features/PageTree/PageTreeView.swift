@@ -3,37 +3,39 @@ import SwiftUI
 struct PageTreeView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = PageTreeViewModel()
+    @State private var browserViewModel = PageBrowserViewModel()
     @State private var creationRequest: PageCreationRequest?
-    @State private var moveRequest: PageTreeNode?
-    @State private var copyRequest: PageTreeNode?
     @State private var isShowingTrash = false
 
     let space: DocmostSpace
 
     var body: some View {
         List {
-            if viewModel.isLoading && viewModel.nodes.isEmpty {
-                ProgressView("Loading pages")
+            PageBrowserScopeSwitch(viewModel: browserViewModel)
+                .listRowInsets(PageBrowserMetrics.switchInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+            if browserViewModel.isLoading {
+                ProgressView(browserViewModel.selectedScope.loadingTitle)
             }
 
-            ForEach(viewModel.visibleNodes) { visibleNode in
-                PageTreeNodeView(
-                    node: visibleNode.node,
-                    depth: visibleNode.depth,
-                    isExpanded: visibleNode.isExpanded,
-                    isSelected: appState.selectedPageID == visibleNode.node.slugId,
-                    toggle: toggleNode,
-                    openInDetailColumn: openInDetailColumn,
-                    openInNewWindow: nil,
-                    movePage: movePage,
-                    createChild: beginCreateChild,
-                    duplicate: beginDuplicate,
-                    moveToSpace: beginMoveToSpace,
-                    delete: deletePage
+            ForEach(browserViewModel.items) { item in
+                NavigationLink(value: item) {
+                    PageBrowserRowView(item: item)
+                }
+                .listRowInsets(PageBrowserMetrics.rowInsets)
+                .listRowSeparator(.visible)
+            }
+
+            if browserViewModel.items.isEmpty && browserViewModel.isLoading == false {
+                ContentUnavailableView(
+                    browserViewModel.selectedScope.emptyTitle,
+                    systemImage: browserViewModel.selectedScope.emptySystemImage
                 )
             }
 
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = browserViewModel.errorMessage {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(DocmostlyTheme.destructive)
@@ -45,12 +47,8 @@ struct PageTreeView: View {
                     .foregroundStyle(DocmostlyTheme.destructive)
             }
 
-            if viewModel.nodes.isEmpty && viewModel.isLoading == false {
-                Text(appState.isOffline ? "No cached pages" : "No pages")
-                    .foregroundStyle(.secondary)
-            }
         }
-        .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
+        .environment(\.defaultMinListRowHeight, PageBrowserMetrics.rowHeight)
         .navigationTitle(space.name)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -70,35 +68,15 @@ struct PageTreeView: View {
         .refreshable {
             await refreshPages()
         }
-        .task(id: space.id) {
+        .task(id: pageBrowserTaskKey) {
             await refreshPages()
         }
-        .navigationDestination(for: PageTreeNode.self) { node in
-            PageReaderDestinationView(pageID: node.slugId)
+        .navigationDestination(for: PageBrowserItem.self) { item in
+            PageBrowserDestinationView(item: item)
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
                 await createPage(title: title, parentPageId: request.parentPageId)
-            }
-        }
-        .sheet(item: $moveRequest) { node in
-            PageMoveToSpaceSheet(
-                page: node,
-                currentSpaceId: space.id,
-                spaces: appState.spaces
-            ) { targetSpaceId in
-                let success = await viewModel.movePageToSpace(node, targetSpaceId: targetSpaceId, appState: appState)
-                return success ? nil : viewModel.errorMessage ?? "Could not move this page."
-            }
-        }
-        .sheet(item: $copyRequest) { node in
-            PageCopySheet(
-                page: node,
-                currentSpaceId: space.id,
-                spaces: appState.spaces
-            ) { targetSpaceId in
-                let success = await viewModel.duplicatePage(node, targetSpaceId: targetSpaceId, appState: appState)
-                return success ? nil : viewModel.errorMessage ?? "Could not duplicate this page."
             }
         }
         .sheet(isPresented: $isShowingTrash) {
@@ -106,42 +84,12 @@ struct PageTreeView: View {
         }
     }
 
+    private var pageBrowserTaskKey: PageBrowserTaskKey {
+        PageBrowserTaskKey(spaceID: space.id, scope: browserViewModel.selectedScope)
+    }
+
     private func beginCreateRoot() {
         creationRequest = PageCreationRequest(parent: nil, spaceName: space.name)
-    }
-
-    private func beginCreateChild(_ node: PageTreeNode) {
-        creationRequest = PageCreationRequest(parent: node, spaceName: space.name)
-    }
-
-    private func beginDuplicate(_ node: PageTreeNode) {
-        copyRequest = node
-    }
-
-    private func beginMoveToSpace(_ node: PageTreeNode) {
-        moveRequest = node
-    }
-
-    private func deletePage(_ node: PageTreeNode) {
-        Task {
-            await viewModel.deletePage(node, appState: appState)
-        }
-    }
-
-    private func toggleNode(_ node: PageTreeNode) {
-        Task {
-            await viewModel.toggle(node: node, appState: appState)
-        }
-    }
-
-    private func openInDetailColumn(_ node: PageTreeNode) {
-        appState.selectPage(id: node.slugId, spaceID: node.spaceId, revealSpaceInSidebar: true)
-    }
-
-    private func movePage(sourceID: String, operation: PageTreeDropOperation) {
-        Task {
-            await viewModel.movePage(sourceID: sourceID, operation: operation, appState: appState)
-        }
     }
 
     private func createPage(title: String, parentPageId: String?) async -> String? {
@@ -163,10 +111,132 @@ struct PageTreeView: View {
     }
 
     private func refreshPages() async {
-        async let loadRoot: Void = viewModel.loadRoot(spaceId: space.id, appState: appState)
+        async let loadBrowser: Void = browserViewModel.load(space: space, provider: appState)
         async let loadSpaceActionState: Void = viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
-        await loadRoot
+        await loadBrowser
         await loadSpaceActionState
+    }
+}
+
+private struct PageBrowserTaskKey: Hashable {
+    let spaceID: String
+    let scope: PageBrowserScope
+}
+
+private enum PageBrowserMetrics {
+    static let rowHeight: CGFloat = 54
+    static let iconWidth: CGFloat = 28
+    static let rowInsets = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+    static let switchInsets = EdgeInsets(top: 8, leading: 12, bottom: 10, trailing: 12)
+}
+
+private struct PageBrowserScopeSwitch: View {
+    @Bindable var viewModel: PageBrowserViewModel
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 18) {
+                ForEach(PageBrowserScope.allCases) { scope in
+                    Button {
+                        viewModel.selectedScope = scope
+                    } label: {
+                        PageBrowserScopeLabel(
+                            scope: scope,
+                            isSelected: viewModel.selectedScope == scope
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(viewModel.selectedScope == scope ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct PageBrowserScopeLabel: View {
+    let scope: PageBrowserScope
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Label(scope.title, systemImage: scope.systemImage)
+                .font(.callout)
+                .foregroundStyle(isSelected ? .primary : .secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Capsule()
+                .fill(isSelected ? Color.primary : Color.clear)
+                .frame(height: 2)
+        }
+        .padding(.top, 6)
+        .contentShape(.rect)
+    }
+}
+
+private struct PageBrowserRowView: View {
+    let item: PageBrowserItem
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            PageBrowserItemIcon(icon: item.icon)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                HStack(spacing: 6) {
+                    Text(item.subtitle)
+
+                    if let updatedAt = item.updatedAt {
+                        Text(updatedAt.formatted(.relative(presentation: .named)))
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: PageBrowserMetrics.rowHeight, alignment: .leading)
+        .contentShape(.rect)
+    }
+}
+
+private struct PageBrowserItemIcon: View {
+    let icon: String?
+
+    var body: some View {
+        Group {
+            if let icon, icon.isEmpty == false {
+                Text(icon)
+                    .font(.title3)
+                    .lineLimit(1)
+            } else {
+                Image(systemName: "doc.text")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: PageBrowserMetrics.iconWidth, height: PageBrowserMetrics.iconWidth)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct PageBrowserDestinationView: View {
+    @Environment(AppState.self) private var appState
+
+    let item: PageBrowserItem
+
+    var body: some View {
+        PageReaderView(pageID: item.slugId)
+            .task(id: item.id) {
+                appState.selectPage(id: item.slugId, spaceID: item.spaceId)
+            }
     }
 }
 
