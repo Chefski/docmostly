@@ -20,13 +20,13 @@ nonisolated struct PageBrowserItem: Identifiable, Hashable, Sendable {
     }
 
     init?(favorite: DocmostFavorite, fallbackSpaceName: String) {
-        guard favorite.type == .page, let slugId = favorite.page?.slugId ?? favorite.pageId else { return nil }
+        guard favorite.type == .page, let page = favorite.page else { return nil }
 
-        id = favorite.page?.id ?? favorite.id
-        self.slugId = slugId
-        title = favorite.page?.title.isEmpty == false ? favorite.page?.title ?? "Untitled" : "Untitled"
-        icon = favorite.page?.icon
-        spaceId = favorite.page?.spaceId ?? favorite.spaceId
+        id = page.id
+        slugId = page.slugId
+        title = page.title.isEmpty ? "Untitled" : page.title
+        icon = page.icon
+        spaceId = page.spaceId
         subtitle = fallbackSpaceName
         updatedAt = nil
     }

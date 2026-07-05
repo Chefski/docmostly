@@ -10,21 +10,30 @@ final class PageBrowserViewModel {
     private(set) var items: [PageBrowserItem] = []
     var isLoading = false
     var errorMessage: String?
+    @ObservationIgnored private var activeLoadID = UUID()
 
     func load(space: DocmostSpace, provider: any PageBrowserProviding) async {
+        let requestedScope = selectedScope
+        let loadID = UUID()
+        activeLoadID = loadID
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if activeLoadID == loadID {
+                isLoading = false
+            }
+        }
 
         do {
-            switch selectedScope {
+            let loadedItems: [PageBrowserItem]
+            switch requestedScope {
             case .recentlyUpdated:
                 let response = try await provider.loadRecentPages(
                     spaceId: space.id,
                     cursor: nil,
                     limit: Self.defaultPageLimit
                 )
-                items = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
+                loadedItems = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
             case .favorites:
                 let response = try await provider.loadFavorites(
                     type: .page,
@@ -32,7 +41,7 @@ final class PageBrowserViewModel {
                     cursor: nil,
                     limit: Self.defaultPageLimit
                 )
-                items = response.items.compactMap {
+                loadedItems = response.items.compactMap {
                     PageBrowserItem(favorite: $0, fallbackSpaceName: space.name)
                 }
             case .createdByMe:
@@ -42,9 +51,13 @@ final class PageBrowserViewModel {
                     cursor: nil,
                     limit: Self.defaultPageLimit
                 )
-                items = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
+                loadedItems = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
             }
+
+            guard activeLoadID == loadID, selectedScope == requestedScope, Task.isCancelled == false else { return }
+            items = loadedItems
         } catch {
+            guard activeLoadID == loadID, selectedScope == requestedScope, Task.isCancelled == false else { return }
             items = []
             errorMessage = error.localizedDescription
         }

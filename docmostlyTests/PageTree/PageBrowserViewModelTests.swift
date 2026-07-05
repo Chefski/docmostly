@@ -17,7 +17,10 @@ struct PageBrowserViewModelTests {
 
     @Test func loadsFavoritePagesForSelectedSpace() async throws {
         let provider = PageBrowserProviderSpy()
-        provider.favorites = [Self.favorite(id: "favorite-1", title: "Launch Plan")]
+        provider.favorites = [
+            Self.favorite(id: "favorite-1", title: "Launch Plan"),
+            Self.favoriteWithoutPage(id: "favorite-2")
+        ]
         let viewModel = PageBrowserViewModel()
         viewModel.selectedScope = .favorites
 
@@ -100,6 +103,22 @@ struct PageBrowserViewModelTests {
                 icon: nil,
                 spaceId: "space-1"
             ),
+            space: nil,
+            template: nil
+        )
+    }
+
+    private static func favoriteWithoutPage(id: String) -> DocmostFavorite {
+        DocmostFavorite(
+            id: id,
+            userId: "user-1",
+            pageId: "page-2",
+            spaceId: nil,
+            templateId: nil,
+            type: .page,
+            workspaceId: "workspace-1",
+            createdAt: Date(timeIntervalSince1970: 0),
+            page: nil,
             space: nil,
             template: nil
         )

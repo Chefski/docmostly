@@ -80,7 +80,7 @@ extension AppState {
 
         do {
             let response: PaginatedResponse<DocmostPage> = try await apiClient.send(.createdByUser(
-                userId: userId,
+                userId: resolvedUserID,
                 spaceId: spaceId,
                 cursor: cursor,
                 limit: limit
