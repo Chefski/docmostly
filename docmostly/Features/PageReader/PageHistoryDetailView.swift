@@ -5,6 +5,7 @@ struct PageHistoryDetailView: View {
     let spaceID: String?
     let canRestore: Bool
     @Bindable var viewModel: PageHistoryViewModel
+    let requestRestore: () -> Void
     @Environment(AppState.self) private var appState
 
     var body: some View {
@@ -23,7 +24,7 @@ struct PageHistoryDetailView: View {
                         version: selectedVersion,
                         canRestore: canRestore && viewModel.canRequestRestoreConfirmation,
                         isRestoring: viewModel.isRestoring,
-                        restore: viewModel.requestRestoreConfirmation
+                        restore: requestRestore
                     )
 
                     if let restoreErrorMessage = viewModel.restoreErrorMessage {

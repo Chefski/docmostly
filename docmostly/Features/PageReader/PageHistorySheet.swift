@@ -8,6 +8,7 @@ struct PageHistorySheet: View {
     let restore: () async -> Bool
     let close: () -> Void
     @Environment(AppState.self) private var appState
+    @State private var isShowingRestoreConfirmation = false
 
     var body: some View {
         NavigationSplitView {
@@ -18,7 +19,8 @@ struct PageHistorySheet: View {
                 pageID: pageID,
                 spaceID: spaceID,
                 canRestore: canRestore,
-                viewModel: viewModel
+                viewModel: viewModel,
+                requestRestore: requestRestoreConfirmation
             )
                 .navigationTitle(viewModel.selectedVersion?.title ?? "Version")
         }
@@ -39,24 +41,31 @@ struct PageHistorySheet: View {
             }
             Button("Cancel", role: .cancel) {
                 viewModel.cancelRestoreConfirmation()
+                isShowingRestoreConfirmation = false
             }
         } message: {
             Text("Any unsaved edits that are not in page history may be lost.")
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Done", action: close)
+                Button("Done") {
+                    viewModel.cancelRestoreConfirmation()
+                    close()
+                }
             }
         }
     }
 
     private var restoreConfirmationBinding: Binding<Bool> {
         Binding {
-            viewModel.pendingRestoreVersion != nil
+            isShowingRestoreConfirmation
         } set: { isPresented in
-            if isPresented == false {
-                viewModel.cancelRestoreConfirmation()
-            }
+            isShowingRestoreConfirmation = isPresented
         }
+    }
+
+    private func requestRestoreConfirmation() {
+        viewModel.requestRestoreConfirmation()
+        isShowingRestoreConfirmation = viewModel.pendingRestoreVersion != nil
     }
 }

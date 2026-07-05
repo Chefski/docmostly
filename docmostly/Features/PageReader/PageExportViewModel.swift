@@ -15,6 +15,7 @@ final class PageExportViewModel {
 
         isExporting = true
         errorMessage = nil
+        exportedFile = nil
         defer { isExporting = false }
 
         do {
