@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 actor DocmostAPIClient {
     nonisolated static let maximumResponseBytes = DocmostResponseSizeLimit.maximumBytes
+    nonisolated static let maximumExportResponseBytes = DocmostResponseSizeLimit.maximumExportBytes
 
     nonisolated let baseURL: URL
     private let loader: any HTTPDataLoading
@@ -98,9 +99,9 @@ actor DocmostAPIClient {
             includeAttachments: includeAttachments
         ).urlRequest(baseURL: baseURL)
         let request = await authenticatedRequest(endpointRequest)
-        let (data, response) = try await loader.data(for: request)
+        let (data, response) = try await loader.data(for: request, maximumBytes: Self.maximumExportResponseBytes)
         await ingestCookies(from: response, requestURL: request.url)
-        try validateResponseSize(data)
+        try validateResponseSize(data, maximumBytes: Self.maximumExportResponseBytes)
         try validate(response: response, data: data)
 
         let httpResponse = response as? HTTPURLResponse
@@ -184,8 +185,11 @@ actor DocmostAPIClient {
         }
     }
 
-    private func validateResponseSize(_ data: Data) throws {
-        guard data.count <= Self.maximumResponseBytes else {
+    private func validateResponseSize(
+        _ data: Data,
+        maximumBytes: Int = Self.maximumResponseBytes
+    ) throws {
+        guard data.count <= maximumBytes else {
             throw APIError.responseTooLarge
         }
     }

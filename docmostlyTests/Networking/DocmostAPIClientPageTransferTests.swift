@@ -35,6 +35,7 @@ struct DocmostAPIClientPageTransferTests {
         #expect(body["pageId"] as? String == "page-1")
         #expect(body["format"] as? String == "markdown")
         #expect(body["includeChildren"] as? Bool == true)
+        #expect(await loader.dataRequestMaximumBytes.first == DocmostResponseSizeLimit.maximumExportBytes)
         #expect(file.fileName == "Roadmap Plan.md")
         #expect(String(data: file.data, encoding: .utf8) == "# Roadmap")
     }

@@ -21,6 +21,10 @@ extension NativeRichEditorViewModel {
         notifyLocalAwarenessChanged()
     }
 
+    func restoreEditingSnapshot(_ snapshot: NativeEditorHistorySnapshot) {
+        applyHistorySnapshot(snapshot)
+    }
+
     func handleDocumentChanged() {
         guard canEdit else {
             restoreReadOnlyBaseline()

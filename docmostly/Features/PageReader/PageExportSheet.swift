@@ -3,8 +3,11 @@ import SwiftUI
 struct PageExportSheet: View {
     let pageID: String
     @Bindable var viewModel: PageExportViewModel
+    let exportFailed: (String) -> Void
     let close: () -> Void
     @Environment(AppState.self) private var appState
+    @State private var exportedPageDocument: DocmostlyExportDocument?
+    @State private var isShowingExportedFileSaver = false
 
     var body: some View {
         NavigationStack {
@@ -58,6 +61,21 @@ struct PageExportSheet: View {
                     }
                 }
             }
+        }
+        .fileExporter(
+            isPresented: $isShowingExportedFileSaver,
+            document: exportedPageDocument,
+            contentType: exportedPageDocument?.contentType ?? .data,
+            defaultFilename: exportedPageDocument?.fileName ?? "docmost-page"
+        ) { result in
+            if case .failure(let error) = result {
+                exportFailed(error.localizedDescription)
+            }
+        }
+        .onChange(of: viewModel.exportedFile) { _, document in
+            guard let document else { return }
+            exportedPageDocument = document
+            isShowingExportedFileSaver = true
         }
     }
 }

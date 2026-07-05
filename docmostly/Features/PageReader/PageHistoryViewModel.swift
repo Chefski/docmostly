@@ -104,21 +104,30 @@ final class PageHistoryViewModel {
             pendingRestoreVersion = nil
         }
 
+        let preRestoreSnapshot = editorViewModel.makeHistorySnapshot()
+        var didApplySnapshot = false
+
         do {
             try await editorViewModel.waitForPendingCRDTLocalChange()
             editorViewModel.applyServerHistorySnapshot(title: version.title, document: content)
+            didApplySnapshot = true
             if editorViewModel.canSave {
                 guard await editorViewModel.save(appState: appState) else {
                     restoreErrorMessage = editorViewModel.saveErrorMessage ?? "Could not restore this version."
+                    editorViewModel.restoreEditingSnapshot(preRestoreSnapshot)
                     return false
                 }
             } else if editorViewModel.title != editorViewModel.lastSavedTitle ||
                         editorViewModel.document != editorViewModel.lastSavedDocument {
                 restoreErrorMessage = "Could not restore this version because it is not currently saveable."
+                editorViewModel.restoreEditingSnapshot(preRestoreSnapshot)
                 return false
             }
             return true
         } catch {
+            if didApplySnapshot {
+                editorViewModel.restoreEditingSnapshot(preRestoreSnapshot)
+            }
             restoreErrorMessage = error.localizedDescription
             return false
         }

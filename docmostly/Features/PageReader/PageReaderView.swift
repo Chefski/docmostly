@@ -19,9 +19,6 @@ struct PageReaderView: View {
     @State var isShowingPageHistory = false
     @State var isShowingPageExport = false
     @State var isShowingPageImport = false
-    @State var isShowingPageImporter = false
-    @State var isShowingExportedFileSaver = false
-    @State var exportedPageDocument: DocmostlyExportDocument?
     @State var isShowingMentionPicker = false
     @State var isShowingInlineCommentComposer = false
     @State var isUploadingAttachment = false
@@ -133,22 +130,6 @@ struct PageReaderView: View {
             allowsMultipleSelection: true,
             onCompletion: handleAttachmentImport
         )
-        .fileImporter(
-            isPresented: $isShowingPageImporter,
-            allowedContentTypes: DocmostlyPageImportTypes.supported,
-            allowsMultipleSelection: true,
-            onCompletion: handlePageImport
-        )
-        .fileExporter(
-            isPresented: $isShowingExportedFileSaver,
-            document: exportedPageDocument,
-            contentType: exportedPageDocument?.contentType ?? .data,
-            defaultFilename: exportedPageDocument?.fileName ?? "docmost-page"
-        ) { result in
-            if case .failure(let error) = result {
-                pageActionErrorMessage = error.localizedDescription
-            }
-        }
         .alert("Attachment Upload Failed", isPresented: attachmentUploadFailedBinding) {
             Button("OK", role: .cancel) {
                 attachmentUploadErrorMessage = nil
@@ -220,6 +201,9 @@ struct PageReaderView: View {
                 PageExportSheet(
                     pageID: editorViewModel.currentPageID,
                     viewModel: pageExportViewModel,
+                    exportFailed: { errorMessage in
+                        pageActionErrorMessage = errorMessage
+                    },
                     close: { isShowingPageExport = false }
                 )
             }
@@ -229,7 +213,7 @@ struct PageReaderView: View {
                 spaceID: editorViewModel?.currentSpaceID,
                 canImport: editorViewModel?.canEdit == true,
                 viewModel: pageImportViewModel,
-                chooseFiles: { isShowingPageImporter = true },
+                importFiles: handlePageImport,
                 cancelImport: cancelPageImport,
                 close: { isShowingPageImport = false }
             )
@@ -327,11 +311,6 @@ struct PageReaderView: View {
                 pendingInlineCommentID = nil
                 pendingInlineCommentDraft = nil
             }
-        }
-        .onChange(of: pageExportViewModel.exportedFile) { _, document in
-            guard let document else { return }
-            exportedPageDocument = document
-            isShowingExportedFileSaver = true
         }
         .onChange(of: readerMode) { _, mode in
             if mode == .read {

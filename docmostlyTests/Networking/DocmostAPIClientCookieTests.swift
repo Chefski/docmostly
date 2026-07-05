@@ -181,6 +181,7 @@ actor CapturingHTTPDataLoader: HTTPDataLoading {
 
     private var responses: [Response]
     private(set) var dataRequests: [URLRequest] = []
+    private(set) var dataRequestMaximumBytes: [Int?] = []
     private(set) var uploadRequests: [URLRequest] = []
 
     init(responses: [Response]) {
@@ -189,6 +190,13 @@ actor CapturingHTTPDataLoader: HTTPDataLoading {
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         dataRequests.append(request)
+        dataRequestMaximumBytes.append(nil)
+        return try nextResponse()
+    }
+
+    func data(for request: URLRequest, maximumBytes: Int) async throws -> (Data, URLResponse) {
+        dataRequests.append(request)
+        dataRequestMaximumBytes.append(maximumBytes)
         return try nextResponse()
     }
 

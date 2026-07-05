@@ -4,9 +4,10 @@ struct PageImportSheet: View {
     let spaceID: String?
     let canImport: Bool
     @Bindable var viewModel: PageImportViewModel
-    let chooseFiles: () -> Void
+    let importFiles: (Result<[URL], any Error>) -> Void
     let cancelImport: () -> Void
     let close: () -> Void
+    @State private var isShowingPageImporter = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +22,9 @@ struct PageImportSheet: View {
                         ProgressView("Importing pages")
                         Button("Cancel Import", role: .destructive, action: cancelImport)
                     } else {
-                        Button("Choose Files", systemImage: "square.and.arrow.up", action: chooseFiles)
+                        Button("Choose Files", systemImage: "square.and.arrow.up") {
+                            isShowingPageImporter = true
+                        }
                             .buttonStyle(.glassProminent)
                             .disabled(canImport == false || spaceID == nil || viewModel.canImport == false)
                     }
@@ -58,5 +61,11 @@ struct PageImportSheet: View {
                 }
             }
         }
+        .fileImporter(
+            isPresented: $isShowingPageImporter,
+            allowedContentTypes: DocmostlyPageImportTypes.supported,
+            allowsMultipleSelection: true,
+            onCompletion: importFiles
+        )
     }
 }

@@ -2,11 +2,19 @@ import Foundation
 
 nonisolated protocol HTTPDataLoading: Sendable {
     func data(for request: URLRequest) async throws -> (Data, URLResponse)
+    func data(for request: URLRequest, maximumBytes: Int) async throws -> (Data, URLResponse)
     func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> (Data, URLResponse)
 }
 
 nonisolated enum DocmostResponseSizeLimit {
     static let maximumBytes = 10_000_000
+    static let maximumExportBytes = 250_000_000
+}
+
+extension HTTPDataLoading {
+    func data(for request: URLRequest, maximumBytes: Int) async throws -> (Data, URLResponse) {
+        try await data(for: request)
+    }
 }
 
 nonisolated enum DocmostURLSessionFactory {
@@ -52,6 +60,11 @@ nonisolated enum DocmostURLSessionFactory {
 }
 
 extension URLSession: HTTPDataLoading {
+    func data(for request: URLRequest, maximumBytes: Int) async throws -> (Data, URLResponse) {
+        let (bytes, response) = try await bytes(for: request)
+        return try await Self.collect(bytes: bytes, response: response, maximumBytes: maximumBytes)
+    }
+
     func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> (Data, URLResponse) {
         try await upload(for: request, fromFile: fileURL, delegate: nil)
     }
@@ -71,25 +84,12 @@ private final class DocmostRedirectGuardedSession:
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try await data(for: request, maximumBytes: DocmostResponseSizeLimit.maximumBytes)
+    }
+
+    func data(for request: URLRequest, maximumBytes: Int) async throws -> (Data, URLResponse) {
         let (bytes, response) = try await session.bytes(for: request, delegate: self)
-        if response.expectedContentLength > Int64(DocmostResponseSizeLimit.maximumBytes) {
-            throw APIError.responseTooLarge
-        }
-
-        var data = Data()
-        data.reserveCapacity(min(
-            max(Int(response.expectedContentLength), 0),
-            DocmostResponseSizeLimit.maximumBytes
-        ))
-
-        for try await byte in bytes {
-            data.append(byte)
-            guard data.count <= DocmostResponseSizeLimit.maximumBytes else {
-                throw APIError.responseTooLarge
-            }
-        }
-
-        return (data, response)
+        return try await Self.collect(bytes: bytes, response: response, maximumBytes: maximumBytes)
     }
 
     func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> (Data, URLResponse) {
@@ -113,5 +113,29 @@ private final class DocmostRedirectGuardedSession:
         }
 
         completionHandler(request)
+    }
+}
+
+private extension HTTPDataLoading {
+    static func collect(
+        bytes: URLSession.AsyncBytes,
+        response: URLResponse,
+        maximumBytes: Int
+    ) async throws -> (Data, URLResponse) {
+        if response.expectedContentLength > Int64(maximumBytes) {
+            throw APIError.responseTooLarge
+        }
+
+        var data = Data()
+        data.reserveCapacity(min(max(Int(response.expectedContentLength), 0), maximumBytes))
+
+        for try await byte in bytes {
+            data.append(byte)
+            guard data.count <= maximumBytes else {
+                throw APIError.responseTooLarge
+            }
+        }
+
+        return (data, response)
     }
 }
