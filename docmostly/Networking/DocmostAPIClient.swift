@@ -185,10 +185,11 @@ actor DocmostAPIClient {
         }
     }
 
-    private func validateResponseSize(
-        _ data: Data,
-        maximumBytes: Int = Self.maximumResponseBytes
-    ) throws {
+    private func validateResponseSize(_ data: Data) throws {
+        try validateResponseSize(data, maximumBytes: Self.maximumResponseBytes)
+    }
+
+    private func validateResponseSize(_ data: Data, maximumBytes: Int) throws {
         guard data.count <= maximumBytes else {
             throw APIError.responseTooLarge
         }
