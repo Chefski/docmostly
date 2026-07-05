@@ -5,10 +5,19 @@ struct PageReaderSupplementaryPanelView: View {
 
     let panel: PageReaderPanel
     let pageID: String
+    let canEdit: Bool
+    let hasPageRestriction: Bool
+    let workspaceSharingDisabled: Bool
+    let spaceSharingDisabled: Bool
+    let publicShareURL: URL?
+    let serverURLString: String
     let tableOfContentsItems: [PageReaderTableOfContentsItem]
     let selectHeading: (PageReaderTableOfContentsItem) -> Void
     let markInlineCommentResolved: (String, Bool) async -> Void
     let removeInlineComment: (String) async -> Void
+    let loadSharingState: () async -> Void
+    let setPublicSharing: (Bool) async -> Void
+    let updateShareOptions: (Bool?, Bool?) async -> Void
     let close: () -> Void
 
     var body: some View {
@@ -38,6 +47,25 @@ struct PageReaderSupplementaryPanelView: View {
                 PageReaderTableOfContentsPanelView(
                     items: tableOfContentsItems,
                     select: selectHeading
+                )
+            case .attachments:
+                AttachmentLinksView(
+                    links: viewModel.attachmentLinks,
+                    serverURLString: serverURLString,
+                    showsEmptyState: true
+                )
+            case .sharing:
+                PageSharingPanelView(
+                    viewModel: viewModel,
+                    pageID: pageID,
+                    canEdit: canEdit,
+                    hasPageRestriction: hasPageRestriction,
+                    workspaceSharingDisabled: workspaceSharingDisabled,
+                    spaceSharingDisabled: spaceSharingDisabled,
+                    publicShareURL: publicShareURL,
+                    loadSharingState: loadSharingState,
+                    setPublicSharing: setPublicSharing,
+                    updateShareOptions: updateShareOptions
                 )
             }
         }

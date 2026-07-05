@@ -183,10 +183,24 @@ struct PageReaderView: View {
                     viewModel: viewModel,
                     panel: activePanel,
                     pageID: editorViewModel.currentPageID,
+                    canEdit: editorViewModel.canEdit,
+                    hasPageRestriction: editorViewModel.hasPageRestriction,
+                    workspaceSharingDisabled: workspaceSharingDisabled,
+                    spaceSharingDisabled: spaceSharingDisabled,
+                    publicShareURL: publicShareURL,
+                    serverURLString: appState.serverURLString,
                     tableOfContentsItems: tableOfContentsItems,
                     selectHeading: selectHeading,
                     markInlineCommentResolved: markInlineCommentResolved,
                     removeInlineComment: removeInlineComment,
+                    loadSharingState: loadSharingState,
+                    setPublicSharing: setPublicSharing,
+                    updateShareOptions: { includeSubPages, searchIndexing in
+                        await updateShareOptions(
+                            includeSubPages: includeSubPages,
+                            searchIndexing: searchIndexing
+                        )
+                    },
                     close: closeSupplementaryPanel
                 )
             }
@@ -199,10 +213,24 @@ struct PageReaderView: View {
                         viewModel: viewModel,
                         panel: panel,
                         pageID: editorViewModel.currentPageID,
+                        canEdit: editorViewModel.canEdit,
+                        hasPageRestriction: editorViewModel.hasPageRestriction,
+                        workspaceSharingDisabled: workspaceSharingDisabled,
+                        spaceSharingDisabled: spaceSharingDisabled,
+                        publicShareURL: publicShareURL,
+                        serverURLString: appState.serverURLString,
                         tableOfContentsItems: tableOfContentsItems,
                         selectHeading: selectHeading,
                         markInlineCommentResolved: markInlineCommentResolved,
                         removeInlineComment: removeInlineComment,
+                        loadSharingState: loadSharingState,
+                        setPublicSharing: setPublicSharing,
+                        updateShareOptions: { includeSubPages, searchIndexing in
+                            await updateShareOptions(
+                                includeSubPages: includeSubPages,
+                                searchIndexing: searchIndexing
+                            )
+                        },
                         close: closeSupplementaryPanel
                     )
                     .navigationTitle(panel.title)

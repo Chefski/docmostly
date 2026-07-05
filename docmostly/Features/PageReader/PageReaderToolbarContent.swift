@@ -51,6 +51,8 @@ extension PageReaderView {
             canMoveToSpace: editorViewModel.currentSpaceID != nil,
             showComments: showComments,
             showTableOfContents: showTableOfContents,
+            showAttachments: showAttachments,
+            showSharing: showSharing,
             copyPageLink: copyPageLink,
             copyPageMarkdown: copyPageMarkdown,
             toggleFavorite: toggleFavorite,

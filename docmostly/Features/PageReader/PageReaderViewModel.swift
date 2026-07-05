@@ -12,9 +12,15 @@ final class PageReaderViewModel {
     private(set) var openComments: [DocmostComment] = []
     private(set) var resolvedComments: [DocmostComment] = []
     var attachmentLinks: [DocmostAttachmentLink] = []
+    var pageShare: DocmostPageShare?
+    var pageRestrictionInfo: DocmostPageRestrictionInfo?
+    var pagePermissionMembers: [DocmostPagePermissionMember] = []
     var isLoading = false
     var errorMessage: String?
     var commentErrorMessage: String?
+    var sharingErrorMessage: String?
+    var isLoadingSharingState = false
+    var isUpdatingShare = false
     var draftComment = ""
     var replyDraftsByCommentID: [String: String] = [:]
     var editDraftsByCommentID: [String: String] = [:]
@@ -45,6 +51,7 @@ final class PageReaderViewModel {
     func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
         errorMessage = nil
+        resetSharingState()
         defer { isLoading = false }
 
         async let cachedAttachmentLinks = appState.attachmentLinks(pageId: pageID)
@@ -53,7 +60,8 @@ final class PageReaderViewModel {
         }
         async let loadedEngagement = fetchEngagement(pageID: pageID, appState: appState)
 
-        attachmentLinks = await cachedAttachmentLinks
+        let cachedLinks = await cachedAttachmentLinks
+        attachmentLinks = await appState.loadAttachmentDetails(pageId: pageID, fallbackLinks: cachedLinks)
         let commentOutcome = await loadedComments
         comments = commentOutcome.value ?? []
         commentErrorMessage = commentOutcome.errorMessage
@@ -403,6 +411,93 @@ final class PageReaderViewModel {
             return PageReaderLoadOutcome(value: try await operation(), errorMessage: nil)
         } catch {
             return PageReaderLoadOutcome(value: nil, errorMessage: error.localizedDescription)
+        }
+    }
+}
+
+extension PageReaderViewModel {
+    func resetSharingState() {
+        pageShare = nil
+        pageRestrictionInfo = nil
+        pagePermissionMembers = []
+        sharingErrorMessage = nil
+        isLoadingSharingState = false
+        isUpdatingShare = false
+    }
+
+    func loadSharingState(pageID: String, appState: AppState) async {
+        isLoadingSharingState = true
+        sharingErrorMessage = nil
+        defer { isLoadingSharingState = false }
+
+        async let loadedShare = captureLoad {
+            try await appState.loadPageShare(pageId: pageID)
+        }
+        async let loadedRestriction = captureLoad {
+            try await appState.loadPageRestrictionInfo(pageId: pageID)
+        }
+
+        let shareOutcome = await loadedShare
+        pageShare = shareOutcome.value ?? nil
+
+        let restrictionOutcome = await loadedRestriction
+        pageRestrictionInfo = restrictionOutcome.value ?? nil
+
+        if let info = pageRestrictionInfo, info.hasDirectRestriction {
+            let membersOutcome = await captureLoad {
+                try await appState.loadPagePermissionMembers(pageId: pageID)
+            }
+            pagePermissionMembers = membersOutcome.value ?? []
+            sharingErrorMessage = membersOutcome.errorMessage
+        } else {
+            pagePermissionMembers = []
+        }
+
+        sharingErrorMessage = sharingErrorMessage ??
+            shareOutcome.errorMessage ??
+            restrictionOutcome.errorMessage
+    }
+
+    func setPublicSharing(_ isEnabled: Bool, pageID: String, appState: AppState) async {
+        guard isUpdatingShare == false else { return }
+
+        isUpdatingShare = true
+        sharingErrorMessage = nil
+        defer { isUpdatingShare = false }
+
+        do {
+            if isEnabled {
+                pageShare = try await appState.createPageShare(pageId: pageID)
+            } else if let shareID = pageShare?.id {
+                try await appState.deletePageShare(shareId: shareID)
+                pageShare = nil
+            }
+        } catch {
+            sharingErrorMessage = error.localizedDescription
+        }
+    }
+
+    func updateShareOptions(
+        pageID: String,
+        includeSubPages: Bool? = nil,
+        searchIndexing: Bool? = nil,
+        appState: AppState
+    ) async {
+        guard isUpdatingShare == false, let shareID = pageShare?.id else { return }
+
+        isUpdatingShare = true
+        sharingErrorMessage = nil
+        defer { isUpdatingShare = false }
+
+        do {
+            pageShare = try await appState.updatePageShare(
+                shareId: shareID,
+                includeSubPages: includeSubPages,
+                searchIndexing: searchIndexing
+            )
+        } catch {
+            sharingErrorMessage = error.localizedDescription
+            await loadSharingState(pageID: pageID, appState: appState)
         }
     }
 }

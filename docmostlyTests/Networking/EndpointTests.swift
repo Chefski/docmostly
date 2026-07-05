@@ -182,6 +182,55 @@ struct EndpointTests {
         #expect(object?["resolved"] as? Bool == true)
     }
 
+    @Test func buildsShareRequests() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+
+        let forPage = try Endpoint.shareForPage(pageId: "page-1").urlRequest(baseURL: baseURL)
+        #expect(forPage.url?.absoluteString == "https://docs.example.com/api/shares/for-page")
+        #expect(try jsonBody(forPage)["pageId"] as? String == "page-1")
+
+        let create = try Endpoint.createShare(
+            pageId: "page-1",
+            includeSubPages: true,
+            searchIndexing: false
+        ).urlRequest(baseURL: baseURL)
+        #expect(create.url?.absoluteString == "https://docs.example.com/api/shares/create")
+        let createBody = try jsonBody(create)
+        #expect(createBody["pageId"] as? String == "page-1")
+        #expect(createBody["includeSubPages"] as? Bool == true)
+        #expect(createBody["searchIndexing"] as? Bool == false)
+
+        let update = try Endpoint.updateShare(
+            shareId: "share-1",
+            includeSubPages: false
+        ).urlRequest(baseURL: baseURL)
+        #expect(update.url?.absoluteString == "https://docs.example.com/api/shares/update")
+        let updateBody = try jsonBody(update)
+        #expect(updateBody["shareId"] as? String == "share-1")
+        #expect(updateBody["includeSubPages"] as? Bool == false)
+        #expect(updateBody.keys.contains("searchIndexing") == false)
+
+        let delete = try Endpoint.deleteShare(shareId: "share-1").urlRequest(baseURL: baseURL)
+        #expect(delete.url?.absoluteString == "https://docs.example.com/api/shares/delete")
+        #expect(try jsonBody(delete)["shareId"] as? String == "share-1")
+    }
+
+    @Test func buildsPageRestrictionReadRequests() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+
+        let info = try Endpoint.pageRestrictionInfo(pageId: "page-1").urlRequest(baseURL: baseURL)
+        #expect(info.url?.absoluteString == "https://docs.example.com/api/pages/permission-info")
+        #expect(try jsonBody(info)["pageId"] as? String == "page-1")
+
+        let members = try Endpoint.pagePermissions(pageId: "page-1", cursor: "cursor-1", limit: 25)
+            .urlRequest(baseURL: baseURL)
+        #expect(members.url?.absoluteString == "https://docs.example.com/api/pages/permissions")
+        let body = try jsonBody(members)
+        #expect(body["pageId"] as? String == "page-1")
+        #expect(body["cursor"] as? String == "cursor-1")
+        #expect(body["limit"] as? Int == 25)
+    }
+
     @Test func buildsUpdateCommentRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let endpoint = Endpoint.updateComment(
@@ -208,5 +257,10 @@ struct EndpointTests {
         let body = try #require(request.httpBody)
         let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         #expect(object?["commentId"] as? String == "comment-1")
+    }
+
+    private func jsonBody(_ request: URLRequest) throws -> [String: Any] {
+        let body = try #require(request.httpBody)
+        return try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
     }
 }

@@ -8,6 +8,11 @@ final class CachedAttachment {
     var id: String = ""
     var fileName: String = ""
     var path: String = ""
+    var fileSize: Int?
+    var fileExt: String?
+    var mimeType: String?
+    var createdAt: Date?
+    var updatedAt: Date?
     var pageId: String = ""
     var cachedAt: Date = Date.now
 
@@ -17,6 +22,11 @@ final class CachedAttachment {
         id = link.id
         fileName = link.fileName
         path = link.path
+        fileSize = link.fileSize
+        fileExt = link.fileExt
+        mimeType = link.mimeType
+        createdAt = link.createdAt
+        updatedAt = link.updatedAt
         self.pageId = pageId
         self.cachedAt = cachedAt
     }
@@ -25,16 +35,35 @@ final class CachedAttachment {
         id = link.id
         fileName = link.fileName
         path = link.path
+        fileSize = link.fileSize
+        fileExt = link.fileExt
+        mimeType = link.mimeType
+        createdAt = link.createdAt
+        updatedAt = link.updatedAt
         self.cachedAt = cachedAt
     }
 
     func matches(link: DocmostAttachmentLink) -> Bool {
         id == link.id &&
             fileName == link.fileName &&
-            path == link.path
+            path == link.path &&
+            fileSize == link.fileSize &&
+            fileExt == link.fileExt &&
+            mimeType == link.mimeType &&
+            createdAt == link.createdAt &&
+            updatedAt == link.updatedAt
     }
 
     func asLink() -> DocmostAttachmentLink {
-        DocmostAttachmentLink(id: id, fileName: fileName, path: path)
+        DocmostAttachmentLink(
+            id: id,
+            fileName: fileName,
+            path: path,
+            fileSize: fileSize,
+            fileExt: fileExt,
+            mimeType: mimeType,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }

@@ -234,6 +234,24 @@ extension PageReaderView {
         toggleSupplementaryPanel(.tableOfContents)
     }
 
+    func showAttachments() {
+        toggleSupplementaryPanel(.attachments)
+    }
+
+    func showSharing() {
+        toggleSupplementaryPanel(.sharing)
+    }
+
+    func loadSharingState() async {
+        guard let editorViewModel else { return }
+
+        await viewModel.loadSharingState(pageID: editorViewModel.currentPageID, appState: appState)
+        if let errorMessage = viewModel.sharingErrorMessage {
+            pageActionErrorMessage = errorMessage
+            viewModel.sharingErrorMessage = nil
+        }
+    }
+
     func toggleSupplementaryPanel(_ panel: PageReaderPanel) {
         activePanel = activePanel == panel ? nil : panel
     }
@@ -281,6 +299,57 @@ extension PageReaderView {
         return baseURL
             .appending(path: "p")
             .appending(path: pageSlug)
+    }
+
+    var publicShareURL: URL? {
+        guard
+            let editorViewModel,
+            let key = viewModel.pageShare?.key,
+            let baseURL = URL(string: appState.serverURLString)
+        else {
+            return nil
+        }
+
+        let pageSlug = PageSlugBuilder.slug(slugId: editorViewModel.currentPageSlugID, title: editorViewModel.title)
+        return baseURL
+            .appending(path: "share")
+            .appending(path: key)
+            .appending(path: "p")
+            .appending(path: pageSlug)
+    }
+
+    var workspaceSharingDisabled: Bool {
+        appState.currentUser?.workspace.settings?.sharing?.disabled == true
+    }
+
+    var spaceSharingDisabled: Bool {
+        guard let editorViewModel, let currentSpaceID = editorViewModel.currentSpaceID else { return false }
+        return appState.spaces.first(where: { $0.id == currentSpaceID })?.settings?.sharing?.disabled == true
+    }
+
+    func setPublicSharing(_ isEnabled: Bool) async {
+        guard let editorViewModel else { return }
+
+        await viewModel.setPublicSharing(isEnabled, pageID: editorViewModel.currentPageID, appState: appState)
+        if let errorMessage = viewModel.sharingErrorMessage {
+            pageActionErrorMessage = errorMessage
+            viewModel.sharingErrorMessage = nil
+        }
+    }
+
+    func updateShareOptions(includeSubPages: Bool?, searchIndexing: Bool?) async {
+        guard let editorViewModel else { return }
+
+        await viewModel.updateShareOptions(
+            pageID: editorViewModel.currentPageID,
+            includeSubPages: includeSubPages,
+            searchIndexing: searchIndexing,
+            appState: appState
+        )
+        if let errorMessage = viewModel.sharingErrorMessage {
+            pageActionErrorMessage = errorMessage
+            viewModel.sharingErrorMessage = nil
+        }
     }
 
     var pageNavigationTitle: String {

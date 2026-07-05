@@ -17,6 +17,7 @@ final class NativeRichEditorViewModel {
     var isSaving = false
     var isDirty = false
     var canEdit = true
+    var hasPageRestriction = false
     var errorMessage: String?
     var saveErrorMessage: String?
     var activeBlockID: UUID?
@@ -274,6 +275,7 @@ final class NativeRichEditorViewModel {
 
     func applyPagePermissions(_ permissions: DocmostPagePermissions?) {
         pageAllowsEditing = permissions?.canEdit ?? true
+        hasPageRestriction = permissions?.hasRestriction ?? false
         updateEditAccess()
     }
 

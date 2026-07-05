@@ -168,6 +168,35 @@ struct CacheRepositoryEditablePageTests {
         #expect(updatedAttachmentRow.fileName == "updated-diagram.svg")
     }
 
+    @Test func savingEditablePageCachesNativeAttachmentLinksForOfflineInspection() throws {
+        let (repository, context) = makeRepositoryAndContext()
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "attachment",
+                attrs: [
+                    "attachmentId": .string("file-1"),
+                    "url": .string("/api/files/file-1/Archive%20Plan.pdf"),
+                    "name": .string("Archive Plan.pdf"),
+                    "mime": .string("application/pdf"),
+                    "size": .int(8_192)
+                ]
+            )
+        ])
+
+        try repository.saveEditablePage(editablePage(content: document), scope: scope)
+
+        let attachment = try #require(cachedAttachments(context: context).first)
+        #expect(attachment.id == "file-1")
+        #expect(attachment.fileName == "Archive Plan.pdf")
+        #expect(attachment.path == "/api/files/file-1/Archive%20Plan.pdf")
+        #expect(attachment.fileSize == 8_192)
+        #expect(attachment.mimeType == "application/pdf")
+
+        let links = try repository.loadAttachmentLinks(pageId: "page-1", scope: scope)
+        #expect(links.first?.fileName == "Archive Plan.pdf")
+        #expect(links.first?.fileSize == 8_192)
+    }
+
     @Test func cachedEditablePagesAreScopedByServerAndUser() throws {
         let repository = makeRepository()
         let otherUserScope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-2")
