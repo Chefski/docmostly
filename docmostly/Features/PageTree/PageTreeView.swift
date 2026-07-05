@@ -83,7 +83,7 @@ struct PageTreeView: View {
                 }
             }
         }
-        .environment(\.defaultMinListRowHeight, PageBrowserMetrics.rowHeight)
+        .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
         .navigationTitle(space.name)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -108,6 +108,9 @@ struct PageTreeView: View {
         }
         .navigationDestination(for: PageBrowserItem.self) { item in
             PageBrowserDestinationView(item: item)
+        }
+        .navigationDestination(for: PageTreeNode.self) { node in
+            PageReaderDestinationView(pageID: node.slugId)
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
