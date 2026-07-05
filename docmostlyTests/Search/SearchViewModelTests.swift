@@ -42,6 +42,29 @@ struct SearchViewModelTests {
         #expect(provider.requests.map(\.offset) == [0, SearchViewModel.defaultPageSize])
     }
 
+    @Test func loadMoreAdvancesOffsetByFetchedRowsWhenDuplicatesAreDropped() async throws {
+        let provider = SearchProviderSpy()
+        provider.selectedSpaceID = "space-1"
+        provider.resultsByOffset[0] = (0..<SearchViewModel.defaultPageSize).map { Self.result(id: "page-\($0)") }
+        provider.resultsByOffset[SearchViewModel.defaultPageSize] = (0..<SearchViewModel.defaultPageSize).map {
+            Self.result(id: "page-\($0)")
+        }
+        provider.resultsByOffset[SearchViewModel.defaultPageSize * 2] = [Self.result(id: "page-50")]
+        let viewModel = SearchViewModel()
+        viewModel.query = "roadmap"
+
+        await viewModel.search(provider: provider)
+        await viewModel.loadMore(provider: provider)
+        await viewModel.loadMore(provider: provider)
+
+        #expect(viewModel.results.count == SearchViewModel.defaultPageSize + 1)
+        #expect(provider.requests.map(\.offset) == [
+            0,
+            SearchViewModel.defaultPageSize,
+            SearchViewModel.defaultPageSize * 2
+        ])
+    }
+
     @Test func resolvesAllSpacesAndCurrentUserScopes() async throws {
         let provider = SearchProviderSpy()
         provider.selectedSpaceID = "space-1"

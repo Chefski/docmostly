@@ -39,7 +39,6 @@ extension PageReaderView {
     }
 
     private func pageActionsMenu(editorViewModel: NativeRichEditorViewModel) -> some View {
-        #if os(macOS)
         PageReaderPageActionsMenu(
             pageShareURL: pageShareURL,
             activePanel: activePanel,
@@ -60,30 +59,15 @@ extension PageReaderView {
             showMoveToSpace: showMoveToSpace,
             duplicateCurrentPage: duplicateCurrentPage,
             confirmTrash: { isConfirmingPageTrash = true },
-            openCurrentPageInNewWindow: openCurrentPageInNewWindow
+            openCurrentPageInNewWindow: openCurrentPageInNewWindowAction
         )
+    }
+
+    private var openCurrentPageInNewWindowAction: (() -> Void)? {
+        #if os(macOS)
+        openCurrentPageInNewWindow
         #else
-        PageReaderPageActionsMenu(
-            pageShareURL: pageShareURL,
-            activePanel: activePanel,
-            usesFullWidth: $usesFullWidth,
-            isFavoritePage: viewModel.isFavoritePage,
-            isTogglingFavorite: viewModel.isTogglingFavorite,
-            isWatchingPage: viewModel.isWatchingPage,
-            isTogglingWatch: viewModel.isTogglingWatch,
-            canEdit: editorViewModel.canEdit,
-            canMoveToSpace: editorViewModel.currentSpaceID != nil,
-            showComments: showComments,
-            showTableOfContents: showTableOfContents,
-            copyPageLink: copyPageLink,
-            copyPageMarkdown: copyPageMarkdown,
-            toggleFavorite: toggleFavorite,
-            toggleWatch: toggleWatch,
-            showLabelEditor: showLabelEditor,
-            showMoveToSpace: showMoveToSpace,
-            duplicateCurrentPage: duplicateCurrentPage,
-            confirmTrash: { isConfirmingPageTrash = true }
-        )
+        nil
         #endif
     }
 }

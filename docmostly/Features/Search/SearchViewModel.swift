@@ -65,6 +65,7 @@ final class SearchViewModel {
     var errorMessage: String?
     var spaceScope: SearchSpaceScope = .currentSpace
     var authorScope: SearchAuthorScope = .anyone
+    private var requestedResultCount = 0
 
     var searchTaskKey: SearchTaskKey {
         SearchTaskKey(query: query, spaceScope: spaceScope, authorScope: authorScope)
@@ -76,12 +77,13 @@ final class SearchViewModel {
             results = []
             errorMessage = nil
             hasMoreResults = false
+            requestedResultCount = 0
             return
         }
 
         let requestedSpaceScope = spaceScope
         let requestedAuthorScope = authorScope
-        let requestedOffset = reset ? 0 : results.count
+        let requestedOffset = reset ? 0 : requestedResultCount
         let requestedSpaceID = requestedSpaceScope.resolvedSpaceID(currentSpaceID: provider.selectedSpaceID)
         let requestedCreatorID = requestedAuthorScope.resolvedCreatorID(currentUserID: provider.currentSearchUserID)
 
@@ -119,6 +121,7 @@ final class SearchViewModel {
             } else {
                 appendUniqueResults(fetchedResults)
             }
+            requestedResultCount = requestedOffset + fetchedResults.count
             hasMoreResults = fetchedResults.count == Self.defaultPageSize
         } catch {
             guard Task.isCancelled == false else { return }

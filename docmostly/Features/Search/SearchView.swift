@@ -68,13 +68,13 @@ private struct SearchFilterBar: View {
         Group {
             if #available(iOS 26.0, macOS 26.0, *) {
                 GlassEffectContainer(spacing: 8) {
-                    filterContent
+                    SearchFilterContent(viewModel: viewModel, spaces: spaces)
                         .padding(.horizontal)
                         .padding(.vertical, 10)
                         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 18))
                 }
             } else {
-                filterContent
+                SearchFilterContent(viewModel: viewModel, spaces: spaces)
                     .padding(.horizontal)
                     .padding(.vertical, 10)
                     .background(.regularMaterial, in: .rect(cornerRadius: 18))
@@ -82,23 +82,33 @@ private struct SearchFilterBar: View {
         }
         .accessibilityElement(children: .contain)
     }
+}
 
-    private var filterContent: some View {
+private struct SearchFilterContent: View {
+    @Bindable var viewModel: SearchViewModel
+    let spaces: [DocmostSpace]
+
+    var body: some View {
         ViewThatFits {
             HStack {
-                spacePicker
-                authorPicker
+                SearchSpacePicker(viewModel: viewModel, spaces: spaces)
+                SearchAuthorPicker(viewModel: viewModel)
             }
 
             VStack(alignment: .leading) {
-                spacePicker
-                authorPicker
+                SearchSpacePicker(viewModel: viewModel, spaces: spaces)
+                SearchAuthorPicker(viewModel: viewModel)
             }
         }
         .controlSize(.small)
     }
+}
 
-    private var spacePicker: some View {
+private struct SearchSpacePicker: View {
+    @Bindable var viewModel: SearchViewModel
+    let spaces: [DocmostSpace]
+
+    var body: some View {
         Picker("Space", selection: $viewModel.spaceScope) {
             Label("Current Space", systemImage: "sidebar.left")
                 .tag(SearchSpaceScope.currentSpace)
@@ -113,8 +123,12 @@ private struct SearchFilterBar: View {
         }
         .pickerStyle(.menu)
     }
+}
 
-    private var authorPicker: some View {
+private struct SearchAuthorPicker: View {
+    @Bindable var viewModel: SearchViewModel
+
+    var body: some View {
         Picker("Author", selection: $viewModel.authorScope) {
             Label("Anyone", systemImage: "person.2")
                 .tag(SearchAuthorScope.anyone)

@@ -20,9 +20,7 @@ struct PageReaderPageActionsMenu: View {
     let showMoveToSpace: () -> Void
     let duplicateCurrentPage: () -> Void
     let confirmTrash: () -> Void
-    #if os(macOS)
-    let openCurrentPageInNewWindow: () -> Void
-    #endif
+    let openCurrentPageInNewWindow: (() -> Void)?
 
     var body: some View {
         Menu("Page Actions", systemImage: "ellipsis.circle") {
@@ -50,9 +48,9 @@ struct PageReaderPageActionsMenu: View {
                     Label("Full Width", systemImage: "arrow.left.and.right")
                 }
 
-                #if os(macOS)
-                Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
-                #endif
+                if let openCurrentPageInNewWindow {
+                    Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
+                }
             }
 
             Section("Following") {
@@ -72,8 +70,10 @@ struct PageReaderPageActionsMenu: View {
                     Button("Move", systemImage: "arrow.right", action: showMoveToSpace)
                 }
 
-                Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
-                Button("Move to Trash", systemImage: "trash", role: .destructive, action: confirmTrash)
+                if canEdit {
+                    Button("Duplicate", systemImage: "doc.on.doc", action: duplicateCurrentPage)
+                    Button("Move to Trash", systemImage: "trash", role: .destructive, action: confirmTrash)
+                }
             }
         }
         .accessibilityLabel("Page Actions")

@@ -12,11 +12,15 @@ struct NativeEditorToolbarSurface<Content: View>: View {
             shape: .capsule,
             isInteractive: true
         ) {
-            surfaceContent
+            NativeEditorToolbarSurfaceContent(content: content)
         }
     }
+}
 
-    private var surfaceContent: some View {
+private struct NativeEditorToolbarSurfaceContent<Content: View>: View {
+    let content: Content
+
+    var body: some View {
         HStack(spacing: NativeEditorToolbarMetrics.controlSpacing) {
             content
         }

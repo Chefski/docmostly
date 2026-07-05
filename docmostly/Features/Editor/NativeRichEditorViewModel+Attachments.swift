@@ -27,15 +27,14 @@ extension NativeRichEditorViewModel {
     ) async {
         guard attachments.isEmpty == false else { return }
 
-        let attachmentsWithDimensions = await attachments.asyncMap { uploadedAttachment in
-            let mediaDimensions = await NativeEditorAttachmentBlockFactory.mediaDimensions(
-                for: uploadedAttachment.sourceFileURL,
-                importKind: importKind
-            )
-            return (
+        let attachmentsWithDimensions = await attachments.orderedConcurrentMap { uploadedAttachment in
+            (
                 attachment: uploadedAttachment.attachment,
                 sourceFileURL: uploadedAttachment.sourceFileURL,
-                mediaDimensions: mediaDimensions
+                mediaDimensions: await NativeEditorAttachmentBlockFactory.mediaDimensions(
+                    for: uploadedAttachment.sourceFileURL,
+                    importKind: importKind
+                )
             )
         }
 
@@ -113,17 +112,27 @@ extension NativeRichEditorViewModel {
     }
 }
 
-private extension Sequence {
-    func asyncMap<Transformed>(
-        _ transform: (Element) async -> Transformed
+private extension Sequence where Element: Sendable {
+    func orderedConcurrentMap<Transformed: Sendable>(
+        _ transform: @escaping @Sendable (Element) async -> Transformed
     ) async -> [Transformed] {
-        var values: [Transformed] = []
-        values.reserveCapacity(underestimatedCount)
+        let elements = Array(self)
+        return await withTaskGroup(
+            of: (offset: Int, value: Transformed).self,
+            returning: [Transformed].self
+        ) { group in
+            for (offset, element) in elements.enumerated() {
+                group.addTask {
+                    (offset, await transform(element))
+                }
+            }
 
-        for element in self {
-            values.append(await transform(element))
+            var values = [Transformed?](repeating: nil, count: elements.count)
+            for await result in group {
+                values[result.offset] = result.value
+            }
+
+            return values.compactMap(\.self)
         }
-
-        return values
     }
 }

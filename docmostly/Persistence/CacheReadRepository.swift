@@ -32,13 +32,10 @@ actor CacheReadRepository {
     }
 
     func searchCachedPages(
-        query: String,
-        spaceId: String?,
-        limit: Int,
-        offset: Int,
+        _ request: CachedSearchRequest,
         scope: CacheScope
     ) throws -> [DocmostSearchResult] {
-        try repository().searchCachedPages(query: query, spaceId: spaceId, limit: limit, offset: offset, scope: scope)
+        try repository().searchCachedPages(request, scope: scope)
     }
 
     private func repository() -> CacheRepository {

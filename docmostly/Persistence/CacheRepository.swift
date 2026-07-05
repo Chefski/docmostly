@@ -15,6 +15,14 @@ nonisolated struct CacheScope: Equatable, Hashable, Sendable {
     }
 }
 
+nonisolated struct CachedSearchRequest: Equatable, Sendable {
+    let query: String
+    let spaceId: String?
+    let creatorId: String?
+    let limit: Int
+    let offset: Int
+}
+
 nonisolated final class CacheRepository {
     private let context: ModelContext
     private var deferredSaveDepth = 0
@@ -259,24 +267,30 @@ nonisolated final class CacheRepository {
         return try context.fetch(descriptor).map { $0.asLink() }
     }
 
-    func searchCachedPages(
-        query: String,
-        spaceId: String? = nil,
-        limit: Int = 100,
-        offset: Int = 0,
-        scope: CacheScope
-    ) throws -> [DocmostSearchResult] {
-        let fetchLimit = max(100, limit + offset)
-        let pages = try loadRecentPages(limit: fetchLimit, scope: scope)
+    func searchCachedPages(_ request: CachedSearchRequest, scope: CacheScope) throws -> [DocmostSearchResult] {
+        let clampedLimit = max(0, request.limit)
+        guard clampedLimit > 0 else { return [] }
+
+        let clampedOffset = max(0, request.offset)
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<CachedPage>(
+            predicate: #Predicate { page in
+                page.cacheServerBaseURL == serverBaseURL && page.cacheUserID == userID
+            },
+            sortBy: [SortDescriptor(\.lastOpenedAt, order: .reverse)]
+        )
+        let pages = try context.fetch(descriptor)
         return pages
             .filter { page in
-                let matchesSpace = spaceId == nil || page.spaceId == spaceId
-                let matchesQuery = page.title.localizedStandardContains(query) ||
-                    page.htmlContent.localizedStandardContains(query)
-                return matchesSpace && matchesQuery
+                let matchesSpace = request.spaceId == nil || page.spaceId == request.spaceId
+                let matchesCreator = request.creatorId == nil || page.creatorId == request.creatorId
+                let matchesQuery = page.title.localizedStandardContains(request.query) ||
+                    page.htmlContent.localizedStandardContains(request.query)
+                return matchesSpace && matchesCreator && matchesQuery
             }
-            .dropFirst(offset)
-            .prefix(limit)
+            .dropFirst(clampedOffset)
+            .prefix(clampedLimit)
             .map { page in
                 DocmostSearchResult(
                     id: page.id,
@@ -284,7 +298,7 @@ nonisolated final class CacheRepository {
                     icon: page.icon,
                     parentPageId: page.parentPageId,
                     slugId: page.slugId,
-                    creatorId: nil,
+                    creatorId: page.creatorId,
                     createdAt: nil,
                     updatedAt: page.updatedAt,
                     rank: nil,

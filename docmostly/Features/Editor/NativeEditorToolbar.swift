@@ -44,7 +44,19 @@ struct NativeEditorToolbar: View {
             }
 
             ScrollView(.horizontal) {
-                toolbarContent
+                NativeEditorToolbarContent(
+                    viewModel: viewModel,
+                    isUploadingAttachment: isUploadingAttachment,
+                    importAttachment: importAttachment,
+                    applyCommand: applyCommand,
+                    isShowingLinkPrompt: $isShowingLinkPrompt,
+                    isShowingSearchReplace: $isShowingSearchReplace,
+                    isShowingStatusPrompt: $isShowingStatusPrompt,
+                    isShowingMathPrompt: $isShowingMathPrompt,
+                    showMentionPicker: showMentionPicker,
+                    showInlineCommentComposer: showInlineCommentComposer,
+                    dismissKeyboard: dismissKeyboard
+                )
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
             }
@@ -88,19 +100,54 @@ struct NativeEditorToolbar: View {
             }
         }
     }
+}
 
-    @ViewBuilder
-    private var toolbarContent: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
-                toolbarGroups
-            }
-        } else {
-            toolbarGroups
+private struct NativeEditorToolbarContent: View {
+    @Bindable var viewModel: NativeRichEditorViewModel
+    let isUploadingAttachment: Bool
+    let importAttachment: (NativeEditorAttachmentImportKind) -> Void
+    let applyCommand: ((NativeEditorCommand) -> Void)?
+    @Binding var isShowingLinkPrompt: Bool
+    @Binding var isShowingSearchReplace: Bool
+    @Binding var isShowingStatusPrompt: Bool
+    @Binding var isShowingMathPrompt: Bool
+    let showMentionPicker: () -> Void
+    let showInlineCommentComposer: () -> Void
+    let dismissKeyboard: () -> Void
+
+    var body: some View {
+        GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
+            NativeEditorToolbarGroups(
+                viewModel: viewModel,
+                isUploadingAttachment: isUploadingAttachment,
+                importAttachment: importAttachment,
+                applyCommand: applyCommand,
+                isShowingLinkPrompt: $isShowingLinkPrompt,
+                isShowingSearchReplace: $isShowingSearchReplace,
+                isShowingStatusPrompt: $isShowingStatusPrompt,
+                isShowingMathPrompt: $isShowingMathPrompt,
+                showMentionPicker: showMentionPicker,
+                showInlineCommentComposer: showInlineCommentComposer,
+                dismissKeyboard: dismissKeyboard
+            )
         }
     }
+}
 
-    private var toolbarGroups: some View {
+private struct NativeEditorToolbarGroups: View {
+    @Bindable var viewModel: NativeRichEditorViewModel
+    let isUploadingAttachment: Bool
+    let importAttachment: (NativeEditorAttachmentImportKind) -> Void
+    let applyCommand: ((NativeEditorCommand) -> Void)?
+    @Binding var isShowingLinkPrompt: Bool
+    @Binding var isShowingSearchReplace: Bool
+    @Binding var isShowingStatusPrompt: Bool
+    @Binding var isShowingMathPrompt: Bool
+    let showMentionPicker: () -> Void
+    let showInlineCommentComposer: () -> Void
+    let dismissKeyboard: () -> Void
+
+    var body: some View {
         HStack(spacing: NativeEditorToolbarMetrics.groupSpacing) {
             NativeEditorToolbarSurface {
                 NativeEditorHistoryToolbarGroup(viewModel: viewModel)

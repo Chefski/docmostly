@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 extension NativeEditorMarkdownParser {
     static func htmlTableMarkedInlineMarkdown(from node: ProseMirrorNode) -> String {

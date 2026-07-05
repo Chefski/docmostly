@@ -3,27 +3,6 @@ import AVFoundation
 import ImageIO
 
 enum NativeEditorAttachmentBlockFactory {
-    static func block(
-        for attachment: DocmostAttachment,
-        importKind: NativeEditorAttachmentImportKind,
-        replacing id: UUID = UUID(),
-        sourceFileURL: URL? = nil
-    ) -> NativeEditorBlock {
-        let context = NativeEditorAttachmentContext(
-            attachment: attachment,
-            source: "/api/files/\(attachment.id)/\(attachment.fileName)",
-            size: attachment.fileSize ?? localFileSize(for: sourceFileURL),
-            mediaDimensions: nil
-        )
-
-        return block(
-            for: attachment,
-            importKind: importKind,
-            replacing: id,
-            context: context
-        )
-    }
-
     static func mediaDimensions(
         for fileURL: URL?,
         importKind: NativeEditorAttachmentImportKind
