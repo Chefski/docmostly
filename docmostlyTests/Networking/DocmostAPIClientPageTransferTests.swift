@@ -39,6 +39,26 @@ struct DocmostAPIClientPageTransferTests {
         #expect(String(data: file.data, encoding: .utf8) == "# Roadmap")
     }
 
+    @Test func exportPageDecodesRFC5987FilenameWithLanguageTag() async throws {
+        let loader = CapturingHTTPDataLoader(responses: [
+            .init(
+                data: Data("# Localized".utf8),
+                response: try response(
+                    url: "https://docs.example.com/api/pages/export",
+                    headers: [
+                        "Content-Disposition": #"attachment; filename*=utf-8'en'Localized%20Roadmap.md"#,
+                        "Content-Type": "text/markdown"
+                    ]
+                )
+            )
+        ])
+        let client = DocmostAPIClient(baseURL: URL(string: "https://docs.example.com")!, loader: loader)
+
+        let file = try await client.exportPage(pageId: "page-1", format: .markdown, includeChildren: false)
+
+        #expect(file.fileName == "Localized Roadmap.md")
+    }
+
     @Test func importPageUploadsMultipartSpaceAndFile() async throws {
         let sourceURL = URL.temporaryDirectory.appending(path: "docmostly-import-\(UUID().uuidString).md")
         try "# Imported".write(to: sourceURL, atomically: true, encoding: .utf8)

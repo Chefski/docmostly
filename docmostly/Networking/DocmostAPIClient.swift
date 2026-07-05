@@ -258,7 +258,11 @@ actor DocmostAPIClient {
         if let encodedName = fields.compactMap({ field -> String? in
             guard field.lowercased().hasPrefix("filename*=") else { return nil }
             let value = field.dropFirst("filename*=".count)
-            return String(value).replacing("UTF-8''", with: "")
+            let components = String(value).split(separator: "'", omittingEmptySubsequences: false)
+            guard components.count >= 3 else {
+                return String(value)
+            }
+            return components.dropFirst(2).joined(separator: "'")
         }).first {
             return encodedName.removingPercentEncoding ?? encodedName
         }

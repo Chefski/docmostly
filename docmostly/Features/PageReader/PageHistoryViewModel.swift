@@ -64,6 +64,7 @@ final class PageHistoryViewModel {
 
         do {
             let detail = try await appState.loadPageHistoryInfo(historyId: versionID)
+            guard selectedVersion?.id == versionID else { return }
             selectedVersion = detail
             selectedDocument = NativeEditorDocument(proseMirrorDocument: detail.content ?? ProseMirrorDocument())
             if let index = versions.firstIndex(where: { $0.id == detail.id }) {

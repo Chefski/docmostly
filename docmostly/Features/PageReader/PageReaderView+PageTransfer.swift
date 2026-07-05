@@ -34,6 +34,8 @@ extension PageReaderView {
             guard fileURLs.isEmpty == false else { return }
 
             pageImportTask?.cancel()
+            let importTaskID = UUID()
+            pageImportTaskID = importTaskID
             pageImportTask = Task {
                 await pageImportViewModel.importFiles(fileURLs, spaceID: spaceID, appState: appState)
                 if Task.isCancelled == false, pageImportViewModel.importedPages.isEmpty == false {
@@ -46,7 +48,10 @@ extension PageReaderView {
                         )
                     }
                 }
-                pageImportTask = nil
+                if pageImportTaskID == importTaskID {
+                    pageImportTask = nil
+                    pageImportTaskID = nil
+                }
             }
         } catch {
             pageActionErrorMessage = error.localizedDescription
@@ -56,6 +61,7 @@ extension PageReaderView {
     func cancelPageImport() {
         pageImportTask?.cancel()
         pageImportTask = nil
+        pageImportTaskID = nil
     }
 
     func restoreSelectedPageVersion() async -> Bool {

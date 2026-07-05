@@ -25,6 +25,7 @@ struct PageReaderView: View {
     @State var isShowingMentionPicker = false
     @State var isShowingInlineCommentComposer = false
     @State var isUploadingAttachment = false
+    @State var pageImportTaskID: UUID?
     @State var pageImportTask: Task<Void, Never>?
     @State var attachmentUploadErrorMessage: String?
     @State var inlineCommentContext: NativeEditorInlineCommentContext?
