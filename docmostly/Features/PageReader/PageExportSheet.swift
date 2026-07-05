@@ -8,6 +8,7 @@ struct PageExportSheet: View {
     @Environment(AppState.self) private var appState
     @State private var exportedPageDocument: DocmostlyExportDocument?
     @State private var isShowingExportedFileSaver = false
+    @State private var exportTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -38,8 +39,9 @@ struct PageExportSheet: View {
                     GlassEffectContainer(spacing: 12) {
                         DocmostlyGlassPanel(cornerRadius: 16) {
                             Button("Export", systemImage: "square.and.arrow.down") {
-                                Task {
+                                exportTask = Task { @MainActor in
                                     await viewModel.export(pageID: pageID, appState: appState)
+                                    exportTask = nil
                                 }
                             }
                             .buttonStyle(.glassProminent)
@@ -54,14 +56,18 @@ struct PageExportSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done", action: close)
+                        .disabled(viewModel.canDismiss == false || isShowingExportedFileSaver)
                 }
                 if viewModel.isExporting {
                     ToolbarItem(placement: .primaryAction) {
-                        ProgressView()
+                        Button("Cancel", role: .cancel) {
+                            exportTask?.cancel()
+                        }
                     }
                 }
             }
         }
+        .interactiveDismissDisabled(viewModel.canDismiss == false || isShowingExportedFileSaver)
         .fileExporter(
             isPresented: $isShowingExportedFileSaver,
             document: exportedPageDocument,
@@ -76,6 +82,10 @@ struct PageExportSheet: View {
             guard let document else { return }
             exportedPageDocument = document
             isShowingExportedFileSaver = true
+        }
+        .onDisappear {
+            guard viewModel.isExporting else { return }
+            exportTask?.cancel()
         }
     }
 }

@@ -9,6 +9,9 @@ final class PageExportViewModel {
     private(set) var isExporting = false
     var errorMessage: String?
     var exportedFile: DocmostlyExportDocument?
+    var canDismiss: Bool {
+        isExporting == false
+    }
 
     func export(pageID: String, appState: AppState) async {
         guard isExporting == false else { return }
@@ -25,6 +28,8 @@ final class PageExportViewModel {
                 includeChildren: includeChildren
             )
             exportedFile = DocmostlyExportDocument(exportFile: file)
+        } catch is CancellationError {
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
