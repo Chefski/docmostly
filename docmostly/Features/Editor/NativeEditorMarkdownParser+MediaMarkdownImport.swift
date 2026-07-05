@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension NativeEditorMarkdownParser {
     static func appendImageMarkdownBlocksWithTrailingText(

@@ -82,7 +82,13 @@ nonisolated enum Endpoint: Sendable {
     case watchSpace(spaceId: String)
     case unwatchSpace(spaceId: String)
     case spaceWatchStatus(spaceId: String)
-    case search(query: String, spaceId: String? = nil, limit: Int = 20)
+    case search(
+        query: String,
+        spaceId: String? = nil,
+        creatorId: String? = nil,
+        limit: Int = 25,
+        offset: Int = 0
+    )
     case searchSuggestions(
         query: String,
         includeUsers: Bool = true,
@@ -421,8 +427,14 @@ nonisolated enum Endpoint: Sendable {
             return try encode(PageIDRequest(pageId: pageId))
         case .watchSpace(let spaceId), .unwatchSpace(let spaceId), .spaceWatchStatus(let spaceId):
             return try encode(SpaceInfoRequest(spaceId: spaceId))
-        case .search(let query, let spaceId, let limit):
-            return try encode(SearchRequest(query: query, spaceId: spaceId, limit: limit))
+        case .search(let query, let spaceId, let creatorId, let limit, let offset):
+            return try encode(SearchRequest(
+                query: query,
+                spaceId: spaceId,
+                creatorId: creatorId,
+                limit: limit,
+                offset: offset
+            ))
         case .searchSuggestions(let query, let includeUsers, let includePages, let spaceId, let limit):
             return try encode(SearchSuggestionsRequest(
                 query: query,
@@ -715,7 +727,9 @@ nonisolated private struct LabelPagesRequest: Encodable {
 nonisolated private struct SearchRequest: Encodable {
     let query: String
     let spaceId: String?
+    let creatorId: String?
     let limit: Int
+    let offset: Int
 }
 
 nonisolated private struct SearchSuggestionsRequest: Encodable {

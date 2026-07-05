@@ -21,7 +21,13 @@ struct EndpointTests {
 
     @Test func buildsAuthenticatedSearchRequest() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
-        let endpoint = Endpoint.search(query: "roadmap", spaceId: "space-1")
+        let endpoint = Endpoint.search(
+            query: "roadmap",
+            spaceId: "space-1",
+            creatorId: "user-1",
+            limit: 25,
+            offset: 50
+        )
         let request = try endpoint.urlRequest(baseURL: baseURL)
 
         #expect(request.url?.path == "/api/search")
@@ -30,6 +36,9 @@ struct EndpointTests {
         let object = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         #expect(object?["query"] as? String == "roadmap")
         #expect(object?["spaceId"] as? String == "space-1")
+        #expect(object?["creatorId"] as? String == "user-1")
+        #expect(object?["limit"] as? Int == 25)
+        #expect(object?["offset"] as? Int == 50)
     }
 
     @Test func omitsJSONContentTypeWhenPostBodyIsEmpty() throws {

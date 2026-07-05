@@ -4,13 +4,13 @@ import Testing
 
 @MainActor
 struct NativeRichEditorUploadedMediaTests {
-    @Test func insertingUploadedImageUsesDocmostDefaultCenterAlignment() {
+    @Test func insertingUploadedImageUsesDocmostDefaultCenterAlignment() async {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/image"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(
+        await viewModel.insertUploadedAttachment(
             uploadedAttachment(fileName: "Diagram.png", mimeType: "image/png", fileExt: "png"),
             as: .image
         )
@@ -25,13 +25,13 @@ struct NativeRichEditorUploadedMediaTests {
         #expect(node?.attrs?["align"] == .string("center"))
     }
 
-    @Test func insertingUploadedVideoUsesDocmostDefaultCenterAlignment() {
+    @Test func insertingUploadedVideoUsesDocmostDefaultCenterAlignment() async {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/video"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(
+        await viewModel.insertUploadedAttachment(
             uploadedAttachment(fileName: "Demo.mp4", mimeType: "video/mp4", fileExt: "mp4"),
             as: .video
         )
@@ -46,13 +46,13 @@ struct NativeRichEditorUploadedMediaTests {
         #expect(node?.attrs?["align"] == .string("center"))
     }
 
-    @Test func insertingUploadedPDFUsesDocmostDefaultDimensions() {
+    @Test func insertingUploadedPDFUsesDocmostDefaultDimensions() async {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/pdf"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(
+        await viewModel.insertUploadedAttachment(
             uploadedAttachment(fileName: "Spec.pdf", mimeType: "application/pdf", fileExt: "pdf"),
             as: .pdf
         )

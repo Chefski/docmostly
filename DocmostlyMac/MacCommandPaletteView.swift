@@ -118,7 +118,7 @@ struct MacCommandPaletteView: View {
         }
 
         searchViewModel.query = trimmedQuery
-        await searchViewModel.search(appState: appState)
+        await searchViewModel.search(provider: appState)
     }
 
     private func perform(_ action: @escaping @MainActor () -> Void) {

@@ -26,12 +26,19 @@ struct MacRootView: View {
                         }
                         .disabled(canCreatePage == false)
 
-                        Button("Command Palette", systemImage: "command") {
-                            presentCommandPalette()
-                        }
+                        Menu("Workspace Actions", systemImage: "ellipsis.circle") {
+                            Button("Command Palette", systemImage: "command") {
+                                presentCommandPalette()
+                            }
 
-                        Button("Search", systemImage: "magnifyingglass") {
-                            appState.selectSidebarUtilityDestination(.search)
+                            Button("Search", systemImage: "magnifyingglass") {
+                                appState.selectSidebarUtilityDestination(.search)
+                            }
+
+                            Button("Open Current Page in New Window", systemImage: "macwindow") {
+                                openSelectedPageInNewWindow()
+                            }
+                            .disabled(selectedPageRoute == nil)
                         }
                     }
                 }

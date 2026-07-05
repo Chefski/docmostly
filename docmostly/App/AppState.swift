@@ -363,24 +363,36 @@ final class AppState {
         }
     }
 
-    func search(query: String, spaceId: String?) async throws -> [DocmostSearchResult] {
+    func search(
+        query: String,
+        spaceId: String?,
+        creatorId: String? = nil,
+        limit: Int = 25,
+        offset: Int = 0
+    ) async throws -> [DocmostSearchResult] {
         guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return []
         }
 
         guard let apiClient else {
-            return try await searchCachedPages(query: query)
+            return try await searchCachedPages(query: query, spaceId: spaceId, limit: limit, offset: offset)
         }
 
         do {
-            let response: SearchResponse = try await apiClient.send(.search(query: query, spaceId: spaceId))
+            let response: SearchResponse = try await apiClient.send(.search(
+                query: query,
+                spaceId: spaceId,
+                creatorId: creatorId,
+                limit: limit,
+                offset: offset
+            ))
             isOffline = false
             return response.items
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
-            return try await searchCachedPages(query: query)
+            return try await searchCachedPages(query: query, spaceId: spaceId, limit: limit, offset: offset)
         }
     }
 
@@ -508,12 +520,29 @@ final class AppState {
         return cached
     }
 
-    private func searchCachedPages(query: String) async throws -> [DocmostSearchResult] {
+    private func searchCachedPages(
+        query: String,
+        spaceId: String? = nil,
+        limit: Int = 100,
+        offset: Int = 0
+    ) async throws -> [DocmostSearchResult] {
         let scope = try requireCacheScope(message: "Search cache is unavailable until you sign in.")
         if let cacheReader {
-            return try await cacheReader.searchCachedPages(query: query, limit: 100, scope: scope)
+            return try await cacheReader.searchCachedPages(
+                query: query,
+                spaceId: spaceId,
+                limit: limit,
+                offset: offset,
+                scope: scope
+            )
         }
-        return try cacheRepository?.searchCachedPages(query: query, limit: 100, scope: scope) ?? []
+        return try cacheRepository?.searchCachedPages(
+            query: query,
+            spaceId: spaceId,
+            limit: limit,
+            offset: offset,
+            scope: scope
+        ) ?? []
     }
 
     private func cachedMentionSuggestions(query: String) async throws -> DocmostMentionSuggestionResponse {

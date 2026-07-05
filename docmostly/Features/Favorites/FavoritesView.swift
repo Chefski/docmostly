@@ -34,9 +34,13 @@ struct FavoritesView: View {
         }
         .navigationTitle("Favorites")
         .toolbar {
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                Task {
-                    await viewModel.load(appState: appState)
+            ToolbarItem(placement: .primaryAction) {
+                Menu("Favorites Actions", systemImage: "ellipsis.circle") {
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task {
+                            await viewModel.load(appState: appState)
+                        }
+                    }
                 }
             }
         }

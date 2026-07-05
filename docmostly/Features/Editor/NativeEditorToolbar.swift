@@ -36,73 +36,20 @@ struct NativeEditorToolbar: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             if isShowingSearchReplace {
-                NativeEditorSearchReplaceBar(viewModel: viewModel)
+                NativeEditorToolbarSurface {
+                    NativeEditorSearchReplaceBar(viewModel: viewModel)
+                }
             }
 
             ScrollView(.horizontal) {
-                HStack(spacing: 6) {
-                    NativeEditorHistoryToolbarGroup(viewModel: viewModel)
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorBlockCommandToolbarGroup(viewModel: viewModel, applyCommand: applyCommand)
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorFormattingToolbarGroup(
-                        viewModel: viewModel,
-                        isShowingStatusPrompt: $isShowingStatusPrompt,
-                        isShowingMathPrompt: $isShowingMathPrompt,
-                        showMentionPicker: showMentionPicker,
-                        showInlineCommentComposer: showInlineCommentComposer
-                    )
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorAlignmentToolbarGroup(
-                        viewModel: viewModel,
-                        isShowingLinkPrompt: $isShowingLinkPrompt
-                    )
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorAttachmentToolbarGroup(
-                        isUploading: isUploadingAttachment,
-                        importAttachment: importAttachment
-                    )
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorClipboardToolbarGroup(
-                        viewModel: viewModel,
-                        isShowingSearchReplace: $isShowingSearchReplace
-                    )
-
-                    Divider()
-                        .frame(height: 28)
-
-                    NativeEditorBlockActionsToolbarGroup(
-                        viewModel: viewModel,
-                        dismissKeyboard: dismissKeyboard
-                    )
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .labelStyle(.iconOnly)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                toolbarContent
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
             }
             .scrollIndicators(.hidden)
         }
-        .background(.regularMaterial, in: .rect(cornerRadius: 10))
-        .padding(.horizontal, 10)
         .padding(.bottom, 6)
         .alert("Link", isPresented: $isShowingLinkPrompt) {
             TextField("URL", text: $linkURLString)
@@ -140,5 +87,58 @@ struct NativeEditorToolbar: View {
                 inlineMathText = ""
             }
         }
+    }
+
+    @ViewBuilder
+    private var toolbarContent: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
+                toolbarGroups
+            }
+        } else {
+            toolbarGroups
+        }
+    }
+
+    private var toolbarGroups: some View {
+        HStack(spacing: NativeEditorToolbarMetrics.groupSpacing) {
+            NativeEditorToolbarSurface {
+                NativeEditorHistoryToolbarGroup(viewModel: viewModel)
+            }
+
+            NativeEditorToolbarSurface {
+                NativeEditorBlockCommandMenu(viewModel: viewModel, applyCommand: applyCommand)
+            }
+
+            NativeEditorToolbarSurface {
+                NativeEditorQuickFormattingToolbarGroup(
+                    viewModel: viewModel,
+                    isShowingLinkPrompt: $isShowingLinkPrompt
+                )
+            }
+
+            NativeEditorToolbarSurface {
+                NativeEditorAttachmentToolbarGroup(
+                    isUploading: isUploadingAttachment,
+                    importAttachment: importAttachment
+                )
+                NativeEditorPasteToolbarButton(viewModel: viewModel)
+                NativeEditorMoreToolbarMenu(
+                    viewModel: viewModel,
+                    isShowingSearchReplace: $isShowingSearchReplace,
+                    isShowingStatusPrompt: $isShowingStatusPrompt,
+                    isShowingMathPrompt: $isShowingMathPrompt,
+                    showMentionPicker: showMentionPicker,
+                    showInlineCommentComposer: showInlineCommentComposer
+                )
+                Button(action: dismissKeyboard) {
+                    Label("Dismiss Keyboard", systemImage: "keyboard.chevron.compact.down")
+                }
+                .nativeEditorToolbarControlFrame()
+            }
+        }
+        .buttonStyle(.plain)
+        .controlSize(.regular)
+        .labelStyle(.iconOnly)
     }
 }

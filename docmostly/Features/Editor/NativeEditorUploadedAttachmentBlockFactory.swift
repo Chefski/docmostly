@@ -13,8 +13,59 @@ enum NativeEditorAttachmentBlockFactory {
             attachment: attachment,
             source: "/api/files/\(attachment.id)/\(attachment.fileName)",
             size: attachment.fileSize ?? localFileSize(for: sourceFileURL),
-            mediaDimensions: mediaDimensions(for: sourceFileURL, importKind: importKind)
+            mediaDimensions: nil
         )
+
+        return block(
+            for: attachment,
+            importKind: importKind,
+            replacing: id,
+            context: context
+        )
+    }
+
+    static func mediaDimensions(
+        for fileURL: URL?,
+        importKind: NativeEditorAttachmentImportKind
+    ) async -> NativeEditorMediaDimensions? {
+        switch importKind {
+        case .image:
+            imageDimensions(for: fileURL)
+        case .video:
+            await videoDimensions(for: fileURL)
+        case .audio, .pdf, .file:
+            nil
+        }
+    }
+
+    static func block(
+        for attachment: DocmostAttachment,
+        importKind: NativeEditorAttachmentImportKind,
+        replacing id: UUID = UUID(),
+        sourceFileURL: URL? = nil,
+        mediaDimensions: NativeEditorMediaDimensions?
+    ) -> NativeEditorBlock {
+        let context = NativeEditorAttachmentContext(
+            attachment: attachment,
+            source: "/api/files/\(attachment.id)/\(attachment.fileName)",
+            size: attachment.fileSize ?? localFileSize(for: sourceFileURL),
+            mediaDimensions: mediaDimensions
+        )
+
+        return block(
+            for: attachment,
+            importKind: importKind,
+            replacing: id,
+            context: context
+        )
+    }
+
+    private static func block(
+        for attachment: DocmostAttachment,
+        importKind: NativeEditorAttachmentImportKind,
+        replacing id: UUID,
+        context: NativeEditorAttachmentContext
+    ) -> NativeEditorBlock {
 
         switch importKind {
         case .image:
@@ -158,29 +209,20 @@ enum NativeEditorAttachmentBlockFactory {
         )
     }
 
-    private static func mediaDimensions(
-        for fileURL: URL?,
-        importKind: NativeEditorAttachmentImportKind
-    ) -> NativeEditorMediaDimensions? {
-        switch importKind {
-        case .image:
-            imageDimensions(for: fileURL)
-        case .video:
-            videoDimensions(for: fileURL)
-        case .audio, .pdf, .file:
-            nil
-        }
-    }
-
-    private static func videoDimensions(for fileURL: URL?) -> NativeEditorMediaDimensions? {
+    private static func videoDimensions(for fileURL: URL?) async -> NativeEditorMediaDimensions? {
         guard let fileURL else { return nil }
 
         let asset = AVURLAsset(url: fileURL)
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+        guard
+            let videoTracks = try? await asset.loadTracks(withMediaType: .video),
+            let videoTrack = videoTracks.first,
+            let naturalSize = try? await videoTrack.load(.naturalSize),
+            let preferredTransform = try? await videoTrack.load(.preferredTransform)
+        else {
             return nil
         }
 
-        let displaySize = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
+        let displaySize = naturalSize.applying(preferredTransform)
         let width = Int(abs(displaySize.width).rounded())
         let height = Int(abs(displaySize.height).rounded())
         guard height > 0, width > 0 else {

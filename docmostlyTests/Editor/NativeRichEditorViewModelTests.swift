@@ -234,13 +234,13 @@ struct NativeRichEditorViewModelTests {
         #expect(inlineNodes.first?.attrs?["text"] == .string(""))
     }
 
-    @Test func insertingUploadedImageReplacesActiveBlockWithDocmostNode() {
+    @Test func insertingUploadedImageReplacesActiveBlockWithDocmostNode() async {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/image"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(uploadedAttachment(), as: .image)
+        await viewModel.insertUploadedAttachment(uploadedAttachment(), as: .image)
 
         let updatedBlock = viewModel.document.blocks[0]
         guard case .image(let image) = updatedBlock.kind else {
@@ -261,11 +261,11 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.isDirty == true)
     }
 
-    @Test func insertingUploadedFileAppendsWhenNoTextBlockIsActive() {
+    @Test func insertingUploadedFileAppendsWhenNoTextBlockIsActive() async {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [])
 
-        viewModel.insertUploadedAttachment(uploadedAttachment(), as: .file)
+        await viewModel.insertUploadedAttachment(uploadedAttachment(), as: .file)
 
         #expect(viewModel.document.blocks.count == 1)
         let updatedBlock = viewModel.document.blocks[0]
@@ -285,13 +285,13 @@ struct NativeRichEditorViewModelTests {
         #expect(viewModel.selectedBlockID == updatedBlock.id)
     }
 
-    @Test func insertingUploadedVideoPreservesFileTitleInDocmostNode() {
+    @Test func insertingUploadedVideoPreservesFileTitleInDocmostNode() async {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("/video"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [block])
         viewModel.focus(blockID: block.id)
 
-        viewModel.insertUploadedAttachment(
+        await viewModel.insertUploadedAttachment(
             uploadedAttachment(fileName: "Launch demo.mp4", mimeType: "video/mp4", fileExt: "mp4"),
             as: .video
         )

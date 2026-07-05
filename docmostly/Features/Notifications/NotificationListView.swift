@@ -55,17 +55,19 @@ struct NotificationListView: View {
         }
         .navigationTitle("Notifications")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("Mark All Read", systemImage: "checkmark.circle") {
-                    Task {
-                        await viewModel.markAllRead(appState: appState)
+            ToolbarItem(placement: .primaryAction) {
+                Menu("Notification Actions", systemImage: "ellipsis.circle") {
+                    Button("Mark All Read", systemImage: "checkmark.circle") {
+                        Task {
+                            await viewModel.markAllRead(appState: appState)
+                        }
                     }
-                }
-                .disabled(viewModel.unreadCount == 0 || viewModel.isMarkingAllRead)
+                    .disabled(viewModel.unreadCount == 0 || viewModel.isMarkingAllRead)
 
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task {
-                        await viewModel.load(appState: appState)
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task {
+                            await viewModel.load(appState: appState)
+                        }
                     }
                 }
             }

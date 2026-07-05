@@ -259,12 +259,24 @@ nonisolated final class CacheRepository {
         return try context.fetch(descriptor).map { $0.asLink() }
     }
 
-    func searchCachedPages(query: String, limit: Int = 100, scope: CacheScope) throws -> [DocmostSearchResult] {
-        let pages = try loadRecentPages(limit: limit, scope: scope)
+    func searchCachedPages(
+        query: String,
+        spaceId: String? = nil,
+        limit: Int = 100,
+        offset: Int = 0,
+        scope: CacheScope
+    ) throws -> [DocmostSearchResult] {
+        let fetchLimit = max(100, limit + offset)
+        let pages = try loadRecentPages(limit: fetchLimit, scope: scope)
         return pages
             .filter { page in
-                page.title.localizedStandardContains(query) || page.htmlContent.localizedStandardContains(query)
+                let matchesSpace = spaceId == nil || page.spaceId == spaceId
+                let matchesQuery = page.title.localizedStandardContains(query) ||
+                    page.htmlContent.localizedStandardContains(query)
+                return matchesSpace && matchesQuery
             }
+            .dropFirst(offset)
+            .prefix(limit)
             .map { page in
                 DocmostSearchResult(
                     id: page.id,
