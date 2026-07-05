@@ -91,6 +91,18 @@ struct AttachmentLinkTests {
         #expect(links[0].id == "file-1")
     }
 
+    @Test func attachmentExtractionIgnoresMalformedUnclosedMetadataTags() throws {
+        let html = """
+        <div data-attachment-id="broken"
+        <a href="/api/files/file-1/Archive%20Plan.pdf">Archive Plan.pdf</a>
+        """
+
+        let link = try #require(AttachmentExtractor.extractLinks(fromHTML: html).first)
+
+        #expect(link.id == "file-1")
+        #expect(link.fileName == "Archive Plan.pdf")
+    }
+
     @Test func attachmentExtractionReadsNativeProseMirrorAttachmentNodes() throws {
         let document = ProseMirrorDocument(content: [
             ProseMirrorNode(

@@ -114,7 +114,10 @@ nonisolated enum AttachmentExtractor {
 
         var searchUpperBound = index
         while let start = html[..<searchUpperBound].range(of: "<", options: .backwards)?.lowerBound {
-            let close = html[start...].firstIndex(of: ">") ?? html.endIndex
+            guard let close = html[start...].firstIndex(of: ">") else {
+                searchUpperBound = start
+                continue
+            }
             let tag = String(html[start...close])
             if tag.hasPrefix("</") == false, tag.contains("data-attachment-") {
                 return tag
