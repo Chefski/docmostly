@@ -103,8 +103,11 @@ struct PageTreeView: View {
         .refreshable {
             await refreshPages()
         }
+        .task(id: space.id) {
+            await refreshTreeState()
+        }
         .task(id: pageBrowserTaskKey) {
-            await refreshPages()
+            await refreshBrowser()
         }
         .navigationDestination(for: PageBrowserItem.self) { item in
             PageBrowserDestinationView(item: item)
@@ -214,10 +217,19 @@ struct PageTreeView: View {
     }
 
     private func refreshPages() async {
-        async let loadBrowser: Void = browserViewModel.load(space: space, provider: appState)
+        async let loadBrowser: Void = refreshBrowser()
+        async let loadTreeState: Void = refreshTreeState()
+        await loadBrowser
+        await loadTreeState
+    }
+
+    private func refreshBrowser() async {
+        await browserViewModel.load(space: space, provider: appState)
+    }
+
+    private func refreshTreeState() async {
         async let loadRoot: Void = viewModel.loadRoot(spaceId: space.id, appState: appState)
         async let loadSpaceActionState: Void = viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
-        await loadBrowser
         await loadRoot
         await loadSpaceActionState
     }
