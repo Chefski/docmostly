@@ -24,6 +24,7 @@ struct PageBrowserViewModelTests {
         await viewModel.load(space: Self.space, provider: provider)
 
         #expect(viewModel.items.map(\.slugId) == ["launch-plan"])
+        #expect(viewModel.items.map(\.updatedAt) == [nil])
         #expect(provider.favoriteRequests == [PageBrowserProviderSpy.Request(spaceId: "space-1", userId: nil)])
     }
 

@@ -262,7 +262,7 @@ extension AppState {
 
     private func createdCachedPages(userId: String?, spaceId: String?, limit: Int) async -> [DocmostPage] {
         guard let userId else { return [] }
-        let candidateLimit = max(limit * 3, limit)
+        let candidateLimit = limit * 3
         return await recentCachedPages(limit: candidateLimit)
             .filter { page in
                 page.creatorId == userId && (spaceId == nil || page.spaceId == spaceId)
