@@ -117,6 +117,12 @@ nonisolated enum Endpoint: Sendable {
     case deleteComment(commentId: String)
     case resolveComment(commentId: String, pageId: String, resolved: Bool)
     case attachmentInfo(attachmentId: String)
+    case shareForPage(pageId: String)
+    case createShare(pageId: String, includeSubPages: Bool = true, searchIndexing: Bool = false)
+    case updateShare(shareId: String, includeSubPages: Bool? = nil, searchIndexing: Bool? = nil)
+    case deleteShare(shareId: String)
+    case pageRestrictionInfo(pageId: String)
+    case pagePermissions(pageId: String, cursor: String? = nil, limit: Int = 50)
     case workspaceInfo
     case updateWorkspace(WorkspaceUpdate)
     case workspaceMembers(query: String? = nil, cursor: String? = nil, limit: Int = 50)
@@ -268,6 +274,18 @@ nonisolated enum Endpoint: Sendable {
             "comments/resolve"
         case .attachmentInfo:
             "files/info"
+        case .shareForPage:
+            "shares/for-page"
+        case .createShare:
+            "shares/create"
+        case .updateShare:
+            "shares/update"
+        case .deleteShare:
+            "shares/delete"
+        case .pageRestrictionInfo:
+            "pages/permission-info"
+        case .pagePermissions:
+            "pages/permissions"
         case .workspaceInfo:
             "workspace/info"
         case .updateWorkspace:
@@ -489,6 +507,26 @@ nonisolated enum Endpoint: Sendable {
             ))
         case .attachmentInfo(let attachmentId):
             return try encode(AttachmentInfoRequest(attachmentId: attachmentId))
+        case .shareForPage(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
+        case .createShare(let pageId, let includeSubPages, let searchIndexing):
+            return try encode(ShareMutationRequest(
+                pageId: pageId,
+                includeSubPages: includeSubPages,
+                searchIndexing: searchIndexing
+            ))
+        case .updateShare(let shareId, let includeSubPages, let searchIndexing):
+            return try encode(ShareMutationRequest(
+                shareId: shareId,
+                includeSubPages: includeSubPages,
+                searchIndexing: searchIndexing
+            ))
+        case .deleteShare(let shareId):
+            return try encode(ShareIDRequest(shareId: shareId))
+        case .pageRestrictionInfo(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
+        case .pagePermissions(let pageId, let cursor, let limit):
+            return try encode(PagePermissionsRequest(pageId: pageId, cursor: cursor, limit: limit))
         case .updateWorkspace(let update):
             return try encode(update)
         case .workspaceMembers(let query, let cursor, let limit):
@@ -797,6 +835,35 @@ nonisolated private struct ResolveCommentRequest: Encodable {
 
 nonisolated private struct AttachmentInfoRequest: Encodable {
     let attachmentId: String
+}
+
+nonisolated private struct ShareIDRequest: Encodable {
+    let shareId: String
+}
+
+nonisolated private struct ShareMutationRequest: Encodable {
+    let shareId: String?
+    let pageId: String?
+    let includeSubPages: Bool?
+    let searchIndexing: Bool?
+
+    init(
+        shareId: String? = nil,
+        pageId: String? = nil,
+        includeSubPages: Bool? = nil,
+        searchIndexing: Bool? = nil
+    ) {
+        self.shareId = shareId
+        self.pageId = pageId
+        self.includeSubPages = includeSubPages
+        self.searchIndexing = searchIndexing
+    }
+}
+
+nonisolated private struct PagePermissionsRequest: Encodable {
+    let pageId: String
+    let cursor: String?
+    let limit: Int
 }
 
 nonisolated private struct UserIDRequest: Encodable {

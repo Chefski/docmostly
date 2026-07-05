@@ -12,6 +12,8 @@ struct PageReaderPageActionsMenu: View {
     let canMoveToSpace: Bool
     let showComments: () -> Void
     let showTableOfContents: () -> Void
+    let showAttachments: () -> Void
+    let showSharing: () -> Void
     let copyPageLink: () -> Void
     let copyPageMarkdown: () -> Void
     let toggleFavorite: () -> Void
@@ -27,6 +29,8 @@ struct PageReaderPageActionsMenu: View {
             Section("Panels") {
                 Button(commentsTitle, systemImage: "text.bubble", action: showComments)
                 Button(tableOfContentsTitle, systemImage: "list.bullet", action: showTableOfContents)
+                Button(attachmentsTitle, systemImage: "paperclip", action: showAttachments)
+                Button(sharingTitle, systemImage: "person.2.badge.gearshape", action: showSharing)
             }
 
             Section("Share") {
@@ -85,6 +89,14 @@ struct PageReaderPageActionsMenu: View {
 
     private var tableOfContentsTitle: String {
         activePanel == .tableOfContents ? "Hide Table of Contents" : "Show Table of Contents"
+    }
+
+    private var attachmentsTitle: String {
+        activePanel == .attachments ? "Hide Attachments" : "Show Attachments"
+    }
+
+    private var sharingTitle: String {
+        activePanel == .sharing ? "Hide Sharing" : "Show Sharing"
     }
 
     private var favoriteTitle: String {

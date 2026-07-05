@@ -183,7 +183,16 @@ nonisolated final class CacheRepository {
             hasChanges = true
         }
 
+        if let document = page.content,
+           try syncAttachments(AttachmentExtractor.extractLinks(from: document), pageId: page.id, scope: scope) {
+            hasChanges = true
+        }
+
         try saveIfNeeded(hasChanges)
+    }
+
+    func saveAttachmentLinks(_ links: [DocmostAttachmentLink], pageId: String, scope: CacheScope) throws {
+        try saveIfNeeded(syncAttachments(links, pageId: pageId, scope: scope))
     }
 
     func loadPage(idOrSlugId: String, scope: CacheScope) throws -> CachedPage? {
@@ -215,6 +224,7 @@ nonisolated final class CacheRepository {
         }
 
         try cachedPage.updateLocalDraft(title: title, document: document)
+        _ = try syncAttachments(AttachmentExtractor.extractLinks(from: document), pageId: pageId, scope: scope)
         try saveIfNeeded(true)
         guard let page = try cachedPage.asEditablePage() else {
             throw APIError.connectionFailed("This page is not cached for offline editing.")

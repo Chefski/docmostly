@@ -19,6 +19,8 @@ enum PageReaderMode: String, CaseIterable, Identifiable {
 enum PageReaderPanel: String, Identifiable {
     case comments
     case tableOfContents
+    case attachments
+    case sharing
 
     var id: Self { self }
 
@@ -28,6 +30,10 @@ enum PageReaderPanel: String, Identifiable {
             "Comments"
         case .tableOfContents:
             "Table of Contents"
+        case .attachments:
+            "Attachments"
+        case .sharing:
+            "Sharing"
         }
     }
 }
