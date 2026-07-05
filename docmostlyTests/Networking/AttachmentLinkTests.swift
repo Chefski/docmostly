@@ -21,6 +21,12 @@ struct AttachmentLinkTests {
         #expect(path == "/api/files/file-1/Launch%20demo%20%231.pdf")
     }
 
+    @Test func buildsEncodedDocmostFilePathForLiteralPercentEscapes() {
+        let path = DocmostAttachmentLink.path(id: "file-1", fileName: "not%2Fnested.pdf")
+
+        #expect(path == "/api/files/file-1/not%252Fnested.pdf")
+    }
+
     @Test func attachmentExtractionReadsDocmostFileBlockMetadata() throws {
         let html = """
         <div data-type="attachment"
@@ -40,6 +46,49 @@ struct AttachmentLinkTests {
         #expect(link.mimeType == "application/pdf")
         #expect(link.fileSize == 2_048)
         #expect(link.path == "/api/files/file-1/Archive%20Plan.pdf")
+    }
+
+    @Test func attachmentExtractionScopesHTMLMetadataToMatchedAttachment() throws {
+        let html = """
+        <div data-type="attachment"
+          data-attachment-url="/api/files/file-1/First.pdf"
+          data-attachment-name="First.pdf"
+          data-attachment-mime="application/pdf"
+          data-attachment-size="1024"
+          data-attachment-id="file-1">
+          <a href="/api/files/file-1/First.pdf">First.pdf</a>
+        </div>
+        <div data-type="attachment"
+          data-attachment-url="/api/files/file-2/Second.pdf"
+          data-attachment-name="Second.pdf"
+          data-attachment-mime="application/pdf"
+          data-attachment-size="2048"
+          data-attachment-id="file-2">
+          <a href="/api/files/file-2/Second.pdf">Second.pdf</a>
+        </div>
+        """
+
+        let links = AttachmentExtractor.extractLinks(fromHTML: html)
+
+        #expect(links.count == 2)
+        #expect(links[0].id == "file-1")
+        #expect(links[0].fileName == "First.pdf")
+        #expect(links[0].fileSize == 1_024)
+        #expect(links[1].id == "file-2")
+        #expect(links[1].fileName == "Second.pdf")
+        #expect(links[1].fileSize == 2_048)
+    }
+
+    @Test func attachmentExtractionDeduplicatesHTMLLinksByAttachmentID() {
+        let html = """
+        <a href="/api/files/file-1/Archive%20Plan.pdf">Archive Plan.pdf</a>
+        <a href="/api/files/file-1/Archive%20Plan%20Copy.pdf">Archive Plan Copy.pdf</a>
+        """
+
+        let links = AttachmentExtractor.extractLinks(fromHTML: html)
+
+        #expect(links.count == 1)
+        #expect(links[0].id == "file-1")
     }
 
     @Test func attachmentExtractionReadsNativeProseMirrorAttachmentNodes() throws {
@@ -62,6 +111,32 @@ struct AttachmentLinkTests {
         #expect(link.fileName == "Archive Plan.pdf")
         #expect(link.mimeType == "application/pdf")
         #expect(link.fileSize == 4_096)
+    }
+
+    @Test func attachmentExtractionDeduplicatesProseMirrorLinksByAttachmentID() {
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "attachment",
+                attrs: [
+                    "attachmentId": .string("file-1"),
+                    "url": .string("/api/files/file-1/Archive%20Plan.pdf"),
+                    "name": .string("Archive Plan.pdf")
+                ]
+            ),
+            ProseMirrorNode(
+                type: "attachment",
+                attrs: [
+                    "attachmentId": .string("file-1"),
+                    "url": .string("/api/files/file-1/Archive%20Plan%20Copy.pdf"),
+                    "name": .string("Archive Plan Copy.pdf")
+                ]
+            )
+        ])
+
+        let links = AttachmentExtractor.extractLinks(from: document)
+
+        #expect(links.count == 1)
+        #expect(links[0].id == "file-1")
     }
 
     @Test func attachmentExtractionCapsLinkCountAndRejectsTraversalSegments() {

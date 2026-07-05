@@ -242,6 +242,16 @@ extension PageReaderView {
         toggleSupplementaryPanel(.sharing)
     }
 
+    func loadSharingState() async {
+        guard let editorViewModel else { return }
+
+        await viewModel.loadSharingState(pageID: editorViewModel.currentPageID, appState: appState)
+        if let errorMessage = viewModel.sharingErrorMessage {
+            pageActionErrorMessage = errorMessage
+            viewModel.sharingErrorMessage = nil
+        }
+    }
+
     func toggleSupplementaryPanel(_ panel: PageReaderPanel) {
         activePanel = activePanel == panel ? nil : panel
     }

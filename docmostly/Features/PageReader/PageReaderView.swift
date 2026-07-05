@@ -193,6 +193,7 @@ struct PageReaderView: View {
                     selectHeading: selectHeading,
                     markInlineCommentResolved: markInlineCommentResolved,
                     removeInlineComment: removeInlineComment,
+                    loadSharingState: loadSharingState,
                     setPublicSharing: setPublicSharing,
                     updateShareOptions: { includeSubPages, searchIndexing in
                         await updateShareOptions(
@@ -222,6 +223,7 @@ struct PageReaderView: View {
                         selectHeading: selectHeading,
                         markInlineCommentResolved: markInlineCommentResolved,
                         removeInlineComment: removeInlineComment,
+                        loadSharingState: loadSharingState,
                         setPublicSharing: setPublicSharing,
                         updateShareOptions: { includeSubPages, searchIndexing in
                             await updateShareOptions(

@@ -15,6 +15,7 @@ struct PageReaderSupplementaryPanelView: View {
     let selectHeading: (PageReaderTableOfContentsItem) -> Void
     let markInlineCommentResolved: (String, Bool) async -> Void
     let removeInlineComment: (String) async -> Void
+    let loadSharingState: () async -> Void
     let setPublicSharing: (Bool) async -> Void
     let updateShareOptions: (Bool?, Bool?) async -> Void
     let close: () -> Void
@@ -56,11 +57,13 @@ struct PageReaderSupplementaryPanelView: View {
             case .sharing:
                 PageSharingPanelView(
                     viewModel: viewModel,
+                    pageID: pageID,
                     canEdit: canEdit,
                     hasPageRestriction: hasPageRestriction,
                     workspaceSharingDisabled: workspaceSharingDisabled,
                     spaceSharingDisabled: spaceSharingDisabled,
                     publicShareURL: publicShareURL,
+                    loadSharingState: loadSharingState,
                     setPublicSharing: setPublicSharing,
                     updateShareOptions: updateShareOptions
                 )

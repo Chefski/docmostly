@@ -17,8 +17,8 @@ struct AttachmentLinksView: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                Text("Attachments")
-                    .font(.headline)
+                    Text("Attachments")
+                        .font(.headline)
 
                     ForEach(links) { link in
                         AttachmentLinkRow(link: link, serverURLString: serverURLString)
@@ -62,8 +62,8 @@ private struct AttachmentLinkRow: View {
                         }
                         .buttonStyle(.bordered)
 
-                        Link(destination: url) {
-                            Label("Download", systemImage: "arrow.down.circle")
+                        Button("Copy Link", systemImage: "link") {
+                            NativeEditorClipboard.write(url.absoluteString)
                         }
                         .buttonStyle(.bordered)
                     }

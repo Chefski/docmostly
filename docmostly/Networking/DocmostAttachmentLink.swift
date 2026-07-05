@@ -73,7 +73,7 @@ nonisolated struct DocmostAttachmentLink: Identifiable, Hashable, Sendable {
 
     private static nonisolated func docmostFilePathComponentAllowed() -> CharacterSet {
         var allowed = CharacterSet.urlPathAllowed
-        allowed.remove(charactersIn: "/\\?#")
+        allowed.remove(charactersIn: "%/\\?#")
         return allowed
     }
 }

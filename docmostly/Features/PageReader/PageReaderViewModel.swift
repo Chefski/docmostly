@@ -51,6 +51,7 @@ final class PageReaderViewModel {
     func loadCompanions(pageID: String, appState: AppState) async {
         isLoading = true
         errorMessage = nil
+        resetSharingState()
         defer { isLoading = false }
 
         async let cachedAttachmentLinks = appState.attachmentLinks(pageId: pageID)
@@ -65,7 +66,6 @@ final class PageReaderViewModel {
         comments = commentOutcome.value ?? []
         commentErrorMessage = commentOutcome.errorMessage
         apply(await loadedEngagement)
-        await loadSharingState(pageID: pageID, appState: appState)
     }
 
     func loadEngagement(pageID: String, appState: AppState) async {
@@ -416,6 +416,15 @@ final class PageReaderViewModel {
 }
 
 extension PageReaderViewModel {
+    func resetSharingState() {
+        pageShare = nil
+        pageRestrictionInfo = nil
+        pagePermissionMembers = []
+        sharingErrorMessage = nil
+        isLoadingSharingState = false
+        isUpdatingShare = false
+    }
+
     func loadSharingState(pageID: String, appState: AppState) async {
         isLoadingSharingState = true
         sharingErrorMessage = nil

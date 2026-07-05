@@ -3,11 +3,13 @@ import SwiftUI
 struct PageSharingPanelView: View {
     @Bindable var viewModel: PageReaderViewModel
 
+    let pageID: String
     let canEdit: Bool
     let hasPageRestriction: Bool
     let workspaceSharingDisabled: Bool
     let spaceSharingDisabled: Bool
     let publicShareURL: URL?
+    let loadSharingState: () async -> Void
     let setPublicSharing: (Bool) async -> Void
     let updateShareOptions: (Bool?, Bool?) async -> Void
 
@@ -18,6 +20,9 @@ struct PageSharingPanelView: View {
                 restrictionSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task(id: pageID) {
+            await loadSharingState()
         }
     }
 

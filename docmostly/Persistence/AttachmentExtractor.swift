@@ -4,7 +4,6 @@ nonisolated enum AttachmentExtractor {
     static let maximumHTMLCharacters = 2_000_000
     static let maximumLinks = 100
     static let maximumFileNameCharacters = 512
-    private static let metadataWindowCharacters = 2_000
 
     static func extractLinks(fromHTML html: String) -> [DocmostAttachmentLink] {
         guard html.count <= maximumHTMLCharacters else { return [] }
@@ -28,7 +27,7 @@ nonisolated enum AttachmentExtractor {
                     continue
                 }
                 let path = "/api/files/\(id)/\(parts[1])"
-                let metadata = metadataNear(range.lowerBound, in: html)
+                let metadata = metadata(forLinkAt: range.lowerBound, fallbackID: id, fallbackPath: path, in: html)
                 let metadataID = metadata.id.flatMap { isSafeSegment($0) ? $0 : nil }
                 let metadataFileName = metadata.fileName.flatMap { isSafeFileName($0) ? $0 : nil }
                 let metadataPath = metadata.path.flatMap { $0.hasPrefix("/api/files/") ? $0 : nil }
@@ -39,7 +38,7 @@ nonisolated enum AttachmentExtractor {
                     fileSize: metadata.fileSize,
                     mimeType: metadata.mimeType
                 )
-                if links.contains(link) == false {
+                if links.contains(where: { $0.id == link.id }) == false {
                     links.append(link)
                 }
             }
@@ -55,7 +54,7 @@ nonisolated enum AttachmentExtractor {
         var nodes = document.content
 
         while links.count < maximumLinks, let node = nodes.popLast() {
-            if let link = link(from: node), links.contains(link) == false {
+            if let link = link(from: node), links.contains(where: { $0.id == link.id }) == false {
                 links.append(link)
             }
 
@@ -69,25 +68,77 @@ nonisolated enum AttachmentExtractor {
         }
     }
 
-    private static func metadataNear(
-        _ index: Substring.Index,
+    private static func metadata(
+        forLinkAt index: Substring.Index,
+        fallbackID: String,
+        fallbackPath: String,
         in html: String
     ) -> AttachmentHTMLMetadata {
-        let lower = html.index(
-            index,
-            offsetBy: -metadataWindowCharacters,
-            limitedBy: html.startIndex
-        ) ?? html.startIndex
-        let upper = html.index(index, offsetBy: metadataWindowCharacters, limitedBy: html.endIndex) ?? html.endIndex
-        let slice = String(html[lower..<upper])
+        guard let scope = metadataScope(forLinkAt: index, in: html) else {
+            return AttachmentHTMLMetadata()
+        }
 
-        return AttachmentHTMLMetadata(
-            id: attribute("data-attachment-id", in: slice),
-            fileName: attribute("data-attachment-name", in: slice)?.removingPercentEncoding,
-            path: attribute("data-attachment-url", in: slice),
-            mimeType: attribute("data-attachment-mime", in: slice),
-            fileSize: attribute("data-attachment-size", in: slice).flatMap(Int.init)
+        var metadata = AttachmentHTMLMetadata(
+            id: attribute("data-attachment-id", in: scope),
+            fileName: attribute("data-attachment-name", in: scope)?.removingPercentEncoding,
+            path: attribute("data-attachment-url", in: scope),
+            mimeType: attribute("data-attachment-mime", in: scope),
+            fileSize: attribute("data-attachment-size", in: scope).flatMap(Int.init)
         )
+
+        if let metadataID = metadata.id, metadataID != fallbackID {
+            metadata.id = nil
+            metadata.fileName = nil
+            metadata.path = nil
+            metadata.mimeType = nil
+            metadata.fileSize = nil
+        }
+
+        if let metadataPath = metadata.path, metadataPath != fallbackPath {
+            metadata.fileName = nil
+            metadata.path = nil
+            metadata.mimeType = nil
+            metadata.fileSize = nil
+        }
+
+        return metadata
+    }
+
+    private static func metadataScope(
+        forLinkAt index: Substring.Index,
+        in html: String
+    ) -> String? {
+        if let sameTagScope = sameTagMetadataScope(forLinkAt: index, in: html) {
+            return sameTagScope
+        }
+
+        var searchUpperBound = index
+        while let start = html[..<searchUpperBound].range(of: "<", options: .backwards)?.lowerBound {
+            let close = html[start...].firstIndex(of: ">") ?? html.endIndex
+            let tag = String(html[start...close])
+            if tag.hasPrefix("</") == false, tag.contains("data-attachment-") {
+                return tag
+            }
+            searchUpperBound = start
+        }
+
+        return nil
+    }
+
+    private static func sameTagMetadataScope(
+        forLinkAt index: Substring.Index,
+        in html: String
+    ) -> String? {
+        guard
+            let start = html[..<index].range(of: "<", options: .backwards)?.lowerBound,
+            let close = html[start...].firstIndex(of: ">"),
+            close >= index
+        else {
+            return nil
+        }
+
+        let tag = String(html[start...close])
+        return tag.contains("data-attachment-") ? tag : nil
     }
 
     private static func attribute(_ name: String, in html: String) -> String? {
@@ -176,9 +227,9 @@ nonisolated enum AttachmentExtractor {
 }
 
 private struct AttachmentHTMLMetadata {
-    let id: String?
-    let fileName: String?
-    let path: String?
-    let mimeType: String?
-    let fileSize: Int?
+    var id: String?
+    var fileName: String?
+    var path: String?
+    var mimeType: String?
+    var fileSize: Int?
 }
