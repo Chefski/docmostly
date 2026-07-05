@@ -10,10 +10,14 @@ struct PageReaderPageActionsMenu: View {
     let isTogglingWatch: Bool
     let canEdit: Bool
     let canMoveToSpace: Bool
+    let canImport: Bool
     let showComments: () -> Void
     let showTableOfContents: () -> Void
     let showAttachments: () -> Void
     let showSharing: () -> Void
+    let showPageHistory: () -> Void
+    let showPageExport: () -> Void
+    let showPageImport: () -> Void
     let copyPageLink: () -> Void
     let copyPageMarkdown: () -> Void
     let toggleFavorite: () -> Void
@@ -52,9 +56,17 @@ struct PageReaderPageActionsMenu: View {
                     Label("Full Width", systemImage: "arrow.left.and.right")
                 }
 
+                Button("Page History", systemImage: "clock.arrow.circlepath", action: showPageHistory)
+
                 if let openCurrentPageInNewWindow {
                     Button("Open in New Window", systemImage: "macwindow", action: openCurrentPageInNewWindow)
                 }
+            }
+
+            Section("Transfer") {
+                Button("Export", systemImage: "square.and.arrow.down", action: showPageExport)
+                Button("Import", systemImage: "square.and.arrow.up", action: showPageImport)
+                    .disabled(canImport == false)
             }
 
             Section("Following") {

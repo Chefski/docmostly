@@ -8,6 +8,23 @@ extension NativeRichEditorViewModel {
         updateHistoryAvailability()
     }
 
+    func applyServerHistorySnapshot(title: String, document: ProseMirrorDocument) {
+        guard canEdit else { return }
+
+        isApplyingHistory = true
+        self.title = title
+        self.document = NativeEditorDocument(proseMirrorDocument: document)
+        clearAuthoringState()
+        isApplyingHistory = false
+        resetEditingHistory()
+        recalculateDirty()
+        notifyLocalAwarenessChanged()
+    }
+
+    func restoreEditingSnapshot(_ snapshot: NativeEditorHistorySnapshot) {
+        applyHistorySnapshot(snapshot)
+    }
+
     func handleDocumentChanged() {
         guard canEdit else {
             restoreReadOnlyBaseline()

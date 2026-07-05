@@ -9,13 +9,21 @@ struct PageReaderView: View {
     @Environment(\.dismiss) var dismiss
     @State var viewModel = PageReaderViewModel()
     @State var editorViewModel: NativeRichEditorViewModel?
+    @State var pageHistoryViewModel = PageHistoryViewModel()
+    @State var pageExportViewModel = PageExportViewModel()
+    @State var pageImportViewModel = PageImportViewModel()
     @State var realtimeEventClient = NativeEditorRealtimeEventClient()
     @State var collaborationPresenceClient = NativeEditorCollaborationPresenceClient()
     @State var attachmentImportKind: NativeEditorAttachmentImportKind?
     @State var isShowingAttachmentImporter = false
+    @State var isShowingPageHistory = false
+    @State var isShowingPageExport = false
+    @State var isShowingPageImport = false
     @State var isShowingMentionPicker = false
     @State var isShowingInlineCommentComposer = false
     @State var isUploadingAttachment = false
+    @State var pageImportTaskID: UUID?
+    @State var pageImportTask: Task<Void, Never>?
     @State var attachmentUploadErrorMessage: String?
     @State var inlineCommentContext: NativeEditorInlineCommentContext?
     @State var inlineCommentErrorMessage: String?
@@ -175,6 +183,40 @@ struct PageReaderView: View {
                     await moveCurrentPage(to: targetSpaceID)
                 }
             }
+        }
+        .sheet(isPresented: $isShowingPageHistory) {
+            if let editorViewModel {
+                PageHistorySheet(
+                    pageID: editorViewModel.currentPageID,
+                    spaceID: editorViewModel.currentSpaceID,
+                    canRestore: editorViewModel.canEdit,
+                    viewModel: pageHistoryViewModel,
+                    restore: restoreSelectedPageVersion,
+                    close: { isShowingPageHistory = false }
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingPageExport) {
+            if let editorViewModel {
+                PageExportSheet(
+                    pageID: editorViewModel.currentPageID,
+                    viewModel: pageExportViewModel,
+                    exportFailed: { errorMessage in
+                        pageActionErrorMessage = errorMessage
+                    },
+                    close: { isShowingPageExport = false }
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingPageImport) {
+            PageImportSheet(
+                spaceID: editorViewModel?.currentSpaceID,
+                canImport: editorViewModel?.canEdit == true,
+                viewModel: pageImportViewModel,
+                importFiles: handlePageImport,
+                cancelImport: cancelPageImport,
+                close: { isShowingPageImport = false }
+            )
         }
         #if os(macOS)
         .inspector(isPresented: activePanelIsPresented) {

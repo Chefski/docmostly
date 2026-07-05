@@ -54,6 +54,8 @@ nonisolated enum Endpoint: Sendable {
     case movePageToSpace(pageId: String, spaceId: String)
     case duplicatePage(pageId: String, spaceId: String? = nil)
     case pageBreadcrumbs(pageId: String)
+    case pageHistory(pageId: String, cursor: String? = nil, limit: Int = 20)
+    case pageHistoryInfo(historyId: String)
     case recentPages(spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
     case favorites(type: FavoriteType? = nil, spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
     case favoriteIds(type: FavoriteType, spaceId: String? = nil)
@@ -103,6 +105,12 @@ nonisolated enum Endpoint: Sendable {
         content: ProseMirrorDocument? = nil,
         format: ContentFormat = .json,
         operation: ContentOperation = .replace
+    )
+    case exportPage(
+        pageId: String,
+        format: DocmostPageExportFormat,
+        includeChildren: Bool = false,
+        includeAttachments: Bool = false
     )
     case comments(pageId: String, cursor: String? = nil, limit: Int = 100)
     case createComment(
@@ -212,6 +220,10 @@ nonisolated enum Endpoint: Sendable {
             "pages/duplicate"
         case .pageBreadcrumbs:
             "pages/breadcrumbs"
+        case .pageHistory:
+            "pages/history"
+        case .pageHistoryInfo:
+            "pages/history/info"
         case .recentPages:
             "pages/recent"
         case .favorites:
@@ -262,6 +274,8 @@ nonisolated enum Endpoint: Sendable {
             "bases/create"
         case .updatePage:
             "pages/update"
+        case .exportPage:
+            "pages/export"
         case .comments:
             "comments"
         case .createComment:
@@ -403,6 +417,10 @@ nonisolated enum Endpoint: Sendable {
             return try encode(DuplicatePageRequest(pageId: pageId, spaceId: spaceId))
         case .pageBreadcrumbs(let pageId):
             return try encode(PageIDRequest(pageId: pageId))
+        case .pageHistory(let pageId, let cursor, let limit):
+            return try encode(PageHistoryRequest(pageId: pageId, cursor: cursor, limit: limit))
+        case .pageHistoryInfo(let historyId):
+            return try encode(PageHistoryInfoRequest(historyId: historyId))
         case .recentPages(let spaceId, let cursor, let limit):
             return try encode(RecentPagesRequest(spaceId: spaceId, cursor: cursor, limit: limit))
         case .favorites(let type, let spaceId, let cursor, let limit):
@@ -483,6 +501,13 @@ nonisolated enum Endpoint: Sendable {
                 content: content,
                 operation: hasContent ? operation.rawValue : nil,
                 format: hasContent ? format.rawValue : nil
+            ))
+        case .exportPage(let pageId, let format, let includeChildren, let includeAttachments):
+            return try encode(ExportPageRequest(
+                pageId: pageId,
+                format: format.rawValue,
+                includeChildren: includeChildren,
+                includeAttachments: includeAttachments
             ))
         case .comments(let pageId, let cursor, let limit):
             return try encode(CommentsRequest(pageId: pageId, cursor: cursor, limit: limit))
@@ -801,6 +826,23 @@ nonisolated private struct UpdatePageRequest: Encodable {
     let content: ProseMirrorDocument?
     let operation: String?
     let format: String?
+}
+
+nonisolated private struct PageHistoryRequest: Encodable {
+    let pageId: String
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct PageHistoryInfoRequest: Encodable {
+    let historyId: String
+}
+
+nonisolated private struct ExportPageRequest: Encodable {
+    let pageId: String
+    let format: String
+    let includeChildren: Bool
+    let includeAttachments: Bool
 }
 
 nonisolated private struct CommentsRequest: Encodable {
