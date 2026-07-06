@@ -6,7 +6,7 @@ nonisolated struct PageReaderDetailStats: Equatable, Sendable {
 
     static func stats(in document: NativeEditorDocument) -> Self {
         let text = document.blocks
-            .map { String($0.text.characters).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap(textSegments)
             .filter { $0.isEmpty == false }
             .joined(separator: "\n")
 
@@ -15,5 +15,21 @@ nonisolated struct PageReaderDetailStats: Equatable, Sendable {
         }
 
         return PageReaderDetailStats(wordCount: words.count, characterCount: text.count)
+    }
+
+    private static func textSegments(from block: NativeEditorBlock) -> [String] {
+        switch block.kind {
+        case .table(let table):
+            table.rows.flatMap { row in
+                row.cells.map { cell in
+                    cell.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock,
+                .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider, .columns,
+                .subpages, .transclusionSource, .transclusionReference, .base, .embed, .drawio, .excalidraw,
+                .mathBlock, .unsupported:
+            [String(block.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)]
+        }
     }
 }

@@ -340,7 +340,6 @@ private struct NativeEditorTableReadOnlyCell: View {
         Text(displayText)
             .font(cell.map(NativeEditorTableLayout.font) ?? .callout)
             .foregroundStyle(cell?.isHeader == true ? .primary : NativeEditorTableLayout.bodyForeground)
-            .lineLimit(6)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, NativeEditorTableLayout.cellHorizontalPadding)
             .padding(.vertical, NativeEditorTableLayout.cellVerticalPadding)
@@ -577,13 +576,15 @@ private struct NativeEditorTableSelectionFill: View {
     let columnIndex: Int
 
     var body: some View {
-        switch selection?.kind {
-        case .row where columnIndex == 0:
-            indicator(width: 4, height: nil, alignment: .leading)
-        case .column where rowIndex == 0:
-            indicator(width: nil, height: 4, alignment: .top)
-        default:
-            EmptyView()
+        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
+            switch selection?.kind {
+            case .row where columnIndex == 0:
+                indicator(width: 4, height: nil, alignment: .leading)
+            case .column where rowIndex == 0:
+                indicator(width: nil, height: 4, alignment: .top)
+            default:
+                EmptyView()
+            }
         }
     }
 

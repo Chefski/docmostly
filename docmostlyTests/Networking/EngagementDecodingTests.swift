@@ -103,6 +103,44 @@ struct EngagementDecodingTests {
         #expect(favorite.createdAt?.formatted(.iso8601.year().month().day()) == "2026-06-20")
     }
 
+    @Test func decodesFavoriteIDsFromPaginatedAndFlatResponses() throws {
+        let paginatedData = Data("""
+        {
+          "data": {
+            "items": ["page-1", "page-2"],
+            "meta": {
+              "limit": 20,
+              "hasNextPage": false,
+              "hasPrevPage": false,
+              "nextCursor": null,
+              "prevCursor": null
+            }
+          },
+          "success": true,
+          "status": 200
+        }
+        """.utf8)
+        let flatData = Data("""
+        {
+          "data": ["page-3", "page-4"],
+          "success": true,
+          "status": 200
+        }
+        """.utf8)
+
+        let paginatedEnvelope = try DocmostJSONDecoder.make().decode(
+            APIEnvelope<FavoriteIDListResponse>.self,
+            from: paginatedData
+        )
+        let flatEnvelope = try DocmostJSONDecoder.make().decode(
+            APIEnvelope<FavoriteIDListResponse>.self,
+            from: flatData
+        )
+
+        #expect(paginatedEnvelope.data.items == ["page-1", "page-2"])
+        #expect(flatEnvelope.data.items == ["page-3", "page-4"])
+    }
+
     @Test func decodesNotifications() throws {
         let data = Data("""
         {

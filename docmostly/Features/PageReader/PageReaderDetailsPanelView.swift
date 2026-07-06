@@ -336,7 +336,7 @@ private struct PageReaderBacklinksListView: View {
                                 )
                             }
                         }
-                        .disabled(viewModel.loadingBacklinkDirections.contains(direction))
+                        .disabled(viewModel.isLoadingBacklinks(pageID: pageID, direction: direction))
                         .frame(maxWidth: .infinity)
                     }
                 }
@@ -350,7 +350,7 @@ private struct PageReaderBacklinksListView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task(id: direction) {
+        .task(id: PageReaderBacklinkTaskID(pageID: pageID, direction: direction)) {
             await viewModel.loadBacklinks(pageID: pageID, direction: direction, appState: appState, reset: true)
         }
         .toolbar {
@@ -367,8 +367,13 @@ private struct PageReaderBacklinksListView: View {
     }
 
     private var isLoadingInitial: Bool {
-        pages.isEmpty && viewModel.loadingBacklinkDirections.contains(direction)
+        pages.isEmpty && viewModel.isLoadingBacklinks(pageID: pageID, direction: direction)
     }
+}
+
+private struct PageReaderBacklinkTaskID: Hashable {
+    let pageID: String
+    let direction: DocmostBacklinkDirection
 }
 
 private struct PageReaderBacklinkRow: View {

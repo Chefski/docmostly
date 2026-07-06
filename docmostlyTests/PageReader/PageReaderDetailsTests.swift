@@ -28,4 +28,26 @@ struct PageReaderDetailsTests {
         #expect(stats.wordCount == 0)
         #expect(stats.characterCount == 0)
     }
+
+    @Test func detailStatsCountTableCellText() {
+        let table = NativeEditorTable(rows: [
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "Quarterly roadmap", isHeader: true, backgroundColorName: nil),
+                NativeEditorTableCell(plainText: "Alpha beta", isHeader: true, backgroundColorName: nil)
+            ]),
+            NativeEditorTableRow(cells: [
+                NativeEditorTableCell(plainText: "  Gamma  ", isHeader: false, backgroundColorName: nil),
+                NativeEditorTableCell(plainText: "", isHeader: false, backgroundColorName: nil)
+            ])
+        ])
+        let document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Intro"), alignment: .left),
+            NativeEditorBlock(kind: .table(table), text: AttributedString("2 rows x 2 columns"), alignment: .left)
+        ])
+
+        let stats = PageReaderDetailStats.stats(in: document)
+
+        #expect(stats.wordCount == 6)
+        #expect(stats.characterCount == 40)
+    }
 }

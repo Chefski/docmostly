@@ -131,7 +131,7 @@ extension AppState {
         }
 
         do {
-            let response: PaginatedResponse<String> = try await apiClient.send(.favoriteIds(
+            let response: FavoriteIDListResponse = try await apiClient.send(.favoriteIds(
                 type: type,
                 spaceId: spaceId
             ))

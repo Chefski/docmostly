@@ -33,7 +33,10 @@ struct PageDetailsDecodingTests {
         #expect(page.creator?.name == "Ada Lovelace")
         #expect(page.lastUpdatedBy?.name == "Grace Hopper")
         #expect(page.createdAt?.formatted(.iso8601.year().month().day()) == "2026-07-04")
-        #expect(page.updatedAt == (try? Date("2026-07-04T10:30:00.000Z", strategy: .iso8601)))
+        #expect(page.updatedAt == (try? Date(
+            "2026-07-04T10:30:00.000Z",
+            strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        )))
     }
 
     @Test func decodesBacklinkCountsAndPages() throws {

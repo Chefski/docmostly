@@ -36,7 +36,8 @@ final class PageReaderViewModel {
     var backlinkPagesByDirection: [DocmostBacklinkDirection: [DocmostBacklinkPage]] = [:]
     var backlinkNextCursorByDirection: [DocmostBacklinkDirection: String?] = [:]
     var backlinkHasNextPageByDirection: [DocmostBacklinkDirection: Bool] = [:]
-    var loadingBacklinkDirections: Set<DocmostBacklinkDirection> = []
+    var loadingBacklinkDirections: Set<PageReaderBacklinkLoadKey> = []
+    var backlinkPageID: String?
     var backlinkErrorMessage: String?
     var isFavoritePage = false
     var isWatchingPage: Bool?
@@ -369,6 +370,10 @@ final class PageReaderViewModel {
         return ids
     }
 
+    func isLoadingBacklinks(pageID: String, direction: DocmostBacklinkDirection) -> Bool {
+        loadingBacklinkDirections.contains(PageReaderBacklinkLoadKey(pageID: pageID, direction: direction))
+    }
+
     private func fetchEngagement(pageID: String, appState: AppState) async -> PageReaderEngagementSnapshot {
         async let loadedBreadcrumbs = captureLoad {
             try await appState.loadPageBreadcrumbs(pageId: pageID)
@@ -393,6 +398,7 @@ final class PageReaderViewModel {
         let watchStatusOutcome = await loadedWatchStatus
 
         return PageReaderEngagementSnapshot(
+            pageID: pageID,
             breadcrumbs: breadcrumbsOutcome.value ?? [],
             labels: labelsOutcome.value ?? [],
             backlinkCounts: backlinkCountsOutcome.value ?? .empty,
@@ -412,9 +418,11 @@ final class PageReaderViewModel {
         breadcrumbs = snapshot.breadcrumbs
         labels = snapshot.labels
         backlinkCounts = snapshot.backlinkCounts
+        backlinkPageID = snapshot.pageID
         backlinkPagesByDirection = [:]
         backlinkNextCursorByDirection = [:]
         backlinkHasNextPageByDirection = [:]
+        loadingBacklinkDirections = []
         backlinkErrorMessage = nil
         isFavoritePage = snapshot.isFavoritePage
         isWatchingPage = snapshot.isWatchingPage
@@ -519,7 +527,13 @@ extension PageReaderViewModel {
     }
 }
 
+nonisolated struct PageReaderBacklinkLoadKey: Hashable, Sendable {
+    let pageID: String
+    let direction: DocmostBacklinkDirection
+}
+
 private struct PageReaderEngagementSnapshot: Sendable {
+    let pageID: String
     let breadcrumbs: [DocmostPage]
     let labels: [DocmostLabel]
     let backlinkCounts: DocmostBacklinkCounts
