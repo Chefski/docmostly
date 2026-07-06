@@ -201,7 +201,9 @@ private struct NativeEditorTableColumnHandle: View {
         }
         .buttonStyle(.plain)
         .font(.caption.bold())
-        .foregroundStyle(isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground)
+        .foregroundStyle(
+            isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground
+        )
         .frame(width: width, height: NativeEditorTableLayout.columnHandleHeight)
         .help("Column \(columnIndex + 1) actions")
     }
@@ -233,7 +235,9 @@ private struct NativeEditorTableRowHandle: View {
         }
         .buttonStyle(.plain)
         .font(.caption.bold())
-        .foregroundStyle(isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground)
+        .foregroundStyle(
+            isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground
+        )
         .frame(width: NativeEditorTableLayout.rowHandleWidth)
         .frame(minHeight: NativeEditorTableLayout.rowMinimumHeight)
         .help("Row \(rowIndex + 1) actions")
@@ -407,7 +411,7 @@ private struct NativeEditorTableColumnResizeHandle: View {
 
     var body: some View {
         Rectangle()
-            .fill(isActive ? DocmostlyTheme.primary.opacity(0.55) : Color.clear)
+            .fill(isActive ? NativeEditorTableLayout.selectionAccent.opacity(0.80) : Color.clear)
             .frame(width: NativeEditorTableLayout.resizeHandleWidth)
             .contentShape(.rect)
             .gesture(
@@ -458,12 +462,111 @@ private struct NativeEditorTableSelectionStroke: View {
     let selection: NativeEditorTableSelection?
     let rowIndex: Int
     let columnIndex: Int
+    let rowCount: Int
+    let columnCount: Int
 
     var body: some View {
-        if selection?.kind == .cell && selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
-            Rectangle()
-                .stroke(DocmostlyTheme.primary.opacity(0.70), lineWidth: 2)
-                .allowsHitTesting(false)
+        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
+            ZStack {
+                if showsFullCellStroke {
+                    Rectangle()
+                        .stroke(NativeEditorTableLayout.selectionAccent, lineWidth: 2)
+                }
+
+                if showsTopEdge {
+                    NativeEditorTableSelectionEdge(edge: .top)
+                }
+
+                if showsLeadingEdge {
+                    NativeEditorTableSelectionEdge(edge: .leading)
+                }
+
+                if showsTrailingEdge {
+                    NativeEditorTableSelectionEdge(edge: .trailing)
+                }
+
+                if showsBottomEdge {
+                    NativeEditorTableSelectionEdge(edge: .bottom)
+                }
+            }
+            .foregroundStyle(NativeEditorTableLayout.selectionAccent)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var showsFullCellStroke: Bool {
+        selection?.kind == .cell
+    }
+
+    private var showsTopEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            true
+        case .column:
+            rowIndex == 0
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsLeadingEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            columnIndex == 0
+        case .column:
+            true
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsTrailingEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            columnIndex == columnCount - 1
+        case .column:
+            true
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsBottomEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            true
+        case .column:
+            rowIndex == rowCount - 1
+        case .cell, nil:
+            false
+        }
+    }
+}
+
+private struct NativeEditorTableSelectionEdge: View {
+    let edge: NativeEditorTableCellBorderEdge
+
+    var body: some View {
+        Rectangle()
+            .fill(NativeEditorTableLayout.selectionAccent)
+            .frame(width: isVertical ? 2 : nil, height: isVertical ? nil : 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+    }
+
+    private var isVertical: Bool {
+        edge == .leading || edge == .trailing
+    }
+
+    private var alignment: Alignment {
+        switch edge {
+        case .top:
+            .top
+        case .leading:
+            .leading
+        case .trailing:
+            .trailing
+        case .bottom:
+            .bottom
         }
     }
 }
@@ -474,42 +577,21 @@ private struct NativeEditorTableSelectionFill: View {
     let columnIndex: Int
 
     var body: some View {
-        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
-            ZStack(alignment: alignment) {
-                DocmostlyTheme.primaryTint
-
-                if shouldShowIndicator {
-                    Rectangle()
-                        .fill(DocmostlyTheme.primary.opacity(0.76))
-                        .frame(width: indicatorWidth, height: indicatorHeight)
-                }
-            }
-            .allowsHitTesting(false)
-        }
-    }
-
-    private var shouldShowIndicator: Bool {
         switch selection?.kind {
-        case .cell:
-            false
-        case .row:
-            columnIndex == 0
-        case .column:
-            rowIndex == 0
-        case nil:
-            false
+        case .row where columnIndex == 0:
+            indicator(width: 4, height: nil, alignment: .leading)
+        case .column where rowIndex == 0:
+            indicator(width: nil, height: 4, alignment: .top)
+        default:
+            EmptyView()
         }
     }
 
-    private var alignment: Alignment {
-        selection?.kind == .column ? .top : .leading
-    }
-
-    private var indicatorWidth: CGFloat? {
-        selection?.kind == .row ? 4 : nil
-    }
-
-    private var indicatorHeight: CGFloat? {
-        selection?.kind == .column ? 4 : nil
+    private func indicator(width: CGFloat?, height: CGFloat?, alignment: Alignment) -> some View {
+            Rectangle()
+                .fill(NativeEditorTableLayout.selectionAccent)
+                .frame(width: width, height: height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+                .allowsHitTesting(false)
     }
 }

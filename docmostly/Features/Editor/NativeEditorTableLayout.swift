@@ -21,22 +21,21 @@ enum NativeEditorTableLayout {
     static let cellVerticalPadding: CGFloat = 10
     static let cornerRadius: CGFloat = 10
     static let gridVerticalPadding: CGFloat = 4
-    static let inlineAddControlSize: CGFloat = 18
 
     static var borderStyle: Color {
-        Color.secondary.opacity(0.18)
+        Color.secondary.opacity(0.16)
     }
 
     static var outerBorderStyle: Color {
-        Color.secondary.opacity(0.22)
+        Color.secondary.opacity(0.18)
     }
 
     static var surfaceBackground: Color {
-        Color.secondary.opacity(0.025)
+        Color.clear
     }
 
     static var headerBackground: Color {
-        Color.secondary.opacity(0.09)
+        Color.clear
     }
 
     static var bodyForeground: Color {
@@ -47,16 +46,8 @@ enum NativeEditorTableLayout {
         Color.secondary.opacity(0.76)
     }
 
-    static var handleBackground: Color {
-        Color.secondary.opacity(0.06)
-    }
-
-    static var selectedHandleBackground: Color {
-        DocmostlyTheme.primaryTint
-    }
-
-    static var addRailBackground: Color {
-        Color.secondary.opacity(0.055)
+    static var selectionAccent: Color {
+        Color(red: 0.89, green: 0.67, blue: 0.00)
     }
 
     static func font(for cell: NativeEditorTableCell) -> Font {

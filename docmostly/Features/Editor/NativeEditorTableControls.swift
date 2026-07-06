@@ -300,16 +300,14 @@ private struct NativeEditorTableColumnDialogActions: View {
 
 struct NativeEditorEmptyTableView: View {
     var body: some View {
-        DocmostlyGlassPanel(cornerRadius: NativeEditorTableLayout.cornerRadius) {
-            Label("Empty table", systemImage: "tablecells")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .overlay {
-                    RoundedRectangle(cornerRadius: NativeEditorTableLayout.cornerRadius)
-                        .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
-                }
+        Label("Empty table", systemImage: "tablecells")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .overlay {
+                Rectangle()
+                    .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
             }
     }
 }
@@ -319,28 +317,26 @@ struct NativeEditorEditableEmptyTableView: View {
     let actions: NativeEditorTableEditingActions
 
     var body: some View {
-        DocmostlyGlassPanel(cornerRadius: NativeEditorTableLayout.cornerRadius) {
-            HStack(spacing: 8) {
-                Label("Empty table", systemImage: "tablecells")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            Label("Empty table", systemImage: "tablecells")
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
 
-                Button("Add row", systemImage: "arrow.down.to.line") {
-                    actions.insertRowBelow(blockID, 0)
-                }
-
-                Button("Add column", systemImage: "arrow.right.to.line") {
-                    actions.insertColumnAfter(blockID, 0)
-                }
+            Button("Add row", systemImage: "arrow.down.to.line") {
+                actions.insertRowBelow(blockID, 0)
             }
-            .buttonStyle(NativeEditorTableToolbarButtonStyle())
-            .padding()
-            .overlay {
-                RoundedRectangle(cornerRadius: NativeEditorTableLayout.cornerRadius)
-                    .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
+
+            Button("Add column", systemImage: "arrow.right.to.line") {
+                actions.insertColumnAfter(blockID, 0)
             }
+        }
+        .buttonStyle(NativeEditorTableToolbarButtonStyle())
+        .padding()
+        .overlay {
+            Rectangle()
+                .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
         }
     }
 }
