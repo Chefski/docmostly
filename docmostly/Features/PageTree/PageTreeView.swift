@@ -4,6 +4,8 @@ struct PageTreeView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = PageTreeViewModel()
     @State private var browserViewModel = PageBrowserViewModel()
+    @State private var searchViewModel = SearchViewModel()
+    @State private var isSearchPresented = false
     @State private var creationRequest: PageCreationRequest?
     @State private var moveRequest: PageTreeNode?
     @State private var copyRequest: PageTreeNode?
@@ -13,73 +15,79 @@ struct PageTreeView: View {
 
     var body: some View {
         List {
-            PageBrowserScopeSwitch(viewModel: browserViewModel)
-                .listRowInsets(PageBrowserMetrics.switchInsets)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-            if browserViewModel.isLoading {
-                ProgressView(browserViewModel.selectedScope.loadingTitle)
-            }
-
-            ForEach(browserViewModel.items) { item in
-                NavigationLink(value: item) {
-                    PageBrowserRowView(item: item)
+            if isShowingSearch {
+                SearchResultsContent(viewModel: searchViewModel, spaces: appState.spaces) {
+                    await searchViewModel.loadMore(provider: appState)
                 }
-                .listRowInsets(PageBrowserMetrics.rowInsets)
-                .listRowSeparator(.visible)
-            }
+            } else {
+                PageBrowserScopeSwitch(viewModel: browserViewModel)
+                    .listRowInsets(PageBrowserMetrics.switchInsets)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
 
-            if browserViewModel.items.isEmpty && browserViewModel.isLoading == false {
-                ContentUnavailableView(
-                    browserViewModel.selectedScope.emptyTitle,
-                    systemImage: browserViewModel.selectedScope.emptySystemImage
-                )
-            }
-
-            if let errorMessage = browserViewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(DocmostlyTheme.destructive)
-            }
-
-            if let spaceActionErrorMessage = viewModel.spaceActionErrorMessage {
-                Text(spaceActionErrorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(DocmostlyTheme.destructive)
-            }
-
-            Section("All Pages") {
-                if viewModel.isLoading && viewModel.nodes.isEmpty {
-                    ProgressView("Loading pages")
+                if browserViewModel.isLoading {
+                    ProgressView(browserViewModel.selectedScope.loadingTitle)
                 }
 
-                ForEach(viewModel.visibleNodes) { visibleNode in
-                    PageTreeNodeView(
-                        node: visibleNode.node,
-                        depth: visibleNode.depth,
-                        isExpanded: visibleNode.isExpanded,
-                        isSelected: appState.selectedPageID == visibleNode.node.slugId,
-                        toggle: toggleNode,
-                        openInDetailColumn: openInDetailColumn,
-                        openInNewWindow: nil,
-                        movePage: movePage,
-                        createChild: beginCreateChild,
-                        duplicate: beginDuplicate,
-                        moveToSpace: beginMoveToSpace,
-                        delete: deletePage
+                ForEach(browserViewModel.items) { item in
+                    NavigationLink(value: item) {
+                        PageBrowserRowView(item: item)
+                    }
+                    .listRowInsets(PageBrowserMetrics.rowInsets)
+                    .listRowSeparator(.visible)
+                }
+
+                if browserViewModel.items.isEmpty && browserViewModel.isLoading == false {
+                    ContentUnavailableView(
+                        browserViewModel.selectedScope.emptyTitle,
+                        systemImage: browserViewModel.selectedScope.emptySystemImage
                     )
                 }
 
-                if let errorMessage = viewModel.errorMessage {
+                if let errorMessage = browserViewModel.errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(DocmostlyTheme.destructive)
                 }
 
-                if viewModel.nodes.isEmpty && viewModel.isLoading == false {
-                    Text(appState.isOffline ? "No cached pages" : "No pages")
-                        .foregroundStyle(.secondary)
+                if let spaceActionErrorMessage = viewModel.spaceActionErrorMessage {
+                    Text(spaceActionErrorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(DocmostlyTheme.destructive)
+                }
+
+                Section("All Pages") {
+                    if viewModel.isLoading && viewModel.nodes.isEmpty {
+                        ProgressView("Loading pages")
+                    }
+
+                    ForEach(viewModel.visibleNodes) { visibleNode in
+                        PageTreeNodeView(
+                            node: visibleNode.node,
+                            depth: visibleNode.depth,
+                            isExpanded: visibleNode.isExpanded,
+                            isSelected: appState.selectedPageID == visibleNode.node.slugId,
+                            toggle: toggleNode,
+                            openInDetailColumn: openInDetailColumn,
+                            openInNewWindow: nil,
+                            movePage: movePage,
+                            createChild: beginCreateChild,
+                            duplicate: beginDuplicate,
+                            moveToSpace: beginMoveToSpace,
+                            delete: deletePage
+                        )
+                    }
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(DocmostlyTheme.destructive)
+                    }
+
+                    if viewModel.nodes.isEmpty && viewModel.isLoading == false {
+                        Text(appState.isOffline ? "No cached pages" : "No pages")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -97,9 +105,26 @@ struct PageTreeView: View {
                     showTrash: showTrash,
                     showSpaceSettings: showSpaceSettings
                 )
+                #if !os(iOS)
                 Button("New Page", systemImage: "plus", action: beginCreateRoot)
+                #endif
             }
+            #if os(iOS)
+            DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            ToolbarSpacer(.fixed, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                Button("New Page", systemImage: "square.and.pencil", action: beginCreateRoot)
+            }
+            #endif
         }
+        #if os(iOS)
+        .searchable(
+            text: $searchViewModel.query,
+            isPresented: $isSearchPresented,
+            placement: .toolbar,
+            prompt: "Search"
+        )
+        #endif
         .refreshable {
             await refreshPages()
         }
@@ -109,11 +134,25 @@ struct PageTreeView: View {
         .task(id: pageBrowserTaskKey) {
             await refreshBrowser()
         }
+        .task(id: searchViewModel.searchTaskKey) {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+                try Task.checkCancellation()
+                await searchViewModel.search(provider: appState)
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
+        }
         .navigationDestination(for: PageBrowserItem.self) { item in
             PageBrowserDestinationView(item: item)
         }
         .navigationDestination(for: PageTreeNode.self) { node in
             PageReaderDestinationView(pageID: node.slugId)
+        }
+        .navigationDestination(for: DocmostSearchResult.self) { result in
+            SearchResultDestinationView(result: result)
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
@@ -153,6 +192,10 @@ struct PageTreeView: View {
 
     private var pageBrowserTaskKey: PageBrowserTaskKey {
         PageBrowserTaskKey(spaceID: space.id, scope: browserViewModel.selectedScope)
+    }
+
+    private var isShowingSearch: Bool {
+        isSearchPresented || searchViewModel.query.isEmpty == false
     }
 
     private func beginCreateRoot() {

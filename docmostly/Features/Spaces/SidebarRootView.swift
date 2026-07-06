@@ -12,9 +12,6 @@ struct SidebarRootView: View {
                 NavigationLink(value: SidebarDestination.notifications) {
                     Label("Notifications", systemImage: "bell")
                 }
-                NavigationLink(value: SidebarDestination.search) {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
             }
 
             Section("Spaces") {
