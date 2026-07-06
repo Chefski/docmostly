@@ -57,3 +57,5 @@ Before opening a pull request:
 ## License
 
 Docmostly is available under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Third-party notices for bundled dependencies are available in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
