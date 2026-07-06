@@ -17,7 +17,7 @@ struct PageTreeView: View {
         List {
             if isShowingSearch {
                 SearchResultsContent(viewModel: searchViewModel, spaces: appState.spaces) {
-                    await searchViewModel.loadMore(provider: appState)
+                    await searchViewModel.loadMore(provider: searchProvider)
                 }
             } else {
                 PageBrowserScopeSwitch(viewModel: browserViewModel)
@@ -137,7 +137,7 @@ struct PageTreeView: View {
         .task(id: searchTaskKey) {
             do {
                 try await Task.sleep(for: .milliseconds(300))
-                await searchViewModel.search(provider: appState)
+                await searchViewModel.search(provider: searchProvider)
             } catch {
                 return
             }
@@ -193,6 +193,10 @@ struct PageTreeView: View {
 
     private var searchTaskKey: PageTreeSearchTaskKey {
         PageTreeSearchTaskKey(spaceID: space.id, searchTaskKey: searchViewModel.searchTaskKey)
+    }
+
+    private var searchProvider: PageTreeSearchProvider {
+        PageTreeSearchProvider(appState: appState, spaceID: space.id)
     }
 
     private var isShowingSearch: Bool {
@@ -282,4 +286,39 @@ struct PageTreeView: View {
 private struct PageTreeSearchTaskKey: Hashable {
     let spaceID: String
     let searchTaskKey: SearchTaskKey
+}
+
+@MainActor
+private final class PageTreeSearchProvider: SearchProviding {
+    let appState: AppState
+    let spaceID: String
+
+    init(appState: AppState, spaceID: String) {
+        self.appState = appState
+        self.spaceID = spaceID
+    }
+
+    var selectedSpaceID: String? {
+        spaceID
+    }
+
+    var currentSearchUserID: String? {
+        appState.currentSearchUserID
+    }
+
+    func search(
+        query: String,
+        spaceId: String?,
+        creatorId: String?,
+        limit: Int,
+        offset: Int
+    ) async throws -> [DocmostSearchResult] {
+        try await appState.search(
+            query: query,
+            spaceId: spaceId,
+            creatorId: creatorId,
+            limit: limit,
+            offset: offset
+        )
+    }
 }
