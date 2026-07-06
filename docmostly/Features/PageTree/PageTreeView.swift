@@ -134,13 +134,10 @@ struct PageTreeView: View {
         .task(id: pageBrowserTaskKey) {
             await refreshBrowser()
         }
-        .task(id: searchViewModel.searchTaskKey) {
+        .task(id: searchTaskKey) {
             do {
                 try await Task.sleep(for: .milliseconds(300))
-                try Task.checkCancellation()
                 await searchViewModel.search(provider: appState)
-            } catch is CancellationError {
-                return
             } catch {
                 return
             }
@@ -192,6 +189,10 @@ struct PageTreeView: View {
 
     private var pageBrowserTaskKey: PageBrowserTaskKey {
         PageBrowserTaskKey(spaceID: space.id, scope: browserViewModel.selectedScope)
+    }
+
+    private var searchTaskKey: PageTreeSearchTaskKey {
+        PageTreeSearchTaskKey(spaceID: space.id, searchTaskKey: searchViewModel.searchTaskKey)
     }
 
     private var isShowingSearch: Bool {
@@ -276,4 +277,9 @@ struct PageTreeView: View {
         await loadRoot
         await loadSpaceActionState
     }
+}
+
+private struct PageTreeSearchTaskKey: Hashable {
+    let spaceID: String
+    let searchTaskKey: SearchTaskKey
 }
