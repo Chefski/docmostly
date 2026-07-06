@@ -14,6 +14,7 @@ struct NativeEditorBlockRow: View {
     let richBlockActions: NativeEditorRichBlockEditingActions?
     let pageID: String
     let spaceID: String?
+    let focusBlock: () -> Void
     let moveBefore: (UUID) -> Void
     let blockChanged: () -> Void
     let selectionChanged: () -> Void
@@ -44,11 +45,13 @@ struct NativeEditorBlockRow: View {
                     .frame(width: 24, alignment: .center)
             }
 
-            if block.isEditable && isReadOnly == false {
+            if showsEditableTextEditor {
                 TextEditor(text: $block.text, selection: $block.selection)
                     .font(block.kind.editorFont)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
+                    .contentMargins(.horizontal, 0, for: .scrollContent)
+                    .contentMargins(.vertical, 0, for: .scrollContent)
                     .frame(maxWidth: .infinity, minHeight: minimumEditorHeight, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .focused(focusedField, equals: .block(block.id))
@@ -56,6 +59,18 @@ struct NativeEditorBlockRow: View {
                     .onChange(of: block.selection) { _, _ in
                         selectionChanged()
                     }
+            } else if block.isEditable && isReadOnly == false {
+                Button(action: focusBlock) {
+                    NativeEditorRichBlockPreviewView(
+                        block: block,
+                        pageID: pageID,
+                        spaceID: spaceID
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(block.kind.accessibilityLabel)
             } else {
                 NativeEditorRichBlockPreviewView(
                     block: block,
@@ -108,14 +123,24 @@ struct NativeEditorBlockRow: View {
     }
 
     private var minimumEditorHeight: CGFloat {
-        switch block.kind {
-        case .heading:
-            58
-        case .codeBlock:
-            88
-        default:
-            46
+        guard block.text.characters.isEmpty else {
+            return 0
         }
+
+        return switch block.kind {
+        case .heading:
+            44
+        case .codeBlock:
+            76
+        default:
+            28
+        }
+    }
+
+    private var showsEditableTextEditor: Bool {
+        block.isEditable &&
+            isReadOnly == false &&
+            (focusedField.wrappedValue == .block(block.id) || block.text.characters.isEmpty)
     }
 
     private var showsControls: Bool {

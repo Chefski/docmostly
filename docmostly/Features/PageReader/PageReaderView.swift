@@ -93,7 +93,10 @@ struct PageReaderView: View {
         }
         .scrollPosition($scrollPosition)
         .safeAreaPadding(.bottom, 72)
-        .navigationTitle(pageNavigationTitle)
+        .navigationTitle(navigationChromeTitle)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             pageReaderToolbar
         }
@@ -224,6 +227,7 @@ struct PageReaderView: View {
                 PageReaderSupplementaryPanelView(
                     viewModel: viewModel,
                     panel: activePanel,
+                    editorViewModel: editorViewModel,
                     pageID: editorViewModel.currentPageID,
                     canEdit: editorViewModel.canEdit,
                     hasPageRestriction: editorViewModel.hasPageRestriction,
@@ -254,6 +258,7 @@ struct PageReaderView: View {
                     PageReaderSupplementaryPanelView(
                         viewModel: viewModel,
                         panel: panel,
+                        editorViewModel: editorViewModel,
                         pageID: editorViewModel.currentPageID,
                         canEdit: editorViewModel.canEdit,
                         hasPageRestriction: editorViewModel.hasPageRestriction,
@@ -283,7 +288,7 @@ struct PageReaderView: View {
                         }
                     }
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents(panel == .details ? [.large] : [.medium, .large])
             }
         }
         #endif

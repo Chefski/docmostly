@@ -35,7 +35,12 @@ private struct MacMainShellEmptyPageDetailView: View {
                 ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
             }
         case .space, nil:
-            RecentPagesView()
+            if let selectedSpace {
+                PageBrowserHomeView(space: selectedSpace)
+                    .id(selectedSpace.id)
+            } else {
+                ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
+            }
         }
     }
 

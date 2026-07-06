@@ -11,17 +11,56 @@ enum NativeEditorTableLayout {
 
     static let minimumColumnWidth: CGFloat = 128
     static let defaultColumnWidth: CGFloat = 184
-    static let compactColumnWidth: CGFloat = 176
+    static let compactColumnWidth: CGFloat = 168
     static let maximumColumnWidth: CGFloat = 480
     static let rowMinimumHeight: CGFloat = 48
-    static let columnHandleHeight: CGFloat = 28
-    static let rowHandleWidth: CGFloat = 30
+    static let columnHandleHeight: CGFloat = 24
+    static let rowHandleWidth: CGFloat = 24
     static let resizeHandleWidth: CGFloat = 14
-    static let cellHorizontalPadding: CGFloat = 10
-    static let cellVerticalPadding: CGFloat = 8
+    static let cellHorizontalPadding: CGFloat = 12
+    static let cellVerticalPadding: CGFloat = 10
+    static let cornerRadius: CGFloat = 10
+    static let gridVerticalPadding: CGFloat = 4
+    static let inlineAddControlSize: CGFloat = 18
 
     static var borderStyle: Color {
-        Color.secondary.opacity(0.24)
+        Color.secondary.opacity(0.18)
+    }
+
+    static var outerBorderStyle: Color {
+        Color.secondary.opacity(0.22)
+    }
+
+    static var surfaceBackground: Color {
+        Color.secondary.opacity(0.025)
+    }
+
+    static var headerBackground: Color {
+        Color.secondary.opacity(0.09)
+    }
+
+    static var bodyForeground: Color {
+        Color.primary.opacity(0.92)
+    }
+
+    static var handleForeground: Color {
+        Color.secondary.opacity(0.76)
+    }
+
+    static var handleBackground: Color {
+        Color.secondary.opacity(0.06)
+    }
+
+    static var selectedHandleBackground: Color {
+        DocmostlyTheme.primaryTint
+    }
+
+    static var addRailBackground: Color {
+        Color.secondary.opacity(0.055)
+    }
+
+    static func font(for cell: NativeEditorTableCell) -> Font {
+        cell.isHeader ? .callout.bold() : .callout
     }
 
     static func columnWidth(for table: NativeEditorTable, columnIndex: Int, isCompactWidth: Bool) -> CGFloat {
@@ -43,7 +82,7 @@ enum NativeEditorTableLayout {
             return namedBackground
         }
 
-        return cell.isHeader ? Color.secondary.opacity(0.12) : Color.clear
+        return cell.isHeader ? headerBackground : Color.clear
     }
 
     private static func cssBackgroundColor(from value: String) -> Color? {

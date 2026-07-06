@@ -131,6 +131,28 @@ struct EngagementEndpointTests {
         #expect(pagesBody["limit"] as? Int == 30)
     }
 
+    @Test func buildsBacklinkRequests() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+
+        let counts = try Endpoint.pageBacklinkCounts(pageId: "page-1").urlRequest(baseURL: baseURL)
+        #expect(counts.url?.absoluteString == "https://docs.example.com/api/pages/backlinks-count")
+        #expect(try jsonBody(counts)["pageId"] as? String == "page-1")
+
+        let incoming = try Endpoint.pageBacklinks(
+            pageId: "page-1",
+            direction: .incoming,
+            cursor: "cursor-1",
+            limit: 25
+        )
+        .urlRequest(baseURL: baseURL)
+        #expect(incoming.url?.absoluteString == "https://docs.example.com/api/pages/backlinks")
+        let incomingBody = try jsonBody(incoming)
+        #expect(incomingBody["pageId"] as? String == "page-1")
+        #expect(incomingBody["direction"] as? String == "incoming")
+        #expect(incomingBody["cursor"] as? String == "cursor-1")
+        #expect(incomingBody["limit"] as? Int == 25)
+    }
+
     @Test func buildsWatcherRequests() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
 

@@ -50,6 +50,7 @@ extension PageReaderView {
             canEdit: editorViewModel.canEdit,
             canMoveToSpace: editorViewModel.currentSpaceID != nil,
             canImport: editorViewModel.canEdit && editorViewModel.currentSpaceID != nil,
+            showDetails: showDetails,
             showComments: showComments,
             showTableOfContents: showTableOfContents,
             showAttachments: showAttachments,

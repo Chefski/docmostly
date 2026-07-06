@@ -17,6 +17,7 @@ enum PageReaderMode: String, CaseIterable, Identifiable {
 }
 
 enum PageReaderPanel: String, Identifiable {
+    case details
     case comments
     case tableOfContents
     case attachments
@@ -26,6 +27,8 @@ enum PageReaderPanel: String, Identifiable {
 
     var title: String {
         switch self {
+        case .details:
+            "Details"
         case .comments:
             "Comments"
         case .tableOfContents:

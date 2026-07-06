@@ -131,7 +131,11 @@ extension AppState {
         }
 
         do {
-            let favoriteIds: [String] = try await apiClient.send(.favoriteIds(type: type, spaceId: spaceId))
+            let response: PaginatedResponse<String> = try await apiClient.send(.favoriteIds(
+                type: type,
+                spaceId: spaceId
+            ))
+            let favoriteIds = response.items
             favoriteIDsByType[type] = Set(favoriteIds)
             isOffline = false
             scheduleOfflineQueueReconciliation()

@@ -4,6 +4,7 @@ struct SpaceIconView: View {
     @Environment(AppState.self) private var appState
 
     let space: DocmostSpace
+    let size: CGFloat
 
     var body: some View {
         Group {
@@ -24,9 +25,14 @@ struct SpaceIconView: View {
                 SpaceIconFallbackView(initial: initial)
             }
         }
-        .frame(width: 28, height: 28)
-        .clipShape(.rect(cornerRadius: 6))
+        .frame(width: size, height: size)
+        .clipShape(.circle)
         .accessibilityHidden(true)
+    }
+
+    init(space: DocmostSpace, size: CGFloat = 28) {
+        self.space = space
+        self.size = size
     }
 
     private var logoURL: URL? {

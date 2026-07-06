@@ -175,8 +175,10 @@ final class CachedPage {
             content: try ProseMirrorDocument.decode(from: proseMirrorJSONData),
             icon: icon,
             spaceId: spaceId,
+            createdAt: nil,
             updatedAt: updatedAt,
             permissions: permissions,
+            creator: nil,
             lastUpdatedBy: nil
         )
     }

@@ -70,6 +70,13 @@ nonisolated enum Endpoint: Sendable {
     case workspaceLabels(type: LabelType = .page, query: String? = nil, cursor: String? = nil, limit: Int = 50)
     case addPageLabels(pageId: String, names: [String])
     case removePageLabel(pageId: String, labelId: String)
+    case pageBacklinkCounts(pageId: String)
+    case pageBacklinks(
+        pageId: String,
+        direction: DocmostBacklinkDirection,
+        cursor: String? = nil,
+        limit: Int = 25
+    )
     case labelPages(
         labelId: String? = nil,
         name: String? = nil,
@@ -253,6 +260,10 @@ nonisolated enum Endpoint: Sendable {
             "pages/labels/add"
         case .removePageLabel:
             "pages/labels/remove"
+        case .pageBacklinkCounts:
+            "pages/backlinks-count"
+        case .pageBacklinks:
+            "pages/backlinks"
         case .labelPages:
             "labels/pages"
         case .watchPage:
@@ -467,6 +478,15 @@ nonisolated enum Endpoint: Sendable {
             return try encode(AddPageLabelsRequest(pageId: pageId, names: names))
         case .removePageLabel(let pageId, let labelId):
             return try encode(RemovePageLabelRequest(pageId: pageId, labelId: labelId))
+        case .pageBacklinkCounts(let pageId):
+            return try encode(PageIDRequest(pageId: pageId))
+        case .pageBacklinks(let pageId, let direction, let cursor, let limit):
+            return try encode(PageBacklinksRequest(
+                pageId: pageId,
+                direction: direction.rawValue,
+                cursor: cursor,
+                limit: limit
+            ))
         case .labelPages(let labelId, let name, let spaceId, let query, let cursor, let limit):
             return try encode(LabelPagesRequest(
                 labelId: labelId,
@@ -805,6 +825,13 @@ nonisolated private struct AddPageLabelsRequest: Encodable {
 nonisolated private struct RemovePageLabelRequest: Encodable {
     let pageId: String
     let labelId: String
+}
+
+nonisolated private struct PageBacklinksRequest: Encodable {
+    let pageId: String
+    let direction: String
+    let cursor: String?
+    let limit: Int
 }
 
 nonisolated private struct LabelPagesRequest: Encodable {

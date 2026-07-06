@@ -15,8 +15,6 @@ struct NativeEditorTableEditor: View {
     let actions: NativeEditorTableEditingActions
 
     @State private var selection: NativeEditorTableSelection?
-    @State private var actionSelection: NativeEditorTableSelection?
-    @State private var isShowingActionDialog = false
     @State private var dragStartWidths: [Int: CGFloat] = [:]
     @FocusState private var focusedCell: NativeEditorTableCellCoordinate?
     #if os(iOS)
@@ -30,37 +28,10 @@ struct NativeEditorTableEditor: View {
                 table: table,
                 actions: actions,
                 selection: $selection,
-                actionSelection: $actionSelection,
-                isShowingActionDialog: $isShowingActionDialog,
                 dragStartWidths: $dragStartWidths,
                 focusedCell: $focusedCell,
                 isCompactWidth: isCompactWidth
             )
-
-            NativeEditorTableActionBar(
-                blockID: blockID,
-                table: table,
-                actions: actions,
-                selection: selection,
-                actionSelection: $actionSelection,
-                isShowingActionDialog: $isShowingActionDialog
-            )
-        }
-        .confirmationDialog(
-            actionSelection?.actionTitle ?? "Table actions",
-            isPresented: $isShowingActionDialog,
-            titleVisibility: .visible
-        ) {
-            if let actionSelection {
-                NativeEditorTableDialogActions(
-                    blockID: blockID,
-                    table: table,
-                    selection: actionSelection,
-                    actions: actions
-                )
-            }
-
-            Button("Cancel", role: .cancel) {}
         }
         .onChange(of: focusedCell) { _, coordinate in
             guard let coordinate else { return }
@@ -69,7 +40,6 @@ struct NativeEditorTableEditor: View {
         .onChange(of: table) { _, updatedTable in
             guard let selection, updatedTable.contains(selection) == false else { return }
             self.selection = nil
-            actionSelection = nil
         }
     }
 

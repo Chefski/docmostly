@@ -1,7 +1,16 @@
 import Foundation
 
+nonisolated enum DocmostImageAttachmentType: String {
+    case spaceIcon = "space-icon"
+    case workspaceIcon = "workspace-icon"
+}
+
 nonisolated enum SpaceLogoURL {
-    static func url(logo: String?, serverURLString: String) -> URL? {
+    static func url(
+        logo: String?,
+        serverURLString: String,
+        type: DocmostImageAttachmentType = .spaceIcon
+    ) -> URL? {
         guard let logo else { return nil }
 
         let trimmedLogo = logo.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -21,7 +30,7 @@ nonisolated enum SpaceLogoURL {
             .appending(path: AppConfig.apiPathPrefix)
             .appending(path: "attachments")
             .appending(path: "img")
-            .appending(path: "space-icon")
+            .appending(path: type.rawValue)
             .appending(path: trimmedLogo)
     }
 }

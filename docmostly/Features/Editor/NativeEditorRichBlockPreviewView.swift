@@ -186,6 +186,7 @@ struct NativeEditorRichBlockPreviewView: View {
             NativeEditorUnsupportedBlockView(block: block)
         case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
             Text(block.text)
+                .font(block.kind.editorFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

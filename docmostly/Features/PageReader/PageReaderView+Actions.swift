@@ -226,6 +226,10 @@ extension PageReaderView {
         }
     }
 
+    func showDetails() {
+        toggleSupplementaryPanel(.details)
+    }
+
     func showComments() {
         toggleSupplementaryPanel(.comments)
     }
@@ -358,6 +362,14 @@ extension PageReaderView {
         }
 
         return initialTitle ?? "Page"
+    }
+
+    var navigationChromeTitle: String {
+        #if os(iOS)
+        ""
+        #else
+        pageNavigationTitle
+        #endif
     }
 
     var currentSpaceSlug: String? {

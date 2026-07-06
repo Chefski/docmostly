@@ -17,6 +17,20 @@ struct SpaceLogoURLTests {
         )
     }
 
+    @Test func buildsDocmostWorkspaceIconAttachmentURL() throws {
+        let url = try #require(
+            SpaceLogoURL.url(
+                logo: "workspace.png",
+                serverURLString: "https://docs.example.com",
+                type: .workspaceIcon
+            )
+        )
+
+        #expect(
+            url.absoluteString == "https://docs.example.com/api/attachments/img/workspace-icon/workspace.png"
+        )
+    }
+
     @Test func percentEncodesStoredLogoFileName() throws {
         let url = try #require(
             SpaceLogoURL.url(

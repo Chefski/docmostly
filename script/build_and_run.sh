@@ -5,7 +5,7 @@ MODE="${1:-run}"
 APP_NAME="DocmostlyMac"
 PROJECT_NAME="docmostly.xcodeproj"
 SCHEME_NAME="DocmostlyMac"
-BUNDLE_ID="ski.chef.DocmostlyMac"
+BUNDLE_ID="ski.chef.docmostly"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.derivedData/$APP_NAME"

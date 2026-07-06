@@ -15,20 +15,35 @@ struct WorkspaceAccountMenu: View {
                 }
             }
         } label: {
-            Label {
-                Text(workspaceName)
-            } icon: {
-                WorkspaceIconView(
-                    logo: appState.currentUser?.workspace.logo,
-                    name: workspaceName
-                )
-            }
+            WorkspaceAccountMenuLabel(
+                logo: appState.currentUser?.workspace.logo,
+                name: workspaceName
+            )
         }
-        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
         .accessibilityLabel(workspaceName)
     }
 
     private var workspaceName: String {
         appState.currentUser?.workspace.name ?? "Workspace"
+    }
+}
+
+private struct WorkspaceAccountMenuLabel: View {
+    let logo: String?
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            WorkspaceIconView(logo: logo, name: name, size: 32)
+
+            Text(name)
+                .lineLimit(1)
+
+            Image(systemName: "chevron.down")
+                .imageScale(.small)
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(.primary)
     }
 }

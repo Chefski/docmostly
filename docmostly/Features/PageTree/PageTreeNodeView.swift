@@ -96,9 +96,9 @@ enum PageTreeSidebarMetrics {
     static let branchSpacing: CGFloat = 1
     static let listRowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
     #else
-    static let rowHeight: CGFloat = 44
-    static let branchSpacing: CGFloat = 6
-    static let listRowInsets = EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8)
+    static let rowHeight: CGFloat = 42
+    static let branchSpacing: CGFloat = 3
+    static let listRowInsets = EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8)
     #endif
 
     static let depthIndent: CGFloat = 18

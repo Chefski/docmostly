@@ -11,6 +11,7 @@ struct PageReaderPageActionsMenu: View {
     let canEdit: Bool
     let canMoveToSpace: Bool
     let canImport: Bool
+    let showDetails: () -> Void
     let showComments: () -> Void
     let showTableOfContents: () -> Void
     let showAttachments: () -> Void
@@ -31,6 +32,7 @@ struct PageReaderPageActionsMenu: View {
     var body: some View {
         Menu("Page Actions", systemImage: "ellipsis.circle") {
             Section("Panels") {
+                Button(detailsTitle, systemImage: "info.circle", action: showDetails)
                 Button(commentsTitle, systemImage: "text.bubble", action: showComments)
                 Button(tableOfContentsTitle, systemImage: "list.bullet", action: showTableOfContents)
                 Button(attachmentsTitle, systemImage: "paperclip", action: showAttachments)
@@ -93,6 +95,10 @@ struct PageReaderPageActionsMenu: View {
             }
         }
         .accessibilityLabel("Page Actions")
+    }
+
+    private var detailsTitle: String {
+        activePanel == .details ? "Hide Details" : "Show Details"
     }
 
     private var commentsTitle: String {
