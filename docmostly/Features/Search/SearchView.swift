@@ -6,39 +6,8 @@ struct SearchView: View {
 
     var body: some View {
         List {
-            SearchFilterBar(viewModel: viewModel, spaces: appState.spaces)
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-            if viewModel.isSearching {
-                ProgressView("Searching")
-            }
-
-            ForEach(viewModel.results) { result in
-                SearchResultRowView(result: result)
-            }
-
-            if viewModel.hasMoreResults {
-                Button("Show More", systemImage: "chevron.down") {
-                    Task {
-                        await viewModel.loadMore(provider: appState)
-                    }
-                }
-                .disabled(viewModel.isLoadingMore)
-            }
-
-            if viewModel.isLoadingMore {
-                ProgressView("Loading more")
-            }
-
-            if viewModel.results.isEmpty && viewModel.query.isEmpty == false && viewModel.isSearching == false {
-                ContentUnavailableView.search(text: viewModel.query)
-            }
-
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(DocmostlyTheme.destructive)
+            SearchResultsContent(viewModel: viewModel, spaces: appState.spaces) {
+                await viewModel.loadMore(provider: appState)
             }
         }
         .navigationTitle("Search")
@@ -56,6 +25,49 @@ struct SearchView: View {
         }
         .navigationDestination(for: DocmostSearchResult.self) { result in
             SearchResultDestinationView(result: result)
+        }
+    }
+}
+
+struct SearchResultsContent: View {
+    @Bindable var viewModel: SearchViewModel
+    let spaces: [DocmostSpace]
+    let loadMore: () async -> Void
+
+    var body: some View {
+        SearchFilterBar(viewModel: viewModel, spaces: spaces)
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+
+        if viewModel.isSearching {
+            ProgressView("Searching")
+        }
+
+        ForEach(viewModel.results) { result in
+            SearchResultRowView(result: result)
+        }
+
+        if viewModel.hasMoreResults {
+            Button("Show More", systemImage: "chevron.down") {
+                Task {
+                    await loadMore()
+                }
+            }
+            .disabled(viewModel.isLoadingMore)
+        }
+
+        if viewModel.isLoadingMore {
+            ProgressView("Loading more")
+        }
+
+        if viewModel.results.isEmpty && viewModel.query.isEmpty == false && viewModel.isSearching == false {
+            ContentUnavailableView.search(text: viewModel.query)
+        }
+
+        if let errorMessage = viewModel.errorMessage {
+            Text(errorMessage)
+                .font(.footnote)
+                .foregroundStyle(DocmostlyTheme.destructive)
         }
     }
 }
