@@ -51,6 +51,10 @@ struct NativeEditorBodyView: View {
                         richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
                         pageID: viewModel.currentPageID,
                         spaceID: viewModel.currentSpaceID,
+                        focusBlock: {
+                            guard authoringIsAvailable else { return }
+                            viewModel.focus(blockID: block.id)
+                        },
                         moveBefore: { movedBlockID in
                             guard authoringIsAvailable else { return }
                             viewModel.moveBlock(movedBlockID, before: block.id)

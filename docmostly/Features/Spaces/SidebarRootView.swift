@@ -32,12 +32,11 @@ struct SidebarRootView: View {
                     .listRowSeparator(.hidden)
             }
         }
-        .navigationTitle("Docmostly")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                WorkspaceAccountMenu()
-            }
-        }
+        .navigationTitle(navigationTitle)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar(content: toolbarContent)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
         .refreshable {
             await appState.loadSpaces()
@@ -50,5 +49,26 @@ struct SidebarRootView: View {
         } set: { destination in
             appState.selectSidebarDestination(destination)
         }
+    }
+
+    private var navigationTitle: String {
+        #if os(iOS)
+        ""
+        #else
+        "Docmostly"
+        #endif
+    }
+
+    @ToolbarContentBuilder
+    private func toolbarContent() -> some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .topBarLeading) {
+            WorkspaceAccountMenu()
+        }
+        #else
+        ToolbarItem(placement: .primaryAction) {
+            WorkspaceAccountMenu()
+        }
+        #endif
     }
 }

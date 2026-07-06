@@ -2,6 +2,7 @@ import Foundation
 
 extension NativeRichEditorViewModel {
     func markRemoteBaseline(updatedAt: Date?) {
+        self.updatedAt = updatedAt ?? self.updatedAt
         lastRemoteUpdatedAt = updatedAt
         pendingRemotePage = nil
         pendingRemoteUpdate = nil
@@ -331,6 +332,7 @@ extension NativeRichEditorViewModel {
         document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
         lastSavedTitle = title
         lastSavedDocument = document
+        applyPageDetails(page, fallbackLastUpdatedBy: lastUpdatedBy)
         applyPagePermissions(page.permissions)
         activeCollaborators = collaborators(from: lastUpdatedBy)
         remoteCursors = []
@@ -347,6 +349,7 @@ extension NativeRichEditorViewModel {
 
     private func recordRecentEditor(from person: DocmostPagePerson?) {
         guard let person else { return }
+        lastUpdatedBy = person
         activeCollaborators.removeAll { $0.source == .recentEditor }
         activeCollaborators.append(NativeEditorCollaborator(person: person))
     }

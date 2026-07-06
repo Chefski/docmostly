@@ -12,7 +12,11 @@ final class PageBrowserViewModel {
     var errorMessage: String?
     @ObservationIgnored private var activeLoadID = UUID()
 
-    func load(space: DocmostSpace, provider: any PageBrowserProviding) async {
+    func load(
+        space: DocmostSpace,
+        provider: any PageBrowserProviding,
+        limit: Int = PageBrowserViewModel.defaultPageLimit
+    ) async {
         let requestedScope = selectedScope
         let loadID = UUID()
         activeLoadID = loadID
@@ -31,7 +35,7 @@ final class PageBrowserViewModel {
                 let response = try await provider.loadRecentPages(
                     spaceId: space.id,
                     cursor: nil,
-                    limit: Self.defaultPageLimit
+                    limit: limit
                 )
                 loadedItems = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
             case .favorites:
@@ -39,7 +43,7 @@ final class PageBrowserViewModel {
                     type: .page,
                     spaceId: space.id,
                     cursor: nil,
-                    limit: Self.defaultPageLimit
+                    limit: limit
                 )
                 loadedItems = response.items.compactMap {
                     PageBrowserItem(favorite: $0, fallbackSpaceName: space.name)
@@ -49,7 +53,7 @@ final class PageBrowserViewModel {
                     userId: provider.currentPageBrowserUserID,
                     spaceId: space.id,
                     cursor: nil,
-                    limit: Self.defaultPageLimit
+                    limit: limit
                 )
                 loadedItems = response.items.map { PageBrowserItem(page: $0, fallbackSpaceName: space.name) }
             }

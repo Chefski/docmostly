@@ -44,6 +44,10 @@ final class NativeRichEditorViewModel {
         }
     }
     var resolvedRemoteCursorsByBlockID: [UUID: [NativeEditorResolvedRemoteCursor]] = [:]
+    var creator: DocmostPagePerson?
+    var lastUpdatedBy: DocmostPagePerson?
+    var createdAt: Date?
+    var updatedAt: Date?
 
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored private var editablePageSlugID: String
@@ -150,6 +154,7 @@ final class NativeRichEditorViewModel {
             editablePageSpaceID = page.spaceId
             title = page.title
             document = NativeEditorDocument(proseMirrorDocument: page.content ?? ProseMirrorDocument())
+            applyPageDetails(page)
             lastSavedTitle = title
             lastSavedDocument = document
             resetEditingHistory()
@@ -193,6 +198,7 @@ final class NativeRichEditorViewModel {
             editablePageID = page.id
             editablePageSlugID = page.slugId
             title = page.title
+            applyPageDetails(page)
             lastSavedTitle = title
             lastSavedDocument = document
             markRemoteBaseline(updatedAt: page.updatedAt)

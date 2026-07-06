@@ -25,8 +25,9 @@ struct NativeEditorTableReadOnlyGrid: View {
                         }
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, NativeEditorTableLayout.gridVerticalPadding)
             }
+            .scrollIndicators(.hidden)
         }
     }
 
@@ -61,8 +62,6 @@ struct NativeEditorTableEditableGrid: View {
     let table: NativeEditorTable
     let actions: NativeEditorTableEditingActions
     @Binding var selection: NativeEditorTableSelection?
-    @Binding var actionSelection: NativeEditorTableSelection?
-    @Binding var isShowingActionDialog: Bool
     @Binding var dragStartWidths: [Int: CGFloat]
     let focusedCell: FocusState<NativeEditorTableCellCoordinate?>.Binding
     let isCompactWidth: Bool
@@ -74,20 +73,21 @@ struct NativeEditorTableEditableGrid: View {
             ScrollView(.horizontal) {
                 Grid(horizontalSpacing: 0, verticalSpacing: 0) {
                     NativeEditorTableColumnHandleRow(
+                        blockID: blockID,
                         table: table,
+                        actions: actions,
                         selection: $selection,
-                        actionSelection: $actionSelection,
-                        isShowingActionDialog: $isShowingActionDialog,
                         isCompactWidth: isCompactWidth
                     )
 
                     ForEach(table.rows.indices, id: \.self) { rowIndex in
                         GridRow {
                             NativeEditorTableRowHandle(
+                                blockID: blockID,
+                                table: table,
+                                actions: actions,
                                 rowIndex: rowIndex,
-                                selection: $selection,
-                                actionSelection: $actionSelection,
-                                isShowingActionDialog: $isShowingActionDialog
+                                selection: $selection
                             )
 
                             ForEach(0..<table.columnCount, id: \.self) { columnIndex in
@@ -97,6 +97,8 @@ struct NativeEditorTableEditableGrid: View {
                                         cell: cell,
                                         rowIndex: rowIndex,
                                         columnIndex: columnIndex,
+                                        rowCount: table.rows.count,
+                                        columnCount: table.columnCount,
                                         width: columnWidth(for: columnIndex),
                                         actions: actions,
                                         selection: $selection,
@@ -114,8 +116,9 @@ struct NativeEditorTableEditableGrid: View {
                         }
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, NativeEditorTableLayout.gridVerticalPadding)
             }
+            .scrollIndicators(.hidden)
         }
     }
 
@@ -138,10 +141,10 @@ struct NativeEditorTableEditableGrid: View {
 }
 
 private struct NativeEditorTableColumnHandleRow: View {
+    let blockID: UUID
     let table: NativeEditorTable
+    let actions: NativeEditorTableEditingActions
     @Binding var selection: NativeEditorTableSelection?
-    @Binding var actionSelection: NativeEditorTableSelection?
-    @Binding var isShowingActionDialog: Bool
     let isCompactWidth: Bool
 
     var body: some View {
@@ -154,6 +157,9 @@ private struct NativeEditorTableColumnHandleRow: View {
 
             ForEach(0..<table.columnCount, id: \.self) { columnIndex in
                 NativeEditorTableColumnHandle(
+                    blockID: blockID,
+                    table: table,
+                    actions: actions,
                     columnIndex: columnIndex,
                     width: NativeEditorTableLayout.columnWidth(
                         for: table,
@@ -161,9 +167,7 @@ private struct NativeEditorTableColumnHandleRow: View {
                         isCompactWidth: isCompactWidth
                     ),
                     isSelected: selection == .column(columnIndex),
-                    selection: $selection,
-                    actionSelection: $actionSelection,
-                    isShowingActionDialog: $isShowingActionDialog
+                    selection: $selection
                 )
             }
         }
@@ -171,49 +175,76 @@ private struct NativeEditorTableColumnHandleRow: View {
 }
 
 private struct NativeEditorTableColumnHandle: View {
+    let blockID: UUID
+    let table: NativeEditorTable
+    let actions: NativeEditorTableEditingActions
     let columnIndex: Int
     let width: CGFloat
     let isSelected: Bool
     @Binding var selection: NativeEditorTableSelection?
-    @Binding var actionSelection: NativeEditorTableSelection?
-    @Binding var isShowingActionDialog: Bool
 
     var body: some View {
-        Button("Column \(columnIndex + 1) actions", systemImage: "ellipsis") {
-            let nextSelection = NativeEditorTableSelection.column(columnIndex)
-            selection = nextSelection
-            actionSelection = nextSelection
-            isShowingActionDialog = true
+        Menu {
+            Button("Delete Column", systemImage: "rectangle.badge.minus") {
+                selection = .column(columnIndex)
+                actions.deleteColumn(blockID, columnIndex)
+            }
+            .disabled(table.columnCount <= 1)
+
+            Button("Add Column", systemImage: "rectangle.badge.plus") {
+                selection = .column(columnIndex)
+                actions.insertColumnAfter(blockID, columnIndex)
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .accessibilityLabel("Column \(columnIndex + 1) actions")
         }
-        .labelStyle(.iconOnly)
         .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? DocmostlyTheme.primary : .secondary)
+        .font(.caption.bold())
+        .foregroundStyle(
+            isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground
+        )
         .frame(width: width, height: NativeEditorTableLayout.columnHandleHeight)
-        .background(isSelected ? DocmostlyTheme.primaryTint : Color.clear, in: .rect(cornerRadius: 4))
         .help("Column \(columnIndex + 1) actions")
     }
 }
 
 private struct NativeEditorTableRowHandle: View {
+    let blockID: UUID
+    let table: NativeEditorTable
+    let actions: NativeEditorTableEditingActions
     let rowIndex: Int
     @Binding var selection: NativeEditorTableSelection?
-    @Binding var actionSelection: NativeEditorTableSelection?
-    @Binding var isShowingActionDialog: Bool
 
     var body: some View {
-        Button("Row \(rowIndex + 1) actions", systemImage: "ellipsis") {
-            let nextSelection = NativeEditorTableSelection.row(rowIndex)
-            selection = nextSelection
-            actionSelection = nextSelection
-            isShowingActionDialog = true
+        Menu {
+            Button("Delete Row", systemImage: "rectangle.badge.minus") {
+                selection = .row(rowIndex)
+                actions.deleteRow(blockID, rowIndex)
+            }
+            .disabled(table.rows.count <= 1)
+
+            Button("Add Row", systemImage: "rectangle.badge.plus") {
+                selection = .row(rowIndex)
+                actions.insertRowBelow(blockID, rowIndex)
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .rotationEffect(.degrees(90))
+                .accessibilityLabel("Row \(rowIndex + 1) actions")
         }
-        .labelStyle(.iconOnly)
         .buttonStyle(.plain)
-        .foregroundStyle(selection == .row(rowIndex) ? DocmostlyTheme.primary : .secondary)
+        .font(.caption.bold())
+        .foregroundStyle(
+            isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground
+        )
         .frame(width: NativeEditorTableLayout.rowHandleWidth)
         .frame(minHeight: NativeEditorTableLayout.rowMinimumHeight)
-        .background(selection == .row(rowIndex) ? DocmostlyTheme.primaryTint : Color.clear, in: .rect(cornerRadius: 4))
         .help("Row \(rowIndex + 1) actions")
+    }
+
+    private var isSelected: Bool {
+        selection == .row(rowIndex)
     }
 }
 
@@ -222,6 +253,8 @@ private struct NativeEditorTableEditableCell: View {
     let cell: NativeEditorTableCell
     let rowIndex: Int
     let columnIndex: Int
+    let rowCount: Int
+    let columnCount: Int
     let width: CGFloat
     let actions: NativeEditorTableEditingActions
     @Binding var selection: NativeEditorTableSelection?
@@ -231,8 +264,8 @@ private struct NativeEditorTableEditableCell: View {
     var body: some View {
         TextField("Cell", text: cellBinding, axis: .vertical)
             .textFieldStyle(.plain)
-            .font(cell.isHeader ? .body.bold() : .body)
-            .foregroundStyle(.primary)
+            .font(NativeEditorTableLayout.font(for: cell))
+            .foregroundStyle(cell.isHeader ? .primary : NativeEditorTableLayout.bodyForeground)
             .lineLimit(4)
             .focused(focusedCell, equals: NativeEditorTableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex))
             .padding(.horizontal, NativeEditorTableLayout.cellHorizontalPadding)
@@ -245,7 +278,20 @@ private struct NativeEditorTableEditableCell: View {
             )
             .background(NativeEditorTableLayout.cellBackground(for: cell))
             .overlay {
-                NativeEditorTableSelectionStroke(isSelected: isSelected)
+                NativeEditorTableSelectionFill(
+                    selection: selection,
+                    rowIndex: rowIndex,
+                    columnIndex: columnIndex
+                )
+            }
+            .overlay {
+                NativeEditorTableSelectionStroke(
+                    selection: selection,
+                    rowIndex: rowIndex,
+                    columnIndex: columnIndex,
+                    rowCount: rowCount,
+                    columnCount: columnCount
+                )
             }
             .overlay(alignment: .top) {
                 NativeEditorTableCellBorder(edge: .top, isVisible: rowIndex == 0)
@@ -292,8 +338,9 @@ private struct NativeEditorTableReadOnlyCell: View {
 
     var body: some View {
         Text(displayText)
-            .font(cell?.isHeader == true ? .body.bold() : .body)
-            .foregroundStyle(.primary)
+            .font(cell.map(NativeEditorTableLayout.font) ?? .callout)
+            .foregroundStyle(cell?.isHeader == true ? .primary : NativeEditorTableLayout.bodyForeground)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, NativeEditorTableLayout.cellHorizontalPadding)
             .padding(.vertical, NativeEditorTableLayout.cellVerticalPadding)
             .frame(
@@ -363,7 +410,7 @@ private struct NativeEditorTableColumnResizeHandle: View {
 
     var body: some View {
         Rectangle()
-            .fill(isActive ? DocmostlyTheme.primary.opacity(0.45) : Color.clear)
+            .fill(isActive ? NativeEditorTableLayout.selectionAccent.opacity(0.80) : Color.clear)
             .frame(width: NativeEditorTableLayout.resizeHandleWidth)
             .contentShape(.rect)
             .gesture(
@@ -411,13 +458,141 @@ private struct NativeEditorTableCellBorder: View {
 }
 
 private struct NativeEditorTableSelectionStroke: View {
-    let isSelected: Bool
+    let selection: NativeEditorTableSelection?
+    let rowIndex: Int
+    let columnIndex: Int
+    let rowCount: Int
+    let columnCount: Int
 
     var body: some View {
-        if isSelected {
-            Rectangle()
-                .stroke(DocmostlyTheme.primary.opacity(0.70), lineWidth: 2)
-                .allowsHitTesting(false)
+        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
+            ZStack {
+                if showsFullCellStroke {
+                    Rectangle()
+                        .stroke(NativeEditorTableLayout.selectionAccent, lineWidth: 2)
+                }
+
+                if showsTopEdge {
+                    NativeEditorTableSelectionEdge(edge: .top)
+                }
+
+                if showsLeadingEdge {
+                    NativeEditorTableSelectionEdge(edge: .leading)
+                }
+
+                if showsTrailingEdge {
+                    NativeEditorTableSelectionEdge(edge: .trailing)
+                }
+
+                if showsBottomEdge {
+                    NativeEditorTableSelectionEdge(edge: .bottom)
+                }
+            }
+            .foregroundStyle(NativeEditorTableLayout.selectionAccent)
+            .allowsHitTesting(false)
         }
+    }
+
+    private var showsFullCellStroke: Bool {
+        selection?.kind == .cell
+    }
+
+    private var showsTopEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            true
+        case .column:
+            rowIndex == 0
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsLeadingEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            columnIndex == 0
+        case .column:
+            true
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsTrailingEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            columnIndex == columnCount - 1
+        case .column:
+            true
+        case .cell, nil:
+            false
+        }
+    }
+
+    private var showsBottomEdge: Bool {
+        switch selection?.kind {
+        case .row:
+            true
+        case .column:
+            rowIndex == rowCount - 1
+        case .cell, nil:
+            false
+        }
+    }
+}
+
+private struct NativeEditorTableSelectionEdge: View {
+    let edge: NativeEditorTableCellBorderEdge
+
+    var body: some View {
+        Rectangle()
+            .fill(NativeEditorTableLayout.selectionAccent)
+            .frame(width: isVertical ? 2 : nil, height: isVertical ? nil : 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+    }
+
+    private var isVertical: Bool {
+        edge == .leading || edge == .trailing
+    }
+
+    private var alignment: Alignment {
+        switch edge {
+        case .top:
+            .top
+        case .leading:
+            .leading
+        case .trailing:
+            .trailing
+        case .bottom:
+            .bottom
+        }
+    }
+}
+
+private struct NativeEditorTableSelectionFill: View {
+    let selection: NativeEditorTableSelection?
+    let rowIndex: Int
+    let columnIndex: Int
+
+    var body: some View {
+        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
+            switch selection?.kind {
+            case .row where columnIndex == 0:
+                indicator(width: 4, height: nil, alignment: .leading)
+            case .column where rowIndex == 0:
+                indicator(width: nil, height: 4, alignment: .top)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    private func indicator(width: CGFloat?, height: CGFloat?, alignment: Alignment) -> some View {
+            Rectangle()
+                .fill(NativeEditorTableLayout.selectionAccent)
+                .frame(width: width, height: height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+                .allowsHitTesting(false)
     }
 }

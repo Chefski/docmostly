@@ -32,6 +32,13 @@ final class PageReaderViewModel {
     var resolvingCommentIDs: Set<String> = []
     var breadcrumbs: [DocmostPage] = []
     var labels: [DocmostLabel] = []
+    var backlinkCounts = DocmostBacklinkCounts.empty
+    var backlinkPagesByDirection: [DocmostBacklinkDirection: [DocmostBacklinkPage]] = [:]
+    var backlinkNextCursorByDirection: [DocmostBacklinkDirection: String?] = [:]
+    var backlinkHasNextPageByDirection: [DocmostBacklinkDirection: Bool] = [:]
+    var loadingBacklinkDirections: Set<PageReaderBacklinkLoadKey> = []
+    var backlinkPageID: String?
+    var backlinkErrorMessage: String?
     var isFavoritePage = false
     var isWatchingPage: Bool?
     var isTogglingFavorite = false
@@ -363,12 +370,19 @@ final class PageReaderViewModel {
         return ids
     }
 
+    func isLoadingBacklinks(pageID: String, direction: DocmostBacklinkDirection) -> Bool {
+        loadingBacklinkDirections.contains(PageReaderBacklinkLoadKey(pageID: pageID, direction: direction))
+    }
+
     private func fetchEngagement(pageID: String, appState: AppState) async -> PageReaderEngagementSnapshot {
         async let loadedBreadcrumbs = captureLoad {
             try await appState.loadPageBreadcrumbs(pageId: pageID)
         }
         async let loadedLabels = captureLoad {
             try await appState.loadPageLabels(pageId: pageID)
+        }
+        async let loadedBacklinkCounts = captureLoad {
+            try await appState.loadPageBacklinkCounts(pageId: pageID)
         }
         async let loadedFavoriteIDs = captureLoad {
             try await appState.loadFavoriteIds(type: .page)
@@ -379,17 +393,21 @@ final class PageReaderViewModel {
 
         let breadcrumbsOutcome = await loadedBreadcrumbs
         let labelsOutcome = await loadedLabels
+        let backlinkCountsOutcome = await loadedBacklinkCounts
         let favoriteIDsOutcome = await loadedFavoriteIDs
         let watchStatusOutcome = await loadedWatchStatus
 
         return PageReaderEngagementSnapshot(
+            pageID: pageID,
             breadcrumbs: breadcrumbsOutcome.value ?? [],
             labels: labelsOutcome.value ?? [],
+            backlinkCounts: backlinkCountsOutcome.value ?? .empty,
             isFavoritePage: favoriteIDsOutcome.value?.contains(pageID) ?? false,
             isWatchingPage: watchStatusOutcome.value?.watching,
             errorMessage: [
                 breadcrumbsOutcome.errorMessage,
                 labelsOutcome.errorMessage,
+                backlinkCountsOutcome.errorMessage,
                 favoriteIDsOutcome.errorMessage,
                 watchStatusOutcome.errorMessage
             ].compactMap(\.self).first
@@ -399,6 +417,13 @@ final class PageReaderViewModel {
     private func apply(_ snapshot: PageReaderEngagementSnapshot) {
         breadcrumbs = snapshot.breadcrumbs
         labels = snapshot.labels
+        backlinkCounts = snapshot.backlinkCounts
+        backlinkPageID = snapshot.pageID
+        backlinkPagesByDirection = [:]
+        backlinkNextCursorByDirection = [:]
+        backlinkHasNextPageByDirection = [:]
+        loadingBacklinkDirections = []
+        backlinkErrorMessage = nil
         isFavoritePage = snapshot.isFavoritePage
         isWatchingPage = snapshot.isWatchingPage
         engagementErrorMessage = snapshot.errorMessage
@@ -502,9 +527,16 @@ extension PageReaderViewModel {
     }
 }
 
+nonisolated struct PageReaderBacklinkLoadKey: Hashable, Sendable {
+    let pageID: String
+    let direction: DocmostBacklinkDirection
+}
+
 private struct PageReaderEngagementSnapshot: Sendable {
+    let pageID: String
     let breadcrumbs: [DocmostPage]
     let labels: [DocmostLabel]
+    let backlinkCounts: DocmostBacklinkCounts
     let isFavoritePage: Bool
     let isWatchingPage: Bool?
     let errorMessage: String?

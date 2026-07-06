@@ -13,9 +13,13 @@ struct DocmostlyMacApp: App {
                 .environment(appState)
                 .environment(commandController)
                 .modelContainer(sharedModelContainer)
-                .frame(minWidth: 980, minHeight: 680)
+                .frame(
+                    minWidth: appState.phase == .authenticated ? 980 : 760,
+                    minHeight: appState.phase == .authenticated ? 680 : 520
+                )
         }
         .windowToolbarStyle(.unified)
+        .defaultSize(width: 860, height: 560)
         .commands {
             DocmostlyMacCommands(
                 appState: appState,

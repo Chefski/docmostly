@@ -15,40 +15,25 @@ struct PageTreeView: View {
 
     var body: some View {
         List {
+            SpaceTitleHeaderView(space: space)
+                .listRowInsets(PageBrowserMetrics.headerInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
             if isShowingSearch {
                 SearchResultsContent(viewModel: searchViewModel, spaces: appState.spaces) {
                     await searchViewModel.loadMore(provider: searchProvider)
                 }
             } else {
-                PageBrowserScopeSwitch(viewModel: browserViewModel)
-                    .listRowInsets(PageBrowserMetrics.switchInsets)
+                RecentPagesRailView(
+                    items: browserViewModel.items,
+                    isLoading: browserViewModel.isLoading,
+                    errorMessage: browserViewModel.errorMessage,
+                    isOffline: appState.isOffline
+                )
+                    .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-
-                if browserViewModel.isLoading {
-                    ProgressView(browserViewModel.selectedScope.loadingTitle)
-                }
-
-                ForEach(browserViewModel.items) { item in
-                    NavigationLink(value: item) {
-                        PageBrowserRowView(item: item)
-                    }
-                    .listRowInsets(PageBrowserMetrics.rowInsets)
-                    .listRowSeparator(.visible)
-                }
-
-                if browserViewModel.items.isEmpty && browserViewModel.isLoading == false {
-                    ContentUnavailableView(
-                        browserViewModel.selectedScope.emptyTitle,
-                        systemImage: browserViewModel.selectedScope.emptySystemImage
-                    )
-                }
-
-                if let errorMessage = browserViewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(DocmostlyTheme.destructive)
-                }
 
                 if let spaceActionErrorMessage = viewModel.spaceActionErrorMessage {
                     Text(spaceActionErrorMessage)
@@ -92,7 +77,6 @@ struct PageTreeView: View {
             }
         }
         .environment(\.defaultMinListRowHeight, PageTreeSidebarMetrics.rowHeight)
-        .navigationTitle(space.name)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if viewModel.isPerformingAction || viewModel.isPerformingSpaceAction {
@@ -272,7 +256,12 @@ struct PageTreeView: View {
     }
 
     private func refreshBrowser() async {
-        await browserViewModel.load(space: space, provider: appState)
+        browserViewModel.selectedScope = .recentlyUpdated
+        await browserViewModel.load(
+            space: space,
+            provider: appState,
+            limit: PageBrowserMetrics.railLimit
+        )
     }
 
     private func refreshTreeState() async {

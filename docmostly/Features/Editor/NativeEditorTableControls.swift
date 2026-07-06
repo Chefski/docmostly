@@ -9,43 +9,62 @@ struct NativeEditorTableActionBar: View {
     @Binding var isShowingActionDialog: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            if let selection {
-                Text(selection.summaryTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        GlassEffectContainer(spacing: 8) {
+            DocmostlyGlassPanel(cornerRadius: 14) {
+                HStack(spacing: 8) {
+                    if let selection {
+                        Text(selection.summaryTitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .padding(.trailing, 2)
 
-                NativeEditorTableInlineButtons(
-                    blockID: blockID,
-                    table: table,
-                    actions: actions,
-                    selection: selection,
-                    showMore: showActions
-                )
-            } else {
-                Button("Add row", systemImage: "arrow.down.to.line") {
-                    actions.insertRowBelow(blockID, max(table.rows.count - 1, 0))
-                }
-                .help("Add row")
+                        NativeEditorTableInlineButtons(
+                            blockID: blockID,
+                            table: table,
+                            actions: actions,
+                            selection: selection,
+                            showMore: showActions
+                        )
+                        .labelStyle(.iconOnly)
+                    } else {
+                        Button("Add row", systemImage: "arrow.down.to.line") {
+                            actions.insertRowBelow(blockID, max(table.rows.count - 1, 0))
+                        }
+                        .help("Add row")
 
-                Button("Add column", systemImage: "arrow.right.to.line") {
-                    actions.insertColumnAfter(blockID, max(table.columnCount - 1, 0))
+                        Button("Add column", systemImage: "arrow.right.to.line") {
+                            actions.insertColumnAfter(blockID, max(table.columnCount - 1, 0))
+                        }
+                        .help("Add column")
+                    }
                 }
-                .help("Add column")
+                .buttonStyle(NativeEditorTableToolbarButtonStyle())
+                .controlSize(.small)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
             }
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-        .controlSize(.small)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 8))
     }
 
     private func showActions(_ selection: NativeEditorTableSelection) {
         actionSelection = selection
         isShowingActionDialog = true
+    }
+}
+
+private struct NativeEditorTableToolbarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 8)
+            .frame(minHeight: 28)
+            .background(backgroundColor(isPressed: configuration.isPressed), in: .capsule)
+    }
+
+    private func backgroundColor(isPressed: Bool) -> Color {
+        isPressed ? DocmostlyTheme.primaryTint : Color.secondary.opacity(0.08)
     }
 }
 
@@ -281,15 +300,14 @@ private struct NativeEditorTableColumnDialogActions: View {
 
 struct NativeEditorEmptyTableView: View {
     var body: some View {
-        Text("Empty table")
+        Label("Empty table", systemImage: "tablecells")
             .font(.callout)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(Color.secondary.opacity(0.06), in: .rect(cornerRadius: 8))
             .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(NativeEditorTableLayout.borderStyle, lineWidth: 1)
+                Rectangle()
+                    .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
             }
     }
 }
@@ -300,24 +318,25 @@ struct NativeEditorEditableEmptyTableView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("Empty table")
+            Label("Empty table", systemImage: "tablecells")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Button("Add row", systemImage: "plus") {
+            Spacer(minLength: 0)
+
+            Button("Add row", systemImage: "arrow.down.to.line") {
                 actions.insertRowBelow(blockID, 0)
             }
 
-            Button("Add column", systemImage: "plus") {
+            Button("Add column", systemImage: "arrow.right.to.line") {
                 actions.insertColumnAfter(blockID, 0)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NativeEditorTableToolbarButtonStyle())
         .padding()
-        .background(Color.secondary.opacity(0.06), in: .rect(cornerRadius: 8))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(NativeEditorTableLayout.borderStyle, lineWidth: 1)
+            Rectangle()
+                .stroke(NativeEditorTableLayout.outerBorderStyle, lineWidth: 1)
         }
     }
 }

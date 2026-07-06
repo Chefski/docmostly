@@ -4,6 +4,7 @@ struct PageReaderSupplementaryPanelView: View {
     @Bindable var viewModel: PageReaderViewModel
 
     let panel: PageReaderPanel
+    let editorViewModel: NativeRichEditorViewModel
     let pageID: String
     let canEdit: Bool
     let hasPageRestriction: Bool
@@ -36,6 +37,13 @@ struct PageReaderSupplementaryPanelView: View {
             Divider()
 
             switch panel {
+            case .details:
+                PageReaderDetailsPanelView(
+                    viewModel: viewModel,
+                    editorViewModel: editorViewModel,
+                    pageID: pageID,
+                    canEdit: canEdit
+                )
             case .comments:
                 PageReaderCommentsPanelView(
                     viewModel: viewModel,
