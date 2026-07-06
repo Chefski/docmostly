@@ -15,9 +15,6 @@ struct SidebarRootView: View {
                 NavigationLink(value: SidebarDestination.search) {
                     Label("Search", systemImage: "magnifyingglass")
                 }
-                NavigationLink(value: SidebarDestination.settings) {
-                    Label("Settings", systemImage: "gearshape")
-                }
             }
 
             Section("Spaces") {
@@ -39,6 +36,11 @@ struct SidebarRootView: View {
             }
         }
         .navigationTitle("Docmostly")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                WorkspaceAccountMenu()
+            }
+        }
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
         .refreshable {
             await appState.loadSpaces()

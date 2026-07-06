@@ -91,8 +91,16 @@ struct PageTreeNodeView: View {
 }
 
 enum PageTreeSidebarMetrics {
-    static let rowHeight: CGFloat = 26
-    static let branchSpacing: CGFloat = 0
+    #if os(macOS)
+    static let rowHeight: CGFloat = 28
+    static let branchSpacing: CGFloat = 1
+    static let listRowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
+    #else
+    static let rowHeight: CGFloat = 44
+    static let branchSpacing: CGFloat = 6
+    static let listRowInsets = EdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8)
+    #endif
+
     static let depthIndent: CGFloat = 18
     static let columnSpacing: CGFloat = 5
     static let iconTitleSpacing: CGFloat = 8
@@ -100,7 +108,6 @@ enum PageTreeSidebarMetrics {
     static let iconWidth: CGFloat = 26
     static let selectionCornerRadius: CGFloat = 6
     static let leafBulletSize: CGFloat = 5
-    static let listRowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
 }
 
 private struct PageTreeDisclosureColumn: View {

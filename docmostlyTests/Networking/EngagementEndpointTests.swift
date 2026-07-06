@@ -17,6 +17,20 @@ struct EngagementEndpointTests {
         #expect(recentBody["spaceId"] as? String == "space-1")
         #expect(recentBody["cursor"] as? String == "cursor-1")
         #expect(recentBody["limit"] as? Int == 15)
+
+        let createdByUser = try Endpoint.createdByUser(
+            userId: "user-1",
+            spaceId: "space-1",
+            cursor: "cursor-2",
+            limit: 20
+        )
+        .urlRequest(baseURL: baseURL)
+        #expect(createdByUser.url?.absoluteString == "https://docs.example.com/api/pages/created-by-user")
+        let createdByUserBody = try jsonBody(createdByUser)
+        #expect(createdByUserBody["userId"] as? String == "user-1")
+        #expect(createdByUserBody["spaceId"] as? String == "space-1")
+        #expect(createdByUserBody["cursor"] as? String == "cursor-2")
+        #expect(createdByUserBody["limit"] as? Int == 20)
     }
 
     @Test func buildsFavoriteRequests() throws {

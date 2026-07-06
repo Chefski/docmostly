@@ -57,6 +57,7 @@ nonisolated enum Endpoint: Sendable {
     case pageHistory(pageId: String, cursor: String? = nil, limit: Int = 20)
     case pageHistoryInfo(historyId: String)
     case recentPages(spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
+    case createdByUser(userId: String? = nil, spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
     case favorites(type: FavoriteType? = nil, spaceId: String? = nil, cursor: String? = nil, limit: Int = 20)
     case favoriteIds(type: FavoriteType, spaceId: String? = nil)
     case addFavorite(type: FavoriteType, pageId: String? = nil, spaceId: String? = nil, templateId: String? = nil)
@@ -226,6 +227,8 @@ nonisolated enum Endpoint: Sendable {
             "pages/history/info"
         case .recentPages:
             "pages/recent"
+        case .createdByUser:
+            "pages/created-by-user"
         case .favorites:
             "favorites"
         case .favoriteIds:
@@ -423,6 +426,13 @@ nonisolated enum Endpoint: Sendable {
             return try encode(PageHistoryInfoRequest(historyId: historyId))
         case .recentPages(let spaceId, let cursor, let limit):
             return try encode(RecentPagesRequest(spaceId: spaceId, cursor: cursor, limit: limit))
+        case .createdByUser(let userId, let spaceId, let cursor, let limit):
+            return try encode(CreatedByUserRequest(
+                userId: userId,
+                spaceId: spaceId,
+                cursor: cursor,
+                limit: limit
+            ))
         case .favorites(let type, let spaceId, let cursor, let limit):
             return try encode(FavoritesRequest(
                 type: type?.rawValue,
@@ -739,6 +749,13 @@ nonisolated private struct DuplicatePageRequest: Encodable {
 }
 
 nonisolated private struct RecentPagesRequest: Encodable {
+    let spaceId: String?
+    let cursor: String?
+    let limit: Int
+}
+
+nonisolated private struct CreatedByUserRequest: Encodable {
+    let userId: String?
     let spaceId: String?
     let cursor: String?
     let limit: Int
