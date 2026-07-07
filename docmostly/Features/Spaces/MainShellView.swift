@@ -13,7 +13,7 @@ struct MainShellView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .task {
-            await appState.loadSpaces()
+            await loadSpacesIfNeeded()
         }
         #else
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -25,8 +25,13 @@ struct MainShellView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .task {
-            await appState.loadSpaces()
+            await loadSpacesIfNeeded()
         }
         #endif
+    }
+
+    private func loadSpacesIfNeeded() async {
+        guard appState.spaces.isEmpty else { return }
+        await appState.loadSpaces()
     }
 }

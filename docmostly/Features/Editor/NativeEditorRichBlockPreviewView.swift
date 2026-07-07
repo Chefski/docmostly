@@ -6,6 +6,7 @@ struct NativeEditorRichBlockPreviewView: View {
     var richBlockActions: NativeEditorRichBlockEditingActions?
     let pageID: String
     let spaceID: String?
+    var serverURLString: String?
 
     var body: some View {
         switch block.kind {
@@ -19,9 +20,7 @@ struct NativeEditorRichBlockPreviewView: View {
                     Divider()
                 }
         case .divider:
-            Divider()
-                .padding(.vertical)
-                .accessibilityLabel("Divider")
+            NativeEditorHorizontalRuleView()
         case .table(let table):
             if let tableActions {
                 NativeEditorTableEditor(blockID: block.id, table: table, actions: tableActions)
@@ -75,35 +74,11 @@ struct NativeEditorRichBlockPreviewView: View {
                 }
             }
         case .callout(let callout):
-            previewShell(
-                systemImage: calloutSystemImage(for: callout.style),
-                title: "\(callout.style.capitalized) callout",
-                subtitle: callout.previewText
-            ) {
-                if let richBlockActions {
-                    NativeEditorCalloutEditor(blockID: block.id, callout: callout, actions: richBlockActions)
-                }
-            }
+            NativeEditorCalloutBlockView(blockID: block.id, callout: callout, actions: richBlockActions)
         case .details(let details):
-            previewShell(
-                systemImage: details.isOpen ? "chevron.down.circle" : "chevron.right.circle",
-                title: details.summary.isEmpty ? "Toggle block" : details.summary,
-                subtitle: details.previewText
-            ) {
-                if let richBlockActions {
-                    NativeEditorDetailsEditor(blockID: block.id, details: details, actions: richBlockActions)
-                }
-            }
+            NativeEditorDetailsBlockView(blockID: block.id, details: details, actions: richBlockActions)
         case .columns(let columns):
-            previewShell(
-                systemImage: columnsSystemImage(for: columns.columnCount),
-                title: "Columns",
-                subtitle: columns.previewText
-            ) {
-                if let richBlockActions {
-                    NativeEditorColumnsEditor(blockID: block.id, columns: columns, actions: richBlockActions)
-                }
-            }
+            NativeEditorColumnsBlockView(blockID: block.id, columns: columns, actions: richBlockActions)
         case .subpages:
             previewShell(systemImage: "doc.on.doc", title: "Subpages", subtitle: nil) {
                 NativeEditorSubpagesView(pageID: pageID, spaceID: spaceID)
@@ -139,49 +114,27 @@ struct NativeEditorRichBlockPreviewView: View {
                 subtitle: base.pageID ?? "Base page pending"
             )
         case .embed(let embed):
-            previewShell(
-                systemImage: "rectangle.connected.to.line.below",
-                title: embed.provider ?? "Embed",
-                subtitle: embed.source
-            ) {
-                if let richBlockActions {
-                    NativeEditorEmbedEditor(blockID: block.id, embed: embed, actions: richBlockActions)
-                }
-            }
+            NativeEditorEmbedBlockView(blockID: block.id, embed: embed, actions: richBlockActions)
         case .drawio(let diagram):
-            previewShell(
+            NativeEditorDiagramBlockView(
+                blockID: block.id,
+                diagram: diagram,
+                title: "Draw.io diagram",
                 systemImage: "flowchart",
-                title: diagram.title ?? "Draw.io diagram",
-                subtitle: diagram.alternativeText ?? diagram.source
-            ) {
-                if let richBlockActions {
-                    NativeEditorDiagramEditor(
-                        blockID: block.id,
-                        diagram: diagram,
-                        update: richBlockActions.updateDrawio
-                    )
-                }
-            }
+                serverURLString: serverURLString,
+                update: richBlockActions?.updateDrawio
+            )
         case .excalidraw(let diagram):
-            previewShell(
+            NativeEditorDiagramBlockView(
+                blockID: block.id,
+                diagram: diagram,
+                title: "Excalidraw diagram",
                 systemImage: "scribble.variable",
-                title: diagram.title ?? "Excalidraw diagram",
-                subtitle: diagram.alternativeText ?? diagram.source
-            ) {
-                if let richBlockActions {
-                    NativeEditorDiagramEditor(
-                        blockID: block.id,
-                        diagram: diagram,
-                        update: richBlockActions.updateExcalidraw
-                    )
-                }
-            }
+                serverURLString: serverURLString,
+                update: richBlockActions?.updateExcalidraw
+            )
         case .mathBlock(let math):
-            previewShell(systemImage: "function", title: "Math equation", subtitle: math.text) {
-                if let richBlockActions {
-                    NativeEditorMathBlockEditor(blockID: block.id, math: math, actions: richBlockActions)
-                }
-            }
+            NativeEditorMathBlockView(blockID: block.id, math: math, actions: richBlockActions)
         case .unsupported:
             NativeEditorUnsupportedBlockView(block: block)
         case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
@@ -223,11 +176,12 @@ struct NativeEditorRichBlockPreviewView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.24), in: .rect(cornerRadius: 8))
+        .background(.quaternary.opacity(0.18), in: .rect(cornerRadius: 10))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(.quaternary, lineWidth: 1)
         }
+        .glassEffect(.regular.tint(.white.opacity(0.08)), in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(block.kind.accessibilityLabel)
     }
@@ -237,29 +191,4 @@ struct NativeEditorRichBlockPreviewView: View {
         return ByteCountFormatStyle(style: .file).format(Int64(size))
     }
 
-    private func calloutSystemImage(for style: String) -> String {
-        switch style {
-        case "note":
-            "note.text"
-        case "warning":
-            "exclamationmark.triangle"
-        case "success":
-            "checkmark.circle"
-        case "danger", "error":
-            "xmark.octagon"
-        case "tip":
-            "lightbulb"
-        default:
-            "info.circle"
-        }
-    }
-
-    private func columnsSystemImage(for columnCount: Int) -> String {
-        switch columnCount {
-        case 3...:
-            "rectangle.split.3x1"
-        default:
-            "rectangle.split.2x1"
-        }
-    }
 }

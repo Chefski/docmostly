@@ -4,11 +4,12 @@ struct NativeEditorBodyView: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
+    var serverURLString: String?
     var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
     var applyCommand: ((NativeEditorCommand) -> Void)?
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 10) {
+        LazyVStack(alignment: .leading, spacing: 6) {
             TextField("Page title", text: $viewModel.title, axis: .vertical)
                 .font(.largeTitle)
                 .bold()
@@ -51,6 +52,7 @@ struct NativeEditorBodyView: View {
                         richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
                         pageID: viewModel.currentPageID,
                         spaceID: viewModel.currentSpaceID,
+                        serverURLString: serverURLString,
                         focusBlock: {
                             guard authoringIsAvailable else { return }
                             viewModel.focus(blockID: block.id)

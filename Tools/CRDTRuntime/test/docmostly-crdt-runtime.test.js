@@ -1,12 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as Y from "yjs";
-import { yDocToProsemirrorJSON } from "y-prosemirror";
+import {
+  initProseMirrorDoc,
+  updateYFragment,
+  yDocToProsemirrorJSON
+} from "y-prosemirror";
+import { Schema } from "@tiptap/pm/model";
 import "../src/docmostly-crdt-runtime.js";
 
 const fragmentName = "default";
+const schema = new Schema({
+  nodes: {
+    doc: { content: "block+" },
+    text: { group: "inline" },
+    paragraph: {
+      group: "block",
+      content: "inline*",
+      attrs: { textAlign: { default: null } }
+    }
+  },
+  marks: {}
+});
 
-test("seeds the initial document into Yjs state without broadcasting it as a local update", () => {
+test("starts with empty Yjs state without broadcasting fetched page content", () => {
   const document = globalThis.docmostlyCRDT.createDocument({
     pageID: "page-1",
     title: "Page",
@@ -15,15 +32,13 @@ test("seeds the initial document into Yjs state without broadcasting it as a loc
 
   assert.deepEqual(document.drainLocalUpdates(), []);
 
-  const emptyStateVector = base64FromBytes(Y.encodeStateVector(new Y.Doc()));
-  const update = document.encodeStateAsUpdate(emptyStateVector);
-  const ydoc = new Y.Doc();
-  Y.applyUpdate(ydoc, bytesFromBase64(update));
-
-  assert.deepEqual(yDocToProsemirrorJSON(ydoc, fragmentName), paragraphDocument("Seed"));
+  assert.equal(
+    document.encodeStateVector(),
+    base64FromBytes(Y.encodeStateVector(new Y.Doc()))
+  );
 });
 
-test("seeds independent documents with shared Yjs state so later updates replace the seed", () => {
+test("applies remote document update to empty native state", () => {
   const firstDocument = globalThis.docmostlyCRDT.createDocument({
     pageID: "page-1",
     title: "Page",
@@ -52,22 +67,21 @@ test("seeds independent documents with shared Yjs state so later updates replace
   }]);
 });
 
-test("does not duplicate seed content when another seeded document syncs initial state", () => {
-  const firstDocument = globalThis.docmostlyCRDT.createDocument({
+test("does not duplicate content when syncing with server-converted ydoc", () => {
+  const nativeDocument = globalThis.docmostlyCRDT.createDocument({
     pageID: "page-1",
     title: "Page",
     document: paragraphDocument("Seed")
   });
-  const secondDocument = globalThis.docmostlyCRDT.createDocument({
-    pageID: "page-1",
-    title: "Page",
-    document: paragraphDocument("Seed")
-  });
+  const serverDocument = serverYDocFromJSON(paragraphDocument("Seed"));
 
-  const emptyStateVector = base64FromBytes(Y.encodeStateVector(new Y.Doc()));
-  secondDocument.applyRemoteUpdate(firstDocument.encodeStateAsUpdate(emptyStateVector));
+  const serverUpdate = base64FromBytes(Y.encodeStateAsUpdate(
+    serverDocument,
+    bytesFromBase64(nativeDocument.encodeStateVector())
+  ));
+  nativeDocument.applyRemoteUpdate(serverUpdate);
 
-  assert.deepEqual(secondDocument.drainDocumentSnapshots(), [{
+  assert.deepEqual(nativeDocument.drainDocumentSnapshots(), [{
     title: "Page",
     document: paragraphDocument("Seed"),
     updatedAt: null
@@ -81,6 +95,25 @@ function paragraphDocument(text) {
       type: "paragraph",
       content: [{ type: "text", text }]
     }]
+  };
+}
+
+function serverYDocFromJSON(document) {
+  const ydoc = new Y.Doc();
+  const fragment = ydoc.getXmlFragment(fragmentName);
+  const nextDoc = schema.nodeFromJSON(document);
+  const transactionTarget = {
+    transact: (operation) => ydoc.transact(operation)
+  };
+  updateYFragment(transactionTarget, fragment, nextDoc, mappingStateFor(fragment));
+  return ydoc;
+}
+
+function mappingStateFor(fragment) {
+  const state = initProseMirrorDoc(fragment, schema);
+  return {
+    mapping: state.mapping,
+    isOMark: state.meta.isOMark
   };
 }
 

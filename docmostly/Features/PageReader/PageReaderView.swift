@@ -74,6 +74,7 @@ struct PageReaderView: View {
                             viewModel: editorViewModel,
                             focusedField: $editorFocusedField,
                             isAuthoringEnabled: readerMode == .edit,
+                            serverURLString: appState.serverURLString,
                             importAttachment: beginAttachmentImport,
                             applyCommand: applyEditorCommand
                         )
@@ -92,7 +93,9 @@ struct PageReaderView: View {
             .scrollTargetLayout()
         }
         .scrollPosition($scrollPosition)
+        #if os(iOS)
         .safeAreaPadding(.bottom, 72)
+        #endif
         .navigationTitle(navigationChromeTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -100,6 +103,7 @@ struct PageReaderView: View {
         .toolbar {
             pageReaderToolbar
         }
+        #if os(iOS)
         .safeAreaInset(edge: .bottom) {
             if let editorViewModel, readerMode == .edit, editorViewModel.isEditing, editorViewModel.canEdit {
                 VStack(spacing: 6) {
@@ -127,6 +131,7 @@ struct PageReaderView: View {
                 }
             }
         }
+        #endif
         .fileImporter(
             isPresented: $isShowingAttachmentImporter,
             allowedContentTypes: attachmentAllowedContentTypes,

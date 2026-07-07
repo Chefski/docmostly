@@ -9,7 +9,8 @@ struct NativeEditorBlockPrefix: View {
             case .bulletListItem:
                 Text("•")
             case .orderedListItem(let ordinal):
-                Text(ordinal.formatted())
+                Text("\(ordinal.formatted()).")
+                    .monospacedDigit()
             case .taskListItem(let isChecked):
                 Button(
                     isChecked ? "Mark Incomplete" : "Mark Complete",
@@ -19,12 +20,7 @@ struct NativeEditorBlockPrefix: View {
                 }
                 .labelStyle(.iconOnly)
                 .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)
-            case .blockquote:
-                Image(systemName: "quote.opening")
-                    .accessibilityHidden(true)
-            case .codeBlock:
-                Image(systemName: "curlybraces")
-                    .accessibilityHidden(true)
+                .buttonStyle(.plain)
             case .unsupported:
                 Image(systemName: "lock")
                     .accessibilityHidden(true)
@@ -34,6 +30,6 @@ struct NativeEditorBlockPrefix: View {
         }
         .font(.body)
         .foregroundStyle(.secondary)
-        .padding(.top, 10)
+        .frame(width: 28, alignment: .center)
     }
 }
