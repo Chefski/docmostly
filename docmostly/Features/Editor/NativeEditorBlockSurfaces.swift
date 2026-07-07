@@ -215,7 +215,8 @@ struct NativeEditorDiagramBlockView: View {
         VStack(alignment: .leading, spacing: 10) {
             if let sourceURL {
                 NativeEditorWebEmbedView(
-                    html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle)
+                    html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle),
+                    allowedHosts: Set([sourceURL.host()?.lowercased()].compactMap(\.self))
                 )
                 .frame(minHeight: 260)
                 .clipShape(.rect(cornerRadius: 10))
@@ -279,24 +280,10 @@ struct NativeEditorDiagramBlockView: View {
     }
 
     private var sourceURL: URL? {
-        guard let source = diagram.source?.trimmingCharacters(in: .whitespacesAndNewlines),
-              source.isEmpty == false
-        else {
-            return nil
-        }
-
-        if let absoluteURL = URL(string: source),
-           absoluteURL.scheme?.isEmpty == false {
-            return absoluteURL
-        }
-
-        guard let serverURLString,
-              let serverURL = URL(string: serverURLString)
-        else {
-            return nil
-        }
-
-        return URL(string: source, relativeTo: serverURL)?.absoluteURL
+        NativeEditorWebURLPolicy.documentResourceURL(
+            from: diagram.source,
+            serverURLString: serverURLString
+        )
     }
 }
 

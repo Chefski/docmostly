@@ -103,7 +103,6 @@ struct PageReaderView: View {
         .toolbar {
             pageReaderToolbar
         }
-        #if os(iOS)
         .safeAreaInset(edge: .bottom) {
             if let editorViewModel, readerMode == .edit, editorViewModel.isEditing, editorViewModel.canEdit {
                 VStack(spacing: 6) {
@@ -131,7 +130,6 @@ struct PageReaderView: View {
                 }
             }
         }
-        #endif
         .fileImporter(
             isPresented: $isShowingAttachmentImporter,
             allowedContentTypes: attachmentAllowedContentTypes,

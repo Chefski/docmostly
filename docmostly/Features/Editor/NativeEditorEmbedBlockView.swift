@@ -11,6 +11,7 @@ struct NativeEditorEmbedBlockView: View {
         VStack(alignment: .leading, spacing: 10) {
             if let youtubeSource = embed.youtubePlayerSource {
                 NativeEditorYouTubeEmbedView(source: youtubeSource)
+                    .id(youtubeSource)
             } else if let spotifyURL = embed.spotifyEmbedURL {
                 NativeEditorSpotifyEmbedView(url: spotifyURL)
             } else {
@@ -66,7 +67,8 @@ private struct NativeEditorSpotifyEmbedView: View {
 
     var body: some View {
         NativeEditorWebEmbedView(
-            html: NativeEditorWebEmbedHTML.iframeHTML(source: url, title: "Spotify embed")
+            html: NativeEditorWebEmbedHTML.iframeHTML(source: url, title: "Spotify embed"),
+            allowedHosts: ["open.spotify.com"]
         )
         .frame(minHeight: 180)
         .clipShape(.rect(cornerRadius: 10))
@@ -117,8 +119,7 @@ private struct NativeEditorGenericEmbedView: View {
     }
 
     private var sourceURL: URL? {
-        guard let source = embed.source else { return nil }
-        return URL(string: source)
+        NativeEditorWebURLPolicy.webURL(from: embed.source)
     }
 }
 
@@ -206,13 +207,15 @@ enum NativeEditorWebEmbedHTML {
 #if os(iOS)
 struct NativeEditorWebEmbedView: UIViewRepresentable {
     let html: String
+    let allowedHosts: Set<String>
 
     func makeCoordinator() -> NativeEditorWebEmbedCoordinator {
-        NativeEditorWebEmbedCoordinator()
+        NativeEditorWebEmbedCoordinator(allowedHosts: allowedHosts)
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = false
@@ -220,35 +223,57 @@ struct NativeEditorWebEmbedView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.allowedHosts = allowedHosts
         context.coordinator.load(html: html, in: webView)
     }
 }
 #elseif os(macOS)
 struct NativeEditorWebEmbedView: NSViewRepresentable {
     let html: String
+    let allowedHosts: Set<String>
 
     func makeCoordinator() -> NativeEditorWebEmbedCoordinator {
-        NativeEditorWebEmbedCoordinator()
+        NativeEditorWebEmbedCoordinator(allowedHosts: allowedHosts)
     }
 
     func makeNSView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.allowedHosts = allowedHosts
         context.coordinator.load(html: html, in: webView)
     }
 }
 #endif
 
-final class NativeEditorWebEmbedCoordinator {
+final class NativeEditorWebEmbedCoordinator: NSObject, WKNavigationDelegate {
+    var allowedHosts: Set<String>
     private var loadedHTML: String?
+
+    init(allowedHosts: Set<String>) {
+        self.allowedHosts = allowedHosts
+        super.init()
+    }
 
     func load(html: String, in webView: WKWebView) {
         guard loadedHTML != html else { return }
         loadedHTML = html
         webView.loadHTMLString(html, baseURL: nil)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        let isAllowed = NativeEditorWebURLPolicy.allowsNavigation(
+            to: navigationAction.request.url,
+            allowedHosts: allowedHosts
+        )
+        decisionHandler(isAllowed ? .allow : .cancel)
     }
 }

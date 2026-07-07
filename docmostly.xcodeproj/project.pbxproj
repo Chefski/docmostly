@@ -265,6 +265,7 @@
 			);
 			name = docmostly;
 			packageProductDependencies = (
+				E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */,
 			);
 			productName = docmostly;
 			productReference = 47D95DD22FE294E500ECEA87 /* docmostly.app */;

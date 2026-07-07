@@ -85,6 +85,61 @@ struct NativeEditorEmbedPresentationTests {
         #expect(embed.youtubePlayerSource == "https://www.youtube.com/watch?v=DTUDPMmy6IU")
     }
 
+    @Test func preservesYouTubeStartParametersInPlayerSource() {
+        #expect(
+            NativeEditorEmbedResolver.youtubeWatchSource(
+                from: "https://www.youtube.com/watch?v=DTUDPMmy6IU&start=90"
+            ) == "https://www.youtube.com/watch?v=DTUDPMmy6IU&start=90"
+        )
+        #expect(
+            NativeEditorEmbedResolver.youtubeWatchSource(
+                from: "https://youtu.be/DTUDPMmy6IU?t=1m30s"
+            ) == "https://www.youtube.com/watch?v=DTUDPMmy6IU&t=1m30s"
+        )
+    }
+
+    @Test func genericWebEmbedLinksRejectNonWebSchemes() {
+        #expect(NativeEditorWebURLPolicy.webURL(from: "https://docs.example.com/embed") != nil)
+        #expect(NativeEditorWebURLPolicy.webURL(from: "http://docs.example.com/embed") != nil)
+        #expect(NativeEditorWebURLPolicy.webURL(from: "file:///etc/passwd") == nil)
+        #expect(NativeEditorWebURLPolicy.webURL(from: "docmostly://page/1") == nil)
+    }
+
+    @Test func documentResourcesStayOnServerOrigin() {
+        let serverURLString = "https://docs.example.com"
+
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
+                from: "/uploads/diagram.svg",
+                serverURLString: serverURLString
+            )?.absoluteString == "https://docs.example.com/uploads/diagram.svg"
+        )
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
+                from: "https://docs.example.com/uploads/diagram.svg",
+                serverURLString: serverURLString
+            )?.absoluteString == "https://docs.example.com/uploads/diagram.svg"
+        )
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
+                from: "https://evil.example.com/uploads/diagram.svg",
+                serverURLString: serverURLString
+            ) == nil
+        )
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
+                from: "file:///etc/passwd",
+                serverURLString: serverURLString
+            ) == nil
+        )
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
+                from: "//evil.example.com/uploads/diagram.svg",
+                serverURLString: serverURLString
+            ) == nil
+        )
+    }
+
     private func columnNode(_ text: String) -> ProseMirrorNode {
         ProseMirrorNode(
             type: "column",

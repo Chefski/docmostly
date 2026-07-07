@@ -25,8 +25,14 @@ nonisolated enum NativeEditorEmbedResolver {
     }
 
     static func youtubeWatchSource(from source: String?) -> String? {
-        guard let videoID = youtubeVideoID(from: source) else { return nil }
-        return "https://www.youtube.com/watch?v=\(videoID)"
+        guard let video = youtubeVideo(from: source) else { return nil }
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "www.youtube.com"
+        components.path = "/watch"
+        components.queryItems = [URLQueryItem(name: "v", value: video.id)] + video.timeQueryItems
+        return components.url?.absoluteString
     }
 
     static func spotifyEmbedURL(from source: String?) -> URL? {
@@ -53,7 +59,7 @@ nonisolated enum NativeEditorEmbedResolver {
     }
 
     private static func inferredProvider(from source: String?) -> String? {
-        if youtubeVideoID(from: source) != nil {
+        if youtubeVideo(from: source) != nil {
             return "YouTube"
         }
 
@@ -64,7 +70,7 @@ nonisolated enum NativeEditorEmbedResolver {
         return nil
     }
 
-    private static func youtubeVideoID(from source: String?) -> String? {
+    private static func youtubeVideo(from source: String?) -> YouTubeVideo? {
         guard
             let source,
             let components = URLComponents(string: source),
@@ -75,7 +81,9 @@ nonisolated enum NativeEditorEmbedResolver {
 
         let normalizedHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         if normalizedHost == "youtu.be" {
-            return nonEmptyVideoID(String(components.path.dropFirst()))
+            return nonEmptyVideoID(String(components.path.dropFirst())).map {
+                YouTubeVideo(id: $0, timeQueryItems: youtubeTimeQueryItems(from: components))
+            }
         }
 
         guard normalizedHost == "youtube.com" || normalizedHost == "youtube-nocookie.com" else {
@@ -83,18 +91,45 @@ nonisolated enum NativeEditorEmbedResolver {
         }
 
         if components.path.hasPrefix("/embed/") {
-            return nonEmptyVideoID(String(components.path.dropFirst("/embed/".count)))
+            return nonEmptyVideoID(String(components.path.dropFirst("/embed/".count))).map {
+                YouTubeVideo(id: $0, timeQueryItems: youtubeTimeQueryItems(from: components))
+            }
         }
 
         if components.path == "/watch" {
-            return components.queryItems?.first { $0.name == "v" }?.value.flatMap(nonEmptyVideoID)
+            return components.queryItems?
+                .first { $0.name == "v" }?
+                .value
+                .flatMap(nonEmptyVideoID)
+                .map {
+                    YouTubeVideo(id: $0, timeQueryItems: youtubeTimeQueryItems(from: components))
+                }
         }
 
         return nil
     }
 
+    private static func youtubeTimeQueryItems(from components: URLComponents) -> [URLQueryItem] {
+        let supportedNames: Set<String> = ["start", "t"]
+        return components.queryItems?.compactMap { item in
+            guard supportedNames.contains(item.name),
+                  let value = item.value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  value.isEmpty == false
+            else {
+                return nil
+            }
+
+            return URLQueryItem(name: item.name, value: value)
+        } ?? []
+    }
+
     private static func nonEmptyVideoID(_ value: String) -> String? {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    private struct YouTubeVideo {
+        let id: String
+        let timeQueryItems: [URLQueryItem]
     }
 }
