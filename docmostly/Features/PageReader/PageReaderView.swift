@@ -90,6 +90,8 @@ struct PageReaderView: View {
             }
             .padding()
             .frame(maxWidth: usesFullWidth ? .infinity : 900, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .animation(.spring(response: 0.28, dampingFraction: 0.9), value: usesFullWidth)
             .scrollTargetLayout()
         }
         .scrollPosition($scrollPosition)

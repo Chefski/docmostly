@@ -37,12 +37,18 @@ struct NativeEditorBlockRow: View {
                         .draggable(block.id.uuidString)
 
                     if hasVisiblePrefix {
-                        NativeEditorBlockPrefix(block: $block)
+                        NativeEditorBlockPrefix(
+                            block: $block,
+                            allowsTaskToggle: NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: isReadOnly)
+                        )
                             .frame(width: 24, alignment: .center)
                     }
                 }
             } else if hasVisiblePrefix {
-                NativeEditorBlockPrefix(block: $block)
+                NativeEditorBlockPrefix(
+                    block: $block,
+                    allowsTaskToggle: NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: isReadOnly)
+                )
                     .frame(width: 24, alignment: .center)
             }
 
@@ -145,9 +151,7 @@ struct NativeEditorBlockRow: View {
     }
 
     private var showsEditableTextEditor: Bool {
-        block.isEditable &&
-            isReadOnly == false &&
-            (focusedField.wrappedValue == .block(block.id) || block.text.characters.isEmpty)
+        NativeEditorBlockRowPolicy.showsEditableTextEditor(block: block, isReadOnly: isReadOnly)
     }
 
     private var showsControls: Bool {
