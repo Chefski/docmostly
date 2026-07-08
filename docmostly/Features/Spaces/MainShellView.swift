@@ -21,9 +21,11 @@ struct MainShellView: View {
         }
         .task(id: commandController.spaceSettingsPresentationRequestID) {
             guard commandController.spaceSettingsPresentationRequestID != nil else { return }
-            await loadSpacesIfNeeded()
+            defer {
+                commandController.clearSpaceSettingsPresentationRequest()
+            }
+            guard await appState.loadSpaces() else { return }
             showSpaceSettings()
-            commandController.clearSpaceSettingsPresentationRequest()
         }
         .sheet(isPresented: $isShowingSpaceSettings) {
             if let selectedSpace {

@@ -30,7 +30,7 @@ final class AppState {
     @ObservationIgnored var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
     @ObservationIgnored private var restoreTask: Task<Void, Never>?
-    @ObservationIgnored private var spacesLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
     @ObservationIgnored var offlineReplayTask: Task<Void, Never>?
@@ -216,25 +216,25 @@ final class AppState {
         phase = .unauthenticated
     }
 
-    func loadSpaces() async {
+    @discardableResult func loadSpaces() async -> Bool {
         if let spacesLoadTask {
-            await spacesLoadTask.value
-            return
+            return await spacesLoadTask.value
         }
 
         let task = Task { [weak self] in
-            guard let self else { return }
-            await self.performLoadSpaces()
+            guard let self else { return false }
+            return await self.performLoadSpaces()
         }
         spacesLoadTask = task
-        await task.value
+        let loadedFromServer = await task.value
         spacesLoadTask = nil
+        return loadedFromServer
     }
 
-    private func performLoadSpaces() async {
+    private func performLoadSpaces() async -> Bool {
         guard let apiClient else {
             await loadCachedSpaces()
-            return
+            return false
         }
 
         do {
@@ -247,14 +247,16 @@ final class AppState {
             }
             await refreshOfflineMutationCount()
             scheduleOfflineQueueReconciliation()
+            return true
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else {
                 spaces = []
-                return
+                return false
             }
             await loadCachedSpaces()
+            return false
         }
     }
 
