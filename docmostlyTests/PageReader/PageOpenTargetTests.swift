@@ -15,7 +15,10 @@ struct PageOpenTargetTests {
     }
 
     @Test func browserItemTargetUsesItemRouteData() {
-        let item = PageBrowserItem(page: page(id: "page-1", slugId: "roadmap", spaceId: "space-1"), fallbackSpaceName: "Product")
+        let item = PageBrowserItem(
+            page: page(id: "page-1", slugId: "roadmap", spaceId: "space-1"),
+            fallbackSpaceName: "Product"
+        )
 
         let target = PageOpenTarget(item: item)
 

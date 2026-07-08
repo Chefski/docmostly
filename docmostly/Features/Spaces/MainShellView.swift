@@ -49,7 +49,6 @@ struct MainShellView: View {
     }
 
     private func loadSpacesIfNeeded() async {
-        guard appState.spaces.isEmpty else { return }
         await appState.loadSpaces()
     }
 

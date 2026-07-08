@@ -66,8 +66,26 @@ nonisolated enum NativeEditorWebURLPolicy {
     }
 
     private static func sameOrigin(_ url: URL, as serverURL: URL) -> Bool {
-        url.scheme?.lowercased() == serverURL.scheme?.lowercased()
+        let urlScheme = url.scheme?.lowercased()
+        let serverScheme = serverURL.scheme?.lowercased()
+
+        return urlScheme == serverScheme
             && url.host()?.lowercased() == serverURL.host()?.lowercased()
-            && url.port == serverURL.port
+            && effectivePort(for: url, scheme: urlScheme) == effectivePort(for: serverURL, scheme: serverScheme)
+    }
+
+    private static func effectivePort(for url: URL, scheme: String?) -> Int? {
+        if let port = url.port {
+            return port
+        }
+
+        switch scheme {
+        case "http":
+            return 80
+        case "https":
+            return 443
+        default:
+            return nil
+        }
     }
 }

@@ -122,6 +122,12 @@ struct NativeEditorEmbedPresentationTests {
         )
         #expect(
             NativeEditorWebURLPolicy.documentResourceURL(
+                from: "https://docs.example.com:443/uploads/diagram.svg",
+                serverURLString: serverURLString
+            )?.absoluteString == "https://docs.example.com:443/uploads/diagram.svg"
+        )
+        #expect(
+            NativeEditorWebURLPolicy.documentResourceURL(
                 from: "https://evil.example.com/uploads/diagram.svg",
                 serverURLString: serverURLString
             ) == nil
