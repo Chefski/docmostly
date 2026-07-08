@@ -12,38 +12,60 @@ extension PageReaderView {
         editorFocusedField = nil
         realtimePageID = nil
         editorViewModel = nil
-        let editorViewModel = NativeRichEditorViewModel(pageID: pageID)
 
-        await editorViewModel.load(appState: appState)
-        guard Task.isCancelled == false else { return }
+        for attempt in 0..<2 {
+            let editorViewModel = NativeRichEditorViewModel(pageID: pageID, initialTitle: initialTitle ?? "")
+            let didLoadPage = await editorViewModel.load(appState: appState)
+            guard Task.isCancelled == false else { return }
 
-        if editorViewModel.errorMessage == nil {
-            self.editorViewModel = editorViewModel
-            if let currentSpaceID = editorViewModel.currentSpaceID {
-                pageLoaded(editorViewModel.currentPageSlugID, currentSpaceID, editorViewModel.title)
-            }
-            if editorViewModel.canEdit == false {
-                readerMode = .read
-            }
-
-            async let attachCRDT: Void = NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
-                to: editorViewModel,
-                appState: appState
-            )
-            async let loadCompanions: Void = viewModel.loadCompanions(
-                pageID: editorViewModel.currentPageID,
-                appState: appState
-            )
-            await attachCRDT
-            guard Task.isCancelled == false else {
-                await loadCompanions
+            if didLoadPage {
+                await finishNativePageLoad(editorViewModel)
                 return
             }
-            realtimePageID = editorViewModel.currentPageID
-            await loadCompanions
-        } else {
-            self.editorViewModel = editorViewModel
+
+            if editorViewModel.errorMessage != nil {
+                self.editorViewModel = editorViewModel
+                return
+            }
+
+            guard attempt == 0 else {
+                editorViewModel.errorMessage = "Page loading was interrupted."
+                self.editorViewModel = editorViewModel
+                return
+            }
+
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+            } catch {
+                return
+            }
         }
+    }
+
+    private func finishNativePageLoad(_ editorViewModel: NativeRichEditorViewModel) async {
+        self.editorViewModel = editorViewModel
+        if let currentSpaceID = editorViewModel.currentSpaceID {
+            pageLoaded(editorViewModel.currentPageSlugID, currentSpaceID, editorViewModel.title)
+        }
+        if editorViewModel.canEdit == false {
+            readerMode = .read
+        }
+
+        async let attachCRDT: Void = NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
+            to: editorViewModel,
+            appState: appState
+        )
+        async let loadCompanions: Void = viewModel.loadCompanions(
+            pageID: editorViewModel.currentPageID,
+            appState: appState
+        )
+        await attachCRDT
+        guard Task.isCancelled == false else {
+            await loadCompanions
+            return
+        }
+        realtimePageID = editorViewModel.currentPageID
+        await loadCompanions
     }
 
     func autosaveInlineEdits() {

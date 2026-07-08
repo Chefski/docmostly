@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3FEC0B2EC8EF1D5311589C30 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */; };
+		470013002FFD8842006F135C /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */; };
+		BA1551ED7F4ACCE1C5452A4E /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9ED94873D837F0482A6F599C /* YouTubePlayerKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4769951A2FE721BE00A9454F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -98,6 +104,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA1551ED7F4ACCE1C5452A4E /* YouTubePlayerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,6 +112,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				470013002FFD8842006F135C /* YouTubePlayerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +127,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3FEC0B2EC8EF1D5311589C30 /* YouTubePlayerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +195,7 @@
 			);
 			name = DocmostlyMac;
 			packageProductDependencies = (
+				9ED94873D837F0482A6F599C /* YouTubePlayerKit */,
 			);
 			productName = DocmostlyMac;
 			productReference = 4769950B2FE721BC00A9454F /* DocmostlyMac.app */;
@@ -209,6 +219,7 @@
 			);
 			name = DocmostlyMacTests;
 			packageProductDependencies = (
+				E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */,
 			);
 			productName = DocmostlyMacTests;
 			productReference = 476995192FE721BE00A9454F /* DocmostlyMacTests.xctest */;
@@ -254,6 +265,7 @@
 			);
 			name = docmostly;
 			packageProductDependencies = (
+				E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */,
 			);
 			productName = docmostly;
 			productReference = 47D95DD22FE294E500ECEA87 /* docmostly.app */;
@@ -348,6 +360,9 @@
 			);
 			mainGroup = 47D95DC92FE294E500ECEA87;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				29CBB455D32F07D0CAD26246 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 47D95DD32FE294E500ECEA87 /* Products */;
 			projectDirPath = "";
@@ -492,13 +507,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -527,13 +544,15 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -973,6 +992,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		29CBB455D32F07D0CAD26246 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SvenTiigi/YouTubePlayerKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9ED94873D837F0482A6F599C /* YouTubePlayerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 29CBB455D32F07D0CAD26246 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
+			productName = YouTubePlayerKit;
+		};
+		E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 29CBB455D32F07D0CAD26246 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
+			productName = YouTubePlayerKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 47D95DCA2FE294E500ECEA87 /* Project object */;
 }

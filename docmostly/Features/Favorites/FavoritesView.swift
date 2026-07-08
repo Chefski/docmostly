@@ -12,13 +12,7 @@ struct FavoritesView: View {
 
             Section("Favorites") {
                 ForEach(viewModel.favorites) { favorite in
-                    if favorite.targetID == nil {
-                        FavoriteRowView(favorite: favorite)
-                    } else {
-                        NavigationLink(value: favorite) {
-                            FavoriteRowView(favorite: favorite)
-                        }
-                    }
+                    favoriteRow(favorite)
                 }
             }
 
@@ -52,6 +46,40 @@ struct FavoritesView: View {
         }
         .navigationDestination(for: DocmostFavorite.self) { favorite in
             FavoriteDestinationView(favorite: favorite)
+        }
+        .pageOpenDestination()
+    }
+
+    @ViewBuilder
+    private func favoriteRow(_ favorite: DocmostFavorite) -> some View {
+        switch favorite.type {
+        case .page:
+            if let target = PageOpenTarget(favorite: favorite) {
+                PageOpenLink(target: target) {
+                    FavoriteRowView(favorite: favorite)
+                }
+            } else {
+                FavoriteRowView(favorite: favorite)
+            }
+        case .space:
+            if let targetID = favorite.targetID {
+                #if os(macOS)
+                Button {
+                    appState.selectSpace(id: targetID)
+                } label: {
+                    FavoriteRowView(favorite: favorite)
+                }
+                .buttonStyle(.plain)
+                #else
+                NavigationLink(value: favorite) {
+                    FavoriteRowView(favorite: favorite)
+                }
+                #endif
+            } else {
+                FavoriteRowView(favorite: favorite)
+            }
+        case .template:
+            FavoriteRowView(favorite: favorite)
         }
     }
 }

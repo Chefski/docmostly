@@ -142,7 +142,8 @@ final class NativeRichEditorViewModel {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
-    func load(appState: AppState) async {
+    @discardableResult
+    func load(appState: AppState) async -> Bool {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -161,8 +162,13 @@ final class NativeRichEditorViewModel {
             markRemoteBaseline(updatedAt: page.updatedAt)
             applyPagePermissions(page.permissions)
             isDirty = false
+            return true
         } catch {
+            guard Self.isCancelledLoadError(error) == false else {
+                return false
+            }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -215,6 +221,19 @@ final class NativeRichEditorViewModel {
         Task {
             await load(appState: appState)
         }
+    }
+
+    static func isCancelledLoadError(_ error: any Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return true
+        }
+
+        return false
     }
 
     func focusTitle() {

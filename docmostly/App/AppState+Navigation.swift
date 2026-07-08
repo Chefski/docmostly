@@ -40,6 +40,14 @@ extension AppState {
         selectedPageID = pageID
     }
 
+    func openPage(_ target: PageOpenTarget) {
+        selectPage(
+            id: target.slugId,
+            spaceID: target.spaceId,
+            revealSpaceInSidebar: target.revealSpaceInSidebar
+        )
+    }
+
     func clearSelectedPage() {
         selectedPageID = nil
     }

@@ -40,9 +40,9 @@ struct MacWorkspaceSidebarView: View {
                     MacSidebarActionRow(
                         title: "Space settings",
                         systemImage: "gearshape",
-                        isSelected: selectionState.isUtilitySelected(.settings)
+                        isSelected: false
                     ) {
-                        appState.selectSidebarUtilityDestination(.settings)
+                        showSpaceSettings()
                     }
 
                     MacSidebarActionRow(
@@ -255,7 +255,8 @@ struct MacWorkspaceSidebarView: View {
     }
 
     private func showSpaceSettings() {
-        appState.selectSidebarUtilityDestination(.settings)
+        guard selectedSpace != nil else { return }
+        commandController.requestSpaceSettingsPresentation()
     }
 }
 

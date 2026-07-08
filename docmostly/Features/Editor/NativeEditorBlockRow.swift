@@ -14,6 +14,7 @@ struct NativeEditorBlockRow: View {
     let richBlockActions: NativeEditorRichBlockEditingActions?
     let pageID: String
     let spaceID: String?
+    let serverURLString: String?
     let focusBlock: () -> Void
     let moveBefore: (UUID) -> Void
     let blockChanged: () -> Void
@@ -21,7 +22,7 @@ struct NativeEditorBlockRow: View {
     let dropText: (String) -> Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             if showsControls {
                 VStack(spacing: 4) {
                     Button(
@@ -36,38 +37,49 @@ struct NativeEditorBlockRow: View {
                         .draggable(block.id.uuidString)
 
                     if hasVisiblePrefix {
-                        NativeEditorBlockPrefix(block: $block)
+                        NativeEditorBlockPrefix(
+                            block: $block,
+                            allowsTaskToggle: NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: isReadOnly)
+                        )
                             .frame(width: 24, alignment: .center)
                     }
                 }
             } else if hasVisiblePrefix {
-                NativeEditorBlockPrefix(block: $block)
+                NativeEditorBlockPrefix(
+                    block: $block,
+                    allowsTaskToggle: NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: isReadOnly)
+                )
                     .frame(width: 24, alignment: .center)
             }
 
             if showsEditableTextEditor {
-                TextEditor(text: $block.text, selection: $block.selection)
-                    .font(block.kind.editorFont)
-                    .scrollContentBackground(.hidden)
-                    .scrollDisabled(true)
-                    .contentMargins(.horizontal, 0, for: .scrollContent)
-                    .contentMargins(.vertical, 0, for: .scrollContent)
-                    .frame(maxWidth: .infinity, minHeight: minimumEditorHeight, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .focused(focusedField, equals: .block(block.id))
-                    .accessibilityLabel(block.kind.accessibilityLabel)
-                    .onChange(of: block.selection) { _, _ in
-                        selectionChanged()
-                    }
+                NativeEditorBlockTextSurface(kind: block.kind) {
+                    TextEditor(text: $block.text, selection: $block.selection)
+                        .font(block.kind.editorFont)
+                        .scrollContentBackground(.hidden)
+                        .scrollDisabled(true)
+                        .contentMargins(.horizontal, 0, for: .scrollContent)
+                        .contentMargins(.vertical, 0, for: .scrollContent)
+                        .frame(maxWidth: .infinity, minHeight: minimumEditorHeight, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .focused(focusedField, equals: .block(block.id))
+                        .accessibilityLabel(block.kind.accessibilityLabel)
+                        .onChange(of: block.selection) { _, _ in
+                            selectionChanged()
+                        }
+                }
             } else if block.isEditable && isReadOnly == false {
                 Button(action: focusBlock) {
-                    NativeEditorRichBlockPreviewView(
-                        block: block,
-                        pageID: pageID,
-                        spaceID: spaceID
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
+                    NativeEditorBlockTextSurface(kind: block.kind) {
+                        NativeEditorRichBlockPreviewView(
+                            block: block,
+                            pageID: pageID,
+                            spaceID: spaceID,
+                            serverURLString: serverURLString
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(block.kind.accessibilityLabel)
@@ -75,9 +87,10 @@ struct NativeEditorBlockRow: View {
                 NativeEditorRichBlockPreviewView(
                     block: block,
                     tableActions: tableActions,
-                    richBlockActions: richBlockActions,
+                    richBlockActions: activeRichBlockActions,
                     pageID: pageID,
-                    spaceID: spaceID
+                    spaceID: spaceID,
+                    serverURLString: serverURLString
                 )
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -94,7 +107,7 @@ struct NativeEditorBlockRow: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, rowVerticalPadding)
         .padding(.leading, blockIndentPadding)
         .background {
             (isSelected ? DocmostlyTheme.primaryTint : Color.clear)
@@ -138,9 +151,7 @@ struct NativeEditorBlockRow: View {
     }
 
     private var showsEditableTextEditor: Bool {
-        block.isEditable &&
-            isReadOnly == false &&
-            (focusedField.wrappedValue == .block(block.id) || block.text.characters.isEmpty)
+        NativeEditorBlockRowPolicy.showsEditableTextEditor(block: block, isReadOnly: isReadOnly)
     }
 
     private var showsControls: Bool {
@@ -149,7 +160,7 @@ struct NativeEditorBlockRow: View {
 
     private var hasVisiblePrefix: Bool {
         switch block.kind {
-        case .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock, .unsupported:
+        case .bulletListItem, .orderedListItem, .taskListItem, .unsupported:
             true
         default:
             false
@@ -158,5 +169,20 @@ struct NativeEditorBlockRow: View {
 
     private var blockIndentPadding: CGFloat {
         CGFloat(block.indentLevel) * 22
+    }
+
+    private var rowVerticalPadding: CGFloat {
+        switch block.kind {
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            0
+        case .divider:
+            6
+        default:
+            2
+        }
+    }
+
+    private var activeRichBlockActions: NativeEditorRichBlockEditingActions? {
+        showsControls ? richBlockActions : nil
     }
 }

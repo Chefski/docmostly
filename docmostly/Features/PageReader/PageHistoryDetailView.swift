@@ -33,7 +33,12 @@ struct PageHistoryDetailView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(viewModel.selectedDocument.blocks, id: \.id) { block in
-                            NativeEditorRichBlockPreviewView(block: block, pageID: pageID, spaceID: spaceID)
+                            NativeEditorRichBlockPreviewView(
+                                block: block,
+                                pageID: pageID,
+                                spaceID: spaceID,
+                                serverURLString: appState.serverURLString
+                            )
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NativeEditorBlockPrefix: View {
     @Binding var block: NativeEditorBlock
+    var allowsTaskToggle = true
 
     var body: some View {
         Group {
@@ -9,22 +10,10 @@ struct NativeEditorBlockPrefix: View {
             case .bulletListItem:
                 Text("•")
             case .orderedListItem(let ordinal):
-                Text(ordinal.formatted())
+                Text("\(ordinal.formatted()).")
+                    .monospacedDigit()
             case .taskListItem(let isChecked):
-                Button(
-                    isChecked ? "Mark Incomplete" : "Mark Complete",
-                    systemImage: isChecked ? "checkmark.circle.fill" : "circle"
-                ) {
-                    block.kind = .taskListItem(isChecked: isChecked == false)
-                }
-                .labelStyle(.iconOnly)
-                .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)
-            case .blockquote:
-                Image(systemName: "quote.opening")
-                    .accessibilityHidden(true)
-            case .codeBlock:
-                Image(systemName: "curlybraces")
-                    .accessibilityHidden(true)
+                taskListPrefix(isChecked: isChecked)
             case .unsupported:
                 Image(systemName: "lock")
                     .accessibilityHidden(true)
@@ -34,6 +23,25 @@ struct NativeEditorBlockPrefix: View {
         }
         .font(.body)
         .foregroundStyle(.secondary)
-        .padding(.top, 10)
+        .frame(width: 28, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func taskListPrefix(isChecked: Bool) -> some View {
+        let title = isChecked ? "Mark Incomplete" : "Mark Complete"
+        let systemImage = isChecked ? "checkmark.circle.fill" : "circle"
+
+        if allowsTaskToggle {
+            Button(title, systemImage: systemImage) {
+                block.kind = .taskListItem(isChecked: isChecked == false)
+            }
+            .labelStyle(.iconOnly)
+            .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)
+            .buttonStyle(.plain)
+        } else {
+            Image(systemName: systemImage)
+                .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)
+                .accessibilityLabel(isChecked ? "Complete task" : "Incomplete task")
+        }
     }
 }

@@ -102,7 +102,7 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
         case .base(let base):
             base.pageID == nil ? base.previewText : "Base"
         case .embed(let embed):
-            embed.provider.map { "\($0) embed" } ?? "Embed"
+            "\(embed.displayProvider) embed"
         case .drawio:
             "Draw.io diagram"
         case .excalidraw:

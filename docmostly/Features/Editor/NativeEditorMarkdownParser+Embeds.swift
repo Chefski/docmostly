@@ -338,9 +338,13 @@ extension NativeEditorMarkdownParser {
         from attributes: [String: String],
         linkAttributes: [String: String]
     ) -> NativeEditorEmbedBlock {
-        NativeEditorEmbedBlock(
-            source: nonEmptyHTMLAttribute(attributes["data-src"]) ?? nonEmptyHTMLAttribute(linkAttributes["href"]),
-            provider: nonEmptyHTMLAttribute(attributes["data-provider"]),
+        let source = nonEmptyHTMLAttribute(attributes["data-src"]) ?? nonEmptyHTMLAttribute(linkAttributes["href"])
+        return NativeEditorEmbedBlock(
+            source: source,
+            provider: NativeEditorEmbedResolver.provider(
+                source: source,
+                explicitProvider: nonEmptyHTMLAttribute(attributes["data-provider"])
+            ),
             alignment: nonEmptyHTMLAttribute(attributes["data-align"]),
             width: nonEmptyHTMLAttribute(attributes["data-width"]),
             height: nonEmptyHTMLAttribute(attributes["data-height"])

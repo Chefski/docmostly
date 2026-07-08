@@ -74,6 +74,7 @@ struct PageReaderView: View {
                             viewModel: editorViewModel,
                             focusedField: $editorFocusedField,
                             isAuthoringEnabled: readerMode == .edit,
+                            serverURLString: appState.serverURLString,
                             importAttachment: beginAttachmentImport,
                             applyCommand: applyEditorCommand
                         )
@@ -89,10 +90,14 @@ struct PageReaderView: View {
             }
             .padding()
             .frame(maxWidth: usesFullWidth ? .infinity : 900, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .animation(.spring(response: 0.28, dampingFraction: 0.9), value: usesFullWidth)
             .scrollTargetLayout()
         }
         .scrollPosition($scrollPosition)
+        #if os(iOS)
         .safeAreaPadding(.bottom, 72)
+        #endif
         .navigationTitle(navigationChromeTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

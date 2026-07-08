@@ -3,9 +3,10 @@ import SwiftUI
 #if os(macOS)
 struct MacMainShellDetailView: View {
     @Environment(AppState.self) private var appState
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             if let selectedPageID = appState.selectedPageID {
                 PageReaderView(pageID: selectedPageID)
             } else {
@@ -13,7 +14,24 @@ struct MacMainShellDetailView: View {
             }
         }
         .navigationSplitViewColumnWidth(min: 520, ideal: 900)
+        .onChange(of: navigationResetKey) { _, _ in
+            navigationPath = NavigationPath()
+        }
     }
+
+    private var navigationResetKey: MacMainShellDetailNavigationResetKey {
+        MacMainShellDetailNavigationResetKey(
+            destination: appState.selectedSidebarDestination,
+            selectedSpaceID: appState.selectedSpaceID,
+            selectedPageID: appState.selectedPageID
+        )
+    }
+}
+
+private struct MacMainShellDetailNavigationResetKey: Equatable {
+    let destination: SidebarDestination?
+    let selectedSpaceID: String?
+    let selectedPageID: String?
 }
 
 private struct MacMainShellEmptyPageDetailView: View {
@@ -28,12 +46,7 @@ private struct MacMainShellEmptyPageDetailView: View {
         case .search:
             SearchView()
         case .settings:
-            if let selectedSpace {
-                MacSpaceSettingsDetailView(space: selectedSpace)
-                    .id(selectedSpace.id)
-            } else {
-                ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
-            }
+            SettingsView()
         case .space, nil:
             if let selectedSpace {
                 PageBrowserHomeView(space: selectedSpace)
@@ -51,24 +64,6 @@ private struct MacMainShellEmptyPageDetailView: View {
         }
 
         return appState.spaces.first
-    }
-}
-
-private struct MacSpaceSettingsDetailView: View {
-    @Environment(AppState.self) private var appState
-    @State private var viewModel = SettingsManagementViewModel()
-
-    let space: DocmostSpace
-
-    var body: some View {
-        SpaceSettingsDetailView(space: space, canManage: canManage)
-            .task {
-                viewModel.seed(from: appState)
-            }
-    }
-
-    private var canManage: Bool {
-        viewModel.canManageWorkspace || space.membership?.role == "admin"
     }
 }
 #endif

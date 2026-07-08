@@ -5,6 +5,14 @@ import Testing
 
 @MainActor
 struct NativeRichEditorViewModelTests {
+    @Test func cancelledLoadErrorsAreNotFatalPageErrors() {
+        let urlCancellation = URLError(.cancelled)
+
+        #expect(NativeRichEditorViewModel.isCancelledLoadError(CancellationError()) == true)
+        #expect(NativeRichEditorViewModel.isCancelledLoadError(urlCancellation) == true)
+        #expect(NativeRichEditorViewModel.isCancelledLoadError(APIError.connectionFailed("offline")) == false)
+    }
+
     @Test func togglesInlineMarkAcrossActiveBlockWhenSelectionIsMissing() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Native editor"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")

@@ -22,12 +22,12 @@ struct NotificationListView: View {
             Section(header: NotificationSectionHeaderView(unreadCount: viewModel.unreadCount)) {
                 ForEach(viewModel.notifications) { notification in
                     Group {
-                        if notification.page == nil {
-                            NotificationRowView(notification: notification)
-                        } else {
-                            NavigationLink(value: notification) {
+                        if let target = PageOpenTarget(notification: notification) {
+                            PageOpenLink(target: target) {
                                 NotificationRowView(notification: notification)
                             }
+                        } else {
+                            NotificationRowView(notification: notification)
                         }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -78,8 +78,6 @@ struct NotificationListView: View {
         .refreshable {
             await viewModel.load(appState: appState)
         }
-        .navigationDestination(for: DocmostNotification.self) { notification in
-            NotificationDestinationView(notification: notification)
-        }
+        .pageOpenDestination()
     }
 }

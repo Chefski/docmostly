@@ -53,9 +53,6 @@ struct NativeEditorDetailsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle("Open", isOn: openBinding)
-                .toggleStyle(.switch)
-
             TextField("Summary", text: summaryBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(1...3)
@@ -63,14 +60,6 @@ struct NativeEditorDetailsEditor: View {
             TextField("Details", text: bodyBinding, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...5)
-        }
-    }
-
-    private var openBinding: Binding<Bool> {
-        Binding {
-            details.isOpen
-        } set: { isOpen in
-            actions.updateDetails(blockID, details.summary, details.previewText, isOpen)
         }
     }
 

@@ -26,7 +26,7 @@ struct RecentPagesRailView: View {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: PageBrowserMetrics.railCardSpacing) {
                         ForEach(items) { item in
-                            NavigationLink(value: item) {
+                            PageOpenLink(target: PageOpenTarget(item: item)) {
                                 RecentPageCardView(item: item)
                             }
                             .buttonStyle(.plain)
