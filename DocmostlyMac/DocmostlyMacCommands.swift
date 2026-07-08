@@ -55,7 +55,7 @@ struct DocmostlyMacCommands: Commands {
             .disabled(appState.phase != .authenticated)
 
             Button("Space Settings", systemImage: "gearshape") {
-                select(.settings)
+                presentSpaceSettings()
             }
             .keyboardShortcut("4", modifiers: .command)
             .disabled(appState.phase != .authenticated)
@@ -114,6 +114,16 @@ struct DocmostlyMacCommands: Commands {
             return
         }
 
+        openWindow(id: "main")
+    }
+
+    private func presentSpaceSettings() {
+        if let focusedActions {
+            focusedActions.presentSpaceSettings()
+            return
+        }
+
+        commandController.requestSpaceSettingsPresentation()
         openWindow(id: "main")
     }
 

@@ -6,9 +6,18 @@ import SwiftUI
 @Observable
 final class MacDesktopCommandController {
     var sidebarReloadRequestID = UUID()
+    var spaceSettingsPresentationRequestID: UUID?
 
     func requestSidebarReload() {
         sidebarReloadRequestID = UUID()
+    }
+
+    func requestSpaceSettingsPresentation() {
+        spaceSettingsPresentationRequestID = UUID()
+    }
+
+    func clearSpaceSettingsPresentationRequest() {
+        spaceSettingsPresentationRequestID = nil
     }
 }
 
@@ -17,6 +26,7 @@ struct MacDesktopCommandActions {
     let selectedPageRoute: () -> MacPageWindowRoute?
     let presentCommandPalette: () -> Void
     let presentPageCreation: () -> Void
+    let presentSpaceSettings: () -> Void
     let selectSidebarDestination: (SidebarDestination) -> Void
     let openSelectedPageInNewWindow: () -> Void
 }

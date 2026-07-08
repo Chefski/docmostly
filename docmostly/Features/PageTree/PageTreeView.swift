@@ -126,14 +126,9 @@ struct PageTreeView: View {
                 return
             }
         }
-        .navigationDestination(for: PageBrowserItem.self) { item in
-            PageBrowserDestinationView(item: item)
-        }
+        .pageOpenDestination()
         .navigationDestination(for: PageTreeNode.self) { node in
             PageReaderDestinationView(pageID: node.slugId)
-        }
-        .navigationDestination(for: DocmostSearchResult.self) { result in
-            SearchResultDestinationView(result: result)
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in

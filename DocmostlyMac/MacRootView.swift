@@ -113,7 +113,7 @@ struct MacRootView: View {
                 keywords: ["permissions", "members"],
                 isEnabled: appState.phase == .authenticated
             ) {
-                appState.selectSidebarUtilityDestination(.settings)
+                presentSpaceSettings()
             },
             MacCommandPaletteItem(
                 title: "Refresh Spaces",
@@ -162,6 +162,7 @@ struct MacRootView: View {
             selectedPageRoute: { selectedPageRoute },
             presentCommandPalette: presentCommandPalette,
             presentPageCreation: presentPageCreation,
+            presentSpaceSettings: presentSpaceSettings,
             selectSidebarDestination: selectSidebarDestination,
             openSelectedPageInNewWindow: openSelectedPageInNewWindow
         )
@@ -173,6 +174,10 @@ struct MacRootView: View {
 
     private func presentPageCreation() {
         isPageCreationPresented = true
+    }
+
+    private func presentSpaceSettings() {
+        commandController.requestSpaceSettingsPresentation()
     }
 
     private func createRootPage(title: String) async -> String? {

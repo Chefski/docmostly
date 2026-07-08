@@ -60,6 +60,24 @@ struct AppStateNavigationSelectionTests {
         #expect(appState.selectedPageID == nil)
     }
 
+    @Test func switchingSpacesAfterOpeningAuxiliaryPageClearsStalePageSelection() {
+        let appState = makeAppState()
+        let target = PageOpenTarget(
+            id: "page-1",
+            slugId: "roadmap",
+            spaceId: "space-1",
+            revealSpaceInSidebar: false
+        )
+        appState.selectSidebarUtilityDestination(.search)
+
+        appState.openPage(target)
+        appState.selectSidebarDestination(.space("space-2"))
+
+        #expect(appState.selectedSidebarDestination == .space("space-2"))
+        #expect(appState.selectedSpaceID == "space-2")
+        #expect(appState.selectedPageID == nil)
+    }
+
     @Test func defaultSpaceSelectionDoesNotOverrideAnExistingSpace() {
         let appState = makeAppState()
         appState.selectedSpaceID = "space-2"

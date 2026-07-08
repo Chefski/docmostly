@@ -4,7 +4,7 @@ struct SearchResultRowView: View {
     let result: DocmostSearchResult
 
     var body: some View {
-        NavigationLink(value: result) {
+        PageOpenLink(target: PageOpenTarget(searchResult: result)) {
             VStack(alignment: .leading, spacing: 6) {
                 Label {
                     Text(result.title.isEmpty ? "Untitled" : result.title)

@@ -16,7 +16,7 @@ struct NativeEditorSubpagesView: View {
             }
 
             ForEach(pages) { page in
-                NavigationLink(value: page) {
+                PageOpenLink(target: PageOpenTarget(page: page, revealSpaceInSidebar: true)) {
                     PageListRowView(page: page, systemImage: page.hasChildren == true ? "doc.on.doc" : "doc.text")
                 }
             }
@@ -36,12 +36,7 @@ struct NativeEditorSubpagesView: View {
         .task(id: taskID) {
             await load()
         }
-        .navigationDestination(for: DocmostPage.self) { page in
-            PageReaderView(pageID: page.slugId)
-                .task(id: page.id) {
-                    appState.selectPage(id: page.slugId, spaceID: page.spaceId)
-                }
-        }
+        .pageOpenDestination()
     }
 
     private var taskID: String {
