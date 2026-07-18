@@ -269,6 +269,10 @@ private extension NativeEditorColumnsBlockView {
 }
 
 struct NativeEditorDiagramBlockView: View {
+    @Environment(AppState.self) private var appState
+    @State private var authorizedSourceURL: URL?
+    @State private var resourceCookies: [StoredHTTPCookie] = []
+
     let blockID: UUID
     let diagram: NativeEditorDiagramBlock
     let title: String
@@ -279,15 +283,30 @@ struct NativeEditorDiagramBlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let sourceURL {
-                NativeEditorWebEmbedView(
-                    html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle),
-                    allowedHosts: Set([sourceURL.host()?.lowercased()].compactMap(\.self))
-                )
+                Group {
+                    if authorizedSourceURL == sourceURL {
+                        NativeEditorWebEmbedView(
+                            html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle),
+                            allowedHosts: Set([sourceURL.host()?.lowercased()].compactMap(\.self)),
+                            cookies: resourceCookies
+                        )
+                    } else {
+                        ProgressView("Loading diagram")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
                 .frame(minHeight: 260)
                 .clipShape(.rect(cornerRadius: 10))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(.quaternary, lineWidth: 1)
+                }
+                .task(id: sourceURL) {
+                    authorizedSourceURL = nil
+                    let cookies = await appState.activeSessionCookies(for: sourceURL)
+                    guard Task.isCancelled == false else { return }
+                    resourceCookies = cookies
+                    authorizedSourceURL = sourceURL
                 }
             } else {
                 HStack(alignment: .top, spacing: 10) {

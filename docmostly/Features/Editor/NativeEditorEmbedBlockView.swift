@@ -208,6 +208,7 @@ enum NativeEditorWebEmbedHTML {
 struct NativeEditorWebEmbedView: UIViewRepresentable {
     let html: String
     let allowedHosts: Set<String>
+    var cookies: [StoredHTTPCookie] = []
 
     func makeCoordinator() -> NativeEditorWebEmbedCoordinator {
         NativeEditorWebEmbedCoordinator(allowedHosts: allowedHosts)
@@ -224,13 +225,14 @@ struct NativeEditorWebEmbedView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.allowedHosts = allowedHosts
-        context.coordinator.load(html: html, in: webView)
+        context.coordinator.load(html: html, cookies: cookies, in: webView)
     }
 }
 #elseif os(macOS)
 struct NativeEditorWebEmbedView: NSViewRepresentable {
     let html: String
     let allowedHosts: Set<String>
+    var cookies: [StoredHTTPCookie] = []
 
     func makeCoordinator() -> NativeEditorWebEmbedCoordinator {
         NativeEditorWebEmbedCoordinator(allowedHosts: allowedHosts)
@@ -245,7 +247,7 @@ struct NativeEditorWebEmbedView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.allowedHosts = allowedHosts
-        context.coordinator.load(html: html, in: webView)
+        context.coordinator.load(html: html, cookies: cookies, in: webView)
     }
 }
 #endif
@@ -253,16 +255,28 @@ struct NativeEditorWebEmbedView: NSViewRepresentable {
 final class NativeEditorWebEmbedCoordinator: NSObject, WKNavigationDelegate {
     var allowedHosts: Set<String>
     private var loadedHTML: String?
+    private var loadedCookies: [StoredHTTPCookie] = []
+    private var loadTask: Task<Void, Never>?
 
     init(allowedHosts: Set<String>) {
         self.allowedHosts = allowedHosts
         super.init()
     }
 
-    func load(html: String, in webView: WKWebView) {
-        guard loadedHTML != html else { return }
+    func load(html: String, cookies: [StoredHTTPCookie], in webView: WKWebView) {
+        guard loadedHTML != html || loadedCookies != cookies else { return }
         loadedHTML = html
-        webView.loadHTMLString(html, baseURL: nil)
+        loadedCookies = cookies
+        loadTask?.cancel()
+        loadTask = Task { @MainActor [weak webView] in
+            guard let webView else { return }
+            await CookieBridge.installInWebKit(
+                cookies,
+                store: webView.configuration.websiteDataStore.httpCookieStore
+            )
+            guard Task.isCancelled == false else { return }
+            webView.loadHTMLString(html, baseURL: nil)
+        }
     }
 
     func webView(
