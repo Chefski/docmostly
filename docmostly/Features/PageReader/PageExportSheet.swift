@@ -37,20 +37,17 @@ struct PageExportSheet: View {
                 }
 
                 Section {
-                    GlassEffectContainer(spacing: 12) {
-                        DocmostlyGlassPanel(cornerRadius: 16) {
-                            Button("Export", systemImage: "square.and.arrow.down") {
-                                exportTask = Task { @MainActor in
-                                    await viewModel.export(pageID: pageID, appState: appState)
-                                    exportTask = nil
-                                }
-                            }
-                            .buttonStyle(.glassProminent)
-                            .disabled(viewModel.isExporting)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                    Button("Export", systemImage: "square.and.arrow.down") {
+                        exportTask = Task { @MainActor in
+                            await viewModel.export(pageID: pageID, appState: appState)
+                            exportTask = nil
                         }
                     }
+                    .labelStyle(.titleAndIcon)
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(viewModel.isExporting)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationTitle("Export Page")

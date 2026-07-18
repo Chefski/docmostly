@@ -67,17 +67,18 @@ final class PageTreeViewModel {
 
         isTogglingSpaceFavorite = true
         spaceActionErrorMessage = nil
+        let wasFavorite = isFavoriteSpace
+        isFavoriteSpace.toggle()
         defer { isTogglingSpaceFavorite = false }
 
         do {
-            if isFavoriteSpace {
+            if wasFavorite {
                 try await appState.removeFavorite(type: .space, spaceId: spaceId)
-                isFavoriteSpace = false
             } else {
                 try await appState.addFavorite(type: .space, spaceId: spaceId)
-                isFavoriteSpace = true
             }
         } catch {
+            isFavoriteSpace = wasFavorite
             spaceActionErrorMessage = error.localizedDescription
         }
     }

@@ -2,82 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension PageReaderView {
-    func retry() {
-        Task {
-            await loadNativePage()
-        }
-    }
-
-    func loadNativePage() async {
-        editorFocusedField = nil
-        realtimePageID = nil
-        editorViewModel = nil
-
-        for attempt in 0..<2 {
-            let editorViewModel = NativeRichEditorViewModel(pageID: pageID, initialTitle: initialTitle ?? "")
-            let didLoadPage = await editorViewModel.load(appState: appState)
-            guard Task.isCancelled == false else { return }
-
-            if didLoadPage {
-                await finishNativePageLoad(editorViewModel)
-                return
-            }
-
-            if editorViewModel.errorMessage != nil {
-                self.editorViewModel = editorViewModel
-                return
-            }
-
-            guard attempt == 0 else {
-                editorViewModel.errorMessage = "Page loading was interrupted."
-                self.editorViewModel = editorViewModel
-                return
-            }
-
-            do {
-                try await Task.sleep(for: .milliseconds(250))
-            } catch {
-                return
-            }
-        }
-    }
-
-    private func finishNativePageLoad(_ editorViewModel: NativeRichEditorViewModel) async {
-        self.editorViewModel = editorViewModel
-        if let currentSpaceID = editorViewModel.currentSpaceID {
-            pageLoaded(editorViewModel.currentPageSlugID, currentSpaceID, editorViewModel.title)
-        }
-        if editorViewModel.canEdit == false {
-            readerMode = .read
-        }
-
-        async let attachCRDT: Void = NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
-            to: editorViewModel,
-            appState: appState
-        )
-        async let loadCompanions: Void = viewModel.loadCompanions(
-            pageID: editorViewModel.currentPageID,
-            appState: appState
-        )
-        await attachCRDT
-        guard Task.isCancelled == false else {
-            await loadCompanions
-            return
-        }
-        realtimePageID = editorViewModel.currentPageID
-        await loadCompanions
-    }
-
-    func autosaveInlineEdits() {
-        guard let editorViewModel, editorViewModel.canSave else { return }
-
-        Task {
-            if await editorViewModel.save(appState: appState) {
-                await viewModel.loadCompanions(pageID: editorViewModel.currentPageID, appState: appState)
-            }
-        }
-    }
-
     func beginAttachmentImport(_ importKind: NativeEditorAttachmentImportKind) {
         attachmentImportKind = importKind
         attachmentUploadErrorMessage = nil
@@ -498,28 +422,28 @@ extension PageReaderView {
         isShowingInlineCommentComposer = true
     }
 
-    func createInlineComment(_ text: String) async throws {
+    func createInlineComment(_ body: CommentBody) async throws {
         guard let editorViewModel, let inlineCommentContext else {
             throw NativeEditorInlineCommentCreationError.noSelection
         }
 
         let commentID: String
         let yjsSelection: NativeEditorYjsSelection?
-        if let pendingInlineCommentID, pendingInlineCommentDraft == text {
+        if let pendingInlineCommentID, pendingInlineCommentDraft == body {
             commentID = pendingInlineCommentID
             yjsSelection = pendingInlineCommentYjsSelection
         } else {
             yjsSelection = await editorViewModel.inlineCommentYjsSelection(for: inlineCommentContext)
             let comment = try await appState.addInlineComment(
                 pageId: editorViewModel.currentPageID,
-                text: text,
+                body: body,
                 selectedText: inlineCommentContext.selectedText,
                 yjsSelection: yjsSelection
             )
             viewModel.applyCreatedComment(comment)
             commentID = comment.id
             pendingInlineCommentID = comment.id
-            pendingInlineCommentDraft = text
+            pendingInlineCommentDraft = body
             pendingInlineCommentYjsSelection = yjsSelection
         }
 

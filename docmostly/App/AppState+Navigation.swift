@@ -17,6 +17,7 @@ extension AppState {
 
         selectedSidebarDestination = destination
         selectedPageID = nil
+        selectedCommentID = nil
     }
 
     func selectSpace(id spaceID: String, clearsPage: Bool = true) {
@@ -25,10 +26,16 @@ extension AppState {
 
         if clearsPage {
             selectedPageID = nil
+            selectedCommentID = nil
         }
     }
 
-    func selectPage(id pageID: String, spaceID: String? = nil, revealSpaceInSidebar: Bool = false) {
+    func selectPage(
+        id pageID: String,
+        spaceID: String? = nil,
+        revealSpaceInSidebar: Bool = false,
+        commentID: String? = nil
+    ) {
         if let spaceID {
             selectedSpaceID = spaceID
 
@@ -38,24 +45,33 @@ extension AppState {
         }
 
         selectedPageID = pageID
+        selectedCommentID = commentID
     }
 
     func openPage(_ target: PageOpenTarget) {
         selectPage(
             id: target.slugId,
             spaceID: target.spaceId,
-            revealSpaceInSidebar: target.revealSpaceInSidebar
+            revealSpaceInSidebar: target.revealSpaceInSidebar,
+            commentID: target.commentId
         )
     }
 
     func clearSelectedPage() {
         selectedPageID = nil
+        selectedCommentID = nil
+    }
+
+    func clearSelectedPage(ifMatching pageID: String) {
+        guard selectedPageID == pageID else { return }
+        clearSelectedPage()
     }
 
     func resetNavigationSelection() {
         selectedSidebarDestination = nil
         selectedSpaceID = nil
         selectedPageID = nil
+        selectedCommentID = nil
     }
 
     func selectDefaultSpaceIfNeeded() {
@@ -75,6 +91,7 @@ extension AppState {
 
         selectedSpaceID = nil
         selectedPageID = nil
+        selectedCommentID = nil
 
         guard let firstSpaceID = spaces.first?.id else {
             if shouldRevealDefaultSpace {

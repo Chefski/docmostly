@@ -5,17 +5,20 @@ nonisolated struct PageOpenTarget: Identifiable, Hashable, Sendable {
     let slugId: String
     let spaceId: String?
     let revealSpaceInSidebar: Bool
+    let commentId: String?
 
     init(
         id: String,
         slugId: String,
         spaceId: String?,
-        revealSpaceInSidebar: Bool = false
+        revealSpaceInSidebar: Bool = false,
+        commentId: String? = nil
     ) {
         self.id = id
         self.slugId = slugId
         self.spaceId = spaceId
         self.revealSpaceInSidebar = revealSpaceInSidebar
+        self.commentId = commentId
     }
 
     init(page: DocmostPage, revealSpaceInSidebar: Bool = false) {
@@ -74,7 +77,8 @@ nonisolated struct PageOpenTarget: Identifiable, Hashable, Sendable {
             id: page.id,
             slugId: page.slugId,
             spaceId: notification.spaceId ?? notification.space?.id,
-            revealSpaceInSidebar: revealSpaceInSidebar
+            revealSpaceInSidebar: revealSpaceInSidebar,
+            commentId: notification.commentId
         )
     }
 }
@@ -118,9 +122,12 @@ struct PageOpenDestinationView: View {
     let target: PageOpenTarget
 
     var body: some View {
-        PageReaderView(pageID: target.slugId)
+        PageReaderView(pageID: target.slugId, initialCommentID: target.commentId)
             .task(id: target.id) {
                 appState.openPage(target)
+            }
+            .onDisappear {
+                appState.clearSelectedPage(ifMatching: target.slugId)
             }
     }
 }

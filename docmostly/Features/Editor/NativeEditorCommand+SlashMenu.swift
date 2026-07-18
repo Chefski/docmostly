@@ -19,8 +19,6 @@ extension NativeEditorCommand {
         .pdf,
         .fileAttachment,
         .table,
-        .baseInline,
-        .kanban,
         .details,
         .callout,
         .mathInline,

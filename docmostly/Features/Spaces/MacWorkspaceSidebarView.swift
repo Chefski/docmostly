@@ -5,6 +5,7 @@ struct MacWorkspaceSidebarView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(AppState.self) private var appState
     @Environment(MacDesktopCommandController.self) private var commandController
+    @Environment(NotificationStore.self) private var notificationStore
     @State private var viewModel = PageTreeViewModel()
     @State private var creationRequest: PageCreationRequest?
     @State private var moveRequest: PageTreeNode?
@@ -35,6 +36,23 @@ struct MacWorkspaceSidebarView: View {
                         isSelected: selectionState.isUtilitySelected(.search)
                     ) {
                         appState.selectSidebarUtilityDestination(.search)
+                    }
+
+                    MacSidebarActionRow(
+                        title: "Favorites",
+                        systemImage: "star",
+                        isSelected: selectionState.isUtilitySelected(.favorites)
+                    ) {
+                        appState.selectSidebarUtilityDestination(.favorites)
+                    }
+
+                    MacSidebarActionRow(
+                        title: "Notifications",
+                        systemImage: "bell",
+                        isSelected: selectionState.isUtilitySelected(.notifications),
+                        badgeCount: notificationStore.unreadCount
+                    ) {
+                        appState.selectSidebarUtilityDestination(.notifications)
                     }
 
                     MacSidebarActionRow(
@@ -310,13 +328,23 @@ private struct MacSidebarActionRow: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+    var badgeCount: Int = 0
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
+            HStack {
+                Label(title, systemImage: systemImage)
+                Spacer(minLength: 0)
+                if badgeCount > 0 {
+                    Text(badgeCount > 99 ? "99+" : badgeCount.formatted())
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("\(badgeCount) unread")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, minHeight: MacSidebarMetrics.rowHeight, alignment: .leading)

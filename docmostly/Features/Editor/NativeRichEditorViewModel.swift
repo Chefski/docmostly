@@ -15,7 +15,9 @@ final class NativeRichEditorViewModel {
     }
     var isLoading = false
     var isSaving = false
+    var isResolvingConflict = false
     var isDirty = false
+    var localEditRevision: UInt = 0
     var canEdit = true
     var hasPageRestriction = false
     var errorMessage: String?
@@ -44,6 +46,10 @@ final class NativeRichEditorViewModel {
         }
     }
     var resolvedRemoteCursorsByBlockID: [UUID: [NativeEditorResolvedRemoteCursor]] = [:]
+    var remotePresenceProjection = NativeEditorRemotePresenceProjection(
+        document: NativeEditorDocument(),
+        cursors: []
+    )
     var creator: DocmostPagePerson?
     var lastUpdatedBy: DocmostPagePerson?
     var createdAt: Date?
@@ -52,10 +58,24 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored private var editablePageID: String
     @ObservationIgnored private var editablePageSlugID: String
     @ObservationIgnored private var editablePageSpaceID: String?
-    @ObservationIgnored var lastSavedTitle: String
-    @ObservationIgnored var lastSavedDocument = NativeEditorDocument()
+    @ObservationIgnored var savedBaselineRevision: UInt = 0
+    @ObservationIgnored var lastSavedTitle: String {
+        didSet {
+            savedBaselineRevision += 1
+        }
+    }
+    @ObservationIgnored var lastSavedDocument = NativeEditorDocument() {
+        didSet {
+            savedBaselineRevision += 1
+        }
+    }
     @ObservationIgnored var lastRemoteUpdatedAt: Date?
     @ObservationIgnored var pendingRemotePage: DocmostEditablePage?
+    @ObservationIgnored var pendingRemoteCRDTSnapshot: NativeEditorCRDTDocumentSnapshot?
+    @ObservationIgnored var hasDurablyPersistedLocalCRDTDraft = false
+    @ObservationIgnored var retainedReadOnlyDraftSnapshot: NativeEditorHistorySnapshot?
+    @ObservationIgnored var isCRDTEngineReadyForLocalChanges = false
+    @ObservationIgnored var crdtOperationGeneration: UInt = 0
     @ObservationIgnored private var pageAllowsEditing = true
     @ObservationIgnored private var collaborationAllowsEditing = true
     @ObservationIgnored var undoStack: [NativeEditorHistorySnapshot] = []
@@ -65,6 +85,8 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
     @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, any Error>?
+    @ObservationIgnored var activeSaveTask: Task<Bool, Never>?
+    @ObservationIgnored let autosaveCoordinator = NativeEditorAutosaveCoordinator()
     @ObservationIgnored let localAwarenessUpdateStream: AsyncStream<Void>
     @ObservationIgnored let localAwarenessUpdateContinuation: AsyncStream<Void>.Continuation
 
@@ -83,9 +105,9 @@ final class NativeRichEditorViewModel {
         localAwarenessUpdateContinuation = awarenessUpdates.continuation
         lastKnownSnapshot = makeHistorySnapshot()
         self.crdtDocumentEngine = crdtDocumentEngine
-        crdtSyncCoordinator = crdtDocumentEngine.map {
-            NativeEditorCRDTSyncCoordinator(documentEngine: $0)
-        }
+        isCRDTEngineReadyForLocalChanges = crdtDocumentEngine?
+            .requiresInitialRemoteSnapshot == false
+        crdtSyncCoordinator = crdtDocumentEngine.map(makeCRDTSyncCoordinator)
     }
 
     deinit {
@@ -138,14 +160,24 @@ final class NativeRichEditorViewModel {
         canEdit &&
         isDirty &&
         isLoading == false &&
-        isSaving == false &&
-        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        isSaving == false
+    }
+
+    var hasOutgoingChangesRequiringPersistence: Bool {
+        isSaving || (isDirty && hasDurablyPersistedLocalCRDTDraft == false)
     }
 
     @discardableResult
     func load(appState: AppState) async -> Bool {
         isLoading = true
         errorMessage = nil
+        pendingRemotePage = nil
+        pendingRemoteUpdate = nil
+        pendingRemoteCRDTSnapshot = nil
+        hasDurablyPersistedLocalCRDTDraft = false
+        retainedReadOnlyDraftSnapshot = nil
+        isCRDTEngineReadyForLocalChanges = crdtDocumentEngine?
+            .requiresInitialRemoteSnapshot == false
         defer { isLoading = false }
 
         do {
@@ -173,46 +205,64 @@ final class NativeRichEditorViewModel {
     }
 
     func save(appState: AppState) async -> Bool {
+        if let activeSaveTask {
+            let didSave = await activeSaveTask.value
+            guard canEdit, isDirty, isLoading == false else {
+                return didSave
+            }
+            return await save(appState: appState)
+        }
+
         guard canSave else { return false }
 
+        let snapshot = makeSaveSnapshot()
         isSaving = true
         saveErrorMessage = nil
-        defer { isSaving = false }
+
+        let saveTask = Task { [self, appState] in
+            let didSave = await persist(snapshot: snapshot, appState: appState)
+            activeSaveTask = nil
+            isSaving = false
+            return didSave
+        }
+        activeSaveTask = saveTask
+        return await saveTask.value
+    }
+
+    func persistRetainedReadOnlyDraft(appState: AppState) async -> Bool {
+        if let activeSaveTask {
+            _ = await activeSaveTask.value
+        }
+
+        guard canEdit == false, isDirty else { return true }
+
+        let snapshotTitle = title
+        let snapshotDocument = document
+        let snapshotBaseDocument = lastSavedDocument
+        let capturedAt = Date.now
+        saveErrorMessage = nil
 
         do {
-            if let crdtDocumentEngine {
-                try await waitForPendingCRDTLocalChange()
-                let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                let result = try await crdtDocumentEngine.flushPendingLocalChanges(
-                    title: trimmedTitle,
-                    document: document
-                )
-                title = result.title ?? trimmedTitle
-                lastSavedTitle = title
-                lastSavedDocument = document
-                markRemoteBaseline(updatedAt: result.updatedAt ?? lastRemoteUpdatedAt)
-                lastKnownSnapshot = makeHistorySnapshot()
-                isDirty = false
-                return true
+            let persistence = try await appState.persistDeferredCollaborativeDraft(
+                pageId: editablePageID,
+                title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                documentSnapshot: snapshotDocument.proseMirrorDocument,
+                baseDocument: snapshotBaseDocument.proseMirrorDocument,
+                snapshotCapturedAt: capturedAt
+            )
+            if let page = persistence.page {
+                editablePageID = page.id
+                editablePageSlugID = page.slugId
             }
 
-            let page = try await appState.updatePage(
-                pageId: editablePageID,
-                title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                document: document.proseMirrorDocument
-            )
-            editablePageID = page.id
-            editablePageSlugID = page.slugId
-            title = page.title
-            applyPageDetails(page)
-            lastSavedTitle = title
-            lastSavedDocument = document
-            markRemoteBaseline(updatedAt: page.updatedAt)
-            lastKnownSnapshot = makeHistorySnapshot()
-            isDirty = false
+            hasDurablyPersistedLocalCRDTDraft = canEdit == false &&
+                isDirty &&
+                title == snapshotTitle &&
+                document == snapshotDocument
             return true
         } catch {
             saveErrorMessage = error.localizedDescription
+            hasDurablyPersistedLocalCRDTDraft = false
             return false
         }
     }
@@ -311,8 +361,6 @@ final class NativeRichEditorViewModel {
 
     func markCollaborationUnavailable(_ message: String) {
         collaborationAllowsEditing = false
-        pendingRemotePage = nil
-        pendingRemoteUpdate = nil
         activeCollaborators = []
         remoteCursors = []
         resolvedRemoteCursors = []
@@ -324,8 +372,6 @@ final class NativeRichEditorViewModel {
 
     func markCollaborationAuthenticationFailed(_ message: String) {
         collaborationAllowsEditing = false
-        pendingRemotePage = nil
-        pendingRemoteUpdate = nil
         activeCollaborators = []
         remoteCursors = []
         resolvedRemoteCursors = []
@@ -341,13 +387,11 @@ final class NativeRichEditorViewModel {
         canEdit = false
         errorMessage = message
         saveErrorMessage = nil
-        pendingRemotePage = nil
-        pendingRemoteUpdate = nil
         realtimeStatus = .failed(message)
         activeCollaborators = []
         remoteCursors = []
         resolvedRemoteCursors = []
-        discardUnsavedEditsForReadOnlyAccess()
+        freezeAuthoringForReadOnlyAccess()
     }
 
     func clearAuthoringState() {
@@ -364,19 +408,191 @@ final class NativeRichEditorViewModel {
         canEdit = nextCanEdit
 
         if canEdit == false {
-            discardUnsavedEditsForReadOnlyAccess()
+            freezeAuthoringForReadOnlyAccess()
+        } else {
+            resumeAuthoringAfterReadOnlyAccess()
         }
     }
 
-    private func discardUnsavedEditsForReadOnlyAccess() {
-        crdtLocalChangeTask?.cancel()
-        crdtLocalChangeTask = nil
-        title = lastSavedTitle
-        document = lastSavedDocument
-        isDirty = false
-        clearAuthoringState()
-        resetEditingHistory()
-        notifyLocalAwarenessChanged()
+}
+
+private extension NativeRichEditorViewModel {
+    struct SaveSnapshot {
+        let pageID: String
+        let title: String
+        let document: NativeEditorDocument
+        let baseDocument: NativeEditorDocument
+        let localEditRevision: UInt
+        let savedBaselineRevision: UInt
+        let capturedAt: Date
+        let requiresLocalOnlyCRDTPersistence: Bool
+        let crdtFlushTask: Task<NativeEditorCRDTSaveResult, any Error>?
+
+        var trimmedTitle: String {
+            title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
+    func makeSaveSnapshot() -> SaveSnapshot {
+        let snapshotTitle = title
+        let snapshotDocument = document
+        let requiresLocalOnlyCRDTPersistence = crdtDocumentEngine != nil &&
+            (pendingRemoteCRDTSnapshot != nil || isCRDTEngineReadyForLocalChanges == false)
+        return SaveSnapshot(
+            pageID: editablePageID,
+            title: snapshotTitle,
+            document: snapshotDocument,
+            baseDocument: lastSavedDocument,
+            localEditRevision: localEditRevision,
+            savedBaselineRevision: savedBaselineRevision,
+            capturedAt: .now,
+            requiresLocalOnlyCRDTPersistence: requiresLocalOnlyCRDTPersistence,
+            crdtFlushTask: requiresLocalOnlyCRDTPersistence ? nil : enqueueCRDTSnapshotFlush(
+                title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                document: snapshotDocument
+            )
+        )
+    }
+
+    func persist(snapshot: SaveSnapshot, appState: AppState) async -> Bool {
+        do {
+            if snapshot.requiresLocalOnlyCRDTPersistence {
+                let persistence = try await appState.persistDeferredCollaborativeDraft(
+                    pageId: snapshot.pageID,
+                    title: snapshot.trimmedTitle,
+                    documentSnapshot: snapshot.document.proseMirrorDocument,
+                    baseDocument: snapshot.baseDocument.proseMirrorDocument,
+                    snapshotCapturedAt: snapshot.capturedAt
+                )
+                if let page = persistence.page {
+                    editablePageID = page.id
+                    editablePageSlugID = page.slugId
+                }
+                completeLocalOnlyCRDTDraftPersistence(snapshot: snapshot)
+                return true
+            }
+
+            if crdtDocumentEngine != nil {
+                guard let crdtFlushTask = snapshot.crdtFlushTask else {
+                    throw APIError.connectionFailed("Collaborative save preparation failed.")
+                }
+                let result = try await crdtFlushTask.value
+                let flushedTitle = result.title ?? snapshot.trimmedTitle
+
+                if appState.hasPageUpdatePersistence {
+                    let persistence = try await appState.updateCollaborativePageTitle(
+                        pageId: snapshot.pageID,
+                        title: flushedTitle,
+                        documentSnapshot: snapshot.document.proseMirrorDocument,
+                        baseDocument: snapshot.baseDocument.proseMirrorDocument,
+                        snapshotCapturedAt: snapshot.capturedAt
+                    )
+                    if let page = persistence.page {
+                        editablePageID = page.id
+                        editablePageSlugID = page.slugId
+                    }
+                    completeSuccessfulSave(
+                        snapshot: snapshot,
+                        persistedTitle: persistence.persistedTitle,
+                        updatedAt: persistence.updatedAt ?? result.updatedAt,
+                        page: persistence.page
+                    )
+                } else {
+                    completeSuccessfulSave(
+                        snapshot: snapshot,
+                        persistedTitle: flushedTitle,
+                        updatedAt: result.updatedAt,
+                        page: nil
+                    )
+                }
+                return true
+            }
+
+            let page = try await appState.updatePage(
+                pageId: snapshot.pageID,
+                title: snapshot.trimmedTitle,
+                document: snapshot.document.proseMirrorDocument,
+                baseDocument: snapshot.baseDocument.proseMirrorDocument
+            )
+            editablePageID = page.id
+            editablePageSlugID = page.slugId
+            completeSuccessfulSave(
+                snapshot: snapshot,
+                persistedTitle: page.title,
+                updatedAt: page.updatedAt,
+                page: page
+            )
+            return true
+        } catch {
+            saveErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func completeLocalOnlyCRDTDraftPersistence(snapshot: SaveSnapshot) {
+        let stillRequiresLocalOnlyPersistence = pendingRemoteCRDTSnapshot != nil ||
+            isCRDTEngineReadyForLocalChanges == false
+        guard stillRequiresLocalOnlyPersistence else {
+            hasDurablyPersistedLocalCRDTDraft = false
+            return
+        }
+
+        let hasNewerLocalEdits = localEditRevision != snapshot.localEditRevision
+        let currentContentMatchesSnapshot = title == snapshot.title && document == snapshot.document
+        hasDurablyPersistedLocalCRDTDraft = hasNewerLocalEdits == false && currentContentMatchesSnapshot
+        lastKnownSnapshot = makeHistorySnapshot()
+        recalculateDirty()
+    }
+
+    func completeSuccessfulSave(
+        snapshot: SaveSnapshot,
+        persistedTitle: String,
+        updatedAt: Date?,
+        page: DocmostEditablePage?
+    ) {
+        let baselineChangedWhileSaving = savedBaselineRevision != snapshot.savedBaselineRevision
+        let receivedConflictingRemoteUpdate = pendingRemotePage != nil ||
+            pendingRemoteUpdate != nil ||
+            pendingRemoteCRDTSnapshot != nil
+
+        guard baselineChangedWhileSaving == false, receivedConflictingRemoteUpdate == false else {
+            lastKnownSnapshot = makeHistorySnapshot()
+            recalculateDirty()
+            return
+        }
+
+        let hasNewerLocalEdits = localEditRevision != snapshot.localEditRevision
+        let currentContentMatchesSnapshot = title == snapshot.title && document == snapshot.document
+
+        if hasNewerLocalEdits == false, currentContentMatchesSnapshot == false {
+            lastSavedTitle = title
+            lastSavedDocument = document
+        } else {
+            if title == snapshot.title {
+                title = persistedTitle
+            }
+            lastSavedTitle = persistedTitle
+            lastSavedDocument = snapshot.document
+        }
+
+        if let page {
+            applyPageDetails(page)
+        }
+        markRemoteBaseline(updatedAt: latestRemoteUpdateDate(updatedAt))
+        lastKnownSnapshot = makeHistorySnapshot()
+        recalculateDirty()
+    }
+
+    func latestRemoteUpdateDate(_ candidate: Date?) -> Date? {
+        switch (lastRemoteUpdatedAt, candidate) {
+        case (.none, .none):
+            nil
+        case (.some(let existing), .none):
+            existing
+        case (.none, .some(let candidate)):
+            candidate
+        case (.some(let existing), .some(let candidate)):
+            max(existing, candidate)
+        }
+    }
 }

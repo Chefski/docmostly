@@ -1,6 +1,18 @@
 import Foundation
 import SwiftData
 
+nonisolated enum OfflinePageUpdateSupersessionResult: Equatable, Sendable {
+    case enqueued
+    case superseded
+    case newerPendingUpdatePreserved
+}
+
+nonisolated enum OfflinePageUpdateAcknowledgementResult: Equatable, Sendable {
+    case noPendingUpdate
+    case acknowledged
+    case newerPendingUpdatePreserved
+}
+
 nonisolated final class OfflineMutationQueue {
     private let context: ModelContext
     private let encoder = JSONEncoder()
@@ -12,6 +24,7 @@ nonisolated final class OfflineMutationQueue {
 
     @discardableResult
     func enqueue(_ payload: OfflineMutationPayload, scope: CacheScope) throws -> OfflineMutationRecord {
+        let payload = try preservingOldestPageUpdateBase(in: payload, scope: scope)
         let payloadData = try encoder.encode(payload)
         let replacementOrder = try removeCoalescedMutation(for: payload, scope: scope)
         let replayOrder = if let replacementOrder {
@@ -33,6 +46,171 @@ nonisolated final class OfflineMutationQueue {
     func removeCoalescedMutations(for payload: OfflineMutationPayload, scope: CacheScope) throws {
         _ = try removeCoalescedMutation(for: payload, scope: scope)
         try context.save()
+    }
+
+    func supersedePendingPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        baseDocument: ProseMirrorDocument? = nil,
+        snapshotCapturedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateSupersessionResult {
+        var payload = OfflineMutationPayload.updatePage(
+            pageId: pageId,
+            title: title,
+            document: document,
+            baseDocument: baseDocument
+        )
+        let coalescingKey = "\(OfflineMutationKind.updatePage.rawValue):\(pageId)"
+
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<QueuedOfflineMutation>(
+            predicate: #Predicate { mutation in
+                mutation.cacheServerBaseURL == serverBaseURL &&
+                    mutation.cacheUserID == userID &&
+                    mutation.coalescingKey == coalescingKey
+            },
+            sortBy: [
+                SortDescriptor(\.replayOrder),
+                SortDescriptor(\.createdAt)
+            ]
+        )
+        let matches = try context.fetch(descriptor)
+        guard let retainedMutation = matches.first else {
+            let mutation = QueuedOfflineMutation(
+                payload: payload,
+                scope: scope,
+                payloadData: try encoder.encode(payload),
+                replayOrder: try nextReplayOrder(scope: scope)
+            )
+            mutation.createdAt = snapshotCapturedAt
+            mutation.updatedAt = snapshotCapturedAt
+            context.insert(mutation)
+            try context.save()
+            return .enqueued
+        }
+        if case .updatePage(_, _, _, let oldestBaseDocument) = try decoder.decode(
+            OfflineMutationPayload.self,
+            from: retainedMutation.payloadData
+        ) {
+            payload = .updatePage(
+                pageId: pageId,
+                title: title,
+                document: document,
+                baseDocument: oldestBaseDocument
+            )
+        }
+        guard matches.allSatisfy({ $0.createdAt <= snapshotCapturedAt }) else {
+            return .newerPendingUpdatePreserved
+        }
+
+        retainedMutation.kindRaw = payload.kind.rawValue
+        retainedMutation.coalescingKey = coalescingKey
+        retainedMutation.payloadData = try encoder.encode(payload)
+        retainedMutation.createdAt = snapshotCapturedAt
+        retainedMutation.updatedAt = .now
+        retainedMutation.attemptCount = 0
+        retainedMutation.lastErrorMessage = nil
+
+        for mutation in matches.dropFirst() {
+            context.delete(mutation)
+        }
+        try context.save()
+        return .superseded
+    }
+
+    func acknowledgePendingPageUpdate(
+        pageId: String,
+        snapshotCapturedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateAcknowledgementResult {
+        let coalescingKey = "\(OfflineMutationKind.updatePage.rawValue):\(pageId)"
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<QueuedOfflineMutation>(
+            predicate: #Predicate { mutation in
+                mutation.cacheServerBaseURL == serverBaseURL &&
+                    mutation.cacheUserID == userID &&
+                    mutation.coalescingKey == coalescingKey
+            }
+        )
+        let matches = try context.fetch(descriptor)
+        guard matches.isEmpty == false else { return .noPendingUpdate }
+        guard matches.allSatisfy({ $0.createdAt <= snapshotCapturedAt }) else {
+            return .newerPendingUpdatePreserved
+        }
+
+        for mutation in matches {
+            context.delete(mutation)
+        }
+        try context.save()
+        return .acknowledged
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func resolvePendingPageUpdateKeepingLocal(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        remoteBaseDocument: ProseMirrorDocument,
+        replacingThrough cutoff: Date,
+        resolvedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateSupersessionResult {
+        let payload = OfflineMutationPayload.updatePage(
+            pageId: pageId,
+            title: title,
+            document: document,
+            baseDocument: remoteBaseDocument
+        )
+        let coalescingKey = "\(OfflineMutationKind.updatePage.rawValue):\(pageId)"
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<QueuedOfflineMutation>(
+            predicate: #Predicate { mutation in
+                mutation.cacheServerBaseURL == serverBaseURL &&
+                    mutation.cacheUserID == userID &&
+                    mutation.coalescingKey == coalescingKey
+            },
+            sortBy: [
+                SortDescriptor(\.replayOrder),
+                SortDescriptor(\.createdAt)
+            ]
+        )
+        let matches = try context.fetch(descriptor)
+
+        guard matches.allSatisfy({ $0.createdAt <= cutoff }) else {
+            return .newerPendingUpdatePreserved
+        }
+
+        guard let retainedMutation = matches.first else {
+            let mutation = QueuedOfflineMutation(
+                payload: payload,
+                scope: scope,
+                payloadData: try encoder.encode(payload),
+                replayOrder: try nextReplayOrder(scope: scope),
+                createdAt: resolvedAt
+            )
+            context.insert(mutation)
+            try context.save()
+            return .enqueued
+        }
+
+        retainedMutation.kindRaw = payload.kind.rawValue
+        retainedMutation.coalescingKey = coalescingKey
+        retainedMutation.payloadData = try encoder.encode(payload)
+        retainedMutation.createdAt = resolvedAt
+        retainedMutation.updatedAt = resolvedAt
+        retainedMutation.attemptCount = 0
+        retainedMutation.lastErrorMessage = nil
+
+        for mutation in matches.dropFirst() {
+            context.delete(mutation)
+        }
+        try context.save()
+        return .superseded
     }
 
     func removePendingPageLabel(pageId: String, localId: String, scope: CacheScope) throws {
@@ -120,6 +298,44 @@ nonisolated final class OfflineMutationQueue {
             context.delete(mutation)
         }
         return replayOrder
+    }
+
+    private func preservingOldestPageUpdateBase(
+        in payload: OfflineMutationPayload,
+        scope: CacheScope
+    ) throws -> OfflineMutationPayload {
+        guard case .updatePage(let pageId, let title, let document, _) = payload,
+              let coalescingKey = payload.coalescingKey
+        else {
+            return payload
+        }
+
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        var descriptor = FetchDescriptor<QueuedOfflineMutation>(
+            predicate: #Predicate { mutation in
+                mutation.cacheServerBaseURL == serverBaseURL &&
+                    mutation.cacheUserID == userID &&
+                    mutation.coalescingKey == coalescingKey
+            },
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        descriptor.fetchLimit = 1
+        guard let existingMutation = try context.fetch(descriptor).first,
+              case .updatePage(_, _, _, let oldestBaseDocument) = try decoder.decode(
+                OfflineMutationPayload.self,
+                from: existingMutation.payloadData
+              )
+        else {
+            return payload
+        }
+
+        return .updatePage(
+            pageId: pageId,
+            title: title,
+            document: document,
+            baseDocument: oldestBaseDocument
+        )
     }
 
     private enum PendingMutationUpdate {

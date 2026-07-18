@@ -38,6 +38,8 @@ struct NativeEditorBlockPrefix: View {
             .labelStyle(.iconOnly)
             .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)
             .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(.interaction, .rect)
         } else {
             Image(systemName: systemImage)
                 .foregroundStyle(isChecked ? DocmostlyTheme.primary : .secondary)

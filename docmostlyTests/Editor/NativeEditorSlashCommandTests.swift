@@ -10,7 +10,7 @@ struct NativeEditorSlashCommandTests {
         #expect(slashCommandTitles(for: "embed").contains("Embed"))
     }
 
-    @Test func slashCommandInventoryIncludesBaseColumnsAndProviderEmbeds() {
+    @Test func commandEnumRetainsBaseCompatibilityAlongsideColumnsAndProviderEmbeds() {
         let titles = NativeEditorCommand.allCases.map(\.title)
 
         #expect(titles.contains("Base (Inline)"))
@@ -31,7 +31,19 @@ struct NativeEditorSlashCommandTests {
         #expect(titles.contains("Google Sheets"))
     }
 
-    @Test func slashCommandInventoryUsesDocmostWebCommandTitles() {
+    @Test func userVisibleCommandInventoriesExcludeEditionGatedBaseCommands() {
+        let slashCommands = NativeEditorCommand.slashMenuCases
+        let richCommands = NativeEditorCommand.richCases
+
+        #expect(slashCommands.contains(.baseInline) == false)
+        #expect(slashCommands.contains(.kanban) == false)
+        #expect(richCommands.contains(.baseInline) == false)
+        #expect(richCommands.contains(.kanban) == false)
+        #expect(slashCommandTitles(for: "base").contains("Base (Inline)") == false)
+        #expect(slashCommandTitles(for: "kanban").contains("Kanban") == false)
+    }
+
+    @Test func commandEnumUsesDocmostWebCommandTitles() {
         let titles = NativeEditorCommand.allCases.map(\.title)
         let expectedTitles = [
             "Text",
@@ -108,8 +120,6 @@ struct NativeEditorSlashCommandTests {
             "Embed PDF",
             "File attachment",
             "Table",
-            "Base (Inline)",
-            "Kanban",
             "Toggle block",
             "Callout",
             "Math inline",
@@ -152,7 +162,7 @@ struct NativeEditorSlashCommandTests {
             SlashCommandFilterExpectation(query: "latex", title: "Math inline"),
             SlashCommandFilterExpectation(query: "lozenge", title: "Status"),
             SlashCommandFilterExpectation(query: "reaction", title: "Emoji"),
-            SlashCommandFilterExpectation(query: "table", title: "Base (Inline)")
+            SlashCommandFilterExpectation(query: "table", title: "Table")
         ]
 
         for expectation in expectations {
@@ -374,7 +384,7 @@ struct NativeEditorSlashCommandTests {
         }
     }
 
-    @Test func applyingBaseSlashCommandsCreatesRawBaseNodes() {
+    @Test func applyingLegacyBaseCommandsCreatesRawBaseNodes() {
         let expectations = [
             BaseCommandExpectation(command: .baseInline, previewText: "Base"),
             BaseCommandExpectation(command: .kanban, previewText: "Kanban")

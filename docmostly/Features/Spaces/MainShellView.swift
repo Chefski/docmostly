@@ -2,52 +2,66 @@ import SwiftUI
 
 struct MainShellView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
     @Environment(MacDesktopCommandController.self) private var commandController
     @State private var isShowingSpaceSettings = false
     #endif
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var notificationStore = NotificationStore()
 
     var body: some View {
-        #if os(macOS)
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            MacWorkspaceSidebarView()
-        } detail: {
-            MacMainShellDetailView()
+        Group {
+            #if os(macOS)
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                MacWorkspaceSidebarView()
+            } detail: {
+                MacMainShellDetailView()
+            }
+            .navigationSplitViewStyle(.balanced)
+            .task(id: commandController.spaceSettingsPresentationRequestID) {
+                guard commandController.spaceSettingsPresentationRequestID != nil else { return }
+                defer {
+                    commandController.clearSpaceSettingsPresentationRequest()
+                }
+                guard await appState.loadSpaces() else { return }
+                showSpaceSettings()
+            }
+            .sheet(isPresented: $isShowingSpaceSettings) {
+                if let selectedSpace {
+                    SpaceSettingsDialog(space: selectedSpace)
+                } else {
+                    ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
+                        .frame(minWidth: 480, minHeight: 280)
+                }
+            }
+            #else
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarRootView()
+            } content: {
+                MainShellContentView()
+            } detail: {
+                MainShellDetailView()
+            }
+            .navigationSplitViewStyle(.balanced)
+            #endif
         }
-        .navigationSplitViewStyle(.balanced)
+        .environment(notificationStore)
         .task {
             await loadSpacesIfNeeded()
         }
-        .task(id: commandController.spaceSettingsPresentationRequestID) {
-            guard commandController.spaceSettingsPresentationRequestID != nil else { return }
-            defer {
-                commandController.clearSpaceSettingsPresentationRequest()
-            }
-            guard await appState.loadSpaces() else { return }
-            showSpaceSettings()
-        }
-        .sheet(isPresented: $isShowingSpaceSettings) {
-            if let selectedSpace {
-                SpaceSettingsDialog(space: selectedSpace)
-            } else {
-                ContentUnavailableView("No Space Selected", systemImage: "square.stack.3d.up")
-                    .frame(minWidth: 480, minHeight: 280)
-            }
-        }
-        #else
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarRootView()
-        } content: {
-            MainShellContentView()
-        } detail: {
-            MainShellDetailView()
-        }
-        .navigationSplitViewStyle(.balanced)
         .task {
-            await loadSpacesIfNeeded()
+            await notificationStore.pollUnreadCount(appState: appState)
         }
-        #endif
+        .task {
+            await notificationStore.monitorRealtime(appState: appState)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await notificationStore.refreshUnreadCount(appState: appState)
+            }
+        }
     }
 
     private func loadSpacesIfNeeded() async {

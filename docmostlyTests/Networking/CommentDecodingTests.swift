@@ -44,7 +44,7 @@ struct CommentDecodingTests {
         #expect(comment.isNativelyEditable)
     }
 
-    @Test func richJSONContentIsNotNativelyEditable() throws {
+    @Test func supportedRichJSONContentIsNativelyEditable() throws {
         let data = commentData(contentJSON: """
         {
           "type": "doc",
@@ -68,7 +68,10 @@ struct CommentDecodingTests {
         let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
 
         #expect(comment.content == "Docmost")
-        #expect(comment.isNativelyEditable == false)
+        #expect(comment.isNativelyEditable)
+        #expect(comment.body?.document.content.first?.content?.first?.marks?.contains(where: { mark in
+            mark.type == "link" && mark.attrs?["href"]?.stringValue == "https://docmost.com"
+        }) == true)
     }
 
     @Test func multiParagraphPlainJSONContentIsNativelyEditable() throws {

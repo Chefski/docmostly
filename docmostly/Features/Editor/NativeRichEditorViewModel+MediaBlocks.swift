@@ -20,7 +20,21 @@ extension NativeRichEditorViewModel {
             )
             block.kind = block.kind.replacingMediaBlock(with: media)
             block.text = AttributedString(NativeEditorDocument.previewText(for: block.kind))
-            block.rawNode = NativeEditorRichBlockNodeFactory.mediaNode(from: media, type: block.kind.mediaNodeType)
+            var node = block.rawNode?.type == block.kind.mediaNodeType ?
+                block.rawNode ?? NativeEditorRichBlockNodeFactory.mediaNode(
+                    from: currentMedia,
+                    type: block.kind.mediaNodeType
+                ) :
+                NativeEditorRichBlockNodeFactory.mediaNode(from: currentMedia, type: block.kind.mediaNodeType)
+            var attrs = node.attrs ?? [:]
+            Self.setOptionalString(media.source, key: "src", attrs: &attrs)
+            Self.setOptionalString(media.alternativeText, key: "alt", attrs: &attrs)
+            Self.setOptionalDimension(media.width, key: "width", attrs: &attrs)
+            Self.setOptionalDimension(media.height, key: "height", attrs: &attrs)
+            Self.setOptionalDimension(media.aspectRatio, key: "aspectRatio", attrs: &attrs)
+            Self.setOptionalString(media.alignment, key: "align", attrs: &attrs)
+            node.attrs = attrs.isEmpty ? nil : attrs
+            block.rawNode = node
         }
     }
 
@@ -37,7 +51,16 @@ extension NativeRichEditorViewModel {
             )
             block.kind = .pdf(pdf)
             block.text = AttributedString(NativeEditorDocument.previewText(for: block.kind))
-            block.rawNode = NativeEditorRichBlockNodeFactory.pdfNode(from: pdf)
+            var node = block.rawNode?.type == "pdf" ?
+                block.rawNode ?? NativeEditorRichBlockNodeFactory.pdfNode(from: currentPDF) :
+                NativeEditorRichBlockNodeFactory.pdfNode(from: currentPDF)
+            var attrs = node.attrs ?? [:]
+            Self.setOptionalString(pdf.source, key: "src", attrs: &attrs)
+            Self.setOptionalString(pdf.name, key: "name", attrs: &attrs)
+            Self.setOptionalDimension(pdf.width, key: "width", attrs: &attrs)
+            Self.setOptionalDimension(pdf.height, key: "height", attrs: &attrs)
+            node.attrs = attrs.isEmpty ? nil : attrs
+            block.rawNode = node
         }
     }
 
@@ -53,7 +76,15 @@ extension NativeRichEditorViewModel {
             )
             block.kind = .attachment(attachment)
             block.text = AttributedString(NativeEditorDocument.previewText(for: block.kind))
-            block.rawNode = NativeEditorRichBlockNodeFactory.attachmentNode(from: attachment)
+            var node = block.rawNode?.type == "attachment" ?
+                block.rawNode ?? NativeEditorRichBlockNodeFactory.attachmentNode(from: currentAttachment) :
+                NativeEditorRichBlockNodeFactory.attachmentNode(from: currentAttachment)
+            var attrs = node.attrs ?? [:]
+            Self.setOptionalString(attachment.url, key: "url", attrs: &attrs)
+            Self.setOptionalString(attachment.name, key: "name", attrs: &attrs)
+            Self.setOptionalString(attachment.mimeType, key: "mime", attrs: &attrs)
+            node.attrs = attrs.isEmpty ? nil : attrs
+            block.rawNode = node
         }
     }
 
@@ -81,6 +112,36 @@ extension NativeRichEditorViewModel {
             return nil
         }
         return (widthValue / heightValue).description
+    }
+
+    private static func setOptionalString(
+        _ value: String?,
+        key: String,
+        attrs: inout [String: ProseMirrorJSONValue]
+    ) {
+        if let value, value.isEmpty == false {
+            attrs[key] = .string(value)
+        } else {
+            attrs.removeValue(forKey: key)
+        }
+    }
+
+    private static func setOptionalDimension(
+        _ value: String?,
+        key: String,
+        attrs: inout [String: ProseMirrorJSONValue]
+    ) {
+        guard let value, value.isEmpty == false else {
+            attrs.removeValue(forKey: key)
+            return
+        }
+        if let integer = Int(value) {
+            attrs[key] = .int(integer)
+        } else if let number = Double(value) {
+            attrs[key] = .double(number)
+        } else {
+            attrs[key] = .string(value)
+        }
     }
 }
 

@@ -5,6 +5,26 @@ import Testing
 
 @MainActor
 struct NativeEditorCRDTSavesTests {
+    @Test func untitledPageCanPersistBodyEdits() async {
+        let engine = SavingCRDTDocumentEngine()
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString(""), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.resetEditingHistory()
+
+        viewModel.document.blocks[0].text = AttributedString("Capture this without naming the page")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.canSave)
+        #expect(await viewModel.save(appState: AppState()))
+        #expect(engine.flushRequests.first?.title == "")
+        #expect(viewModel.isDirty == false)
+    }
+
     @Test func crdtBackedSaveFlushesDocumentEngineWithoutRESTClient() async {
         let engine = SavingCRDTDocumentEngine()
         engine.saveResult = NativeEditorCRDTSaveResult(updatedAt: Date(timeIntervalSince1970: 20))

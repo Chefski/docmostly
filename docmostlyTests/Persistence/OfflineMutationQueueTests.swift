@@ -62,6 +62,152 @@ struct OfflineMutationQueueTests {
         ))
     }
 
+    @Test func pageEditsPreserveTheOldestServerBaseline() throws {
+        let queue = makeQueue()
+        let serverBaseline = document(text: "Server baseline")
+        let firstDraft = document(text: "First offline edit")
+        let latestDraft = document(text: "Latest offline edit")
+
+        _ = try queue.enqueue(
+            .updatePage(
+                pageId: "page-1",
+                title: "First",
+                document: firstDraft,
+                baseDocument: serverBaseline
+            ),
+            scope: scope
+        )
+        _ = try queue.enqueue(
+            .updatePage(
+                pageId: "page-1",
+                title: "Latest",
+                document: latestDraft,
+                baseDocument: firstDraft
+            ),
+            scope: scope
+        )
+
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePage(
+                pageId: "page-1",
+                title: "Latest",
+                document: latestDraft,
+                baseDocument: serverBaseline
+            )
+        ])
+    }
+
+    @Test func collaborativeSaveSupersedesOnlyAnOlderPendingPageDraft() throws {
+        let queue = makeQueue()
+        let oldDocument = document(text: "Old offline body")
+        let latestDocument = document(text: "Latest collaborative body")
+        let oldRecord = try queue.enqueue(
+            .updatePage(pageId: "page-1", title: "Old title", document: oldDocument),
+            scope: scope
+        )
+        try queue.markFailed(id: oldRecord.id, scope: scope, message: "Offline")
+        let snapshotCapturedAt = oldRecord.createdAt.addingTimeInterval(1)
+
+        let result = try queue.supersedePendingPageUpdate(
+            pageId: "page-1",
+            title: "Latest title",
+            document: latestDocument,
+            snapshotCapturedAt: snapshotCapturedAt,
+            scope: scope
+        )
+
+        let pending = try queue.pending(scope: scope)
+        #expect(result == .superseded)
+        #expect(pending.count == 1)
+        #expect(pending.first?.id == oldRecord.id)
+        #expect(pending.first?.payload == .updatePage(
+            pageId: "page-1",
+            title: "Latest title",
+            document: latestDocument
+        ))
+        #expect(pending.first?.createdAt == snapshotCapturedAt)
+        #expect(pending.first?.attemptCount == 0)
+        #expect(pending.first?.lastErrorMessage == nil)
+    }
+
+    @Test func olderCollaborativeSnapshotPreservesANewerPendingPageDraft() throws {
+        let queue = makeQueue()
+        let queuedDocument = document(text: "Newer queued body")
+        let olderDocument = document(text: "Older in-flight body")
+        let queuedRecord = try queue.enqueue(
+            .updatePage(pageId: "page-1", title: "Newer title", document: queuedDocument),
+            scope: scope
+        )
+
+        let result = try queue.supersedePendingPageUpdate(
+            pageId: "page-1",
+            title: "Older title",
+            document: olderDocument,
+            snapshotCapturedAt: queuedRecord.createdAt.addingTimeInterval(-1),
+            scope: scope
+        )
+
+        #expect(result == .newerPendingUpdatePreserved)
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePage(pageId: "page-1", title: "Newer title", document: queuedDocument)
+        ])
+    }
+
+    @Test func unconfirmedCollaborativeSaveCreatesADurableReplay() throws {
+        let queue = makeQueue()
+        let document = document(text: "Online body not yet confirmed")
+
+        let result = try queue.supersedePendingPageUpdate(
+            pageId: "page-1",
+            title: "Online title",
+            document: document,
+            snapshotCapturedAt: .now,
+            scope: scope
+        )
+
+        #expect(result == .enqueued)
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePage(pageId: "page-1", title: "Online title", document: document)
+        ])
+    }
+
+    @Test func serverConfirmationAcknowledgesOnlyOlderPendingDrafts() throws {
+        let queue = makeQueue()
+        let record = try queue.enqueue(
+            .updatePage(pageId: "page-1", title: "Queued", document: document(text: "Queued body")),
+            scope: scope
+        )
+
+        let result = try queue.acknowledgePendingPageUpdate(
+            pageId: "page-1",
+            snapshotCapturedAt: record.createdAt.addingTimeInterval(1),
+            scope: scope
+        )
+
+        #expect(result == .acknowledged)
+        #expect(try queue.pending(scope: scope).isEmpty)
+    }
+
+    @Test func olderServerConfirmationPreservesNewerPendingDraft() throws {
+        let queue = makeQueue()
+        let document = document(text: "Newer queued body")
+        let record = try queue.enqueue(
+            .updatePage(pageId: "page-1", title: "Newer", document: document),
+            scope: scope
+        )
+
+        let result = try queue.acknowledgePendingPageUpdate(
+            pageId: "page-1",
+            snapshotCapturedAt: record.createdAt.addingTimeInterval(-1),
+            scope: scope
+        )
+
+        #expect(result == .newerPendingUpdatePreserved)
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePage(pageId: "page-1", title: "Newer", document: document)
+        ])
+    }
+
     @Test func engagementTogglesCoalesceByTarget() throws {
         let queue = makeQueue()
 
@@ -221,7 +367,7 @@ struct OfflineMutationQueueTests {
         )
 
         let pending = try queue.pending(scope: scope)
-        guard case .updatePage(_, _, let patchedDocument) = try #require(pending.first?.payload) else {
+        guard case .updatePage(_, _, let patchedDocument, _) = try #require(pending.first?.payload) else {
             Issue.record("Expected a queued page update")
             return
         }
@@ -256,5 +402,14 @@ struct OfflineMutationQueueTests {
     private func makeQueue() -> OfflineMutationQueue {
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
         return OfflineMutationQueue(context: ModelContext(container))
+    }
+
+    private func document(text: String) -> ProseMirrorDocument {
+        ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                content: [ProseMirrorNode(type: "text", text: text)]
+            )
+        ])
     }
 }

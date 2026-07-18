@@ -1,7 +1,12 @@
 import Foundation
 
 nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
-    case updatePage(pageId: String, title: String, document: ProseMirrorDocument)
+    case updatePage(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        baseDocument: ProseMirrorDocument? = nil
+    )
     case createComment(
         localId: String,
         pageId: String,
@@ -43,6 +48,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         case pageId
         case title
         case document
+        case baseDocument
         case localId
         case content
         case plainText
@@ -69,7 +75,8 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
             self = try .updatePage(
                 pageId: payload.decode(String.self, forKey: .pageId),
                 title: payload.decode(String.self, forKey: .title),
-                document: payload.decode(ProseMirrorDocument.self, forKey: .document)
+                document: payload.decode(ProseMirrorDocument.self, forKey: .document),
+                baseDocument: payload.decodeIfPresent(ProseMirrorDocument.self, forKey: .baseDocument)
             )
         } else if container.contains(.createComment) {
             let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .createComment)
@@ -161,11 +168,12 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .updatePage(let pageId, let title, let document):
+        case .updatePage(let pageId, let title, let document, let baseDocument):
             var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePage)
             try payload.encode(pageId, forKey: .pageId)
             try payload.encode(title, forKey: .title)
             try payload.encode(document, forKey: .document)
+            try payload.encodeIfPresent(baseDocument, forKey: .baseDocument)
         case .createComment(
             let localId,
             let pageId,
@@ -265,7 +273,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var coalescingKey: String? {
         switch self {
-        case .updatePage(let pageId, _, _):
+        case .updatePage(let pageId, _, _, _):
             "\(kind.rawValue):\(pageId)"
         case .resolveComment(let commentId, _, _):
             "\(kind.rawValue):\(commentId)"
@@ -283,20 +291,52 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         }
     }
 
+    /// Only mutations that do not carry newly-authored user content may be discarded after
+    /// the server permanently rejects them. Keep this as an explicit allowlist so new payload
+    /// types default to durable retention until their failure semantics are reviewed.
+    var canDropAfterPermanentClientFailure: Bool {
+        switch self {
+        case .resolveComment,
+                .removePageLabel,
+                .addFavorite,
+                .removeFavorite,
+                .watchPage,
+                .unwatchPage,
+                .watchSpace,
+                .unwatchSpace,
+                .movePage,
+                .movePageToSpace:
+            true
+        case .updatePage, .createComment, .addPageLabels:
+            false
+        }
+    }
+
     func replacingCommentIDs(_ mappings: [String: String]) -> OfflineMutationPayload {
         guard mappings.isEmpty == false else { return self }
 
         switch self {
-        case .updatePage(let pageId, let title, let document):
+        case .updatePage(let pageId, let title, let document, let baseDocument):
             var patchedDocument = document
+            var patchedBaseDocument = baseDocument
             var didReplace = false
             for mapping in mappings {
                 let replacement = patchedDocument.replacingCommentID(mapping.key, with: mapping.value)
                 patchedDocument = replacement.document
                 didReplace = didReplace || replacement.didReplace
+                if let baseDocument = patchedBaseDocument {
+                    let baseReplacement = baseDocument.replacingCommentID(mapping.key, with: mapping.value)
+                    patchedBaseDocument = baseReplacement.document
+                    didReplace = didReplace || baseReplacement.didReplace
+                }
             }
             guard didReplace else { return self }
-            return .updatePage(pageId: pageId, title: title, document: patchedDocument)
+            return .updatePage(
+                pageId: pageId,
+                title: title,
+                document: patchedDocument,
+                baseDocument: patchedBaseDocument
+            )
         default:
             return self
         }

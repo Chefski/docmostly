@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 actor OfflineMutationQueueRepository {
@@ -26,6 +27,57 @@ actor OfflineMutationQueueRepository {
 
     func removeCoalescedMutations(for payload: OfflineMutationPayload, scope: CacheScope) throws {
         try queue().removeCoalescedMutations(for: payload, scope: scope)
+    }
+
+    func supersedePendingPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        baseDocument: ProseMirrorDocument? = nil,
+        snapshotCapturedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateSupersessionResult {
+        try queue().supersedePendingPageUpdate(
+            pageId: pageId,
+            title: title,
+            document: document,
+            baseDocument: baseDocument,
+            snapshotCapturedAt: snapshotCapturedAt,
+            scope: scope
+        )
+    }
+
+    func acknowledgePendingPageUpdate(
+        pageId: String,
+        snapshotCapturedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateAcknowledgementResult {
+        try queue().acknowledgePendingPageUpdate(
+            pageId: pageId,
+            snapshotCapturedAt: snapshotCapturedAt,
+            scope: scope
+        )
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func resolvePendingPageUpdateKeepingLocal(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        remoteBaseDocument: ProseMirrorDocument,
+        replacingThrough cutoff: Date,
+        resolvedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateSupersessionResult {
+        try queue().resolvePendingPageUpdateKeepingLocal(
+            pageId: pageId,
+            title: title,
+            document: document,
+            remoteBaseDocument: remoteBaseDocument,
+            replacingThrough: cutoff,
+            resolvedAt: resolvedAt,
+            scope: scope
+        )
     }
 
     func removePendingPageLabel(pageId: String, localId: String, scope: CacheScope) throws {

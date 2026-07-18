@@ -7,6 +7,9 @@ struct NativeEditorRichBlockPreviewView: View {
     let pageID: String
     let spaceID: String?
     var serverURLString: String?
+    var presenceProjection: NativeEditorRemotePresenceProjection?
+    var presenceScope: [NativeEditorRemotePresenceScope] = []
+    var presenceBlockIndex: Int?
 
     var body: some View {
         switch block.kind {
@@ -28,11 +31,12 @@ struct NativeEditorRichBlockPreviewView: View {
                 NativeEditorTablePreview(table: table)
             }
         case .image(let media):
-            previewShell(systemImage: "photo", title: "Image", subtitle: media.alternativeText ?? media.source) {
-                if let richBlockActions {
-                    NativeEditorMediaBlockEditor(blockID: block.id, media: media, actions: richBlockActions)
-                }
-            }
+            NativeEditorImageBlockView(
+                blockID: block.id,
+                media: media,
+                serverURLString: serverURLString,
+                actions: richBlockActions
+            )
         case .video(let media):
             previewShell(
                 systemImage: "play.rectangle",
@@ -74,39 +78,65 @@ struct NativeEditorRichBlockPreviewView: View {
                 }
             }
         case .callout(let callout):
-            NativeEditorCalloutBlockView(blockID: block.id, callout: callout, actions: richBlockActions)
+            NativeEditorCalloutBlockView(
+                blockID: block.id,
+                callout: callout,
+                content: calloutContent(for: callout),
+                actions: richBlockActions,
+                pageID: pageID,
+                spaceID: spaceID,
+                serverURLString: serverURLString,
+                presenceProjection: presenceProjection,
+                presenceScope: nestedPresenceScope(for: .callout)
+            )
         case .details(let details):
-            NativeEditorDetailsBlockView(blockID: block.id, details: details, actions: richBlockActions)
+            NativeEditorDetailsBlockView(
+                blockID: block.id,
+                details: details,
+                bodyContent: detailsBodyContent(for: details),
+                actions: richBlockActions,
+                pageID: pageID,
+                spaceID: spaceID,
+                serverURLString: serverURLString,
+                presenceProjection: presenceProjection,
+                presenceScope: nestedPresenceScope(for: .detailsContent)
+            )
         case .columns(let columns):
-            NativeEditorColumnsBlockView(blockID: block.id, columns: columns, actions: richBlockActions)
+            NativeEditorColumnsBlockView(
+                blockID: block.id,
+                columns: columns,
+                columnNodes: columnNodes(for: columns),
+                actions: richBlockActions,
+                pageID: pageID,
+                spaceID: spaceID,
+                serverURLString: serverURLString,
+                presenceProjection: presenceProjection,
+                parentPresenceScope: presenceScope,
+                presenceBlockIndex: presenceBlockIndex
+            )
         case .subpages:
             previewShell(systemImage: "doc.on.doc", title: "Subpages", subtitle: nil) {
                 NativeEditorSubpagesView(pageID: pageID, spaceID: spaceID)
             }
         case .transclusionSource(let source):
-            previewShell(
-                systemImage: "arrow.trianglehead.2.clockwise",
-                title: "Synced block",
-                subtitle: source.previewText
-            ) {
-                if let richBlockActions {
-                    NativeEditorTransclusionSourceEditor(blockID: block.id, source: source, actions: richBlockActions)
-                }
-            }
+            NativeEditorTransclusionSourceBlockView(
+                blockID: block.id,
+                source: source,
+                content: block.rawNode?.content ?? [],
+                actions: richBlockActions,
+                pageID: pageID,
+                spaceID: spaceID,
+                serverURLString: serverURLString,
+                presenceProjection: presenceProjection,
+                presenceScope: nestedPresenceScope(for: .transclusionSource)
+            )
         case .transclusionReference(let reference):
-            previewShell(
-                systemImage: "arrow.trianglehead.2.clockwise.rotate.90",
-                title: "Synced block reference",
-                subtitle: reference.transclusionID ?? reference.sourcePageID
-            ) {
-                if let richBlockActions {
-                    NativeEditorTransclusionReferenceEditor(
-                        blockID: block.id,
-                        reference: reference,
-                        actions: richBlockActions
-                    )
-                }
-            }
+            NativeEditorSyncedReferenceView(
+                reference: reference,
+                pageID: pageID,
+                spaceID: spaceID,
+                serverURLString: serverURLString
+            )
         case .base(let base):
             previewShell(
                 systemImage: "tablecells",
@@ -189,6 +219,30 @@ struct NativeEditorRichBlockPreviewView: View {
     private func fileDetail(size: Int?, fallback: String?) -> String? {
         guard let size else { return fallback }
         return ByteCountFormatStyle(style: .file).format(Int64(size))
+    }
+
+    private func detailsBodyContent(for details: NativeEditorDetailsBlock) -> [ProseMirrorNode] {
+        let node = block.rawNode ?? NativeEditorRichBlockNodeFactory.detailsNode(from: details)
+        return node.content?.first(where: { $0.type == "detailsContent" })?.content ?? []
+    }
+
+    private func calloutContent(for callout: NativeEditorCalloutBlock) -> [ProseMirrorNode] {
+        block.rawNode?.content ?? NativeEditorRichBlockNodeFactory.calloutNode(from: callout).content ?? []
+    }
+
+    private func columnNodes(for columns: NativeEditorColumnsBlock) -> [ProseMirrorNode] {
+        let node = block.rawNode ?? NativeEditorRichBlockNodeFactory.columnsNode(from: columns)
+        return (node.content ?? []).filter { $0.type == "column" }
+    }
+
+    private func nestedPresenceScope(
+        for target: NativeEditorNestedContentTarget
+    ) -> [NativeEditorRemotePresenceScope] {
+        guard let presenceBlockIndex else { return presenceScope }
+        return presenceScope + [NativeEditorRemotePresenceScope(
+            containerBlockIndex: presenceBlockIndex,
+            target: target
+        )]
     }
 
 }

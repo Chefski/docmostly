@@ -8,7 +8,7 @@ struct RecentPagesRailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PageBrowserMetrics.railSectionSpacing) {
-            Text(isOffline ? "Recent cached pages" : "Recently updated")
+            Text("Recently updated")
                 .font(.headline)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -33,8 +33,10 @@ struct RecentPagesRailView: View {
                         }
                     }
                     .padding(.horizontal, PageBrowserMetrics.railHorizontalPadding)
+                    .padding(.vertical, PageBrowserMetrics.railCardVerticalOverflowPadding)
                     .scrollTargetLayout()
                 }
+                .padding(.vertical, -PageBrowserMetrics.railCardVerticalOverflowPadding)
                 .scrollIndicators(.hidden)
                 .scrollTargetBehavior(.viewAligned)
             }

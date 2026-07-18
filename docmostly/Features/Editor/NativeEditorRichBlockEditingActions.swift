@@ -4,6 +4,9 @@ struct NativeEditorRichBlockEditingActions {
     let updateCallout: (UUID, String, String?, String) -> Void
     let updateDetails: (UUID, String, String, Bool) -> Void
     let updateColumns: (UUID, String, String, [String]) -> Void
+    let updateNestedContent: (UUID, NativeEditorNestedContentTarget, [ProseMirrorNode]) -> Void
+    let setColumnCount: (UUID, Int) -> Void
+    let updateColumnWidth: (UUID, Int, Double?) -> Void
     let updateTransclusionSource: (UUID, String, String) -> Void
     let updateTransclusionReference: (UUID, String, String) -> Void
     let updateMediaBlock: (UUID, NativeEditorMediaBlockUpdate) -> Void

@@ -10,6 +10,7 @@ enum PageBrowserMetrics {
     static let railHorizontalPadding: CGFloat = 16
     static let railSectionSpacing: CGFloat = 12
     static let railCardSpacing: CGFloat = 12
+    static let railCardVerticalOverflowPadding: CGFloat = 12
     static let railCardWidth: CGFloat = 152
     static let railCardHeight: CGFloat = 154
     static let railCardPadding: CGFloat = 16

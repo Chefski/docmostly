@@ -60,6 +60,26 @@ struct AppStateNavigationSelectionTests {
         #expect(appState.selectedPageID == nil)
     }
 
+    @Test func leavingTheSelectedPageClearsItsPageAndCommentSelection() {
+        let appState = makeAppState()
+        appState.selectPage(id: "page-1", commentID: "comment-1")
+
+        appState.clearSelectedPage(ifMatching: "page-1")
+
+        #expect(appState.selectedPageID == nil)
+        #expect(appState.selectedCommentID == nil)
+    }
+
+    @Test func disappearingPreviousPageDoesNotClearNewerPageSelection() {
+        let appState = makeAppState()
+        appState.selectPage(id: "page-2", commentID: "comment-2")
+
+        appState.clearSelectedPage(ifMatching: "page-1")
+
+        #expect(appState.selectedPageID == "page-2")
+        #expect(appState.selectedCommentID == "comment-2")
+    }
+
     @Test func switchingSpacesAfterOpeningAuxiliaryPageClearsStalePageSelection() {
         let appState = makeAppState()
         let target = PageOpenTarget(

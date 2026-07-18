@@ -147,6 +147,144 @@ struct NativeRichEditorStructuralBlockTests {
         #expect(nodes[2].attrs?["transclusionId"] == .string("sync-2"))
     }
 
+    @Test func containerPropertyUpdatesPreserveStructuredNestedContent() throws {
+        let calloutNode = structuredCalloutNode()
+        let detailsNode = structuredDetailsNode()
+        let columnsNode = structuredColumnsNode()
+        let syncedNode = structuredSyncedNode()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(
+            proseMirrorDocument: ProseMirrorDocument(content: [calloutNode, detailsNode, columnsNode, syncedNode])
+        )
+        let baselineNodes = viewModel.document.proseMirrorDocument.content
+
+        let calloutID = viewModel.document.blocks[0].id
+        let detailsID = viewModel.document.blocks[1].id
+        let columnsID = viewModel.document.blocks[2].id
+        let syncedID = viewModel.document.blocks[3].id
+        let callout = try #require(viewModel.document.blocks[0].rawNode)
+        let details = try #require(viewModel.document.blocks[1].rawNode)
+        let columns = try #require(viewModel.document.blocks[2].rawNode)
+        let synced = try #require(viewModel.document.blocks[3].rawNode)
+
+        viewModel.updateCallout(
+            blockID: calloutID,
+            style: "warning",
+            icon: "⚠️",
+            text: NativeEditorDocument.plainText(in: callout.content ?? [])
+        )
+        viewModel.updateDetails(
+            blockID: detailsID,
+            summary: "More",
+            body: NativeEditorDocument.plainText(in: details.content ?? []),
+            isOpen: true
+        )
+        viewModel.updateColumns(
+            blockID: columnsID,
+            layout: "two_left_sidebar",
+            widthMode: "wide",
+            columnTexts: (columns.content ?? []).map { NativeEditorDocument.plainText(in: $0.content ?? []) }
+        )
+        viewModel.updateTransclusionSource(
+            blockID: syncedID,
+            identifier: "sync-2",
+            text: NativeEditorDocument.plainText(in: synced.content ?? [])
+        )
+
+        let updatedNodes = viewModel.document.proseMirrorDocument.content
+        #expect(updatedNodes[0].content == baselineNodes[0].content)
+        #expect(updatedNodes[0].attrs?["type"] == .string("warning"))
+        #expect(updatedNodes[1].content == baselineNodes[1].content)
+        #expect(updatedNodes[1].attrs?["open"] == .bool(true))
+        #expect(updatedNodes[2].content == baselineNodes[2].content)
+        #expect(updatedNodes[2].attrs?["layout"] == .string("two_left_sidebar"))
+        #expect(updatedNodes[3].content == baselineNodes[3].content)
+        #expect(updatedNodes[3].attrs?["id"] == .string("sync-2"))
+    }
+
+    private func structuredCalloutNode() -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "callout",
+            attrs: ["type": .string("info")],
+            content: [
+                ProseMirrorNode(
+                    type: "heading",
+                    attrs: ["level": .int(2)],
+                    content: [ProseMirrorNode(type: "text", text: "Important")]
+                ),
+                ProseMirrorNode(
+                    type: "bulletList",
+                    content: [
+                        ProseMirrorNode(
+                            type: "listItem",
+                            content: [
+                                ProseMirrorNode(
+                                    type: "paragraph",
+                                    content: [ProseMirrorNode(type: "text", text: "Keep formatting")]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    }
+
+    private func structuredDetailsNode() -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "details",
+            attrs: ["open": .bool(false)],
+            content: [
+                ProseMirrorNode(
+                    type: "detailsSummary",
+                    content: [ProseMirrorNode(type: "text", text: "More")]
+                ),
+                ProseMirrorNode(
+                    type: "detailsContent",
+                    content: [structuredEmbedNode()]
+                )
+            ]
+        )
+    }
+
+    private func structuredColumnsNode() -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "columns",
+            attrs: ["layout": .string("two_equal"), "widthMode": .string("normal")],
+            content: [
+                ProseMirrorNode(
+                    type: "column",
+                    content: [
+                        ProseMirrorNode(
+                            type: "heading",
+                            attrs: ["level": .int(3)],
+                            content: [ProseMirrorNode(type: "text", text: "Left")]
+                        )
+                    ]
+                ),
+                ProseMirrorNode(
+                    type: "column",
+                    content: [ProseMirrorNode(type: "paragraph", content: [])]
+                )
+            ]
+        )
+    }
+
+    private func structuredSyncedNode() -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "transclusionSource",
+            attrs: ["id": .string("sync-1")],
+            content: [structuredEmbedNode()]
+        )
+    }
+
+    private func structuredEmbedNode() -> ProseMirrorNode {
+        ProseMirrorNode(
+            type: "embed",
+            attrs: ["src": .string("https://open.spotify.com/track/example")]
+        )
+    }
+
     private func structuralBlockViewModel() -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [

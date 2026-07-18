@@ -162,6 +162,7 @@ extension AppState {
                 spaceId: spaceId,
                 templateId: templateId
             )
+            favoriteRevision &+= 1
             return
         }
 
@@ -187,8 +188,8 @@ extension AppState {
                 templateId: templateId
             )
         }
+        favoriteRevision &+= 1
     }
-
     func removeFavorite(
         type: FavoriteType,
         pageId: String? = nil,
@@ -203,6 +204,7 @@ extension AppState {
                 spaceId: spaceId,
                 templateId: templateId
             )
+            favoriteRevision &+= 1
             return
         }
 
@@ -234,6 +236,7 @@ extension AppState {
                 templateId: templateId
             )
         }
+        favoriteRevision &+= 1
     }
 
     func loadNotifications(
