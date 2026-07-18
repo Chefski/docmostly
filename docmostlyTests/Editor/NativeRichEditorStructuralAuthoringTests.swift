@@ -126,6 +126,25 @@ struct NativeRichEditorStructuralAuthoringTests {
         #expect(viewModel.document.blocks.first?.rawNode?.content == allowed)
     }
 
+    @Test func syncedSourceAcceptsExistingPageBreaks() throws {
+        let source = ProseMirrorNode(
+            type: "transclusionSource",
+            attrs: ["id": .string("sync-1")],
+            content: [paragraph("Before"), ProseMirrorNode(type: "pageBreak"), paragraph("After")]
+        )
+        let viewModel = viewModel(containing: source)
+        let blockID = try #require(viewModel.document.blocks.first?.id)
+        let updatedContent = [paragraph("Updated"), ProseMirrorNode(type: "pageBreak"), paragraph("After")]
+
+        viewModel.updateNestedContent(
+            blockID: blockID,
+            target: .transclusionSource,
+            content: updatedContent
+        )
+
+        #expect(viewModel.document.blocks.first?.rawNode?.content == updatedContent)
+    }
+
     @Test func mediaConfigurationPreservesServerManagedAndUnknownAttributes() throws {
         let image = ProseMirrorNode(
             type: "image",

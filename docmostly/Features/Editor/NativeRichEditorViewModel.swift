@@ -2,6 +2,8 @@ import Foundation
 import Observation
 import SwiftUI
 
+// swiftlint:disable file_length
+
 @MainActor
 @Observable
 final class NativeRichEditorViewModel {
@@ -238,6 +240,7 @@ final class NativeRichEditorViewModel {
 
         let snapshotTitle = title
         let snapshotDocument = document
+        let snapshotBaseTitle = lastSavedTitle
         let snapshotBaseDocument = lastSavedDocument
         let capturedAt = Date.now
         saveErrorMessage = nil
@@ -247,6 +250,7 @@ final class NativeRichEditorViewModel {
                 pageId: editablePageID,
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 documentSnapshot: snapshotDocument.proseMirrorDocument,
+                baseTitle: snapshotBaseTitle,
                 baseDocument: snapshotBaseDocument.proseMirrorDocument,
                 snapshotCapturedAt: capturedAt
             )
@@ -421,6 +425,7 @@ private extension NativeRichEditorViewModel {
         let pageID: String
         let title: String
         let document: NativeEditorDocument
+        let baseTitle: String
         let baseDocument: NativeEditorDocument
         let localEditRevision: UInt
         let savedBaselineRevision: UInt
@@ -442,6 +447,7 @@ private extension NativeRichEditorViewModel {
             pageID: editablePageID,
             title: snapshotTitle,
             document: snapshotDocument,
+            baseTitle: lastSavedTitle,
             baseDocument: lastSavedDocument,
             localEditRevision: localEditRevision,
             savedBaselineRevision: savedBaselineRevision,
@@ -461,6 +467,7 @@ private extension NativeRichEditorViewModel {
                     pageId: snapshot.pageID,
                     title: snapshot.trimmedTitle,
                     documentSnapshot: snapshot.document.proseMirrorDocument,
+                    baseTitle: snapshot.baseTitle,
                     baseDocument: snapshot.baseDocument.proseMirrorDocument,
                     snapshotCapturedAt: snapshot.capturedAt
                 )
@@ -484,6 +491,7 @@ private extension NativeRichEditorViewModel {
                         pageId: snapshot.pageID,
                         title: flushedTitle,
                         documentSnapshot: snapshot.document.proseMirrorDocument,
+                        baseTitle: snapshot.baseTitle,
                         baseDocument: snapshot.baseDocument.proseMirrorDocument,
                         snapshotCapturedAt: snapshot.capturedAt
                     )
@@ -512,6 +520,7 @@ private extension NativeRichEditorViewModel {
                 pageId: snapshot.pageID,
                 title: snapshot.trimmedTitle,
                 document: snapshot.document.proseMirrorDocument,
+                baseTitle: snapshot.baseTitle,
                 baseDocument: snapshot.baseDocument.proseMirrorDocument
             )
             editablePageID = page.id

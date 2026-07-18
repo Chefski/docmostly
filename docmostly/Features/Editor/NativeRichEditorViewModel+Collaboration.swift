@@ -64,6 +64,19 @@ extension NativeRichEditorViewModel {
         applyPendingRemoteTitleUpdate(pendingRemoteUpdate)
     }
 
+    @discardableResult
+    func acceptPendingRemoteUpdate(
+        matching expectedSnapshot: NativeEditorCRDTDocumentSnapshot,
+        remoteUpdate expectedRemoteUpdate: NativeEditorRemoteUpdate?
+    ) -> Bool {
+        guard pendingRemoteCRDTSnapshot == expectedSnapshot,
+              pendingRemoteUpdate == expectedRemoteUpdate else {
+            return false
+        }
+        acceptPendingRemoteUpdate()
+        return true
+    }
+
     func rejectPendingRemoteUpdate() {
         let rejectedDeferredCRDTSnapshot = pendingRemoteCRDTSnapshot
         let rejectedRemoteTitle = pendingRemoteUpdate?.title ??
@@ -89,6 +102,19 @@ extension NativeRichEditorViewModel {
                 remoteTitle: rejectedRemoteTitle
             )
         }
+    }
+
+    @discardableResult
+    func rejectPendingRemoteUpdate(
+        matching expectedSnapshot: NativeEditorCRDTDocumentSnapshot,
+        remoteUpdate expectedRemoteUpdate: NativeEditorRemoteUpdate?
+    ) -> Bool {
+        guard pendingRemoteCRDTSnapshot == expectedSnapshot,
+              pendingRemoteUpdate == expectedRemoteUpdate else {
+            return false
+        }
+        rejectPendingRemoteUpdate()
+        return true
     }
 
     func clearCollaborationPresence() {

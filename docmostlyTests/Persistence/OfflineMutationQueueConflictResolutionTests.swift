@@ -27,6 +27,7 @@ struct OfflineQueueConflictResolutionTests {
             pageId: "page-1",
             title: "Keep local",
             document: localDocument,
+            remoteBaseTitle: "Remote title",
             remoteBaseDocument: remoteDocument,
             replacingThrough: record.createdAt.addingTimeInterval(1),
             resolvedAt: resolvedAt,
@@ -40,6 +41,7 @@ struct OfflineQueueConflictResolutionTests {
                 pageId: "page-1",
                 title: "Keep local",
                 document: localDocument,
+                baseTitle: "Remote title",
                 baseDocument: remoteDocument
             )
         ])
@@ -58,6 +60,7 @@ struct OfflineQueueConflictResolutionTests {
             pageId: "page-1",
             title: "Older resolution",
             document: document(text: "Older local"),
+            remoteBaseTitle: "Remote title",
             remoteBaseDocument: document(text: "Remote"),
             replacingThrough: record.createdAt.addingTimeInterval(-1),
             resolvedAt: record.createdAt,

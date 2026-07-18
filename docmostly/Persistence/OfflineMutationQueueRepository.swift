@@ -33,6 +33,7 @@ actor OfflineMutationQueueRepository {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String? = nil,
         baseDocument: ProseMirrorDocument? = nil,
         snapshotCapturedAt: Date,
         scope: CacheScope
@@ -41,6 +42,7 @@ actor OfflineMutationQueueRepository {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument,
             snapshotCapturedAt: snapshotCapturedAt,
             scope: scope
@@ -64,6 +66,7 @@ actor OfflineMutationQueueRepository {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        remoteBaseTitle: String,
         remoteBaseDocument: ProseMirrorDocument,
         replacingThrough cutoff: Date,
         resolvedAt: Date,
@@ -73,6 +76,7 @@ actor OfflineMutationQueueRepository {
             pageId: pageId,
             title: title,
             document: document,
+            remoteBaseTitle: remoteBaseTitle,
             remoteBaseDocument: remoteBaseDocument,
             replacingThrough: cutoff,
             resolvedAt: resolvedAt,

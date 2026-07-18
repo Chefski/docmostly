@@ -207,7 +207,13 @@ extension NativeRichEditorViewModel {
         crdtOperationGeneration += 1
         let previousTask = crdtLocalChangeTask
         let flushTask = Task { [crdtSyncCoordinator, previousTask] in
-            try await previousTask?.value
+            do {
+                try await previousTask?.value
+            } catch is CancellationError {
+                try Task.checkCancellation()
+            } catch {
+                // A full snapshot flush can repair a failed predecessor in the local chain.
+            }
             try Task.checkCancellation()
             return try await crdtSyncCoordinator.flushPendingLocalChanges(
                 title: title,

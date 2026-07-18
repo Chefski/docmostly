@@ -11,6 +11,7 @@ extension AppState {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String? = nil,
         baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
         guard let apiClient else {
@@ -18,6 +19,7 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
         }
@@ -49,15 +51,18 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     func updateCollaborativePageTitle(
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
+        baseTitle: String,
         baseDocument: ProseMirrorDocument,
         snapshotCapturedAt: Date
     ) async throws -> CollaborativePagePersistenceResult {
@@ -66,6 +71,7 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument,
                 snapshotCapturedAt: snapshotCapturedAt
             )
@@ -85,6 +91,7 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument,
                 snapshotCapturedAt: snapshotCapturedAt
             )
@@ -98,6 +105,7 @@ extension AppState {
                 serverPage: page,
                 queuedTitle: title,
                 queuedDocument: documentSnapshot,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
             switch replayDecision {
@@ -113,6 +121,7 @@ extension AppState {
                     pageId: pageId,
                     title: title,
                     document: documentSnapshot,
+                    baseTitle: baseTitle,
                     baseDocument: baseDocument,
                     snapshotCapturedAt: snapshotCapturedAt
                 )
@@ -132,10 +141,12 @@ extension AppState {
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
     func persistDeferredCollaborativeDraft(
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
+        baseTitle: String,
         baseDocument: ProseMirrorDocument,
         snapshotCapturedAt: Date
     ) async throws -> CollaborativePagePersistenceResult {
@@ -143,6 +154,7 @@ extension AppState {
             pageId: pageId,
             title: title,
             document: documentSnapshot,
+            baseTitle: baseTitle,
             baseDocument: baseDocument,
             snapshotCapturedAt: snapshotCapturedAt
         )
@@ -168,10 +180,12 @@ private extension AppState {
         scheduleCacheWrite(.saveEditablePage(cachedPage, scope: cacheScope))
     }
 
+    // swiftlint:disable:next function_parameter_count
     func supersedePendingPageUpdate(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String,
         baseDocument: ProseMirrorDocument,
         snapshotCapturedAt: Date
     ) async throws -> OfflinePageUpdateSupersessionResult {
@@ -183,6 +197,7 @@ private extension AppState {
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument,
                 snapshotCapturedAt: snapshotCapturedAt,
                 scope: cacheScope
@@ -195,6 +210,7 @@ private extension AppState {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument,
             snapshotCapturedAt: snapshotCapturedAt,
             scope: cacheScope
@@ -221,10 +237,12 @@ private extension AppState {
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
     func persistCollaborativePageLocally(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String,
         baseDocument: ProseMirrorDocument,
         snapshotCapturedAt: Date
     ) async throws -> CollaborativePagePersistenceResult {
@@ -232,6 +250,7 @@ private extension AppState {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument,
             snapshotCapturedAt: snapshotCapturedAt
         )

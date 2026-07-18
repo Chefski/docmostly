@@ -109,6 +109,7 @@ extension NativeRichEditorViewModel {
 
             let continuationKind = block.kind.mechanicsListContinuationKind
             block.text = split.leading
+            block.rawNode = Self.rawListItemNodeWithoutNestedLists(block.rawNode)
             Self.setInsertionPoint(at: block.text.characters.count, in: &block)
             document.blocks[index] = block
 
@@ -287,6 +288,14 @@ extension NativeRichEditorViewModel {
         default:
             return false
         }
+    }
+
+    private static func rawListItemNodeWithoutNestedLists(_ rawNode: ProseMirrorNode?) -> ProseMirrorNode? {
+        guard var rawNode, rawNode.type == "listItem" || rawNode.type == "taskItem" else {
+            return rawNode
+        }
+        rawNode.content = rawNode.content?.filter { $0.isListContainer == false }
+        return rawNode
     }
 
     private static func canLiftEmptyBlockquote(_ block: NativeEditorBlock) -> Bool {

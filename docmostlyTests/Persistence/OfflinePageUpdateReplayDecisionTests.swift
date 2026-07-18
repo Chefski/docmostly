@@ -10,6 +10,7 @@ struct OfflinePageUpdateReplayDecisionTests {
             serverPage: page(title: "Local", document: localDocument),
             queuedTitle: "Local",
             queuedDocument: localDocument,
+            baseTitle: "Base",
             baseDocument: document("Base")
         ) == .alreadySynchronized)
     }
@@ -21,8 +22,33 @@ struct OfflinePageUpdateReplayDecisionTests {
             serverPage: page(title: "Base", document: baseDocument),
             queuedTitle: "Local",
             queuedDocument: document("Local"),
+            baseTitle: "Base",
             baseDocument: baseDocument
-        ) == .replaceDocument)
+        ) == .replaceDocument(title: "Local"))
+    }
+
+    @Test func bodyOnlyEditPreservesNewerRemoteTitle() {
+        let baseDocument = document("Base")
+
+        #expect(OfflinePageUpdateReplayDecision.resolve(
+            serverPage: page(title: "Remote title", document: baseDocument),
+            queuedTitle: "Base title",
+            queuedDocument: document("Local body"),
+            baseTitle: "Base title",
+            baseDocument: baseDocument
+        ) == .replaceDocument(title: nil))
+    }
+
+    @Test func concurrentDivergentTitleEditsRetainConflict() {
+        let baseDocument = document("Base")
+
+        #expect(OfflinePageUpdateReplayDecision.resolve(
+            serverPage: page(title: "Remote title", document: baseDocument),
+            queuedTitle: "Local title",
+            queuedDocument: document("Local body"),
+            baseTitle: "Base title",
+            baseDocument: baseDocument
+        ) == .conflict)
     }
 
     @Test func unknownOrChangedServerBodyRetainsConflict() {
@@ -30,12 +56,14 @@ struct OfflinePageUpdateReplayDecisionTests {
             serverPage: page(title: "Remote", document: document("Remote")),
             queuedTitle: "Local",
             queuedDocument: document("Local"),
+            baseTitle: "Base",
             baseDocument: document("Base")
         ) == .conflict)
         #expect(OfflinePageUpdateReplayDecision.resolve(
             serverPage: page(title: "Remote", document: document("Remote")),
             queuedTitle: "Local",
             queuedDocument: document("Local"),
+            baseTitle: nil,
             baseDocument: nil
         ) == .conflict)
     }

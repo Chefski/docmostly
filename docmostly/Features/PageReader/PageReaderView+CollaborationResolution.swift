@@ -26,6 +26,12 @@ extension PageReaderView {
         _ resolution: NativeEditorRemoteConflictResolution,
         editorViewModel: NativeRichEditorViewModel
     ) async {
+        guard let remoteSnapshot = editorViewModel.pendingRemoteCRDTSnapshot else { return }
+        let remoteUpdate = editorViewModel.pendingRemoteUpdate
+        let remoteTitle = remoteUpdate?.title ??
+            remoteSnapshot.title ??
+            editorViewModel.title
+
         await appState.pauseOfflineReplayForCollaborativeResolution()
         defer {
             editorViewModel.isResolvingConflict = false
@@ -41,10 +47,12 @@ extension PageReaderView {
             return
         }
 
-        guard let remoteSnapshot = editorViewModel.pendingRemoteCRDTSnapshot else { return }
-        let remoteTitle = editorViewModel.pendingRemoteUpdate?.title ??
-            remoteSnapshot.title ??
-            editorViewModel.title
+        guard editorViewModel.pendingRemoteCRDTSnapshot == remoteSnapshot,
+              editorViewModel.pendingRemoteUpdate == remoteUpdate else {
+            editorViewModel.saveErrorMessage =
+                "A newer remote version arrived while resolving this conflict. Review it and try again."
+            return
+        }
         let cutoff = Date.now
 
         do {
@@ -64,12 +72,20 @@ extension PageReaderView {
                     title: remoteTitle,
                     document: remoteSnapshot.document.proseMirrorDocument
                 )
-                editorViewModel.acceptPendingRemoteUpdate()
+                guard editorViewModel.acceptPendingRemoteUpdate(
+                    matching: remoteSnapshot,
+                    remoteUpdate: remoteUpdate
+                ) else {
+                    editorViewModel.saveErrorMessage =
+                        "A newer remote version arrived while resolving this conflict. Review it and try again."
+                    return
+                }
             case .keepLocal:
                 let result = try await appState.keepPendingCollaborativeDraft(
                     pageId: editorViewModel.currentPageID,
                     title: editorViewModel.title,
                     document: editorViewModel.document.proseMirrorDocument,
+                    remoteBaseTitle: remoteTitle,
                     remoteBaseDocument: remoteSnapshot.document.proseMirrorDocument,
                     replacingThrough: cutoff
                 )
@@ -78,7 +94,14 @@ extension PageReaderView {
                         "A newer local draft appeared while resolving this conflict. Review it and try again."
                     return
                 }
-                editorViewModel.rejectPendingRemoteUpdate()
+                guard editorViewModel.rejectPendingRemoteUpdate(
+                    matching: remoteSnapshot,
+                    remoteUpdate: remoteUpdate
+                ) else {
+                    editorViewModel.saveErrorMessage =
+                        "A newer remote version arrived while resolving this conflict. Review it and try again."
+                    return
+                }
             }
 
             editorViewModel.saveErrorMessage = nil

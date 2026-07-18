@@ -150,6 +150,25 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         #expect(viewModel.isDirty)
     }
 
+    @Test func paragraphIDChangeIsNotTreatedAsMatchingSelfEcho() {
+        let local = ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                attrs: ["id": .string("local-anchor")],
+                content: [ProseMirrorNode(type: "text", text: "Same text")]
+            )
+        ])
+        let remote = ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                attrs: ["id": .string("remote-anchor")],
+                content: [ProseMirrorNode(type: "text", text: "Same text")]
+            )
+        ])
+
+        #expect(local.isCollaborationEquivalent(to: remote) == false)
+    }
+
     @Test func immediateEditBeforeInitialSyncIsBufferedThenPublishedOverAuthoritativeBaseline() async throws {
         let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = NativeRichEditorViewModel(
@@ -234,6 +253,40 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         #expect(viewModel.realtimeStatus == .connected)
     }
 
+    @Test func capturedConflictCannotAcceptNewerPendingSnapshot() {
+        let engine = SnapshotCRDTDocumentEngine()
+        let viewModel = makeDirtyViewModel(engine: engine)
+        let capturedSnapshot = snapshot(text: "First remote body", updatedAt: 20)
+        let newerSnapshot = snapshot(text: "Newer remote body", updatedAt: 21)
+        viewModel.applyCRDTDocumentSnapshot(capturedSnapshot)
+        let capturedUpdate = viewModel.pendingRemoteUpdate
+        viewModel.applyCRDTDocumentSnapshot(newerSnapshot)
+
+        #expect(viewModel.acceptPendingRemoteUpdate(
+            matching: capturedSnapshot,
+            remoteUpdate: capturedUpdate
+        ) == false)
+        #expect(viewModel.pendingRemoteCRDTSnapshot == newerSnapshot)
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local draft"])
+    }
+
+    @Test func capturedConflictCannotRejectNewerPendingSnapshot() {
+        let engine = SnapshotCRDTDocumentEngine()
+        let viewModel = makeDirtyViewModel(engine: engine)
+        let capturedSnapshot = snapshot(text: "First remote body", updatedAt: 20)
+        let newerSnapshot = snapshot(text: "Newer remote body", updatedAt: 21)
+        viewModel.applyCRDTDocumentSnapshot(capturedSnapshot)
+        let capturedUpdate = viewModel.pendingRemoteUpdate
+        viewModel.applyCRDTDocumentSnapshot(newerSnapshot)
+
+        #expect(viewModel.rejectPendingRemoteUpdate(
+            matching: capturedSnapshot,
+            remoteUpdate: capturedUpdate
+        ) == false)
+        #expect(viewModel.pendingRemoteCRDTSnapshot == newerSnapshot)
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local draft"])
+    }
+
     @Test func exposesCRDTDocumentSnapshotStreamFromEngine() async {
         let engine = SnapshotCRDTDocumentEngine()
         let streamPair = AsyncStream.makeStream(of: NativeEditorCRDTDocumentSnapshot.self)
@@ -289,9 +342,13 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     private func document(text: String) -> NativeEditorDocument {
-        NativeEditorDocument(blocks: [
-            NativeEditorBlock(kind: .paragraph, text: AttributedString(text), alignment: .left)
-        ])
+        NativeEditorDocument(proseMirrorDocument: ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                attrs: ["id": .string("stable-test-anchor")],
+                content: [ProseMirrorNode(type: "text", text: text)]
+            )
+        ]))
     }
 }
 

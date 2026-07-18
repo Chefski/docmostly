@@ -487,6 +487,51 @@ extension NativeRichEditorBlockMechanicsTests {
         #expect(continuationItem.content?.first?.content?.first?.text == "nch")
     }
 
+    @Test func listSplitMovesNestedListToContinuationWithoutDuplicatingIt() throws {
+        let original = try JSONDecoder().decode(
+            ProseMirrorDocument.self,
+            from: Data("""
+            {
+              "type": "doc",
+              "content": [{
+                "type": "bulletList",
+                "content": [{
+                  "type": "listItem",
+                  "attrs": { "custom": "preserved" },
+                  "content": [
+                    { "type": "paragraph", "content": [{ "type": "text", "text": "Launch" }] },
+                    {
+                      "type": "bulletList",
+                      "content": [{
+                        "type": "listItem",
+                        "content": [
+                          { "type": "paragraph", "content": [{ "type": "text", "text": "Nested" }] }
+                        ]
+                      }]
+                    }
+                  ]
+                }]
+              }]
+            }
+            """.utf8)
+        )
+        let viewModel = configuredViewModel(
+            blocks: NativeEditorDocument(proseMirrorDocument: original).blocks
+        )
+        let sourceID = try #require(viewModel.document.blocks.first?.id)
+
+        _ = try #require(viewModel.continueListItem(sourceID, at: 3))
+
+        let items = try #require(viewModel.document.proseMirrorDocument.content.first?.content)
+        let leadingContent = try #require(items.first?.content)
+        let continuationContent = try #require(items.dropFirst().first?.content)
+        #expect(items.count == 2)
+        #expect(items.first?.attrs?["custom"] == .string("preserved"))
+        #expect(leadingContent.contains(where: \.isListContainer) == false)
+        #expect(continuationContent.filter(\.isListContainer).count == 1)
+        #expect(continuationContent.last?.content?.first?.content?.first?.text == "Nested")
+    }
+
     private func configuredViewModel(blocks: [NativeEditorBlock]) -> NativeRichEditorViewModel {
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: blocks)

@@ -29,10 +29,12 @@ extension AppState {
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     func keepPendingCollaborativeDraft(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        remoteBaseTitle: String,
         remoteBaseDocument: ProseMirrorDocument,
         replacingThrough cutoff: Date
     ) async throws -> OfflinePageUpdateSupersessionResult {
@@ -48,6 +50,7 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: document,
+                remoteBaseTitle: remoteBaseTitle,
                 remoteBaseDocument: remoteBaseDocument,
                 replacingThrough: cutoff,
                 resolvedAt: resolvedAt,
@@ -58,6 +61,7 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: document,
+                remoteBaseTitle: remoteBaseTitle,
                 remoteBaseDocument: remoteBaseDocument,
                 replacingThrough: cutoff,
                 resolvedAt: resolvedAt,

@@ -52,6 +52,7 @@ nonisolated final class OfflineMutationQueue {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String? = nil,
         baseDocument: ProseMirrorDocument? = nil,
         snapshotCapturedAt: Date,
         scope: CacheScope
@@ -60,6 +61,7 @@ nonisolated final class OfflineMutationQueue {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument
         )
         let coalescingKey = "\(OfflineMutationKind.updatePage.rawValue):\(pageId)"
@@ -91,7 +93,7 @@ nonisolated final class OfflineMutationQueue {
             try context.save()
             return .enqueued
         }
-        if case .updatePage(_, _, _, let oldestBaseDocument) = try decoder.decode(
+        if case .updatePage(_, _, _, let oldestBaseTitle, let oldestBaseDocument) = try decoder.decode(
             OfflineMutationPayload.self,
             from: retainedMutation.payloadData
         ) {
@@ -99,6 +101,7 @@ nonisolated final class OfflineMutationQueue {
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: oldestBaseTitle,
                 baseDocument: oldestBaseDocument
             )
         }
@@ -154,6 +157,7 @@ nonisolated final class OfflineMutationQueue {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        remoteBaseTitle: String,
         remoteBaseDocument: ProseMirrorDocument,
         replacingThrough cutoff: Date,
         resolvedAt: Date,
@@ -163,6 +167,7 @@ nonisolated final class OfflineMutationQueue {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: remoteBaseTitle,
             baseDocument: remoteBaseDocument
         )
         let coalescingKey = "\(OfflineMutationKind.updatePage.rawValue):\(pageId)"
@@ -304,7 +309,7 @@ nonisolated final class OfflineMutationQueue {
         in payload: OfflineMutationPayload,
         scope: CacheScope
     ) throws -> OfflineMutationPayload {
-        guard case .updatePage(let pageId, let title, let document, _) = payload,
+        guard case .updatePage(let pageId, let title, let document, _, _) = payload,
               let coalescingKey = payload.coalescingKey
         else {
             return payload
@@ -322,7 +327,7 @@ nonisolated final class OfflineMutationQueue {
         )
         descriptor.fetchLimit = 1
         guard let existingMutation = try context.fetch(descriptor).first,
-              case .updatePage(_, _, _, let oldestBaseDocument) = try decoder.decode(
+              case .updatePage(_, _, _, let oldestBaseTitle, let oldestBaseDocument) = try decoder.decode(
                 OfflineMutationPayload.self,
                 from: existingMutation.payloadData
               )
@@ -334,6 +339,7 @@ nonisolated final class OfflineMutationQueue {
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: oldestBaseTitle,
             baseDocument: oldestBaseDocument
         )
     }

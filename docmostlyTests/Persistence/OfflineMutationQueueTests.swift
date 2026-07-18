@@ -73,6 +73,7 @@ struct OfflineMutationQueueTests {
                 pageId: "page-1",
                 title: "First",
                 document: firstDraft,
+                baseTitle: "Server title",
                 baseDocument: serverBaseline
             ),
             scope: scope
@@ -82,6 +83,7 @@ struct OfflineMutationQueueTests {
                 pageId: "page-1",
                 title: "Latest",
                 document: latestDraft,
+                baseTitle: "First",
                 baseDocument: firstDraft
             ),
             scope: scope
@@ -92,6 +94,7 @@ struct OfflineMutationQueueTests {
                 pageId: "page-1",
                 title: "Latest",
                 document: latestDraft,
+                baseTitle: "Server title",
                 baseDocument: serverBaseline
             )
         ])
@@ -367,7 +370,7 @@ struct OfflineMutationQueueTests {
         )
 
         let pending = try queue.pending(scope: scope)
-        guard case .updatePage(_, _, let patchedDocument, _) = try #require(pending.first?.payload) else {
+        guard case .updatePage(_, _, let patchedDocument, _, _) = try #require(pending.first?.payload) else {
             Issue.record("Expected a queued page update")
             return
         }

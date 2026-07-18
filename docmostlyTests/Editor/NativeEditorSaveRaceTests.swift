@@ -214,6 +214,7 @@ struct NativeEditorSaveRaceTests {
                 pageId: "page-1",
                 title: "Draft",
                 document: viewModel.document.proseMirrorDocument,
+                baseTitle: "Draft",
                 baseDocument: originalBaseline
             )
         ])

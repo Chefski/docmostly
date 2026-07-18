@@ -144,7 +144,7 @@ extension NativeRichEditorViewModel {
     private static let transclusionSourceAllowedNodeTypes: Set<String> = [
         "paragraph", "heading", "blockquote", "codeBlock", "horizontalRule", "bulletList", "orderedList",
         "taskList", "image", "video", "audio", "attachment", "callout", "details", "embed", "mathBlock",
-        "table", "drawio", "excalidraw", "pdf", "subpages", "columns", "youtube"
+        "table", "drawio", "excalidraw", "pdf", "subpages", "columns", "youtube", "pageBreak"
     ]
 
     private static func nonEmptyBlockContent(_ content: [ProseMirrorNode]) -> [ProseMirrorNode] {

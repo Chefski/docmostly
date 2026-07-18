@@ -10,7 +10,7 @@ nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
     }
 }
 
-nonisolated struct NativeEditorCRDTDocumentSnapshot: Sendable {
+nonisolated struct NativeEditorCRDTDocumentSnapshot: Equatable, Sendable {
     let title: String?
     let document: NativeEditorDocument
     let updatedAt: Date?

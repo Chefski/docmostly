@@ -174,6 +174,7 @@ struct NativeEditorCollaborationSyncStatusTests {
                 pageId: "page-1",
                 title: "Local title",
                 document: viewModel.document.proseMirrorDocument,
+                baseTitle: "Saved title",
                 baseDocument: savedBaseline
             )
         ])

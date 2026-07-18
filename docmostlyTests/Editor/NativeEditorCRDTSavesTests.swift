@@ -104,7 +104,7 @@ struct NativeEditorCRDTSavesTests {
         #expect(engine.events == [.integrateLocalChange, .flushPendingLocalChanges])
     }
 
-    @Test func crdtBackedSaveFailsWhenPendingLocalChangeIntegrationFails() async {
+    @Test func crdtBackedSaveRepairsFailedPendingIntegrationWithFullSnapshotFlush() async {
         let engine = SavingCRDTDocumentEngine()
         engine.integrationError = APIError.connectionFailed("CRDT local merge failed.")
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Draft"), alignment: .left)
@@ -121,18 +121,12 @@ struct NativeEditorCRDTSavesTests {
 
         let didSave = await viewModel.save(appState: AppState())
 
-        #expect(didSave == false)
-        #expect(engine.events == [.integrateLocalChange])
-        #expect(engine.flushRequests.isEmpty)
-        #expect(viewModel.isDirty == true)
-        #expect(
-            viewModel.saveErrorMessage ==
-                APIError.connectionFailed("CRDT local merge failed.").localizedDescription
-        )
-        #expect(
-            viewModel.realtimeStatus ==
-                .failed(APIError.connectionFailed("CRDT local merge failed.").localizedDescription)
-        )
+        #expect(didSave)
+        #expect(engine.events == [.integrateLocalChange, .flushPendingLocalChanges])
+        #expect(engine.flushRequests.count == 1)
+        #expect(engine.flushRequests.first?.document == viewModel.document)
+        #expect(viewModel.isDirty == false)
+        #expect(viewModel.saveErrorMessage == nil)
     }
 }
 

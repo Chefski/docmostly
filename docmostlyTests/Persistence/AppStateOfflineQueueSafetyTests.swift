@@ -146,6 +146,7 @@ struct AppStateOfflineQueueSafetyTests {
             pageId: "page-1",
             title: "Local",
             document: localDocument,
+            remoteBaseTitle: "Remote title",
             remoteBaseDocument: remoteDocument,
             replacingThrough: oldRecord.createdAt.addingTimeInterval(1)
         )
@@ -158,6 +159,7 @@ struct AppStateOfflineQueueSafetyTests {
                 pageId: "page-1",
                 title: "Local",
                 document: localDocument,
+                baseTitle: "Remote title",
                 baseDocument: remoteDocument
             )
         ])

@@ -5,6 +5,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String? = nil,
         baseDocument: ProseMirrorDocument? = nil
     )
     case createComment(
@@ -48,6 +49,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         case pageId
         case title
         case document
+        case baseTitle
         case baseDocument
         case localId
         case content
@@ -76,6 +78,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
                 pageId: payload.decode(String.self, forKey: .pageId),
                 title: payload.decode(String.self, forKey: .title),
                 document: payload.decode(ProseMirrorDocument.self, forKey: .document),
+                baseTitle: payload.decodeIfPresent(String.self, forKey: .baseTitle),
                 baseDocument: payload.decodeIfPresent(ProseMirrorDocument.self, forKey: .baseDocument)
             )
         } else if container.contains(.createComment) {
@@ -168,11 +171,12 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .updatePage(let pageId, let title, let document, let baseDocument):
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePage)
             try payload.encode(pageId, forKey: .pageId)
             try payload.encode(title, forKey: .title)
             try payload.encode(document, forKey: .document)
+            try payload.encodeIfPresent(baseTitle, forKey: .baseTitle)
             try payload.encodeIfPresent(baseDocument, forKey: .baseDocument)
         case .createComment(
             let localId,
@@ -273,7 +277,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var coalescingKey: String? {
         switch self {
-        case .updatePage(let pageId, _, _, _):
+        case .updatePage(let pageId, _, _, _, _):
             "\(kind.rawValue):\(pageId)"
         case .resolveComment(let commentId, _, _):
             "\(kind.rawValue):\(commentId)"
@@ -316,7 +320,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         guard mappings.isEmpty == false else { return self }
 
         switch self {
-        case .updatePage(let pageId, let title, let document, let baseDocument):
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             var patchedDocument = document
             var patchedBaseDocument = baseDocument
             var didReplace = false
@@ -335,6 +339,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
                 pageId: pageId,
                 title: title,
                 document: patchedDocument,
+                baseTitle: baseTitle,
                 baseDocument: patchedBaseDocument
             )
         default:

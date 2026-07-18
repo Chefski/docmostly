@@ -100,12 +100,14 @@ extension AppState {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String? = nil,
         baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
         try await queueOfflineMutation(.updatePage(
             pageId: pageId,
             title: title,
             document: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument
         ))
         return try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
@@ -115,7 +117,7 @@ extension AppState {
         guard let cacheScope else { return page }
         let pendingRecords = try await pendingOfflineMutations(scope: cacheScope)
         guard let draft = pendingRecords.reversed().compactMap({ record -> (String, ProseMirrorDocument)? in
-            guard case .updatePage(let pageID, let title, let document, _) = record.payload,
+            guard case .updatePage(let pageID, let title, let document, _, _) = record.payload,
                   pageID == page.id || pageID == page.slugId
             else {
                 return nil
@@ -278,11 +280,12 @@ extension AppState {
         using apiClient: DocmostAPIClient
     ) async throws -> (localID: String, serverID: String)? {
         switch payload {
-        case .updatePage(let pageId, let title, let document, let baseDocument):
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             try await replayPageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: baseTitle,
                 baseDocument: baseDocument,
                 scope: record.scope,
                 using: apiClient
@@ -325,6 +328,7 @@ extension AppState {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String?,
         baseDocument: ProseMirrorDocument?,
         scope: CacheScope,
         using apiClient: DocmostAPIClient
@@ -335,16 +339,17 @@ extension AppState {
             serverPage: serverPage,
             queuedTitle: title,
             queuedDocument: document,
+            baseTitle: baseTitle,
             baseDocument: baseDocument
         ) {
         case .alreadySynchronized:
             page = serverPage
         case .updateTitleOnly:
             page = try await apiClient.send(.updatePage(pageId: pageId, title: title))
-        case .replaceDocument:
+        case .replaceDocument(let replacementTitle):
             page = try await apiClient.send(.updatePage(
                 pageId: pageId,
-                title: title,
+                title: replacementTitle,
                 content: document,
                 format: .json,
                 operation: .replace

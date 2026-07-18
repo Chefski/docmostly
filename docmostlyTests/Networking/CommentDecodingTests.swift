@@ -206,6 +206,31 @@ struct CommentDecodingTests {
         #expect(comment.isNativelyEditable == false)
     }
 
+    @Test func rejectsOversizedCommentAttributesDuringDecode() throws {
+        let oversizedAttribute = String(
+            repeating: "A",
+            count: ProseMirrorDecodingLimits.maximumAttributeStringLength + 1
+        )
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "attrs": { "metadata": "\(oversizedAttribute)" },
+              "content": [{ "type": "text", "text": "Safe text" }]
+            }
+          ]
+        }
+        """)
+
+        let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
+
+        #expect(comment.content == nil)
+        #expect(comment.body == nil)
+        #expect(comment.isNativelyEditable == false)
+    }
+
     private func commentData(contentJSON: String) -> Data {
         Data("""
         {

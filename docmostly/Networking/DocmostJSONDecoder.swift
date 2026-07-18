@@ -3,6 +3,7 @@ import Foundation
 nonisolated enum DocmostJSONDecoder {
     static func make() -> JSONDecoder {
         let decoder = JSONDecoder()
+        decoder.userInfo[.proseMirrorDecodingBudget] = ProseMirrorDecodingBudget()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let value = try container.decode(String.self)
