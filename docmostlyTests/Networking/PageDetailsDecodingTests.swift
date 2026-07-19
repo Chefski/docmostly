@@ -3,6 +3,23 @@ import Testing
 @testable import docmostly
 
 struct PageDetailsDecodingTests {
+    @Test func decodesUntitledEditablePageWithNullTitle() throws {
+        let data = Data("""
+        {
+          "id": "page-1",
+          "slugId": "new-note",
+          "title": null,
+          "content": null,
+          "spaceId": "space-1"
+        }
+        """.utf8)
+
+        let page = try DocmostJSONDecoder.make().decode(DocmostEditablePage.self, from: data)
+
+        #expect(page.title == "")
+        #expect(page.content == nil)
+    }
+
     @Test func editablePageKeepsDetailsMetadata() throws {
         let data = Data("""
         {

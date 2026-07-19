@@ -2,7 +2,7 @@ import SwiftUI
 
 #if DEBUG
 struct NativeEditorDebugPreviewView: View {
-    @State private var viewModel = NativeRichEditorViewModel(pageID: "preview", initialTitle: "Native Editor")
+    @State private var viewModel = NativeRichEditorViewModel(pageID: "preview", initialTitle: "Blah blah")
     @FocusState private var focusedField: NativeEditorFocus?
 
     var body: some View {
@@ -37,43 +37,7 @@ struct NativeEditorDebugPreviewView: View {
     private func configurePreview() {
         guard viewModel.document.blocks.first?.text.characters.isEmpty == true else { return }
 
-        var paragraph = AttributedString(
-            "Select text, then use the toolbar for bold, italic, lists, links, and alignment."
-        )
-        paragraph.inlinePresentationIntent = .emphasized
-
-        viewModel.document = NativeEditorDocument(blocks: [
-            NativeEditorBlock(
-                kind: .heading(level: 1),
-                text: AttributedString("Native Docmost editor"),
-                alignment: .left
-            ),
-            NativeEditorBlock(kind: .paragraph, text: paragraph, alignment: .left),
-            NativeEditorBlock(
-                kind: .bulletListItem,
-                text: AttributedString("ProseMirror JSON bridge"),
-                alignment: .left
-            ),
-            NativeEditorBlock(
-                kind: .bulletListItem,
-                text: AttributedString("Keyboard toolbar"),
-                alignment: .left
-            ),
-            NativeEditorBlock(
-                kind: .taskListItem(isChecked: false),
-                text: AttributedString("Autosave through pages/update"),
-                alignment: .left
-            ),
-            NativeEditorBlock(
-                kind: .paragraph,
-                text: AttributedString("/to"),
-                alignment: .left
-            )
-        ])
-        if let commandBlockID = viewModel.document.blocks.last?.id {
-            viewModel.focus(blockID: commandBlockID)
-            focusedField = .block(commandBlockID)
-        }
+        viewModel.document = NativeEditorDocument(blocks: Self.previewBlocks)
         viewModel.resetEditingHistory()
     }
 
@@ -87,5 +51,86 @@ struct NativeEditorDebugPreviewView: View {
             viewModel.clearFocus()
         }
     }
+
+    private static let previewBlocks = [
+        NativeEditorBlock(
+            kind: .paragraph,
+            text: AttributedString("The quick brown fox jumped over the fence or whatever"),
+            alignment: .left
+        ),
+        NativeEditorBlock(kind: .heading(level: 1), text: AttributedString("Heading 1"), alignment: .left),
+        NativeEditorBlock(kind: .heading(level: 2), text: AttributedString("Heading 2"), alignment: .left),
+        NativeEditorBlock(kind: .heading(level: 3), text: AttributedString("Heading 3"), alignment: .left),
+        NativeEditorBlock(
+            kind: .bulletListItem,
+            text: AttributedString("Bullet 1"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .bulletListItem,
+            text: AttributedString("Bullet 1"),
+            alignment: .left
+        ),
+        NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Bullet 3"), alignment: .left),
+        NativeEditorBlock(
+            kind: .orderedListItem(ordinal: 1),
+            text: AttributedString("One"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .orderedListItem(ordinal: 2),
+            text: AttributedString("Two"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .orderedListItem(ordinal: 3),
+            text: AttributedString("Three"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .taskListItem(isChecked: false),
+            text: AttributedString("Todo 1"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .taskListItem(isChecked: false),
+            text: AttributedString("Todo 2"),
+            alignment: .left
+        ),
+        NativeEditorBlock(kind: .blockquote, text: AttributedString("The quick maniac man"), alignment: .left),
+        NativeEditorBlock(kind: .divider, text: AttributedString("Divider"), alignment: .left),
+        NativeEditorBlock(
+            kind: .codeBlock(language: "swift"),
+            text: AttributedString(#"print("Hello World!")"#),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .details(NativeEditorDetailsBlock(
+                summary: "Toggle block",
+                previewText: "Can you see everything here?",
+                isOpen: false
+            )),
+            text: AttributedString("Toggle block"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .details(NativeEditorDetailsBlock(
+                summary: "Open toggle block",
+                previewText: "Can you see everything here?",
+                isOpen: true
+            )),
+            text: AttributedString("Open toggle block"),
+            alignment: .left
+        ),
+        NativeEditorBlock(
+            kind: .callout(NativeEditorCalloutBlock(
+                style: "danger",
+                icon: nil,
+                previewText: "Hey you better watch out!!!!"
+            )),
+            text: AttributedString("Hey you better watch out!!!!"),
+            alignment: .left
+        )
+    ]
 }
 #endif

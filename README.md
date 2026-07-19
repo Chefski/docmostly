@@ -2,6 +2,8 @@
 
 Docmostly is an open source Apple-platform app for [Docmost](https://docmost.com), built as a native companion for Docmost workspaces across iPhone, iPad, and Mac.
 
+[![Download Docmostly on TestFlight](https://askyourself.app/assets/testflight.png)](https://testflight.apple.com/join/pnRP3TSA)
+
 The goal is to make Docmost feel at home on iPhone, iPad, and macOS: fast browsing, reliable reading, search, recent pages, offline read-only access, settings, comments, attachments, and collaboration features designed with SwiftUI instead of a web wrapper.
 
 Docmostly is an independent open source project and is not affiliated with, sponsored by, or endorsed by Docmost.

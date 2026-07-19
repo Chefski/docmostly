@@ -30,12 +30,26 @@ struct NativeEditorLocalAwarenessUpdateTests {
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(id: blockID, kind: .paragraph, text: AttributedString("Body"), alignment: .left)
         ])
-        let session = viewModel.collaborationSession()
+        let session = viewModel.collaborationSession(participation: .interactive)
         var iterator = session.localAwarenessUpdates?.makeAsyncIterator()
 
         viewModel.focus(blockID: blockID)
 
         #expect(await iterator?.next() != nil)
+    }
+
+    @Test func receiveOnlyCollaborationSessionSuppressesLocalAwarenessUpdates() {
+        let blockID = UUID()
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(id: blockID, kind: .paragraph, text: AttributedString("Body"), alignment: .left)
+        ])
+
+        let session = viewModel.collaborationSession(participation: .receiveOnly)
+
+        #expect(session.participation == .receiveOnly)
+        #expect(session.localAwarenessCursor == nil)
+        #expect(session.localAwarenessUpdates == nil)
     }
 
     @Test func selectionChangesPublishLocalAwarenessWithoutDirtyingDocument() async {

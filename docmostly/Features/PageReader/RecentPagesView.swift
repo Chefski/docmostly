@@ -12,7 +12,7 @@ struct RecentPagesView: View {
 
             Section(appState.isOffline ? "Recent cached pages" : "Recent pages") {
                 ForEach(viewModel.pages) { page in
-                    NavigationLink(value: page) {
+                    PageOpenLink(target: PageOpenTarget(page: page)) {
                         PageListRowView(page: page, systemImage: "clock")
                     }
                 }
@@ -40,17 +40,12 @@ struct RecentPagesView: View {
                 }
             }
         }
-        .task {
+        .task(id: appState.pageDiscoveryRevision) {
             await viewModel.load(appState: appState)
         }
         .refreshable {
             await viewModel.load(appState: appState)
         }
-        .navigationDestination(for: DocmostPage.self) { page in
-            PageReaderView(pageID: page.slugId)
-                .task(id: page.id) {
-                    appState.selectPage(id: page.slugId, spaceID: page.spaceId)
-                }
-        }
+        .pageOpenDestination()
     }
 }

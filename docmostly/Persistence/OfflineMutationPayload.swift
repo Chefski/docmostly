@@ -1,7 +1,20 @@
 import Foundation
 
 nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
-    case updatePage(pageId: String, title: String, document: ProseMirrorDocument)
+    case updatePage(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        baseTitle: String? = nil,
+        baseDocument: ProseMirrorDocument? = nil
+    )
+    case updatePageCRDT(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        stateUpdate: Data,
+        baseTitle: String? = nil
+    )
     case createComment(
         localId: String,
         pageId: String,
@@ -25,6 +38,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case updatePage
+        case updatePageCRDT
         case createComment
         case resolveComment
         case addPageLabels
@@ -43,6 +57,9 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         case pageId
         case title
         case document
+        case baseTitle
+        case baseDocument
+        case stateUpdate
         case localId
         case content
         case plainText
@@ -64,12 +81,23 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        if container.contains(.updatePage) {
+        if container.contains(.updatePageCRDT) {
+            let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageCRDT)
+            self = try .updatePageCRDT(
+                pageId: payload.decode(String.self, forKey: .pageId),
+                title: payload.decode(String.self, forKey: .title),
+                document: payload.decode(ProseMirrorDocument.self, forKey: .document),
+                stateUpdate: payload.decode(Data.self, forKey: .stateUpdate),
+                baseTitle: payload.decodeIfPresent(String.self, forKey: .baseTitle)
+            )
+        } else if container.contains(.updatePage) {
             let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePage)
             self = try .updatePage(
                 pageId: payload.decode(String.self, forKey: .pageId),
                 title: payload.decode(String.self, forKey: .title),
-                document: payload.decode(ProseMirrorDocument.self, forKey: .document)
+                document: payload.decode(ProseMirrorDocument.self, forKey: .document),
+                baseTitle: payload.decodeIfPresent(String.self, forKey: .baseTitle),
+                baseDocument: payload.decodeIfPresent(ProseMirrorDocument.self, forKey: .baseDocument)
             )
         } else if container.contains(.createComment) {
             let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .createComment)
@@ -161,11 +189,20 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .updatePage(let pageId, let title, let document):
+        case .updatePageCRDT(let pageId, let title, let document, let stateUpdate, let baseTitle):
+            var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageCRDT)
+            try payload.encode(pageId, forKey: .pageId)
+            try payload.encode(title, forKey: .title)
+            try payload.encode(document, forKey: .document)
+            try payload.encode(stateUpdate, forKey: .stateUpdate)
+            try payload.encodeIfPresent(baseTitle, forKey: .baseTitle)
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePage)
             try payload.encode(pageId, forKey: .pageId)
             try payload.encode(title, forKey: .title)
             try payload.encode(document, forKey: .document)
+            try payload.encodeIfPresent(baseTitle, forKey: .baseTitle)
+            try payload.encodeIfPresent(baseDocument, forKey: .baseDocument)
         case .createComment(
             let localId,
             let pageId,
@@ -234,7 +271,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var kind: OfflineMutationKind {
         switch self {
-        case .updatePage:
+        case .updatePage, .updatePageCRDT:
             .updatePage
         case .createComment:
             .createComment
@@ -265,7 +302,8 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var coalescingKey: String? {
         switch self {
-        case .updatePage(let pageId, _, _):
+        case .updatePage(let pageId, _, _, _, _),
+                .updatePageCRDT(let pageId, _, _, _, _):
             "\(kind.rawValue):\(pageId)"
         case .resolveComment(let commentId, _, _):
             "\(kind.rawValue):\(commentId)"
@@ -283,11 +321,32 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         }
     }
 
+    /// Only mutations that do not carry newly-authored user content may be discarded after
+    /// the server permanently rejects them. Keep this as an explicit allowlist so new payload
+    /// types default to durable retention until their failure semantics are reviewed.
+    var canDropAfterPermanentClientFailure: Bool {
+        switch self {
+        case .resolveComment,
+                .removePageLabel,
+                .addFavorite,
+                .removeFavorite,
+                .watchPage,
+                .unwatchPage,
+                .watchSpace,
+                .unwatchSpace,
+                .movePage,
+                .movePageToSpace:
+            true
+        case .updatePage, .updatePageCRDT, .createComment, .addPageLabels:
+            false
+        }
+    }
+
     func replacingCommentIDs(_ mappings: [String: String]) -> OfflineMutationPayload {
         guard mappings.isEmpty == false else { return self }
 
         switch self {
-        case .updatePage(let pageId, let title, let document):
+        case .updatePageCRDT(let pageId, let title, let document, let stateUpdate, let baseTitle):
             var patchedDocument = document
             var didReplace = false
             for mapping in mappings {
@@ -296,7 +355,35 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
                 didReplace = didReplace || replacement.didReplace
             }
             guard didReplace else { return self }
-            return .updatePage(pageId: pageId, title: title, document: patchedDocument)
+            return .updatePageCRDT(
+                pageId: pageId,
+                title: title,
+                document: patchedDocument,
+                stateUpdate: stateUpdate,
+                baseTitle: baseTitle
+            )
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
+            var patchedDocument = document
+            var patchedBaseDocument = baseDocument
+            var didReplace = false
+            for mapping in mappings {
+                let replacement = patchedDocument.replacingCommentID(mapping.key, with: mapping.value)
+                patchedDocument = replacement.document
+                didReplace = didReplace || replacement.didReplace
+                if let baseDocument = patchedBaseDocument {
+                    let baseReplacement = baseDocument.replacingCommentID(mapping.key, with: mapping.value)
+                    patchedBaseDocument = baseReplacement.document
+                    didReplace = didReplace || baseReplacement.didReplace
+                }
+            }
+            guard didReplace else { return self }
+            return .updatePage(
+                pageId: pageId,
+                title: title,
+                document: patchedDocument,
+                baseTitle: baseTitle,
+                baseDocument: patchedBaseDocument
+            )
         default:
             return self
         }

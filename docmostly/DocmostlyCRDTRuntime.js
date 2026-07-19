@@ -13098,7 +13098,6 @@ ${err.toString()}`);
 
   // src/docmostly-crdt-runtime.js
   var fragmentName = "default";
-  var seedClientID = 1;
   var schema = new Schema2({
     nodes: {
       doc: { content: "block+" },
@@ -13303,7 +13302,6 @@ ${err.toString()}`);
       this.snapshots = [];
       this.ydoc = new Doc();
       this.fragment = this.ydoc.getXmlFragment(fragmentName);
-      this.applySeedDocument(seed.title, seed.document);
       this.ydoc.on("update", (update, origin) => {
         if (origin === this.localOrigin) {
           this.localUpdates.push(base64FromBytes(update));
@@ -13380,18 +13378,6 @@ ${err.toString()}`);
       const snapshots = this.snapshots;
       this.snapshots = [];
       return snapshots;
-    }
-    applySeedDocument(title, document2) {
-      this.title = title;
-      const seedDoc = new Doc();
-      seedDoc.clientID = seedClientID;
-      const seedFragment = seedDoc.getXmlFragment(fragmentName);
-      const nextDoc = schema.nodeFromJSON(normalizedDocument(document2));
-      const transactionTarget = {
-        transact: (operation) => seedDoc.transact(operation, this.remoteOrigin)
-      };
-      updateYFragment(transactionTarget, seedFragment, nextDoc, mappingStateFor(seedFragment));
-      applyUpdate(this.ydoc, encodeStateAsUpdate(seedDoc), this.remoteOrigin);
     }
     applyDocument(title, document2, origin) {
       this.title = title;

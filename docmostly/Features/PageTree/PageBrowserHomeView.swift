@@ -24,7 +24,7 @@ struct PageBrowserHomeView: View {
 
             Section(viewModel.selectedScope.title) {
                 ForEach(viewModel.items) { item in
-                    NavigationLink(value: item) {
+                    PageOpenLink(target: PageOpenTarget(item: item)) {
                         PageBrowserRowView(item: item)
                     }
                     .listRowInsets(PageBrowserMetrics.rowInsets)
@@ -51,12 +51,14 @@ struct PageBrowserHomeView: View {
         .refreshable {
             await viewModel.load(space: space, provider: appState)
         }
-        .navigationDestination(for: PageBrowserItem.self) { item in
-            PageBrowserDestinationView(item: item)
-        }
+        .pageOpenDestination()
     }
 
     private var pageBrowserTaskKey: PageBrowserTaskKey {
-        PageBrowserTaskKey(spaceID: space.id, scope: viewModel.selectedScope)
+        PageBrowserTaskKey(
+            spaceID: space.id,
+            scope: viewModel.selectedScope,
+            pageDiscoveryRevision: appState.pageDiscoveryRevision
+        )
     }
 }

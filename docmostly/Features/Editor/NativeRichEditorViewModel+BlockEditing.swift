@@ -291,6 +291,8 @@ extension NativeRichEditorViewModel {
     func deleteBlock(_ blockID: UUID) {
         performUndoableEdit {
             guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else { return }
+            let deletedBlockWasActive = activeBlockID == blockID
+            let deletedBlockWasSelected = selectedBlockID == blockID
 
             if document.blocks.count == 1 {
                 document.blocks[0].text = AttributedString("")
@@ -301,20 +303,39 @@ extension NativeRichEditorViewModel {
                 document.blocks.remove(at: index)
             }
 
-            if activeBlockID == blockID {
-                activeBlockID = document.blocks.indices.contains(index) ?
-                    document.blocks[index].id :
-                    document.blocks.last?.id
-            }
-
-            if selectedBlockID == blockID {
+            if deletedBlockWasSelected {
                 selectedBlockID = nil
                 visibleBlockControlsID = nil
-                activeBlockID = document.blocks.indices.contains(index) ?
-                    document.blocks[index].id :
-                    document.blocks.last?.id
+            }
+
+            if deletedBlockWasActive || deletedBlockWasSelected {
+                focusEditableBlockAfterDeletion(at: index)
             }
         }
+    }
+
+    private func focusEditableBlockAfterDeletion(at deletedIndex: Int) {
+        guard document.blocks.isEmpty == false else {
+            activeBlockID = nil
+            return
+        }
+
+        let precedingIndices = document.blocks.indices.prefix(min(deletedIndex, document.blocks.count)).reversed()
+        let followingIndices = document.blocks.indices.dropFirst(min(deletedIndex, document.blocks.count))
+        let focusIndex = precedingIndices.first(where: { document.blocks[$0].isEditable }) ??
+            followingIndices.first(where: { document.blocks[$0].isEditable })
+        guard let focusIndex else {
+            activeBlockID = nil
+            return
+        }
+
+        let insertionOffset = focusIndex < deletedIndex ? document.blocks[focusIndex].text.characters.count : 0
+        let insertionIndex = document.blocks[focusIndex].text.characters.index(
+            document.blocks[focusIndex].text.startIndex,
+            offsetBy: insertionOffset
+        )
+        document.blocks[focusIndex].selection = AttributedTextSelection(insertionPoint: insertionIndex)
+        activeBlockID = document.blocks[focusIndex].id
     }
 
     func deleteSelectedBlock() {

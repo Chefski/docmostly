@@ -50,7 +50,41 @@ nonisolated struct NativeEditorYjsRelativePosition: Codable, Equatable, Hashable
     let assoc: Int?
 
     var targetsDocmostDefaultFragment: Bool {
-        targetName == Self.docmostFragmentName
+        if let targetName {
+            return targetName == Self.docmostFragmentName
+        }
+        if case .id = type {
+            return true
+        }
+        return false
+    }
+
+    init(
+        type: NativeEditorYjsRelativePositionType?,
+        targetName: String?,
+        item: NativeEditorYjsID?,
+        assoc: Int?
+    ) {
+        self.type = type
+        self.targetName = targetName
+        self.item = item
+        self.assoc = assoc
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decodeIfPresent(NativeEditorYjsRelativePositionType.self, forKey: .type)
+        targetName = try container.decodeIfPresent(String.self, forKey: .targetName)
+        item = try container.decodeIfPresent(NativeEditorYjsID.self, forKey: .item)
+        assoc = try container.decodeIfPresent(Int.self, forKey: .assoc)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeExplicitlyNullable(type, forKey: .type)
+        try container.encodeExplicitlyNullable(targetName, forKey: .targetName)
+        try container.encodeExplicitlyNullable(item, forKey: .item)
+        try container.encodeExplicitlyNullable(assoc, forKey: .assoc)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -58,6 +92,19 @@ nonisolated struct NativeEditorYjsRelativePosition: Codable, Equatable, Hashable
         case targetName = "tname"
         case item
         case assoc
+    }
+}
+
+nonisolated private extension KeyedEncodingContainer {
+    mutating func encodeExplicitlyNullable<Value: Encodable>(
+        _ value: Value?,
+        forKey key: Key
+    ) throws {
+        if let value {
+            try encode(value, forKey: key)
+        } else {
+            try encodeNil(forKey: key)
+        }
     }
 }
 

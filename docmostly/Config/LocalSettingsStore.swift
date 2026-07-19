@@ -5,6 +5,7 @@ final class LocalSettingsStore {
     private let userDefaults: UserDefaults
     private let serverURLKey = "Docmostly.serverURL"
     private let savedServerURLsKey = "Docmostly.savedServerURLs"
+    private let lastSelectedSpaceIDsKey = "Docmostly.lastSelectedSpaceIDs"
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -21,6 +22,24 @@ final class LocalSettingsStore {
 
     func loadSavedServerURLStrings() -> [String] {
         userDefaults.stringArray(forKey: savedServerURLsKey) ?? []
+    }
+
+    func loadLastSelectedSpaceID(for scope: CacheScope) -> String? {
+        lastSelectedSpaceIDs[selectionScopeKey(for: scope)]
+    }
+
+    func saveLastSelectedSpaceID(_ spaceID: String, for scope: CacheScope) {
+        var selectedSpaceIDs = lastSelectedSpaceIDs
+        selectedSpaceIDs[selectionScopeKey(for: scope)] = spaceID
+        userDefaults.set(selectedSpaceIDs, forKey: lastSelectedSpaceIDsKey)
+    }
+
+    private var lastSelectedSpaceIDs: [String: String] {
+        userDefaults.dictionary(forKey: lastSelectedSpaceIDsKey) as? [String: String] ?? [:]
+    }
+
+    private func selectionScopeKey(for scope: CacheScope) -> String {
+        "\(scope.serverBaseURL)\n\(scope.userID)"
     }
 
     private func rememberServerURLString(_ value: String) {

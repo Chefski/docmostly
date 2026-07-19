@@ -134,12 +134,46 @@ struct NativeEditorCollaborationTests {
 
         #expect(viewModel.remoteCursors == [
             NativeEditorRemoteCursor(
-                id: "user-2",
+                id: "client-11",
+                collaboratorID: "user-2",
                 name: "Alice",
                 colorName: "#2563EB",
                 cursor: aliceCursor
             )
         ])
+    }
+
+    @Test func unchangedAwarenessDoesNotRewriteCollaboratorsOrResolvedCursors() {
+        let viewModel = configuredViewModel()
+        let aliceCursor = awarenessCursor(client: 2, anchorClock: 3, headClock: 5)
+        let states = [
+            NativeEditorAwarenessState(
+                clientID: 11,
+                clock: 1,
+                payload: NativeEditorAwarenessPayload(
+                    user: NativeEditorAwarenessUser(id: "user-2", name: "Alice", color: "#2563EB"),
+                    cursor: aliceCursor
+                )
+            )
+        ]
+        let resolvedCursor = NativeEditorResolvedRemoteCursor(
+            id: "user-2",
+            name: "Alice",
+            colorName: "#2563EB",
+            anchor: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 1),
+            head: NativeEditorRemoteTextPosition(blockIndex: 0, characterOffset: 5)
+        )
+
+        let firstUpdateChangedCursors = viewModel.applyAwarenessStates(states, localClientID: 10)
+        viewModel.resolvedRemoteCursors = [resolvedCursor]
+        let repeatedUpdateChangedCursors = viewModel.applyAwarenessStates(states, localClientID: 10)
+
+        #expect(firstUpdateChangedCursors)
+        #expect(repeatedUpdateChangedCursors == false)
+        #expect(viewModel.activeCollaborators == [
+            NativeEditorCollaborator(id: "user-2", name: "Alice", colorName: "#2563EB")
+        ])
+        #expect(viewModel.resolvedRemoteCursors == [resolvedCursor])
     }
 
     @Test func ignoresAwarenessCursorsOutsideDocmostDefaultFragment() {

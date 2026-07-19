@@ -4,24 +4,46 @@ struct NativeEditorBodyView: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
+    var serverURLString: String?
     var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
     var applyCommand: ((NativeEditorCommand) -> Void)?
+    var applyPendingRemoteUpdate: (() -> Void)?
+    var keepPendingLocalUpdate: (() -> Void)?
+    var slashCommandFilter: (NativeEditorCommand) -> Bool = { _ in true }
+    var showsTitle = true
+    var showsCollaborationStatus = true
+    var presenceProjection: NativeEditorRemotePresenceProjection?
+    var presenceScope: [NativeEditorRemotePresenceScope] = []
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 10) {
-            TextField("Page title", text: $viewModel.title, axis: .vertical)
-                .font(.largeTitle)
-                .bold()
-                .textFieldStyle(.plain)
-                .focused(focusedField, equals: .title)
-                .disabled(authoringIsAvailable == false)
-                .accessibilityLabel("Page title")
+        LazyVStack(alignment: .leading, spacing: 6) {
+            if showsTitle {
+                TextField("Page title", text: $viewModel.title, axis: .vertical)
+                    .font(.largeTitle)
+                    .bold()
+                    .textFieldStyle(.plain)
+                    .focused(focusedField, equals: .title)
+                    .submitLabel(.next)
+                    .onSubmit(advanceFromTitle)
+                    .disabled(authoringIsAvailable == false)
+                    .accessibilityLabel("Page title")
+
+                if let creatorName = viewModel.creator?.name, creatorName.isEmpty == false {
+                    NativeEditorBylineView(authorName: creatorName)
+                }
+            }
 
             if let saveErrorMessage = viewModel.saveErrorMessage {
                 NativeEditorSaveErrorView(message: saveErrorMessage)
             }
 
-            NativeEditorCollaborationStatusView(viewModel: viewModel)
+            if showsCollaborationStatus {
+                NativeEditorCollaborationStatusView(
+                    viewModel: viewModel,
+                    applyPendingRemoteUpdate: applyPendingRemoteUpdate,
+                    keepPendingLocalUpdate: keepPendingLocalUpdate
+                )
+            }
 
             ForEach($viewModel.document.blocks) { $block in
                 VStack(alignment: .leading, spacing: 6) {
@@ -51,6 +73,11 @@ struct NativeEditorBodyView: View {
                         richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
                         pageID: viewModel.currentPageID,
                         spaceID: viewModel.currentSpaceID,
+                        serverURLString: serverURLString,
+                        remotePresenceSegments: remotePresenceSegments(for: block.id),
+                        presenceProjection: activePresenceProjection,
+                        presenceScope: presenceScope,
+                        presenceBlockIndex: blockIndex(for: block.id),
                         focusBlock: {
                             guard authoringIsAvailable else { return }
                             viewModel.focus(blockID: block.id)
@@ -58,6 +85,18 @@ struct NativeEditorBodyView: View {
                         moveBefore: { movedBlockID in
                             guard authoringIsAvailable else { return }
                             viewModel.moveBlock(movedBlockID, before: block.id)
+                        },
+                        splitBlock: { characterRange in
+                            guard authoringIsAvailable else { return false }
+                            return viewModel.splitBlock(block.id, replacing: characterRange) != nil
+                        },
+                        insertHardBreak: { characterRange in
+                            guard authoringIsAvailable else { return false }
+                            return viewModel.insertSoftBreak(in: block.id, replacing: characterRange)
+                        },
+                        mergeBlockBackward: {
+                            guard authoringIsAvailable else { return false }
+                            return viewModel.mergeBlockBackward(block.id)
                         },
                         blockChanged: {
                             guard authoringIsAvailable else { return }
@@ -82,16 +121,12 @@ struct NativeEditorBodyView: View {
                         NativeEditorSlashCommandMenu(
                             viewModel: viewModel,
                             importAttachment: importAttachment,
-                            applyCommand: applyCommand
+                            applyCommand: applyCommand,
+                            commandFilter: slashCommandFilter
                         )
                             .padding(.leading, 34)
                     }
 
-                    let remoteCursors = viewModel.resolvedCursorsForBlock(id: block.id)
-                    if remoteCursors.isEmpty == false {
-                        NativeEditorRemoteCursorBadgeStack(cursors: remoteCursors)
-                            .padding(.leading, 34)
-                    }
                 }
             }
 
@@ -111,7 +146,31 @@ struct NativeEditorBodyView: View {
     }
 
     private var authoringIsAvailable: Bool {
-        isAuthoringEnabled && viewModel.canEdit
+        isAuthoringEnabled && viewModel.canEdit && viewModel.isResolvingConflict == false
+    }
+
+    private var activePresenceProjection: NativeEditorRemotePresenceProjection {
+        presenceProjection ?? viewModel.remotePresenceProjection
+    }
+
+    private func blockIndex(for blockID: UUID) -> Int {
+        viewModel.document.blocks.firstIndex(where: { $0.id == blockID }) ?? 0
+    }
+
+    private func remotePresenceSegments(for blockID: UUID) -> [NativeEditorRemotePresenceSegment] {
+        activePresenceProjection.segments(
+            scope: presenceScope,
+            blockIndex: blockIndex(for: blockID)
+        )
+    }
+
+    private func advanceFromTitle() {
+        guard authoringIsAvailable else { return }
+        if let firstEditableBlock = viewModel.document.blocks.first(where: \.isEditable) {
+            viewModel.focus(blockID: firstEditableBlock.id)
+        } else {
+            viewModel.appendBlock()
+        }
     }
 
     private var tableEditingActions: NativeEditorTableEditingActions {
@@ -139,6 +198,9 @@ struct NativeEditorBodyView: View {
             updateCallout: viewModel.updateCallout,
             updateDetails: viewModel.updateDetails,
             updateColumns: viewModel.updateColumns,
+            updateNestedContent: viewModel.updateNestedContent,
+            setColumnCount: viewModel.setColumnCount,
+            updateColumnWidth: viewModel.updateColumnWidth,
             updateTransclusionSource: viewModel.updateTransclusionSource,
             updateTransclusionReference: viewModel.updateTransclusionReference,
             updateMediaBlock: viewModel.updateMediaBlock,

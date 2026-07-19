@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 actor CacheReadRepository {
@@ -21,6 +22,10 @@ actor CacheReadRepository {
 
     func loadEditablePage(idOrSlugId: String, scope: CacheScope) throws -> DocmostEditablePage? {
         try repository().loadEditablePage(idOrSlugId: idOrSlugId, scope: scope)
+    }
+
+    func loadCRDTStateUpdate(pageId: String, scope: CacheScope) throws -> Data? {
+        try repository().loadCRDTStateUpdate(pageId: pageId, scope: scope)
     }
 
     func loadAttachmentLinks(pageId: String, scope: CacheScope) throws -> [DocmostAttachmentLink] {

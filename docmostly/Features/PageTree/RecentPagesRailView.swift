@@ -8,7 +8,7 @@ struct RecentPagesRailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PageBrowserMetrics.railSectionSpacing) {
-            Text(isOffline ? "Recent cached pages" : "Recently updated")
+            Text("Recently updated")
                 .font(.headline)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -26,15 +26,17 @@ struct RecentPagesRailView: View {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: PageBrowserMetrics.railCardSpacing) {
                         ForEach(items) { item in
-                            NavigationLink(value: item) {
+                            PageOpenLink(target: PageOpenTarget(item: item)) {
                                 RecentPageCardView(item: item)
                             }
                             .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, PageBrowserMetrics.railHorizontalPadding)
+                    .padding(.vertical, PageBrowserMetrics.railCardVerticalOverflowPadding)
                     .scrollTargetLayout()
                 }
+                .padding(.vertical, -PageBrowserMetrics.railCardVerticalOverflowPadding)
                 .scrollIndicators(.hidden)
                 .scrollTargetBehavior(.viewAligned)
             }

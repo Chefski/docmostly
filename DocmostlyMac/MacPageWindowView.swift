@@ -115,7 +115,7 @@ struct MacPageWindowView: View {
                 keywords: ["permissions", "members"],
                 isEnabled: appState.phase == .authenticated
             ) {
-                selectSidebarDestination(.settings)
+                presentSpaceSettings()
             },
             MacCommandPaletteItem(
                 title: "Refresh Spaces",
@@ -156,6 +156,7 @@ struct MacPageWindowView: View {
             selectedPageRoute: { selectedPageRoute },
             presentCommandPalette: presentCommandPalette,
             presentPageCreation: presentPageCreation,
+            presentSpaceSettings: presentSpaceSettings,
             selectSidebarDestination: selectSidebarDestination,
             openSelectedPageInNewWindow: openSelectedPageInNewWindow
         )
@@ -177,6 +178,11 @@ struct MacPageWindowView: View {
 
     private func presentPageCreation() {
         isPageCreationPresented = true
+    }
+
+    private func presentSpaceSettings() {
+        commandController.requestSpaceSettingsPresentation()
+        openWindow(id: "main")
     }
 
     private func updateLoadedPageContext(pageID: String, spaceID: String, title: String) {

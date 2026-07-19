@@ -196,6 +196,26 @@ struct NativeEditorCRDTCollaborationTests {
         #expect(frame.message == .sync(.stepOne(Data([21, 22]))))
     }
 
+    @Test func receiveOnlyCollaborationSessionKeepsCRDTDriverWithoutLocalAwareness() async throws {
+        let engine = RecordingCRDTDocumentEngine()
+        engine.encodedStateVector = Data([21, 22])
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+
+        let collaborationSession = viewModel.collaborationSession(participation: .receiveOnly)
+        let driver = try #require(collaborationSession.syncDriver)
+        let frames = try await driver.outboundFramesAfterAuthentication()
+        let frame = try NativeEditorHocuspocusFrame.parse(try #require(frames.first))
+
+        #expect(collaborationSession.participation == .receiveOnly)
+        #expect(collaborationSession.localAwarenessCursor == nil)
+        #expect(collaborationSession.localAwarenessUpdates == nil)
+        #expect(frame.message == .sync(.stepOne(Data([21, 22]))))
+    }
+
     @Test func viewModelResolvesRemoteCursorsThroughCRDTEngine() async throws {
         let remoteCursor = remoteCursor(id: "user-2", name: "Alice")
         let resolvedCursor = NativeEditorResolvedRemoteCursor(

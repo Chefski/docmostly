@@ -1,21 +1,13 @@
 import SwiftUI
 
 struct FavoriteDestinationView: View {
-    @Environment(AppState.self) private var appState
-
     let favorite: DocmostFavorite
 
     var body: some View {
         switch favorite.type {
         case .page:
-            if let targetID = favorite.targetID {
-                PageReaderView(pageID: targetID)
-                    .task(id: favorite.id) {
-                        appState.selectPage(
-                            id: targetID,
-                            spaceID: favorite.page?.spaceId ?? favorite.spaceId
-                        )
-                    }
+            if let target = PageOpenTarget(favorite: favorite) {
+                PageOpenDestinationView(target: target)
             } else {
                 ContentUnavailableView("Page unavailable", systemImage: "doc.text")
             }

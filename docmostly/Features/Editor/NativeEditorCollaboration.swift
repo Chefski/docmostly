@@ -22,14 +22,53 @@ nonisolated enum NativeEditorCollaborationEvent: Equatable, Sendable {
     case syncStatus(Bool)
 }
 
+nonisolated enum NativeEditorCollaborationParticipation: Equatable, Sendable {
+    case interactive
+    case receiveOnly
+
+    var allowsLocalDocumentUpdates: Bool {
+        self == .interactive
+    }
+
+    var allowsLocalAwarenessUpdates: Bool {
+        self == .interactive
+    }
+}
+
 nonisolated struct NativeEditorCollaborationSessionContext: Sendable {
     let url: URL
     let token: String
     let documentName: String
+    let participation: NativeEditorCollaborationParticipation
     let user: DocmostUser?
     let syncDriver: NativeEditorCollaborationSyncDriver?
     let localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)?
     let localAwarenessUpdates: AsyncStream<Void>?
+
+    func allowsInitialDocumentSync(for scope: NativeEditorCollaborationScope) -> Bool {
+        scope.allowsInitialDocumentSync
+    }
+
+    func allowsLocalAwarenessUpdates(for scope: NativeEditorCollaborationScope) -> Bool {
+        participation.allowsLocalAwarenessUpdates && scope.allowsLocalAwarenessUpdates
+    }
+
+    func allowsLocalDocumentUpdates(for scope: NativeEditorCollaborationScope) -> Bool {
+        participation.allowsLocalDocumentUpdates && scope.allowsLocalDocumentUpdates
+    }
+
+    func allowsSyncReply(
+        to message: NativeEditorYjsSyncMessage,
+        authenticatedScope: NativeEditorCollaborationScope?
+    ) -> Bool {
+        guard let authenticatedScope else { return false }
+        switch message {
+        case .stepOne:
+            return participation.allowsLocalDocumentUpdates && authenticatedScope.allowsSyncReply(to: message)
+        case .stepTwo, .update:
+            return authenticatedScope.allowsSyncReply(to: message)
+        }
+    }
 }
 
 enum NativeEditorCollaboratorSource: Equatable, Sendable {
@@ -67,7 +106,7 @@ struct NativeEditorCollaborator: Equatable, Identifiable, Sendable {
         let identifier = user?.id ?? "client-\(awarenessState.clientID)"
         id = identifier
         name = user?.name ?? "Someone"
-        colorName = user?.color ?? Self.colorName(for: identifier)
+        colorName = user?.color ?? NativeEditorPresenceColor.color(for: identifier)
         source = .presence
     }
 
@@ -99,7 +138,7 @@ enum NativeEditorPresenceStatusText {
 
 nonisolated enum NativeEditorPresenceColor {
     static func color(for identifier: String) -> String {
-        let palette = ["#6B7280", "#2563EB", "#059669", "#EA580C", "#7C3AED"]
+        let palette = ["#958DF1", "#F98181", "#FBBC88", "#FAF594", "#70CFF8", "#94FADB", "#B9F18D"]
         let index = stableHash(for: identifier) % palette.count
         return palette[index]
     }
@@ -127,13 +166,20 @@ nonisolated struct NativeEditorAwarenessStateStore: Sendable {
         receivedAt: Date = .now
     ) -> [NativeEditorAwarenessState] {
         for state in updates {
-            if let latestClock = latestClockByClientID[state.clientID], state.clock <= latestClock {
-                if state.clock == latestClock,
-                   state.payload != nil,
-                   statesByClientID[state.clientID] != nil {
-                    lastSeenByClientID[state.clientID] = receivedAt
+            if let latestClock = latestClockByClientID[state.clientID] {
+                if state.clock < latestClock {
+                    continue
                 }
-                continue
+
+                if state.clock == latestClock {
+                    if state.payload == nil, statesByClientID[state.clientID] != nil {
+                        statesByClientID.removeValue(forKey: state.clientID)
+                        lastSeenByClientID.removeValue(forKey: state.clientID)
+                    } else if state.payload != nil, statesByClientID[state.clientID] != nil {
+                        lastSeenByClientID[state.clientID] = receivedAt
+                    }
+                    continue
+                }
             }
 
             latestClockByClientID[state.clientID] = state.clock

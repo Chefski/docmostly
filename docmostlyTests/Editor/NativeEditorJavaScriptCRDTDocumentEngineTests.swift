@@ -69,6 +69,21 @@ struct NativeEditorJSCRDTEngineTests {
         #expect(snapshot.updatedAt == Date(timeIntervalSince1970: 20))
     }
 
+    @Test func capturesRemoteSnapshotForAtomicNativeProjection() async throws {
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: Self.runtimeSource
+        )
+
+        let snapshot = try #require(try await engine.applyRemoteUpdateCapturingSnapshot(Data([8, 7])))
+
+        #expect(snapshot.title == "Remote")
+        #expect(snapshot.document.blocks.map { String($0.text.characters) } == ["Merged"])
+        #expect(snapshot.updatedAt == Date(timeIntervalSince1970: 20))
+    }
+
     @Test func flushesPendingLocalChangesThroughRuntime() async throws {
         let engine = try NativeEditorJSCRDTDocumentEngine(
             pageID: "page-1",
@@ -84,7 +99,8 @@ struct NativeEditorJSCRDTEngineTests {
 
         #expect(result == NativeEditorCRDTSaveResult(
             title: "Saved",
-            updatedAt: Date(timeIntervalSince1970: 30)
+            updatedAt: Date(timeIntervalSince1970: 30),
+            documentStateUpdate: Data([9, 9])
         ))
     }
 

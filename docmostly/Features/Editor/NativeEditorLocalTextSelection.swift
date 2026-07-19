@@ -36,9 +36,10 @@ struct NativeEditorLocalTextSelection: Equatable, Sendable {
         index: AttributedString.Index,
         text: AttributedString
     ) -> NativeEditorRemoteTextPosition {
-        NativeEditorRemoteTextPosition(
-            blockIndex: blockIndex,
-            characterOffset: text.characters.distance(from: text.startIndex, to: index)
-        )
+        let characterOffset = text.characters.distance(from: text.startIndex, to: index)
+        let plainText = String(text.characters)
+        let stringIndex = plainText.index(plainText.startIndex, offsetBy: characterOffset)
+        let utf16Offset = plainText[..<stringIndex].utf16.count
+        return NativeEditorRemoteTextPosition(blockIndex: blockIndex, characterOffset: utf16Offset)
     }
 }

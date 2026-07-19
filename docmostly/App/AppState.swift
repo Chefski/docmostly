@@ -13,24 +13,28 @@ final class AppState {
     var selectedSidebarDestination: SidebarDestination?
     var selectedSpaceID: String?
     var selectedPageID: String?
+    var selectedCommentID: String?
+    var favoriteRevision = 0
+    private(set) var pageDiscoveryRevision = 0
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
     var pendingOfflineMutationCount = 0
 
-    @ObservationIgnored private let settingsStore: LocalSettingsStore
+    @ObservationIgnored let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
+    @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
     @ObservationIgnored var cacheRepository: CacheRepository?
-    @ObservationIgnored private var cacheReader: CacheReadRepository?
+    @ObservationIgnored var cacheReader: CacheReadRepository?
     @ObservationIgnored var cacheWriter: CacheWriteRepository?
     @ObservationIgnored var offlineQueue: OfflineMutationQueue?
     @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
     @ObservationIgnored var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
     @ObservationIgnored private var restoreTask: Task<Void, Never>?
-    @ObservationIgnored private var spacesLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
     @ObservationIgnored var offlineReplayTask: Task<Void, Never>?
@@ -44,12 +48,16 @@ final class AppState {
         settingsStore: LocalSettingsStore? = nil,
         authService: AuthService? = nil,
         cookieJar: SessionCookieJar = SessionCookieJar(),
-        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil
+        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
+        offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing = NativeEditorOfflineCRDTSynchronizer(),
+        apiClient: DocmostAPIClient? = nil
     ) {
         self.settingsStore = settingsStore ?? LocalSettingsStore()
         self.cookieJar = cookieJar
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
+        self.offlineCRDTSynchronizer = offlineCRDTSynchronizer
+        self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
         savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()
     }
@@ -98,6 +106,10 @@ final class AppState {
 
             await self.flushScheduledCacheWrites()
         }
+    }
+
+    func markPageDiscoveryChanged() {
+        pageDiscoveryRevision &+= 1
     }
 
     private func flushScheduledCacheWrites() async {
@@ -216,25 +228,25 @@ final class AppState {
         phase = .unauthenticated
     }
 
-    func loadSpaces() async {
+    @discardableResult func loadSpaces() async -> Bool {
         if let spacesLoadTask {
-            await spacesLoadTask.value
-            return
+            return await spacesLoadTask.value
         }
 
         let task = Task { [weak self] in
-            guard let self else { return }
-            await self.performLoadSpaces()
+            guard let self else { return false }
+            return await self.performLoadSpaces()
         }
         spacesLoadTask = task
-        await task.value
+        let loadedFromServer = await task.value
         spacesLoadTask = nil
+        return loadedFromServer
     }
 
-    private func performLoadSpaces() async {
+    private func performLoadSpaces() async -> Bool {
         guard let apiClient else {
             await loadCachedSpaces()
-            return
+            return false
         }
 
         do {
@@ -247,14 +259,16 @@ final class AppState {
             }
             await refreshOfflineMutationCount()
             scheduleOfflineQueueReconciliation()
+            return true
         } catch {
             isOffline = true
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else {
                 spaces = []
-                return
+                return false
             }
             await loadCachedSpaces()
+            return false
         }
     }
 
@@ -317,7 +331,10 @@ final class AppState {
         }
 
         do {
-            let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
+            let remotePage: DocmostEditablePage = try await apiClient.send(
+                .pageInfo(pageId: idOrSlugId, format: .json)
+            )
+            let page = try await overlayPendingPageUpdate(on: remotePage)
             isOffline = false
             if let cacheScope {
                 scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
@@ -328,38 +345,6 @@ final class AppState {
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
             return try await requireCachedEditablePage(idOrSlugId: idOrSlugId)
-        }
-    }
-
-    func updatePage(pageId: String, title: String, document: ProseMirrorDocument) async throws -> DocmostEditablePage {
-        guard let apiClient else {
-            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
-        }
-
-        do {
-            let page: DocmostEditablePage = try await apiClient.send(.updatePage(
-                pageId: pageId,
-                title: title,
-                content: document,
-                format: .json,
-                operation: .replace
-            ))
-            isOffline = false
-            if let cacheScope {
-                scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
-            }
-            do {
-                try await clearPendingPageUpdate(pageId: pageId, title: title, document: document)
-                scheduleOfflineQueueReconciliation()
-            } catch {
-                statusMessage = error.localizedDescription
-            }
-            return page
-        } catch {
-            guard canQueueOfflineMutation(after: error) else { throw error }
-            isOffline = true
-            statusMessage = error.localizedDescription
-            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
         }
     }
 

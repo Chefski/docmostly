@@ -21,9 +21,10 @@ final class PageReaderViewModel {
     var sharingErrorMessage: String?
     var isLoadingSharingState = false
     var isUpdatingShare = false
-    var draftComment = ""
-    var replyDraftsByCommentID: [String: String] = [:]
-    var editDraftsByCommentID: [String: String] = [:]
+    var draftComment = CommentComposerState()
+    var replyDraftsByCommentID: [String: CommentComposerState] = [:]
+    var editDraftsByCommentID: [String: CommentComposerState] = [:]
+    var commentErrorsByID: [String: String] = [:]
     var isPostingComment = false
     var postingReplyIDs: Set<String> = []
     var editingCommentIDs: Set<String> = []
@@ -84,17 +85,18 @@ final class PageReaderViewModel {
 
         isTogglingFavorite = true
         engagementErrorMessage = nil
+        let wasFavorite = isFavoritePage
+        isFavoritePage.toggle()
         defer { isTogglingFavorite = false }
 
         do {
-            if isFavoritePage {
+            if wasFavorite {
                 try await appState.removeFavorite(type: .page, pageId: pageID)
-                isFavoritePage = false
             } else {
                 try await appState.addFavorite(type: .page, pageId: pageID)
-                isFavoritePage = true
             }
         } catch {
+            isFavoritePage = wasFavorite
             engagementErrorMessage = error.localizedDescription
         }
     }
@@ -158,42 +160,44 @@ final class PageReaderViewModel {
     }
 
     func postComment(pageID: String, appState: AppState) async {
-        guard draftComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-            return
-        }
+        guard draftComment.isEmpty == false else { return }
+        let body = draftComment.body
 
         isPostingComment = true
         commentErrorMessage = nil
         defer { isPostingComment = false }
 
         do {
-            let comment = try await appState.addPageComment(pageId: pageID, text: draftComment)
+            let comment = try await appState.addPageComment(pageId: pageID, body: body)
             applyCreatedComment(comment)
-            draftComment = ""
+            draftComment.reset()
         } catch {
             commentErrorMessage = error.localizedDescription
         }
     }
 
     func postReply(to parentComment: DocmostComment, pageID: String, appState: AppState) async {
-        let draft = replyDraftsByCommentID[parentComment.id] ?? ""
+        let draft = replyDraft(for: parentComment.id)
         guard canSubmitReply(to: parentComment, draft: draft) else {
             return
         }
+        let body = draft.body
 
         postingReplyIDs.insert(parentComment.id)
         commentErrorMessage = nil
+        commentErrorsByID[parentComment.id] = nil
         defer { postingReplyIDs.remove(parentComment.id) }
 
         do {
             let reply = try await appState.addCommentReply(
                 pageId: pageID,
                 parentCommentId: parentComment.id,
-                text: draft
+                body: body
             )
             applyCreatedReply(reply, parentCommentID: parentComment.id)
         } catch {
             commentErrorMessage = error.localizedDescription
+            commentErrorsByID[parentComment.id] = error.localizedDescription
         }
     }
 
@@ -217,22 +221,29 @@ final class PageReaderViewModel {
         deletingCommentIDs.contains(id)
     }
 
-    func canSubmitReply(to parentComment: DocmostComment, draft: String? = nil) -> Bool {
-        let replyDraft = draft ?? replyDraftsByCommentID[parentComment.id] ?? ""
+    func canSubmitReply(to parentComment: DocmostComment, draft: CommentComposerState? = nil) -> Bool {
+        let replyDraft = draft ?? self.replyDraft(for: parentComment.id)
         return parentComment.parentCommentId == nil
             && parentComment.isLocallyQueued == false
             && postingReplyIDs.contains(parentComment.id) == false
-            && replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            && replyDraft.isEmpty == false
     }
 
-    func replies(for parentCommentID: String) -> [DocmostComment] {
-        comments.filter { $0.parentCommentId == parentCommentID }
+    func replyDraft(for commentID: String) -> CommentComposerState {
+        if let draft = replyDraftsByCommentID[commentID] {
+            return draft
+        }
+
+        let draft = CommentComposerState()
+        replyDraftsByCommentID[commentID] = draft
+        return draft
     }
 
     func beginEditing(_ comment: DocmostComment) {
         guard comment.isNativelyEditable else { return }
-        editDraftsByCommentID[comment.id] = comment.content ?? ""
+        editDraftsByCommentID[comment.id] = CommentComposerState(body: comment.body)
         editingCommentIDs.insert(comment.id)
+        commentErrorsByID[comment.id] = nil
     }
 
     func cancelEditing(commentID: String) {
@@ -242,21 +253,21 @@ final class PageReaderViewModel {
 
     func updateComment(_ comment: DocmostComment, appState: AppState) async {
         guard comment.isNativelyEditable else { return }
-        let draft = editDraftsByCommentID[comment.id] ?? ""
-        guard draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-            return
-        }
+        guard let draft = editDraftsByCommentID[comment.id], draft.isEmpty == false else { return }
+        let body = draft.body
         guard updatingCommentIDs.contains(comment.id) == false else { return }
 
         updatingCommentIDs.insert(comment.id)
         commentErrorMessage = nil
+        commentErrorsByID[comment.id] = nil
         defer { updatingCommentIDs.remove(comment.id) }
 
         do {
-            let updatedComment = try await appState.updateComment(comment, text: draft)
+            let updatedComment = try await appState.updateComment(comment, body: body)
             applyEditedComment(updatedComment)
         } catch {
             commentErrorMessage = error.localizedDescription
+            commentErrorsByID[comment.id] = error.localizedDescription
         }
     }
 
@@ -269,6 +280,7 @@ final class PageReaderViewModel {
 
         deletingCommentIDs.insert(comment.id)
         commentErrorMessage = nil
+        commentErrorsByID[comment.id] = nil
         defer { deletingCommentIDs.remove(comment.id) }
 
         do {
@@ -279,6 +291,7 @@ final class PageReaderViewModel {
             }
         } catch {
             commentErrorMessage = error.localizedDescription
+            commentErrorsByID[comment.id] = error.localizedDescription
         }
     }
 
@@ -291,8 +304,15 @@ final class PageReaderViewModel {
         guard resolvingCommentIDs.contains(comment.id) == false else { return }
 
         let targetResolvedState = comment.isResolved == false
+        let optimisticComment = comment.projectingResolution(
+            resolved: targetResolvedState,
+            resolvedBy: appState.currentUser?.user
+        )
         resolvingCommentIDs.insert(comment.id)
         commentErrorMessage = nil
+        commentErrorsByID[comment.id] = nil
+        applyUpdatedComment(optimisticComment)
+        await markInlineCommentResolved?(comment.id, targetResolvedState)
         defer {
             resolvingCommentIDs.remove(comment.id)
         }
@@ -304,9 +324,11 @@ final class PageReaderViewModel {
                 resolved: targetResolvedState
             )
             applyUpdatedComment(updatedComment)
-            await markInlineCommentResolved?(comment.id, targetResolvedState)
         } catch {
+            applyUpdatedComment(comment)
+            await markInlineCommentResolved?(comment.id, comment.isResolved)
             commentErrorMessage = error.localizedDescription
+            commentErrorsByID[comment.id] = error.localizedDescription
         }
     }
 
@@ -320,7 +342,8 @@ final class PageReaderViewModel {
 
     func applyCreatedReply(_ reply: DocmostComment, parentCommentID: String) {
         applyCreatedComment(reply)
-        replyDraftsByCommentID[parentCommentID] = nil
+        replyDraftsByCommentID[parentCommentID]?.reset()
+        commentErrorsByID[parentCommentID] = nil
     }
 
     func applyUpdatedComment(_ comment: DocmostComment) {
@@ -333,6 +356,7 @@ final class PageReaderViewModel {
         applyUpdatedComment(comment)
         editDraftsByCommentID[comment.id] = nil
         editingCommentIDs.remove(comment.id)
+        commentErrorsByID[comment.id] = nil
     }
 
     func removeComment(id: String) {
@@ -346,6 +370,7 @@ final class PageReaderViewModel {
             deletingCommentIDs.remove(commentID)
             replyDraftsByCommentID[commentID] = nil
             editDraftsByCommentID[commentID] = nil
+            commentErrorsByID[commentID] = nil
         }
     }
 

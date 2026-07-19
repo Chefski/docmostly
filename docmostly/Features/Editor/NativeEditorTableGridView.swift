@@ -65,6 +65,7 @@ struct NativeEditorTableEditableGrid: View {
     @Binding var dragStartWidths: [Int: CGFloat]
     let focusedCell: FocusState<NativeEditorTableCellCoordinate?>.Binding
     let isCompactWidth: Bool
+    let moveFocus: (NativeEditorTableCellCoordinate, NativeEditorTableFocusDirection) -> Void
 
     var body: some View {
         if table.rows.isEmpty || table.columnCount == 0 {
@@ -103,7 +104,8 @@ struct NativeEditorTableEditableGrid: View {
                                         actions: actions,
                                         selection: $selection,
                                         dragStartWidths: $dragStartWidths,
-                                        focusedCell: focusedCell
+                                        focusedCell: focusedCell,
+                                        moveFocus: moveFocus
                                     )
                                 } else {
                                     NativeEditorTableMissingCell(
@@ -260,6 +262,7 @@ private struct NativeEditorTableEditableCell: View {
     @Binding var selection: NativeEditorTableSelection?
     @Binding var dragStartWidths: [Int: CGFloat]
     let focusedCell: FocusState<NativeEditorTableCellCoordinate?>.Binding
+    let moveFocus: (NativeEditorTableCellCoordinate, NativeEditorTableFocusDirection) -> Void
 
     var body: some View {
         TextField("Cell", text: cellBinding, axis: .vertical)
@@ -268,6 +271,13 @@ private struct NativeEditorTableEditableCell: View {
             .foregroundStyle(cell.isHeader ? .primary : NativeEditorTableLayout.bodyForeground)
             .lineLimit(4)
             .focused(focusedCell, equals: NativeEditorTableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex))
+            .onKeyPress(.tab, phases: .down) { keyPress in
+                moveFocus(
+                    NativeEditorTableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex),
+                    keyPress.modifiers.contains(.shift) ? .backward : .forward
+                )
+                return .handled
+            }
             .padding(.horizontal, NativeEditorTableLayout.cellHorizontalPadding)
             .padding(.vertical, NativeEditorTableLayout.cellVerticalPadding)
             .frame(
@@ -567,32 +577,5 @@ private struct NativeEditorTableSelectionEdge: View {
         case .bottom:
             .bottom
         }
-    }
-}
-
-private struct NativeEditorTableSelectionFill: View {
-    let selection: NativeEditorTableSelection?
-    let rowIndex: Int
-    let columnIndex: Int
-
-    var body: some View {
-        if selection?.contains(rowIndex: rowIndex, columnIndex: columnIndex) == true {
-            switch selection?.kind {
-            case .row where columnIndex == 0:
-                indicator(width: 4, height: nil, alignment: .leading)
-            case .column where rowIndex == 0:
-                indicator(width: nil, height: 4, alignment: .top)
-            default:
-                EmptyView()
-            }
-        }
-    }
-
-    private func indicator(width: CGFloat?, height: CGFloat?, alignment: Alignment) -> some View {
-            Rectangle()
-                .fill(NativeEditorTableLayout.selectionAccent)
-                .frame(width: width, height: height)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
-                .allowsHitTesting(false)
     }
 }

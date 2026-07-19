@@ -2,6 +2,8 @@ import SwiftUI
 
 struct NativeEditorCollaborationStatusView: View {
     @Bindable var viewModel: NativeRichEditorViewModel
+    var applyPendingRemoteUpdate: (() -> Void)?
+    var keepPendingLocalUpdate: (() -> Void)?
 
     var body: some View {
         if presentation.isVisible {
@@ -11,29 +13,27 @@ struct NativeEditorCollaborationStatusView: View {
                     .foregroundStyle(statusStyle)
 
                 if let pendingRemoteUpdate = viewModel.pendingRemoteUpdate {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(pendingRemoteUpdate.title)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    Text(pendingRemoteUpdate.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
 
-                        if let lastUpdatedBy = pendingRemoteUpdate.lastUpdatedBy {
-                            Text("Edited by \(lastUpdatedBy.name)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                    Spacer(minLength: 0)
+
+                    Button("Apply", systemImage: "arrow.down.doc") {
+                        if let applyPendingRemoteUpdate {
+                            applyPendingRemoteUpdate()
+                        } else {
+                            viewModel.acceptPendingRemoteUpdate()
                         }
                     }
-
-                    Spacer(minLength: 0)
-
-                    Button("Apply", systemImage: "arrow.down.doc", action: viewModel.acceptPendingRemoteUpdate)
-                    Button("Keep Mine", systemImage: "xmark", action: viewModel.rejectPendingRemoteUpdate)
-                } else if presentation.presenceCollaborators.isEmpty == false {
-                    Spacer(minLength: 0)
-                } else if presentation.recentEditors.isEmpty == false {
-                    collaboratorNames
-                    Spacer(minLength: 0)
+                    Button("Keep Mine", systemImage: "xmark") {
+                        if let keepPendingLocalUpdate {
+                            keepPendingLocalUpdate()
+                        } else {
+                            viewModel.rejectPendingRemoteUpdate()
+                        }
+                    }
                 }
             }
             .padding(.horizontal)
@@ -43,18 +43,10 @@ struct NativeEditorCollaborationStatusView: View {
         }
     }
 
-    private var collaboratorNames: some View {
-        Text(presentation.recentEditors.map(\.name).joined(separator: ", "))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-    }
-
     private var presentation: NativeEditorCollabStatusPresentation {
         NativeEditorCollabStatusPresentation(
             realtimeStatus: viewModel.realtimeStatus,
             canEdit: viewModel.canEdit,
-            activeCollaborators: viewModel.activeCollaborators,
             pendingRemoteUpdate: viewModel.pendingRemoteUpdate
         )
     }

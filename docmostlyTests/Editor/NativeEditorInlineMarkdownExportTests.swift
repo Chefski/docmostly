@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct NativeEditorInlineMarkdownExportTests {
-    @Test func documentMarkdownConversionPreservesCommonInlineMarks() throws {
+    @Test func documentMarkdownConversionPreservesCommonInlineMarks() {
         var text = AttributedString("Use ")
         var bold = AttributedString("bold")
         bold.inlinePresentationIntent = .stronglyEmphasized
@@ -14,7 +14,7 @@ struct NativeEditorInlineMarkdownExportTests {
         var code = AttributedString("code")
         code.inlinePresentationIntent = .code
         var link = AttributedString("link")
-        link.link = try #require(URL(string: "https://example.com/spec"))
+        link.link = URL(string: "https://example.com/spec")
 
         text += bold
         text += AttributedString(", ")

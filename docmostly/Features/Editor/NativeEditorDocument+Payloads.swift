@@ -110,9 +110,13 @@ nonisolated extension NativeEditorDocument {
     }
 
     static func embedBlock(from node: ProseMirrorNode) -> NativeEditorEmbedBlock {
-        NativeEditorEmbedBlock(
-            source: node.attrs?["src"]?.stringValue,
-            provider: node.attrs?["provider"]?.stringValue ?? youtubeProviderName(for: node),
+        let source = node.attrs?["src"]?.stringValue
+        return NativeEditorEmbedBlock(
+            source: source,
+            provider: NativeEditorEmbedResolver.provider(
+                source: source,
+                explicitProvider: node.attrs?["provider"]?.stringValue ?? youtubeProviderName(for: node)
+            ),
             alignment: node.attrs?["align"]?.stringValue,
             width: node.attrs?["width"]?.displayString,
             height: node.attrs?["height"]?.displayString

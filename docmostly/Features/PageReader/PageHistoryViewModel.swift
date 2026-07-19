@@ -105,12 +105,10 @@ final class PageHistoryViewModel {
         }
 
         let preRestoreSnapshot = editorViewModel.makeHistorySnapshot()
-        var didApplySnapshot = false
 
         do {
             try await editorViewModel.waitForPendingCRDTLocalChange()
             editorViewModel.applyServerHistorySnapshot(title: version.title, document: content)
-            didApplySnapshot = true
             if editorViewModel.canSave {
                 guard await editorViewModel.save(appState: appState) else {
                     restoreErrorMessage = editorViewModel.saveErrorMessage ?? "Could not restore this version."
@@ -125,9 +123,6 @@ final class PageHistoryViewModel {
             }
             return true
         } catch {
-            if didApplySnapshot {
-                editorViewModel.restoreEditingSnapshot(preRestoreSnapshot)
-            }
             restoreErrorMessage = error.localizedDescription
             return false
         }

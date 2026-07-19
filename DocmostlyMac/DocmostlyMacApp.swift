@@ -1,5 +1,6 @@
-import SwiftUI
+import AppIntents
 import SwiftData
+import SwiftUI
 
 @main
 struct DocmostlyMacApp: App {

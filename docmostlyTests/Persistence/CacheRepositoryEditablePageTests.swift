@@ -209,6 +209,29 @@ struct CacheRepositoryEditablePageTests {
         #expect(try repository.loadEditablePage(idOrSlugId: "page-1", scope: otherServerScope) == nil)
     }
 
+    @Test func collaborativeDocumentStateIsDurableAndScopedByServerAndUser() throws {
+        let repository = makeRepository()
+        let stateUpdate = Data([1, 2, 3, 4])
+        let otherUserScope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-2")
+        let otherServerScope = CacheScope(serverBaseURL: "https://other.example.com", userID: "user-1")
+
+        try repository.saveCRDTStateUpdate(pageId: "page-1", update: stateUpdate, scope: scope)
+
+        #expect(try repository.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == stateUpdate)
+        #expect(try repository.loadCRDTStateUpdate(pageId: "page-1", scope: otherUserScope) == nil)
+        #expect(try repository.loadCRDTStateUpdate(pageId: "page-1", scope: otherServerScope) == nil)
+    }
+
+    @Test func refreshingRESTProjectionDoesNotDiscardCollaborativeDocumentState() throws {
+        let repository = makeRepository()
+        let stateUpdate = Data([9, 8, 7])
+        try repository.saveCRDTStateUpdate(pageId: "page-1", update: stateUpdate, scope: scope)
+
+        try repository.saveEditablePage(editablePage(content: ProseMirrorDocument()), scope: scope)
+
+        #expect(try repository.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == stateUpdate)
+    }
+
     private func makeRepository() -> CacheRepository {
         makeRepositoryAndContext().0
     }

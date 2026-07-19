@@ -10,5 +10,8 @@ struct PageReaderDestinationView: View {
             .task(id: pageID) {
                 appState.selectPage(id: pageID)
             }
+            .onDisappear {
+                appState.clearSelectedPage(ifMatching: pageID)
+            }
     }
 }

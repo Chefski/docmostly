@@ -31,7 +31,7 @@ actor DocmostAPIClient {
         try validate(response: response, data: data)
 
         do {
-            let envelope = try decoder.decode(APIEnvelope<T>.self, from: data)
+            let envelope = try DocmostJSONDecoder.decode(APIEnvelope<T>.self, from: data, using: decoder)
             return envelope.data
         } catch {
             throw APIError.decodingFailed(error.localizedDescription)
@@ -220,10 +220,14 @@ actor DocmostAPIClient {
 
     private func decodeUploadResponse(from data: Data) throws -> DocmostAttachment {
         do {
-            return try decoder.decode(DocmostAttachment.self, from: data)
+            return try DocmostJSONDecoder.decode(DocmostAttachment.self, from: data, using: decoder)
         } catch {
             do {
-                return try decoder.decode(APIEnvelope<DocmostAttachment>.self, from: data).data
+                return try DocmostJSONDecoder.decode(
+                    APIEnvelope<DocmostAttachment>.self,
+                    from: data,
+                    using: decoder
+                ).data
             } catch {
                 throw APIError.decodingFailed(error.localizedDescription)
             }
@@ -232,10 +236,10 @@ actor DocmostAPIClient {
 
     private func decodeImportResponse(from data: Data) throws -> DocmostPage {
         do {
-            return try decoder.decode(APIEnvelope<DocmostPage>.self, from: data).data
+            return try DocmostJSONDecoder.decode(APIEnvelope<DocmostPage>.self, from: data, using: decoder).data
         } catch {
             do {
-                return try decoder.decode(DocmostPage.self, from: data)
+                return try DocmostJSONDecoder.decode(DocmostPage.self, from: data, using: decoder)
             } catch {
                 throw APIError.decodingFailed(error.localizedDescription)
             }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PageReaderSupplementaryPanelView: View {
+    @Environment(AppState.self) private var appState
     @Bindable var viewModel: PageReaderViewModel
 
     let panel: PageReaderPanel
@@ -14,6 +15,8 @@ struct PageReaderSupplementaryPanelView: View {
     let serverURLString: String
     let tableOfContentsItems: [PageReaderTableOfContentsItem]
     let selectHeading: (PageReaderTableOfContentsItem) -> Void
+    let focusedCommentID: String?
+    let focusInlineComment: (String) -> Void
     let markInlineCommentResolved: (String, Bool) async -> Void
     let removeInlineComment: (String) async -> Void
     let loadSharingState: () async -> Void
@@ -48,6 +51,9 @@ struct PageReaderSupplementaryPanelView: View {
                 PageReaderCommentsPanelView(
                     viewModel: viewModel,
                     pageID: pageID,
+                    canComment: canComment,
+                    focusedCommentID: focusedCommentID,
+                    focusInlineComment: focusInlineComment,
                     markInlineCommentResolved: markInlineCommentResolved,
                     removeInlineComment: removeInlineComment
                 )
@@ -79,5 +85,15 @@ struct PageReaderSupplementaryPanelView: View {
         }
         .padding()
         .frame(minWidth: 280, idealWidth: 340, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var canComment: Bool {
+        let allowViewerComments = appState.spaces
+            .first { $0.id == editorViewModel.currentSpaceID }?
+            .settings?.comments?.allowViewerComments == true
+        return CommentPermissionPolicy.canCreate(
+            pageCanEdit: canEdit,
+            allowViewerComments: allowViewerComments
+        )
     }
 }

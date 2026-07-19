@@ -21,9 +21,13 @@ extension AppState {
     }
 
     func addPageComment(pageId: String, text: String) async throws -> DocmostComment {
-        let content = CommentPayload.plainText(text).jsonString
+        try await addPageComment(pageId: pageId, body: CommentBody(plainText: text))
+    }
+
+    func addPageComment(pageId: String, body: CommentBody) async throws -> DocmostComment {
+        let content = body.jsonString
         guard let apiClient else {
-            return try await queueComment(pageId: pageId, text: text, content: content, type: .page)
+            return try await queueComment(pageId: pageId, body: body, content: content, type: .page)
         }
 
         do {
@@ -40,12 +44,24 @@ extension AppState {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            return try await queueComment(pageId: pageId, text: text, content: content, type: .page)
+            return try await queueComment(pageId: pageId, body: body, content: content, type: .page)
         }
     }
 
     func addCommentReply(pageId: String, parentCommentId: String, text: String) async throws -> DocmostComment {
-        let content = CommentPayload.plainText(text).jsonString
+        try await addCommentReply(
+            pageId: pageId,
+            parentCommentId: parentCommentId,
+            body: CommentBody(plainText: text)
+        )
+    }
+
+    func addCommentReply(
+        pageId: String,
+        parentCommentId: String,
+        body: CommentBody
+    ) async throws -> DocmostComment {
+        let content = body.jsonString
         guard let apiClient else {
             throw CommentMutationAvailabilityError.onlineRequired
         }
@@ -75,11 +91,25 @@ extension AppState {
         selectedText: String,
         yjsSelection: NativeEditorYjsSelection? = nil
     ) async throws -> DocmostComment {
-        let content = CommentPayload.plainText(text).jsonString
+        try await addInlineComment(
+            pageId: pageId,
+            body: CommentBody(plainText: text),
+            selectedText: selectedText,
+            yjsSelection: yjsSelection
+        )
+    }
+
+    func addInlineComment(
+        pageId: String,
+        body: CommentBody,
+        selectedText: String,
+        yjsSelection: NativeEditorYjsSelection? = nil
+    ) async throws -> DocmostComment {
+        let content = body.jsonString
         guard let apiClient else {
             return try await queueComment(
                 pageId: pageId,
-                text: text,
+                body: body,
                 content: content,
                 type: .inline,
                 selection: selectedText,
@@ -105,7 +135,7 @@ extension AppState {
             statusMessage = error.localizedDescription
             return try await queueComment(
                 pageId: pageId,
-                text: text,
+                body: body,
                 content: content,
                 type: .inline,
                 selection: selectedText,
@@ -138,11 +168,15 @@ extension AppState {
     }
 
     func updateComment(_ existingComment: DocmostComment, text: String) async throws -> DocmostComment {
+        try await updateComment(existingComment, body: CommentBody(plainText: text))
+    }
+
+    func updateComment(_ existingComment: DocmostComment, body: CommentBody) async throws -> DocmostComment {
         guard existingComment.isNativelyEditable else {
             throw CommentMutationAvailabilityError.unsupportedRichContentEdit
         }
 
-        let content = CommentPayload.plainText(text).jsonString
+        let content = body.jsonString
         guard let apiClient else {
             throw CommentMutationAvailabilityError.onlineRequired
         }
@@ -196,7 +230,7 @@ extension AppState {
 
     private func queueComment(
         pageId: String,
-        text: String,
+        body: CommentBody,
         content: String,
         type: DocmostCommentType,
         selection: String? = nil,
@@ -207,7 +241,7 @@ extension AppState {
             localId: localId,
             pageId: pageId,
             content: content,
-            plainText: text,
+            plainText: body.plainText,
             type: type,
             selection: selection,
             yjsSelection: yjsSelection
@@ -215,14 +249,15 @@ extension AppState {
 
         let comment = DocmostComment(
             id: localId,
-            content: text,
+            content: body.plainText,
             selection: selection,
             type: type.rawValue,
             creatorId: currentUser?.user.id ?? "offline",
             pageId: pageId,
             workspaceId: currentUser?.workspace.id,
             createdAt: Date.now,
-            creator: currentUser?.user
+            creator: currentUser?.user,
+            body: body
         )
         applyLocalComment(comment)
         return comment
@@ -293,7 +328,9 @@ extension AppState {
                 editedAt: existing.editedAt,
                 deletedAt: existing.deletedAt,
                 creator: existing.creator,
-                resolvedBy: resolved ? currentUser?.user : nil
+                resolvedBy: resolved ? currentUser?.user : nil,
+                body: existing.body,
+                isNativelyEditable: existing.isNativelyEditable
             )
         }
 

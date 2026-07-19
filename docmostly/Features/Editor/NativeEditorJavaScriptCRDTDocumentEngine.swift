@@ -38,6 +38,7 @@ nonisolated enum NativeEditorJSCRDTEngineError: Error, LocalizedError, Equatable
 
 @MainActor
 final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+    nonisolated let requiresInitialRemoteSnapshot = true
     private let context: JSContext
     private let runtimeDocument: JSValue
     private let localUpdateStream: AsyncStream<Data>
@@ -114,9 +115,19 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     }
 
     func applyRemoteUpdate(_ update: Data) async throws {
-        try Self.validateRemotePayload(update)
-        _ = try callRequired("applyRemoteUpdate", arguments: [update.base64EncodedString()])
-        try drainRuntimeOutputs()
+        for snapshot in try applyRemoteUpdateCapturingSnapshots(update) {
+            snapshotContinuation.yield(snapshot)
+        }
+    }
+
+    func applyRemoteUpdateCapturingSnapshot(_ update: Data) async throws -> NativeEditorCRDTDocumentSnapshot? {
+        try applyRemoteUpdateAndCaptureSnapshotSynchronously(update)
+    }
+
+    func applyRemoteUpdateAndCaptureSnapshotSynchronously(
+        _ update: Data
+    ) throws -> NativeEditorCRDTDocumentSnapshot? {
+        try applyRemoteUpdateCapturingSnapshots(update).last
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
@@ -144,7 +155,8 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
 
         return NativeEditorCRDTSaveResult(
             title: result.title,
-            updatedAt: try NativeEditorJSCRDTDateParser.date(from: result.updatedAt)
+            updatedAt: try NativeEditorJSCRDTDateParser.date(from: result.updatedAt),
+            documentStateUpdate: try await encodeDocumentState()
         )
     }
 
@@ -158,7 +170,18 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
 
     private func drainRuntimeOutputs() throws {
         try drainLocalUpdates()
-        try drainDocumentSnapshots()
+        for snapshot in try takeDocumentSnapshots() {
+            snapshotContinuation.yield(snapshot)
+        }
+    }
+
+    private func applyRemoteUpdateCapturingSnapshots(
+        _ update: Data
+    ) throws -> [NativeEditorCRDTDocumentSnapshot] {
+        try Self.validateRemotePayload(update)
+        _ = try callRequired("applyRemoteUpdate", arguments: [update.base64EncodedString()])
+        try drainLocalUpdates()
+        return try takeDocumentSnapshots()
     }
 
     private func drainLocalUpdates() throws {
@@ -173,17 +196,14 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         }
     }
 
-    private func drainDocumentSnapshots() throws {
-        guard let value = try callOptional("drainDocumentSnapshots") else { return }
+    private func takeDocumentSnapshots() throws -> [NativeEditorCRDTDocumentSnapshot] {
+        guard let value = try callOptional("drainDocumentSnapshots") else { return [] }
         let snapshots = try decode(
             [NativeEditorJSCRDTRuntimeSnapshot].self,
             from: value,
             function: "drainDocumentSnapshots"
         )
-
-        for snapshot in snapshots {
-            snapshotContinuation.yield(try snapshot.crdtSnapshot())
-        }
+        return try snapshots.map { try $0.crdtSnapshot() }
     }
 
     private func callRequired(_ name: String, arguments: [Any] = []) throws -> JSValue {

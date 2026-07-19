@@ -23,9 +23,7 @@ struct SearchView: View {
                 return
             }
         }
-        .navigationDestination(for: DocmostSearchResult.self) { result in
-            SearchResultDestinationView(result: result)
-        }
+        .pageOpenDestination()
     }
 }
 

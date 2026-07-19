@@ -44,7 +44,7 @@ struct CommentDecodingTests {
         #expect(comment.isNativelyEditable)
     }
 
-    @Test func richJSONContentIsNotNativelyEditable() throws {
+    @Test func supportedRichJSONContentIsNativelyEditable() throws {
         let data = commentData(contentJSON: """
         {
           "type": "doc",
@@ -68,7 +68,10 @@ struct CommentDecodingTests {
         let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
 
         #expect(comment.content == "Docmost")
-        #expect(comment.isNativelyEditable == false)
+        #expect(comment.isNativelyEditable)
+        #expect(comment.body?.document.content.first?.content?.first?.marks?.contains(where: { mark in
+            mark.type == "link" && mark.attrs?["href"]?.stringValue == "https://docmost.com"
+        }) == true)
     }
 
     @Test func multiParagraphPlainJSONContentIsNativelyEditable() throws {
@@ -201,6 +204,56 @@ struct CommentDecodingTests {
 
         #expect(comment.content == nil)
         #expect(comment.isNativelyEditable == false)
+    }
+
+    @Test func rejectsOversizedCommentAttributesDuringDecode() throws {
+        let oversizedAttribute = String(
+            repeating: "A",
+            count: ProseMirrorDecodingLimits.maximumAttributeStringLength + 1
+        )
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "attrs": { "metadata": "\(oversizedAttribute)" },
+              "content": [{ "type": "text", "text": "Safe text" }]
+            }
+          ]
+        }
+        """)
+
+        let comment = try DocmostJSONDecoder.make().decode(DocmostComment.self, from: data)
+
+        #expect(comment.content == nil)
+        #expect(comment.body == nil)
+        #expect(comment.isNativelyEditable == false)
+    }
+
+    @Test func sharedAPIDecoderReceivesAFreshDocumentBudgetForEveryTopLevelDecode() throws {
+        let decoder = DocmostJSONDecoder.make()
+        let initialBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Safe" }] }]
+        }
+        """)
+
+        _ = try DocmostJSONDecoder.decode(DocmostComment.self, from: data, using: decoder)
+        let firstDecodeBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+        _ = try DocmostJSONDecoder.decode(DocmostComment.self, from: data, using: decoder)
+        let secondDecodeBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+
+        #expect(initialBudget !== firstDecodeBudget)
+        #expect(firstDecodeBudget !== secondDecodeBudget)
     }
 
     private func commentData(contentJSON: String) -> Data {
