@@ -106,6 +106,35 @@ test("restores a cached full document update into an empty native document", () 
   }]);
 });
 
+test("validates an update without mutating the live document", () => {
+  const source = serverYDocFromJSON(paragraphDocument("Validated"));
+  const update = base64FromBytes(Y.encodeStateAsUpdate(source));
+  const document = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Stale projection")
+  });
+
+  assert.equal(document.validateUpdate(update), true);
+  assert.deepEqual(document.currentSnapshot(), {
+    title: "Page",
+    document: { type: "doc", content: [] },
+    updatedAt: null
+  });
+  assert.deepEqual(document.drainDocumentSnapshots(), []);
+});
+
+test("rejects corrupt updates during validation", () => {
+  const document = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+
+  assert.throws(() => document.validateUpdate("AQIDBA=="));
+  assert.deepEqual(document.drainDocumentSnapshots(), []);
+});
+
 test("merges non-overlapping edits from two offline native documents", () => {
   const baseDocument = paragraphsDocument("First", "Second");
   const serverDocument = serverYDocFromJSON(baseDocument);

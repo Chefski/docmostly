@@ -464,10 +464,11 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
     private func platformFont(for kind: NativeEditorBlockKind) -> NSFont {
         switch kind {
         case .heading(let level):
-            return NSFont.preferredFont(
+            let font = NSFont.preferredFont(
                 forTextStyle: level == 1 ? .title1 : .title2,
                 options: [:]
             )
+            return NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
         case .codeBlock:
             let bodyFont = NSFont.preferredFont(forTextStyle: .body, options: [:])
             return NSFont.monospacedSystemFont(ofSize: bodyFont.pointSize, weight: .regular)

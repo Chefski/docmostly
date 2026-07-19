@@ -5,18 +5,13 @@ struct PageBrowserScopeLabel: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
-            Label(scope.title, systemImage: scope.systemImage)
-                .font(.callout)
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-
-            Capsule()
-                .fill(isSelected ? Color.primary : Color.clear)
-                .frame(height: 2)
-        }
-        .padding(.top, 6)
-        .contentShape(.rect)
+        Label(scope.title, systemImage: scope.systemImage)
+            .font(.callout)
+            .foregroundStyle(isSelected ? Color.white : Color.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(.capsule)
     }
 }

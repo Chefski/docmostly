@@ -10,15 +10,35 @@ actor NativeEditorCRDTSyncCoordinator {
 
     private let documentEngine: any NativeEditorCRDTDocumentEngine
     private let remoteUpdateHandler: (@Sendable (Data) async throws -> Void)?
+    private let localUpdateCommitter: @Sendable (Data) async throws -> Bool
+    private let pendingLocalUpdatesProvider: @Sendable () async throws -> [Data]
+    private let localUpdateDidSend: @Sendable (Data) async throws -> Void
+    private let committedLocalUpdateStream: AsyncStream<Data>
+    private let committedLocalUpdateContinuation: AsyncStream<Data>.Continuation
+    private var rawLocalUpdateTask: Task<Void, Never>?
     private var pendingLocalEchoCounts: [Data: Int] = [:]
     private var remoteSyncSessionBytes = 0
 
     init(
         documentEngine: any NativeEditorCRDTDocumentEngine,
-        remoteUpdateHandler: (@Sendable (Data) async throws -> Void)? = nil
+        remoteUpdateHandler: (@Sendable (Data) async throws -> Void)? = nil,
+        localUpdateCommitter: @escaping @Sendable (Data) async throws -> Bool = { _ in true },
+        pendingLocalUpdatesProvider: @escaping @Sendable () async throws -> [Data] = { [] },
+        localUpdateDidSend: @escaping @Sendable (Data) async throws -> Void = { _ in }
     ) {
+        let localUpdates = AsyncStream.makeStream(of: Data.self)
         self.documentEngine = documentEngine
         self.remoteUpdateHandler = remoteUpdateHandler
+        self.localUpdateCommitter = localUpdateCommitter
+        self.pendingLocalUpdatesProvider = pendingLocalUpdatesProvider
+        self.localUpdateDidSend = localUpdateDidSend
+        committedLocalUpdateStream = localUpdates.stream
+        committedLocalUpdateContinuation = localUpdates.continuation
+    }
+
+    deinit {
+        rawLocalUpdateTask?.cancel()
+        committedLocalUpdateContinuation.finish()
     }
 
     func makeInitialSyncMessage() async throws -> NativeEditorYjsSyncMessage {
@@ -49,24 +69,43 @@ actor NativeEditorCRDTSyncCoordinator {
         return .update(update)
     }
 
+    func pendingLocalUpdates() async throws -> [Data] {
+        try await pendingLocalUpdatesProvider()
+    }
+
+    func recordLocalUpdateSent(_ update: Data) async throws {
+        try await localUpdateDidSend(update)
+    }
+
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
         -> NativeEditorAwarenessCursor? {
         try await documentEngine.encodeLocalAwarenessCursor(for: selection)
     }
 
     func localUpdates() async -> AsyncStream<Data> {
-        await documentEngine.localUpdates()
+        startRawLocalUpdateForwardingIfNeeded()
+        return committedLocalUpdateStream
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
-        try await documentEngine.integrateLocalChange(change)
+        let updates = try await documentEngine.integrateLocalChangeForCommit(change)
+        for update in updates {
+            try await commitAndPublishLocalUpdate(update)
+        }
     }
 
     func flushPendingLocalChanges(
         title: String,
         document: NativeEditorDocument
     ) async throws -> NativeEditorCRDTSaveResult {
-        try await documentEngine.flushPendingLocalChanges(title: title, document: document)
+        let committed = try await documentEngine.flushPendingLocalChangesForCommit(
+            title: title,
+            document: document
+        )
+        for update in committed.updates {
+            try await commitAndPublishLocalUpdate(update)
+        }
+        return committed.result
     }
 
     private func consumeLocalEcho(for update: Data) -> Bool {
@@ -79,6 +118,23 @@ actor NativeEditorCRDTSyncCoordinator {
         }
 
         return true
+    }
+
+    private func commitAndPublishLocalUpdate(_ update: Data) async throws {
+        if try await localUpdateCommitter(update) {
+            committedLocalUpdateContinuation.yield(update)
+        }
+    }
+
+    private func startRawLocalUpdateForwardingIfNeeded() {
+        guard rawLocalUpdateTask == nil else { return }
+        rawLocalUpdateTask = Task { [weak self, documentEngine] in
+            let updates = await documentEngine.localUpdates()
+            for await update in updates {
+                guard Task.isCancelled == false else { return }
+                try? await self?.commitAndPublishLocalUpdate(update)
+            }
+        }
     }
 
     private func validateRemotePayload(_ data: Data) throws {

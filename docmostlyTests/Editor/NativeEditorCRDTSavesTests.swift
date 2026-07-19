@@ -130,10 +130,9 @@ struct NativeEditorCRDTSavesTests {
         #expect(viewModel.saveErrorMessage == nil)
     }
 
-    @Test func offlineCRDTSaveQueuesYjsStateInsteadOfRESTReplacementSnapshot() async throws {
-        let stateUpdate = Data([1, 4, 9])
+    @Test func offlineCRDTSaveDoesNotPutDocumentBodiesInTheGenericQueue() async throws {
         let engine = SavingCRDTDocumentEngine()
-        engine.saveResult = NativeEditorCRDTSaveResult(documentStateUpdate: stateUpdate)
+        engine.saveResult = NativeEditorCRDTSaveResult(documentStateUpdate: Data([1, 4, 9]))
         let viewModel = NativeRichEditorViewModel(
             pageID: "page-1",
             initialTitle: "Page",
@@ -173,16 +172,8 @@ struct NativeEditorCRDTSavesTests {
 
         #expect(didSave)
         let pending = try await appState.offlineQueueRepository?.pending(scope: scope)
-        #expect(pending?.map(\.payload) == [
-            .updatePageCRDT(
-                pageId: "page-1",
-                title: "Page",
-                document: viewModel.document.proseMirrorDocument,
-                stateUpdate: stateUpdate,
-                baseTitle: "Page"
-            )
-        ])
-        #expect(try await appState.cacheReader?.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == stateUpdate)
+        #expect(pending?.isEmpty == true)
+        #expect(try await appState.cacheReader?.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == nil)
     }
 }
 

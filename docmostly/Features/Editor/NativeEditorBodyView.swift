@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NativeEditorBodyView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
@@ -9,6 +10,7 @@ struct NativeEditorBodyView: View {
     var applyCommand: ((NativeEditorCommand) -> Void)?
     var applyPendingRemoteUpdate: (() -> Void)?
     var keepPendingLocalUpdate: (() -> Void)?
+    var pickPageEmoji: (() -> Void)?
     var slashCommandFilter: (NativeEditorCommand) -> Bool = { _ in true }
     var showsTitle = true
     var showsCollaborationStatus = true
@@ -18,15 +20,24 @@ struct NativeEditorBodyView: View {
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 6) {
             if showsTitle {
-                TextField("Page title", text: $viewModel.title, axis: .vertical)
-                    .font(.largeTitle)
-                    .bold()
-                    .textFieldStyle(.plain)
-                    .focused(focusedField, equals: .title)
-                    .submitLabel(.next)
-                    .onSubmit(advanceFromTitle)
-                    .disabled(authoringIsAvailable == false)
-                    .accessibilityLabel("Page title")
+                HStack(alignment: .firstTextBaseline) {
+                    if isEditingTitle, let pickPageEmoji {
+                        NativeEditorPageTitleIconButton(icon: viewModel.icon, action: pickPageEmoji)
+                            .disabled(authoringIsAvailable == false)
+                            .transition(NativeEditorPageTitleIconTransition())
+                    }
+
+                    TextField("Page title", text: $viewModel.title, axis: .vertical)
+                        .font(.largeTitle)
+                        .bold()
+                        .textFieldStyle(.plain)
+                        .focused(focusedField, equals: .title)
+                        .submitLabel(.next)
+                        .onSubmit(advanceFromTitle)
+                        .disabled(authoringIsAvailable == false)
+                        .accessibilityLabel("Page title")
+                }
+                .animation(titleEditingAnimation, value: isEditingTitle)
 
                 if let creatorName = viewModel.creator?.name, creatorName.isEmpty == false {
                     NativeEditorBylineView(authorName: creatorName)
@@ -88,7 +99,14 @@ struct NativeEditorBodyView: View {
                         },
                         splitBlock: { characterRange in
                             guard authoringIsAvailable else { return false }
-                            return viewModel.splitBlock(block.id, replacing: characterRange) != nil
+                            guard let continuationBlockID = viewModel.splitBlock(
+                                block.id,
+                                replacing: characterRange
+                            ) else {
+                                return false
+                            }
+                            requestBlockFocus(continuationBlockID)
+                            return true
                         },
                         insertHardBreak: { characterRange in
                             guard authoringIsAvailable else { return false }
@@ -96,7 +114,11 @@ struct NativeEditorBodyView: View {
                         },
                         mergeBlockBackward: {
                             guard authoringIsAvailable else { return false }
-                            return viewModel.mergeBlockBackward(block.id)
+                            guard viewModel.mergeBlockBackward(block.id) else { return false }
+                            if let destinationBlockID = viewModel.activeBlockID {
+                                requestBlockFocus(destinationBlockID)
+                            }
+                            return true
                         },
                         blockChanged: {
                             guard authoringIsAvailable else { return }
@@ -149,6 +171,14 @@ struct NativeEditorBodyView: View {
         isAuthoringEnabled && viewModel.canEdit && viewModel.isResolvingConflict == false
     }
 
+    private var isEditingTitle: Bool {
+        focusedField.wrappedValue == .title
+    }
+
+    private var titleEditingAnimation: Animation? {
+        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.22)
+    }
+
     private var activePresenceProjection: NativeEditorRemotePresenceProjection {
         presenceProjection ?? viewModel.remotePresenceProjection
     }
@@ -170,6 +200,22 @@ struct NativeEditorBodyView: View {
             viewModel.focus(blockID: firstEditableBlock.id)
         } else {
             viewModel.appendBlock()
+        }
+    }
+
+    private func requestBlockFocus(_ blockID: UUID) {
+        focusedField.wrappedValue = .block(blockID)
+
+        Task { @MainActor in
+            await Task.yield()
+            guard
+                authoringIsAvailable,
+                viewModel.document.blocks.contains(where: { $0.id == blockID && $0.isEditable })
+            else {
+                return
+            }
+            viewModel.focus(blockID: blockID)
+            focusedField.wrappedValue = .block(blockID)
         }
     }
 

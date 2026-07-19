@@ -9,6 +9,7 @@ import SwiftUI
 final class NativeRichEditorViewModel {
     let pageID: String
     var title: String
+    var icon: String?
     var document = NativeEditorDocument() {
         didSet {
             rebuildResolvedRemoteCursorIndex()
@@ -85,6 +86,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
+    @ObservationIgnored var documentSession: DocumentSession?
     @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, any Error>?
     @ObservationIgnored var activeSaveTask: Task<Bool, Never>?
@@ -99,6 +101,7 @@ final class NativeRichEditorViewModel {
     ) {
         self.pageID = pageID
         title = initialTitle
+        icon = nil
         editablePageID = pageID
         editablePageSlugID = pageID
         lastSavedTitle = initialTitle
@@ -246,6 +249,10 @@ final class NativeRichEditorViewModel {
         saveErrorMessage = nil
 
         do {
+            try await retainCurrentDocumentDraft(
+                title: snapshotTitle,
+                document: snapshotDocument.proseMirrorDocument
+            )
             let persistence = try await appState.persistDeferredCollaborativeDraft(
                 pageId: editablePageID,
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -463,6 +470,10 @@ private extension NativeRichEditorViewModel {
     func persist(snapshot: SaveSnapshot, appState: AppState) async -> Bool {
         do {
             if snapshot.requiresLocalOnlyCRDTPersistence {
+                try await retainCurrentDocumentDraft(
+                    title: snapshot.trimmedTitle,
+                    document: snapshot.document.proseMirrorDocument
+                )
                 let persistence = try await appState.persistDeferredCollaborativeDraft(
                     pageId: snapshot.pageID,
                     title: snapshot.trimmedTitle,
@@ -487,15 +498,10 @@ private extension NativeRichEditorViewModel {
                 let flushedTitle = result.title ?? snapshot.trimmedTitle
 
                 if appState.hasPageUpdatePersistence {
-                    guard let crdtStateUpdate = result.documentStateUpdate,
-                          crdtStateUpdate.isEmpty == false else {
-                        throw APIError.connectionFailed("Collaborative save did not produce durable Yjs state.")
-                    }
                     let persistence = try await appState.updateCollaborativePageTitle(
                         pageId: snapshot.pageID,
                         title: flushedTitle,
                         documentSnapshot: snapshot.document.proseMirrorDocument,
-                        crdtStateUpdate: crdtStateUpdate,
                         baseTitle: snapshot.baseTitle,
                         snapshotCapturedAt: snapshot.capturedAt
                     )

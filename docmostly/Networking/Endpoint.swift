@@ -111,6 +111,7 @@ nonisolated enum Endpoint: Sendable {
     case updatePage(
         pageId: String,
         title: String? = nil,
+        icon: String? = nil,
         content: ProseMirrorDocument? = nil,
         format: ContentFormat = .json,
         operation: ContentOperation = .replace
@@ -141,6 +142,7 @@ nonisolated enum Endpoint: Sendable {
     case pageRestrictionInfo(pageId: String)
     case pagePermissions(pageId: String, cursor: String? = nil, limit: Int = 50)
     case workspaceInfo
+    case workspaceEntitlements
     case updateWorkspace(WorkspaceUpdate)
     case workspaceMembers(query: String? = nil, cursor: String? = nil, limit: Int = 50)
     case deactivateWorkspaceMember(userId: String)
@@ -319,6 +321,8 @@ nonisolated enum Endpoint: Sendable {
             "pages/permissions"
         case .workspaceInfo:
             "workspace/info"
+        case .workspaceEntitlements:
+            "workspace/entitlements"
         case .updateWorkspace:
             "workspace/update"
         case .workspaceMembers:
@@ -364,7 +368,7 @@ nonisolated enum Endpoint: Sendable {
     // swiftlint:disable cyclomatic_complexity function_body_length
     private func bodyData() throws -> Data? {
         switch self {
-        case .workspacePublic, .logout, .collabToken, .currentUser, .workspaceInfo,
+        case .workspacePublic, .logout, .collabToken, .currentUser, .workspaceInfo, .workspaceEntitlements,
                 .unreadNotificationCount, .markAllNotificationsRead, .watchedSpaceIds:
             return nil
         case .login(let email, let password):
@@ -523,7 +527,7 @@ nonisolated enum Endpoint: Sendable {
             ))
         case .createBase(let parentPageId, let template):
             return try encode(CreateBaseRequest(parentPageId: parentPageId, template: template))
-        case .updatePage(let pageId, let title, let content, let format, let operation):
+        case .updatePage(let pageId, let title, let icon, let content, let format, let operation):
             let hasContent: Bool
             if case .some = content {
                 hasContent = true
@@ -533,6 +537,7 @@ nonisolated enum Endpoint: Sendable {
             return try encode(UpdatePageRequest(
                 pageId: pageId,
                 title: title,
+                icon: icon,
                 content: content,
                 operation: hasContent ? operation.rawValue : nil,
                 format: hasContent ? format.rawValue : nil
@@ -872,6 +877,7 @@ nonisolated private struct CreateBaseRequest: Encodable {
 nonisolated private struct UpdatePageRequest: Encodable {
     let pageId: String
     let title: String?
+    let icon: String?
     let content: ProseMirrorDocument?
     let operation: String?
     let format: String?

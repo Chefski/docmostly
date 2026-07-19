@@ -5,6 +5,7 @@ extension NativeRichEditorViewModel {
         _ page: DocmostEditablePage,
         fallbackLastUpdatedBy: DocmostPagePerson? = nil
     ) {
+        icon = page.icon
         creator = page.creator
         lastUpdatedBy = page.lastUpdatedBy ?? fallbackLastUpdatedBy ?? lastUpdatedBy
         createdAt = page.createdAt ?? createdAt

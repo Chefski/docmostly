@@ -3,27 +3,10 @@ import SwiftUI
 struct SidebarRootView: View {
     @Environment(AppState.self) private var appState
     @Environment(NotificationStore.self) private var notificationStore
+    @State private var pageBrowserViewModel = PageBrowserViewModel()
 
     var body: some View {
         List(selection: sidebarSelection) {
-            Section {
-                NavigationLink(value: SidebarDestination.favorites) {
-                    Label("Favorites", systemImage: "star")
-                }
-                NavigationLink(value: SidebarDestination.notifications) {
-                    HStack {
-                        Label("Notifications", systemImage: "bell")
-                        Spacer(minLength: 0)
-                        if notificationStore.unreadCount > 0 {
-                            Text(notificationStore.unreadCount > 99 ? "99+" : notificationStore.unreadCount.formatted())
-                                .foregroundStyle(.secondary)
-                                .accessibilityLabel("\(notificationStore.unreadCount) unread")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
             Section("Spaces") {
                 ForEach(appState.spaces) { space in
                     NavigationLink(value: SidebarDestination.space(space.id)) {
@@ -37,6 +20,8 @@ struct SidebarRootView: View {
                 }
             }
 
+            SidebarPageBrowserSection(viewModel: pageBrowserViewModel)
+
             if appState.isOffline {
                 OfflineBadgeView(text: "Offline")
                     .listRowSeparator(.hidden)
@@ -49,8 +34,13 @@ struct SidebarRootView: View {
         .toolbar(content: toolbarContent)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
         .refreshable {
-            await appState.loadSpaces()
+            _ = await appState.loadSpaces()
+            await loadPageBrowser()
         }
+        .task(id: pageBrowserTaskKey) {
+            await loadPageBrowser()
+        }
+        .pageOpenDestination()
     }
 
     private var sidebarSelection: Binding<SidebarDestination?> {
@@ -69,11 +59,37 @@ struct SidebarRootView: View {
         #endif
     }
 
+    private var pageBrowserTaskKey: SidebarPageBrowserTaskKey {
+        SidebarPageBrowserTaskKey(
+            spaceIDs: appState.spaces.map(\.id),
+            scope: pageBrowserViewModel.selectedScope,
+            pageDiscoveryRevision: appState.pageDiscoveryRevision,
+            favoriteRevision: appState.favoriteRevision
+        )
+    }
+
+    private func loadPageBrowser() async {
+        await pageBrowserViewModel.load(spaces: appState.spaces, provider: appState)
+    }
+
     @ToolbarContentBuilder
     private func toolbarContent() -> some ToolbarContent {
         #if os(iOS)
         ToolbarItem(placement: .topBarLeading) {
             WorkspaceAccountMenu()
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button("Favorites", systemImage: "star") {
+                appState.selectSidebarUtilityDestination(.favorites)
+            }
+
+            Button(
+                "Notifications",
+                systemImage: notificationStore.unreadCount > 0 ? "bell.badge" : "bell"
+            ) {
+                appState.selectSidebarUtilityDestination(.notifications)
+            }
+            .accessibilityValue(notificationAccessibilityValue)
         }
         #else
         ToolbarItem(placement: .primaryAction) {
@@ -81,4 +97,19 @@ struct SidebarRootView: View {
         }
         #endif
     }
+
+    private var notificationAccessibilityValue: String {
+        if notificationStore.unreadCount == 0 {
+            return "No unread notifications"
+        }
+
+        return "\(notificationStore.unreadCount) unread"
+    }
+}
+
+private struct SidebarPageBrowserTaskKey: Hashable {
+    let spaceIDs: [String]
+    let scope: PageBrowserScope
+    let pageDiscoveryRevision: Int
+    let favoriteRevision: Int
 }

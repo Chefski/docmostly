@@ -102,8 +102,10 @@ extension PageReaderView {
                         "A newer remote version arrived while resolving this conflict. Review it and try again."
                     return
                 }
+                try await editorViewModel.waitForPendingCRDTLocalChange()
             }
 
+            await editorViewModel.clearRetainedDocumentDraft()
             editorViewModel.saveErrorMessage = nil
         } catch {
             editorViewModel.saveErrorMessage =

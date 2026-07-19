@@ -4,6 +4,42 @@ import Testing
 
 @MainActor
 struct FavoritesViewModelTests {
+    @Test func urlSessionCancellationDoesNotBecomeLoadError() async {
+        let viewModel = FavoritesViewModel()
+
+        await viewModel.load {
+            throw URLError(.cancelled)
+        }
+
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.isLoading == false)
+    }
+
+    @Test func replacementLoadWinsWhileEarlierRequestUnwinds() async {
+        let first = pageFavorite(id: "favorite-first")
+        let replacement = pageFavorite(id: "favorite-replacement")
+        let loader = FavoritesLoadStub(
+            firstResponse: response(items: [first]),
+            replacementResponse: response(items: [replacement])
+        )
+        let viewModel = FavoritesViewModel()
+
+        let firstLoad = Task {
+            await viewModel.load(operation: loader.load)
+        }
+        while loader.requestCount == 0 {
+            await Task.yield()
+        }
+
+        await viewModel.load(operation: loader.load)
+        loader.finishFirstLoad()
+        await firstLoad.value
+
+        #expect(viewModel.favorites.map(\.id) == [replacement.id])
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.isLoading == false)
+    }
+
     @Test func optimisticRemovalStaysRemovedAfterServerSuccess() async {
         let favorite = pageFavorite(id: "favorite-page")
         let viewModel = FavoritesViewModel()
@@ -117,6 +153,36 @@ struct FavoritesViewModelTests {
                 spaceId: nil
             )
         )
+    }
+}
+
+@MainActor
+private final class FavoritesLoadStub {
+    private let firstResponse: PaginatedResponse<DocmostFavorite>
+    private let replacementResponse: PaginatedResponse<DocmostFavorite>
+    private var firstContinuation: CheckedContinuation<PaginatedResponse<DocmostFavorite>, Never>?
+    private(set) var requestCount = 0
+
+    init(
+        firstResponse: PaginatedResponse<DocmostFavorite>,
+        replacementResponse: PaginatedResponse<DocmostFavorite>
+    ) {
+        self.firstResponse = firstResponse
+        self.replacementResponse = replacementResponse
+    }
+
+    func load() async -> PaginatedResponse<DocmostFavorite> {
+        requestCount += 1
+        guard requestCount == 1 else { return replacementResponse }
+
+        return await withCheckedContinuation { continuation in
+            firstContinuation = continuation
+        }
+    }
+
+    func finishFirstLoad() {
+        firstContinuation?.resume(returning: firstResponse)
+        firstContinuation = nil
     }
 }
 

@@ -13314,9 +13314,25 @@ ${err.toString()}`);
     encodeStateAsUpdate(stateVector) {
       return base64FromBytes(encodeStateAsUpdate(this.ydoc, bytesFromBase64(stateVector)));
     }
+    validateUpdate(update) {
+      const validationDocument = new Doc();
+      try {
+        applyUpdate(validationDocument, bytesFromBase64(update));
+        return true;
+      } finally {
+        validationDocument.destroy();
+      }
+    }
     applyRemoteUpdate(update) {
       applyUpdate(this.ydoc, bytesFromBase64(update), this.remoteOrigin);
       this.enqueueSnapshot();
+    }
+    currentSnapshot() {
+      return {
+        title: this.title,
+        document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
+        updatedAt: null
+      };
     }
     integrateLocalChange(change) {
       this.applyDocument(change.after.title, change.after.document, this.localOrigin);

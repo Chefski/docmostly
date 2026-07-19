@@ -25,7 +25,7 @@ final class AppState {
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
-    @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
+    @ObservationIgnored var documentSessionRegistry: DocumentSessionRegistry?
     @ObservationIgnored var cacheRepository: CacheRepository?
     @ObservationIgnored var cacheReader: CacheReadRepository?
     @ObservationIgnored var cacheWriter: CacheWriteRepository?
@@ -35,6 +35,7 @@ final class AppState {
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
     @ObservationIgnored private var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
+    @ObservationIgnored var sidebarReturnDestination: SidebarDestination?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
     @ObservationIgnored var offlineReplayTask: Task<Void, Never>?
@@ -49,14 +50,14 @@ final class AppState {
         authService: AuthService? = nil,
         cookieJar: SessionCookieJar = SessionCookieJar(),
         crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
-        offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing = NativeEditorOfflineCRDTSynchronizer(),
+        documentSessionRegistry: DocumentSessionRegistry? = nil,
         apiClient: DocmostAPIClient? = nil
     ) {
         self.settingsStore = settingsStore ?? LocalSettingsStore()
         self.cookieJar = cookieJar
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
-        self.offlineCRDTSynchronizer = offlineCRDTSynchronizer
+        self.documentSessionRegistry = documentSessionRegistry
         self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
         savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()
@@ -83,6 +84,14 @@ final class AppState {
         }
         if offlineQueueRepository == nil, let modelContainer {
             offlineQueueRepository = OfflineMutationQueueRepository(modelContainer: modelContainer)
+        }
+        if documentSessionRegistry == nil,
+           let modelContainer,
+           let crdtDocumentEngineFactory {
+            documentSessionRegistry = DocumentSessionRegistry(
+                localPeer: DocumentLocalPersistencePeer(modelContainer: modelContainer),
+                engineFactory: crdtDocumentEngineFactory
+            )
         }
     }
 
@@ -190,6 +199,7 @@ final class AppState {
         savedServerURLStrings = settingsStore.loadSavedServerURLStrings()
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
+        documentSessionRegistry?.removeAll()
         apiClient = client
         currentUser = nil
         cacheScope = nil
@@ -219,6 +229,7 @@ final class AppState {
         try? await authService.logout(client: apiClient)
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
+        documentSessionRegistry?.removeAll()
         currentUser = nil
         cacheScope = nil
         pendingOfflineMutationCount = 0

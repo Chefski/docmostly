@@ -30,7 +30,10 @@ final class PageTreeViewModel {
 
         do {
             let pages = try await appState.loadSidebarPages(spaceId: spaceId)
-            nodes = pages.map(PageTreeNode.init(page:)).sortedByPosition()
+            nodes = pages
+                .map(PageTreeNode.init(page:))
+                .sortedByPosition()
+                .preservingLoadedSubtrees(from: nodes)
             rebuildVisibleNodes()
         } catch {
             errorMessage = error.localizedDescription

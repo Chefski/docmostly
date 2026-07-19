@@ -30,6 +30,63 @@ struct SettingsDraftPayloadTests {
         #expect(body["restrictApiToAdmins"] == nil)
     }
 
+    @Test func workspaceDraftOmitsChangesForUnavailableLicensedFeatures() throws {
+        var draft = WorkspaceSettingsDraft(workspace: workspace())
+        draft.name = "Docs"
+        draft.disablePublicSharing = true
+        draft.restrictApiToAdmins = true
+        draft.trashRetentionDays = 60
+        draft.allowMemberTemplates = false
+        draft.aiSearch = true
+        draft.generativeAi = true
+        draft.mcpEnabled = true
+
+        let update = draft.update(comparedTo: workspace(), availableFeatures: [])
+        let body = try encodedDictionary(update)
+
+        #expect(body["name"] as? String == "Docs")
+        #expect(body["disablePublicSharing"] == nil)
+        #expect(body["restrictApiToAdmins"] == nil)
+        #expect(body["trashRetentionDays"] == nil)
+        #expect(body["allowMemberTemplates"] == nil)
+        #expect(body["aiSearch"] == nil)
+        #expect(body["generativeAi"] == nil)
+        #expect(body["mcpEnabled"] == nil)
+        #expect(update.hasChanges)
+    }
+
+    @Test func workspaceDraftIncludesChangesForAvailableLicensedFeatures() throws {
+        var draft = WorkspaceSettingsDraft(workspace: workspace())
+        draft.disablePublicSharing = true
+        draft.restrictApiToAdmins = true
+        draft.trashRetentionDays = 60
+        draft.allowMemberTemplates = false
+        draft.aiSearch = true
+        draft.generativeAi = true
+        draft.mcpEnabled = true
+
+        let update = draft.update(
+            comparedTo: workspace(),
+            availableFeatures: [
+                .apiKeys,
+                .artificialIntelligence,
+                .mcp,
+                .retention,
+                .sharingControls,
+                .templates
+            ]
+        )
+        let body = try encodedDictionary(update)
+
+        #expect(body["disablePublicSharing"] as? Bool == true)
+        #expect(body["restrictApiToAdmins"] as? Bool == true)
+        #expect(body["trashRetentionDays"] as? Int == 60)
+        #expect(body["allowMemberTemplates"] as? Bool == false)
+        #expect(body["aiSearch"] as? Bool == true)
+        #expect(body["generativeAi"] as? Bool == true)
+        #expect(body["mcpEnabled"] as? Bool == true)
+    }
+
     @Test func roleLabelsMirrorDocmostWeb() {
         #expect(SettingsRoleOption.workspaceRoles.map(\.value) == ["owner", "admin", "member"])
         #expect(SettingsRoleOption.assignableWorkspaceRoles(isOwner: false).map(\.value) == ["admin", "member"])

@@ -6,6 +6,8 @@ enum PageBrowserMetrics {
     static let headerInsets = EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16)
     static let rowInsets = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
     static let switchInsets = EdgeInsets(top: 8, leading: 12, bottom: 10, trailing: 12)
+    static let sidebarScopeSwitchSidePadding: CGFloat = 20
+    static let scopeSwitchVerticalOverflowPadding: CGFloat = 12
     static let railLimit = 12
     static let railHorizontalPadding: CGFloat = 16
     static let railSectionSpacing: CGFloat = 12

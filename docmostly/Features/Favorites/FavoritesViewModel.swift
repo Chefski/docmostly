@@ -7,6 +7,7 @@ final class FavoritesViewModel {
     private static let pageSize = 30
 
     private var pages = CursorPageAccumulator<DocmostFavorite>()
+    @ObservationIgnored private var loadRequestID: UUID?
     var isLoading = false
     var isLoadingNextPage = false
     var mutatingFavoriteIDs: Set<String> = []
@@ -35,18 +36,32 @@ final class FavoritesViewModel {
     }
 
     func load(appState: AppState) async {
-        guard isLoading == false else { return }
+        await load {
+            try await appState.loadFavorites(limit: Self.pageSize)
+        }
+    }
+
+    func load(
+        operation: () async throws -> PaginatedResponse<DocmostFavorite>
+    ) async {
+        let requestID = UUID()
+        loadRequestID = requestID
         isLoading = true
         errorMessage = nil
         nextPageErrorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if loadRequestID == requestID {
+                isLoading = false
+            }
+        }
 
         do {
-            let response = try await appState.loadFavorites(limit: Self.pageSize)
+            let response = try await operation()
+            guard loadRequestID == requestID, Task.isCancelled == false else { return }
             applyInitialPage(response)
-        } catch is CancellationError {
-            return
         } catch {
+            guard loadRequestID == requestID, Task.isCancelled == false else { return }
+            guard Self.isCancelledLoadError(error) == false else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -60,9 +75,8 @@ final class FavoritesViewModel {
         do {
             let response = try await appState.loadFavorites(cursor: cursor, limit: Self.pageSize)
             applyNextPage(response, requestedCursor: cursor)
-        } catch is CancellationError {
-            return
         } catch {
+            guard Self.isCancelledLoadError(error) == false else { return }
             nextPageErrorMessage = error.localizedDescription
         }
     }
@@ -104,12 +118,20 @@ final class FavoritesViewModel {
 
         do {
             try await operation()
-        } catch is CancellationError {
-            pages.restore(removal.item, at: removal.index)
         } catch {
             pages.restore(removal.item, at: removal.index)
+            guard Self.isCancelledLoadError(error) == false else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    static func isCancelledLoadError(_ error: any Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 

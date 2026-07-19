@@ -417,6 +417,29 @@ extension NativeRichEditorBlockMechanicsTests {
         #expect(viewModel.document.blocks.map(plainText) == ["Plan ", "SET STATUS"])
     }
 
+    @Test func backspaceInEmptyBlockDeletesItAndFocusesPreviousBlockEnd() throws {
+        let first = NativeEditorBlock(
+            kind: .paragraph,
+            text: AttributedString("Gdbdhdhd"),
+            alignment: .left
+        )
+        let empty = NativeEditorBlock(
+            kind: .paragraph,
+            text: AttributedString(""),
+            alignment: .left
+        )
+        let viewModel = configuredViewModel(blocks: [first, empty])
+
+        #expect(viewModel.mergeBlockBackward(empty.id))
+
+        let remainingBlock = try #require(viewModel.document.blocks.first)
+        #expect(viewModel.document.blocks.count == 1)
+        #expect(remainingBlock.id == first.id)
+        #expect(plainText(remainingBlock) == "Gdbdhdhd")
+        #expect(try insertionOffset(in: remainingBlock) == 8)
+        #expect(viewModel.activeBlockID == first.id)
+    }
+
     @Test func mergeRefusesToDiscardAdditionalRawListContent() throws {
         let original = try JSONDecoder().decode(
             ProseMirrorDocument.self,

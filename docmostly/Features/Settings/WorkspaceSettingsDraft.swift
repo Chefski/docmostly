@@ -51,6 +51,13 @@ nonisolated struct WorkspaceSettingsDraft: Equatable, Sendable {
         update(comparedTo: workspace).hasChanges
     }
 
+    func hasChanges(
+        comparedTo workspace: DocmostWorkspace,
+        availableFeatures: Set<DocmostWorkspaceFeature>
+    ) -> Bool {
+        update(comparedTo: workspace, availableFeatures: availableFeatures).hasChanges
+    }
+
     func update(comparedTo workspace: DocmostWorkspace) -> WorkspaceUpdate {
         let original = WorkspaceSettingsDraft(workspace: workspace)
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,5 +73,34 @@ nonisolated struct WorkspaceSettingsDraft: Equatable, Sendable {
             trashRetentionDays: trashRetentionDays == original.trashRetentionDays ? nil : trashRetentionDays,
             allowMemberTemplates: allowMemberTemplates == original.allowMemberTemplates ? nil : allowMemberTemplates
         )
+    }
+
+    func update(
+        comparedTo workspace: DocmostWorkspace,
+        availableFeatures: Set<DocmostWorkspaceFeature>
+    ) -> WorkspaceUpdate {
+        var update = update(comparedTo: workspace)
+
+        if availableFeatures.contains(.sharingControls) == false {
+            update.disablePublicSharing = nil
+        }
+        if availableFeatures.contains(.apiKeys) == false {
+            update.restrictApiToAdmins = nil
+        }
+        if availableFeatures.contains(.retention) == false {
+            update.trashRetentionDays = nil
+        }
+        if availableFeatures.contains(.templates) == false {
+            update.allowMemberTemplates = nil
+        }
+        if availableFeatures.contains(.artificialIntelligence) == false {
+            update.aiSearch = nil
+            update.generativeAi = nil
+        }
+        if availableFeatures.contains(.mcp) == false {
+            update.mcpEnabled = nil
+        }
+
+        return update
     }
 }

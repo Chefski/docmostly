@@ -244,6 +244,7 @@ private extension NativeEditorCollaborationPresenceClient {
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFramesAfterAuthentication()
         try await send(frames)
+        try await syncDriver.didSendOutboundFramesAfterAuthentication()
     }
 
     func sendCRDTSyncReply(
@@ -291,6 +292,7 @@ private extension NativeEditorCollaborationPresenceClient {
 
                 do {
                     try await self?.send(frame)
+                    try await syncDriver.didSendLocalUpdate(update)
                 } catch {
                     return
                 }

@@ -58,7 +58,8 @@ struct PageBrowserHomeView: View {
         PageBrowserTaskKey(
             spaceID: space.id,
             scope: viewModel.selectedScope,
-            pageDiscoveryRevision: appState.pageDiscoveryRevision
+            pageDiscoveryRevision: appState.pageDiscoveryRevision,
+            favoriteRevision: appState.favoriteRevision
         )
     }
 }
