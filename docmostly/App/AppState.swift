@@ -13,6 +13,8 @@ final class AppState {
     var selectedSidebarDestination: SidebarDestination?
     var selectedSpaceID: String?
     var selectedPageID: String?
+    var selectedCommentID: String?
+    var favoriteRevision = 0
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
@@ -44,12 +46,14 @@ final class AppState {
         settingsStore: LocalSettingsStore? = nil,
         authService: AuthService? = nil,
         cookieJar: SessionCookieJar = SessionCookieJar(),
-        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil
+        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
+        apiClient: DocmostAPIClient? = nil
     ) {
         self.settingsStore = settingsStore ?? LocalSettingsStore()
         self.cookieJar = cookieJar
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
+        self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
         savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()
     }
@@ -319,7 +323,10 @@ final class AppState {
         }
 
         do {
-            let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: idOrSlugId, format: .json))
+            let remotePage: DocmostEditablePage = try await apiClient.send(
+                .pageInfo(pageId: idOrSlugId, format: .json)
+            )
+            let page = try await overlayPendingPageUpdate(on: remotePage)
             isOffline = false
             if let cacheScope {
                 scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
@@ -330,38 +337,6 @@ final class AppState {
             statusMessage = error.localizedDescription
             guard canUseOfflineCache(after: error) else { throw error }
             return try await requireCachedEditablePage(idOrSlugId: idOrSlugId)
-        }
-    }
-
-    func updatePage(pageId: String, title: String, document: ProseMirrorDocument) async throws -> DocmostEditablePage {
-        guard let apiClient else {
-            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
-        }
-
-        do {
-            let page: DocmostEditablePage = try await apiClient.send(.updatePage(
-                pageId: pageId,
-                title: title,
-                content: document,
-                format: .json,
-                operation: .replace
-            ))
-            isOffline = false
-            if let cacheScope {
-                scheduleCacheWrite(.saveEditablePage(page, scope: cacheScope))
-            }
-            do {
-                try await clearPendingPageUpdate(pageId: pageId, title: title, document: document)
-                scheduleOfflineQueueReconciliation()
-            } catch {
-                statusMessage = error.localizedDescription
-            }
-            return page
-        } catch {
-            guard canQueueOfflineMutation(after: error) else { throw error }
-            isOffline = true
-            statusMessage = error.localizedDescription
-            return try await queuePageUpdate(pageId: pageId, title: title, document: document)
         }
     }
 

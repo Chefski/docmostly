@@ -18,6 +18,7 @@ extension NativeRichEditorViewModel {
         isApplyingHistory = false
         resetEditingHistory()
         recalculateDirty()
+        recordLocalEditForAutosave()
         notifyLocalAwarenessChanged()
     }
 
@@ -27,7 +28,7 @@ extension NativeRichEditorViewModel {
 
     func handleDocumentChanged() {
         guard canEdit else {
-            restoreReadOnlyBaseline()
+            restoreRetainedReadOnlyDraft()
             return
         }
 
@@ -37,7 +38,7 @@ extension NativeRichEditorViewModel {
 
     func handleTitleChanged() {
         guard canEdit else {
-            restoreReadOnlyBaseline()
+            restoreRetainedReadOnlyDraft()
             return
         }
 
@@ -52,6 +53,7 @@ extension NativeRichEditorViewModel {
         redoStack.append(currentSnapshot)
         applyHistorySnapshot(previousSnapshot)
         queueCRDTLocalChange(before: currentSnapshot, after: previousSnapshot)
+        recordLocalEditForAutosave()
     }
 
     func redo() {
@@ -61,6 +63,7 @@ extension NativeRichEditorViewModel {
         undoStack.append(currentSnapshot)
         applyHistorySnapshot(nextSnapshot)
         queueCRDTLocalChange(before: currentSnapshot, after: nextSnapshot)
+        recordLocalEditForAutosave()
     }
 
     func performUndoableEdit(_ edit: () -> Void) {
@@ -77,6 +80,7 @@ extension NativeRichEditorViewModel {
         updateHistoryAvailability()
         recalculateDirty()
         queueCRDTLocalChange(before: before, after: after)
+        recordLocalEditForAutosave()
         notifyLocalAwarenessChanged()
     }
 
@@ -97,6 +101,7 @@ extension NativeRichEditorViewModel {
         guard let before = lastKnownSnapshot else {
             lastKnownSnapshot = makeHistorySnapshot()
             isDirty = true
+            recordLocalEditForAutosave()
             return
         }
 
@@ -118,6 +123,7 @@ extension NativeRichEditorViewModel {
         updateHistoryAvailability()
         isDirty = true
         queueCRDTLocalChange(before: before, after: after)
+        recordLocalEditForAutosave()
     }
 
     private func appendUndoSnapshot(_ snapshot: NativeEditorHistorySnapshot) {
@@ -150,13 +156,24 @@ extension NativeRichEditorViewModel {
         canRedo = redoStack.isEmpty == false
     }
 
-    private func restoreReadOnlyBaseline() {
+    private func recordLocalEditForAutosave() {
+        localEditRevision += 1
+        hasDurablyPersistedLocalCRDTDraft = false
+    }
+
+    func recordCRDTProjectionReadyForAutosave() {
+        recordLocalEditForAutosave()
+    }
+
+    private func restoreRetainedReadOnlyDraft() {
         guard isApplyingHistory == false else { return }
 
-        title = lastSavedTitle
-        document = lastSavedDocument
+        let retainedSnapshot = retainedReadOnlyDraftSnapshot
+        title = retainedSnapshot?.title ?? lastSavedTitle
+        document = retainedSnapshot?.document ?? lastSavedDocument
+        clearAuthoringState()
         lastKnownSnapshot = makeHistorySnapshot()
-        isDirty = false
+        recalculateDirty()
         updateHistoryAvailability()
     }
 
@@ -164,26 +181,100 @@ extension NativeRichEditorViewModel {
         try await crdtLocalChangeTask?.value
     }
 
+    func waitForStableCRDTLocalChangeBarrier() async {
+        var stableGeneration = crdtOperationGeneration
+
+        while Task.isCancelled == false {
+            do {
+                try await crdtLocalChangeTask?.value
+            } catch {
+                return
+            }
+
+            guard stableGeneration != crdtOperationGeneration else { return }
+            stableGeneration = crdtOperationGeneration
+        }
+    }
+
+    func enqueueCRDTSnapshotFlush(
+        title: String,
+        document: NativeEditorDocument
+    ) -> Task<NativeEditorCRDTSaveResult, any Error>? {
+        guard canEdit else { return nil }
+        guard isCRDTEngineReadyForLocalChanges else { return nil }
+        guard let crdtSyncCoordinator else { return nil }
+
+        crdtOperationGeneration += 1
+        let previousTask = crdtLocalChangeTask
+        let flushTask = Task { [crdtSyncCoordinator, previousTask] in
+            do {
+                try await previousTask?.value
+            } catch is CancellationError {
+                try Task.checkCancellation()
+            } catch {
+                // A full snapshot flush can repair a failed predecessor in the local chain.
+            }
+            try Task.checkCancellation()
+            return try await crdtSyncCoordinator.flushPendingLocalChanges(
+                title: title,
+                document: document
+            )
+        }
+        crdtLocalChangeTask = Task { [flushTask] in
+            _ = try await flushTask.value
+        }
+        return flushTask
+    }
+
     private func queueCRDTLocalChange(
         before: NativeEditorHistorySnapshot,
         after: NativeEditorHistorySnapshot
     ) {
-        guard let crdtDocumentEngine else { return }
+        guard canEdit else { return }
+        guard isCRDTEngineReadyForLocalChanges else { return }
+        guard pendingRemoteCRDTSnapshot == nil else { return }
+        guard let crdtSyncCoordinator else { return }
 
+        crdtOperationGeneration += 1
         let previousTask = crdtLocalChangeTask
         let change = NativeEditorCRDTLocalChange(before: before, after: after)
-        crdtLocalChangeTask = Task { [weak self, crdtDocumentEngine, change, previousTask] in
-            try await previousTask?.value
+        crdtLocalChangeTask = Task { [weak self, crdtSyncCoordinator, change, previousTask] in
+            do {
+                try await previousTask?.value
+            } catch is CancellationError {
+                try Task.checkCancellation()
+            } catch {
+                // The latest full snapshot can repair a failed predecessor in the local chain.
+            }
             try Task.checkCancellation()
+            guard let self, self.pendingRemoteCRDTSnapshot == nil else { return }
 
             do {
-                try await crdtDocumentEngine.integrateLocalChange(change)
+                try await crdtSyncCoordinator.integrateLocalChange(change)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                self?.realtimeStatus = .failed(error.localizedDescription)
+                realtimeStatus = .failed(error.localizedDescription)
                 throw error
             }
         }
+    }
+
+    func publishKeptLocalDraft(
+        over snapshot: NativeEditorCRDTDocumentSnapshot,
+        remoteTitle: String
+    ) {
+        let remoteSnapshot = NativeEditorHistorySnapshot(
+            title: remoteTitle,
+            document: snapshot.document,
+            activeBlockID: nil,
+            selectedBlockID: nil,
+            visibleBlockControlsID: nil,
+            isTitleFocused: false
+        )
+        let localSnapshot = makeHistorySnapshot()
+        queueCRDTLocalChange(before: remoteSnapshot, after: localSnapshot)
+        recordLocalEditForAutosave()
+        notifyLocalAwarenessChanged()
     }
 }

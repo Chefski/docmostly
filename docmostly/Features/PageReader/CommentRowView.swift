@@ -10,16 +10,21 @@ struct CommentRowView: View {
     let isEditing: Bool
     let isUpdating: Bool
     let isDeleting: Bool
-    let editDraft: Binding<String>?
+    let editDraft: CommentComposerState?
+    let errorMessage: String?
+    let isFocused: Bool
     let toggleResolved: () -> Void
     let beginEditing: () -> Void
     let cancelEditing: () -> Void
     let saveEditing: () -> Void
     let deleteComment: () -> Void
+    let focusInlineComment: () -> Void
 
     var body: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading) {
+            CommentAvatarView(name: comment.creator?.name)
+
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(comment.creator?.name ?? "Comment")
                         .font(.subheadline)
@@ -27,50 +32,60 @@ struct CommentRowView: View {
 
                     if isReply {
                         Label("Reply", systemImage: "arrow.turn.down.right")
-                            .labelStyle(.titleAndIcon)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
 
+                if isReply == false,
+                   let selection = comment.selection?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   selection.isEmpty == false {
+                    Button(action: focusInlineComment) {
+                        Label {
+                            Text(selection)
+                                .lineLimit(4)
+                        } icon: {
+                            Image(systemName: "quote.opening")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: .rect(cornerRadius: 8))
+                    .accessibilityLabel("Commented text: \(selection)")
+                }
+
                 if isEditing, let editDraft {
-                    TextField("Edit comment", text: editDraft, axis: .vertical)
-                        .lineLimit(2...)
-                        .textFieldStyle(.roundedBorder)
+                    CommentRichComposerView(
+                        draft: editDraft,
+                        placeholder: "Edit comment",
+                        submitTitle: "Save",
+                        accessibilityIdentifier: "comment-edit-field-\(comment.id)",
+                        isEnabled: true,
+                        isSubmitting: isUpdating,
+                        autofocus: true,
+                        submit: saveEditing,
+                        cancel: cancelEditing
+                    )
                 } else {
-                    Text(comment.content ?? "")
-                        .font(.body)
-                        .foregroundStyle(comment.isResolved ? .secondary : .primary)
+                    CommentBodyView(comment: comment)
                 }
 
-                HStack {
-                    if let createdAt = comment.createdAt {
-                        Text(createdAt.formatted(date: .abbreviated, time: .shortened))
-                    }
+                CommentStateMetadataView(comment: comment)
 
-                    if comment.isResolved {
-                        Label("Resolved", systemImage: "checkmark.seal.fill")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                if isEditing {
-                    HStack {
-                        Button("Cancel", systemImage: "xmark", action: cancelEditing)
-                            .controlSize(.small)
-
-                        Button("Save", systemImage: "checkmark", action: saveEditing)
-                            .controlSize(.small)
-                            .disabled(isUpdating)
-                    }
-                    .buttonStyle(.bordered)
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(DocmostlyTheme.destructive)
                 }
             }
 
             Spacer(minLength: 0)
 
-            Menu {
+            Menu("Comment Actions", systemImage: "ellipsis.circle") {
                 if canEdit {
                     Button("Edit Comment", systemImage: "pencil", action: beginEditing)
                 }
@@ -88,16 +103,61 @@ struct CommentRowView: View {
                     Button("Delete Comment", systemImage: "trash", role: .destructive, action: deleteComment)
                         .disabled(isDeleting)
                 }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .padding(.horizontal)
-                    .contentShape(.rect)
-                    .accessibilityLabel("Comment Actions")
             }
+            .labelStyle(.iconOnly)
             .menuStyle(.button)
             .disabled((canEdit || canToggleResolved || canDelete) == false)
+            .accessibilityLabel("Comment Actions")
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, isFocused ? 8 : 0)
+        .background(isFocused ? DocmostlyTheme.primaryTint : .clear, in: .rect(cornerRadius: 8))
+        .accessibilityAddTraits(isFocused ? .isSelected : [])
+    }
+}
+
+private struct CommentAvatarView: View {
+    let name: String?
+
+    var body: some View {
+        Text(initials)
+            .font(.caption)
+            .bold()
+            .foregroundStyle(DocmostlyTheme.primary)
+            .frame(width: 30, height: 30)
+            .background(DocmostlyTheme.primaryTint, in: .circle)
+            .accessibilityLabel(name ?? "Comment author")
+    }
+
+    private var initials: String {
+        let parts = (name ?? "?").split(separator: " ").prefix(2)
+        let value = parts.compactMap(\.first).map(String.init).joined()
+        return value.isEmpty ? "?" : value.uppercased()
+    }
+}
+
+private struct CommentStateMetadataView: View {
+    let comment: DocmostComment
+
+    var body: some View {
+        HStack {
+            if let createdAt = comment.createdAt {
+                Text(createdAt.formatted(date: .abbreviated, time: .shortened))
+            }
+
+            if comment.editedAt != nil {
+                Label("Edited", systemImage: "pencil")
+            }
+
+            if comment.isLocallyQueued {
+                Label("Queued", systemImage: "clock.arrow.circlepath")
+            }
+
+            if comment.isResolved {
+                Label("Resolved", systemImage: "checkmark.seal.fill")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }

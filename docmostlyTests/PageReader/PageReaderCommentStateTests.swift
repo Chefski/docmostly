@@ -138,13 +138,15 @@ struct PageReaderCommentStateTests {
 
     @Test func replyDraftIsClearedWhenReplyIsApplied() throws {
         let viewModel = PageReaderViewModel()
-        viewModel.replyDraftsByCommentID["parent-1"] = "Thanks"
+        viewModel.replyDraftsByCommentID["parent-1"] = CommentComposerState(
+            body: CommentBody(plainText: "Thanks")
+        )
         let reply = try comment(id: "reply-1", text: "Thanks", resolvedAt: nil, parentCommentId: "parent-1")
 
         viewModel.applyCreatedReply(reply, parentCommentID: "parent-1")
 
         #expect(viewModel.comments.map(\.id) == ["reply-1"])
-        #expect(viewModel.replyDraftsByCommentID["parent-1"] == nil)
+        #expect(viewModel.replyDraftsByCommentID["parent-1"]?.isEmpty == true)
     }
 
     @Test func replySubmissionDisallowsQueuedParentsRepliesAndDuplicatePosts() throws {
@@ -152,9 +154,15 @@ struct PageReaderCommentStateTests {
         let parent = try comment(id: "parent-1", text: "Parent", resolvedAt: nil)
         let queuedParent = try comment(id: "offline-comment-1", text: "Queued", resolvedAt: nil)
         let reply = try comment(id: "reply-1", text: "Reply", resolvedAt: nil, parentCommentId: "parent-1")
-        viewModel.replyDraftsByCommentID[parent.id] = "Reply"
-        viewModel.replyDraftsByCommentID[queuedParent.id] = "Reply"
-        viewModel.replyDraftsByCommentID[reply.id] = "Reply"
+        viewModel.replyDraftsByCommentID[parent.id] = CommentComposerState(
+            body: CommentBody(plainText: "Reply")
+        )
+        viewModel.replyDraftsByCommentID[queuedParent.id] = CommentComposerState(
+            body: CommentBody(plainText: "Reply")
+        )
+        viewModel.replyDraftsByCommentID[reply.id] = CommentComposerState(
+            body: CommentBody(plainText: "Reply")
+        )
 
         #expect(viewModel.canSubmitReply(to: parent))
         #expect(viewModel.canSubmitReply(to: queuedParent) == false)
@@ -187,10 +195,12 @@ struct PageReaderCommentStateTests {
         viewModel.comments = [existingComment]
 
         viewModel.beginEditing(existingComment)
-        #expect(viewModel.editDraftsByCommentID["comment-1"] == "Original")
+        #expect(viewModel.editDraftsByCommentID["comment-1"]?.plainText == "Original")
         #expect(viewModel.isEditingComment(id: "comment-1"))
 
-        viewModel.editDraftsByCommentID["comment-1"] = "Updated"
+        viewModel.editDraftsByCommentID["comment-1"] = CommentComposerState(
+            body: CommentBody(plainText: "Updated")
+        )
         viewModel.applyEditedComment(updated)
 
         #expect(viewModel.comments.first?.content == "Updated")

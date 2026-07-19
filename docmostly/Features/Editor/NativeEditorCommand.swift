@@ -71,8 +71,6 @@ enum NativeEditorCommand: String, CaseIterable, Identifiable {
         .pdf,
         .fileAttachment,
         .table,
-        .baseInline,
-        .kanban,
         .callout,
         .details,
         .pageBreak,

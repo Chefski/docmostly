@@ -7,6 +7,8 @@ struct PageReaderView: View {
     #endif
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) var dismiss
+    @Environment(\.scenePhase) var scenePhase
+    @Environment(\.accessibilityReduceMotion) var accessibilityReduceMotion
     @State var viewModel = PageReaderViewModel()
     @State var editorViewModel: NativeRichEditorViewModel?
     @State var pageHistoryViewModel = PageHistoryViewModel()
@@ -32,10 +34,11 @@ struct PageReaderView: View {
     @State var isShowingLabelEditor = false
     @State var isShowingMoveToSpace = false
     @State var pendingInlineCommentID: String?
-    @State var pendingInlineCommentDraft: String?
+    @State var pendingInlineCommentDraft: CommentBody?
     @State var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
     @State var readerMode = PageReaderMode.edit
     @State var activePanel: PageReaderPanel?
+    @State var focusedCommentID: String?
     @State var scrollPosition = ScrollPosition()
     @State var usesFullWidth = false
     @State var realtimePageID: String?
@@ -43,15 +46,21 @@ struct PageReaderView: View {
 
     let pageID: String
     let initialTitle: String?
+    let initialCommentID: String?
+    let focusesEditorOnLoad: Bool
     let pageLoaded: @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void
 
     init(
         pageID: String,
         initialTitle: String? = nil,
+        initialCommentID: String? = nil,
+        focusesEditorOnLoad: Bool = false,
         pageLoaded: @escaping @MainActor (_ pageID: String, _ spaceID: String, _ title: String) -> Void = { _, _, _ in }
     ) {
         self.pageID = pageID
         self.initialTitle = initialTitle
+        self.initialCommentID = initialCommentID
+        self.focusesEditorOnLoad = focusesEditorOnLoad
         self.pageLoaded = pageLoaded
     }
 
@@ -76,7 +85,13 @@ struct PageReaderView: View {
                             isAuthoringEnabled: readerMode == .edit,
                             serverURLString: appState.serverURLString,
                             importAttachment: beginAttachmentImport,
-                            applyCommand: applyEditorCommand
+                            applyCommand: applyEditorCommand,
+                            applyPendingRemoteUpdate: {
+                                resolvePendingRemoteUpdate(.applyRemote)
+                            },
+                            keepPendingLocalUpdate: {
+                                resolvePendingRemoteUpdate(.keepLocal)
+                            }
                         )
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
@@ -242,6 +257,8 @@ struct PageReaderView: View {
                     serverURLString: appState.serverURLString,
                     tableOfContentsItems: tableOfContentsItems,
                     selectHeading: selectHeading,
+                    focusedCommentID: focusedCommentID,
+                    focusInlineComment: focusInlineComment,
                     markInlineCommentResolved: markInlineCommentResolved,
                     removeInlineComment: removeInlineComment,
                     loadSharingState: loadSharingState,
@@ -273,6 +290,8 @@ struct PageReaderView: View {
                         serverURLString: appState.serverURLString,
                         tableOfContentsItems: tableOfContentsItems,
                         selectHeading: selectHeading,
+                        focusedCommentID: focusedCommentID,
+                        focusInlineComment: focusInlineComment,
                         markInlineCommentResolved: markInlineCommentResolved,
                         removeInlineComment: removeInlineComment,
                         loadSharingState: loadSharingState,
@@ -299,21 +318,35 @@ struct PageReaderView: View {
         #endif
         .task(id: pageID) {
             await loadNativePage()
+            focusRequestedCommentIfAvailable()
         }
-        .task(id: realtimePageID) {
+        .task(id: PageReaderCollaborationTaskKeys.realtimeEvents(
+            pageID: realtimePageID,
+            participation: collaborationParticipation
+        )) {
             guard realtimePageID != nil else { return }
             await monitorRealtimeEvents()
         }
-        .task(id: realtimePageID) {
-            guard realtimePageID != nil else { return }
-            await monitorCollaborationPresence()
+        .task(id: collaborationPresenceTaskKey) {
+            guard let collaborationPresenceTaskKey else { return }
+            await monitorCollaborationPresence(participation: collaborationPresenceTaskKey.participation)
         }
-        .task(id: realtimePageID) {
+        .task(id: PageReaderCollaborationTaskKeys.crdtDocumentSnapshots(
+            pageID: realtimePageID,
+            participation: collaborationParticipation
+        )) {
             guard realtimePageID != nil else { return }
             await monitorCRDTDocumentSnapshots()
         }
         .onChange(of: editorFocusedField) { _, newValue in
             updateEditorFocus(newValue)
+        }
+        .onChange(of: appState.selectedCommentID) { _, _ in
+            focusRequestedCommentIfAvailable()
+        }
+        .onChange(of: editorViewModel?.localEditRevision) { oldRevision, newRevision in
+            guard let oldRevision, let newRevision, oldRevision != newRevision else { return }
+            scheduleInlineAutosave()
         }
         .onChange(of: isShowingInlineCommentComposer) { _, isShowing in
             if isShowing == false {
@@ -329,8 +362,14 @@ struct PageReaderView: View {
                 autosaveInlineEdits()
             }
         }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if oldPhase == .active, newPhase != .active {
+                autosaveInlineEdits(reloadCompanions: false)
+            }
+        }
         .onChange(of: editorViewModel?.canEdit) { _, canEdit in
             if canEdit == false {
+                autosaveInlineEdits(reloadCompanions: false)
                 readerMode = .read
             }
         }
@@ -339,4 +378,20 @@ struct PageReaderView: View {
         }
     }
 
+}
+
+extension PageReaderView {
+    var collaborationParticipation: NativeEditorCollaborationParticipation {
+        guard let editorViewModel else { return .receiveOnly }
+        guard readerMode == .edit, editorViewModel.canEdit else { return .receiveOnly }
+        return .interactive
+    }
+
+    var collaborationPresenceTaskKey: PageReaderCollaborationPresenceTaskKey? {
+        PageReaderCollaborationTaskKeys.collaborationPresence(
+            pageID: realtimePageID,
+            participation: collaborationParticipation,
+            isVisible: scenePhase == .active
+        )
+    }
 }

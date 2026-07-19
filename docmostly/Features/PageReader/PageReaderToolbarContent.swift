@@ -19,12 +19,6 @@ extension PageReaderView {
             }
             #endif
         }
-
-        if let editorViewModel, editorViewModel.isSaving {
-            ToolbarItem(placement: .primaryAction) {
-                ProgressView()
-            }
-        }
     }
 
     private func pageModePicker(editorViewModel: NativeRichEditorViewModel) -> some View {

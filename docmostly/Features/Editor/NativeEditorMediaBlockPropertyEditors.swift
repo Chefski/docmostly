@@ -24,9 +24,23 @@ struct NativeEditorMediaBlockEditor: View {
                     .docmostlyKeyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
 
-                TextField("Align", text: alignmentBinding)
-                    .docmostlyTextInputAutocapitalization(.never)
-                    .textFieldStyle(.roundedBorder)
+                Menu(alignmentTitle, systemImage: "text.alignleft") {
+                    ForEach(["left", "center", "right"], id: \.self) { alignment in
+                        Button(alignment.capitalized) {
+                            update(alignment: alignment)
+                        }
+                    }
+                }
+            }
+
+            HStack {
+                ForEach([25, 50, 75, 100], id: \.self) { percentage in
+                    Button("\(percentage)%") {
+                        update(width: "\(percentage)%", height: "")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
         }
     }
@@ -63,12 +77,8 @@ struct NativeEditorMediaBlockEditor: View {
         }
     }
 
-    private var alignmentBinding: Binding<String> {
-        Binding {
-            media.alignment ?? ""
-        } set: { alignment in
-            update(alignment: alignment)
-        }
+    private var alignmentTitle: String {
+        (media.alignment ?? NativeEditorMediaBlock.defaultAlignment).capitalized
     }
 
     private func update(

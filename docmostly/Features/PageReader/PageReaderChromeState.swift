@@ -16,6 +16,57 @@ enum PageReaderMode: String, CaseIterable, Identifiable {
     }
 }
 
+nonisolated struct PageReaderCollaborationPresenceTaskKey: Equatable, Sendable {
+    let pageID: String
+    let participation: NativeEditorCollaborationParticipation
+}
+
+nonisolated enum PageReaderCollaborationTaskKeys {
+    static func collaborationPresence(
+        pageID: String,
+        participation: NativeEditorCollaborationParticipation
+    ) -> PageReaderCollaborationPresenceTaskKey {
+        PageReaderCollaborationPresenceTaskKey(pageID: pageID, participation: participation)
+    }
+
+    static func collaborationPresence(
+        pageID: String?,
+        participation: NativeEditorCollaborationParticipation,
+        isVisible: Bool = true
+    ) -> PageReaderCollaborationPresenceTaskKey? {
+        guard let pageID, isVisible else { return nil }
+        return PageReaderCollaborationPresenceTaskKey(pageID: pageID, participation: participation)
+    }
+
+    static func realtimeEvents(
+        pageID: String,
+        participation: NativeEditorCollaborationParticipation
+    ) -> String {
+        pageID
+    }
+
+    static func realtimeEvents(
+        pageID: String?,
+        participation: NativeEditorCollaborationParticipation
+    ) -> String? {
+        pageID
+    }
+
+    static func crdtDocumentSnapshots(
+        pageID: String,
+        participation: NativeEditorCollaborationParticipation
+    ) -> String {
+        pageID
+    }
+
+    static func crdtDocumentSnapshots(
+        pageID: String?,
+        participation: NativeEditorCollaborationParticipation
+    ) -> String? {
+        pageID
+    }
+}
+
 enum PageReaderPanel: String, Identifiable {
     case details
     case comments

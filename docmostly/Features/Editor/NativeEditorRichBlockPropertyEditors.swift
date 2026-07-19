@@ -20,12 +20,9 @@ struct NativeEditorCalloutEditor: View {
 
                 TextField("Icon", text: iconBinding)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 140)
+                    .frame(maxWidth: 140)
+                    .accessibilityLabel("Callout icon")
             }
-
-            TextField("Callout", text: textBinding, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...4)
         }
     }
 
@@ -37,13 +34,6 @@ struct NativeEditorCalloutEditor: View {
         }
     }
 
-    private var textBinding: Binding<String> {
-        Binding {
-            callout.previewText
-        } set: { text in
-            actions.updateCallout(blockID, callout.style, callout.icon, text)
-        }
-    }
 }
 
 struct NativeEditorDetailsEditor: View {
@@ -57,9 +47,6 @@ struct NativeEditorDetailsEditor: View {
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(1...3)
 
-            TextField("Details", text: bodyBinding, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...5)
         }
     }
 
@@ -71,13 +58,6 @@ struct NativeEditorDetailsEditor: View {
         }
     }
 
-    private var bodyBinding: Binding<String> {
-        Binding {
-            details.previewText
-        } set: { body in
-            actions.updateDetails(blockID, details.summary, body, details.isOpen)
-        }
-    }
 }
 
 struct NativeEditorColumnsEditor: View {
@@ -87,13 +67,13 @@ struct NativeEditorColumnsEditor: View {
 
     private let layouts = NativeEditorColumnsBlock.supportedLayouts
     private let widthModes = NativeEditorColumnsBlock.supportedWidthModes
-    private let columnCountRange = 1...NativeEditorColumnsBlock.maximumColumnCount
+    private let columnCountRange = 2...NativeEditorColumnsBlock.maximumColumnCount
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Menu(layoutTitle, systemImage: "rectangle.split.2x1") {
-                    ForEach(layouts, id: \.self) { layout in
+                    ForEach(supportedLayouts, id: \.self) { layout in
                         Button(layout.replacing("_", with: " ").capitalized) {
                             actions.updateColumns(blockID, layout, columns.widthMode, columnTexts)
                         }
@@ -112,10 +92,21 @@ struct NativeEditorColumnsEditor: View {
             Stepper("Columns: \(columnTexts.count)", value: columnCountBinding, in: columnCountRange)
 
             ForEach(columnTexts.indices, id: \.self) { index in
-                TextField("Column \(index + 1)", text: columnTextBinding(index: index), axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...3)
+                HStack {
+                    Text("Column \(index + 1) width")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Slider(value: columnWidthBinding(index: index), in: 0.25...4, step: 0.05)
+                        .accessibilityLabel("Column \(index + 1) width")
+                }
             }
+
+            Button("Reset Column Widths", systemImage: "arrow.counterclockwise") {
+                for index in columnTexts.indices {
+                    actions.updateColumnWidth(blockID, index, nil)
+                }
+            }
+            .buttonStyle(.borderless)
         }
     }
 
@@ -134,24 +125,26 @@ struct NativeEditorColumnsEditor: View {
         Binding {
             columnTexts.count
         } set: { count in
-            var updatedTexts = columnTexts
-            if count > updatedTexts.count {
-                updatedTexts.append(contentsOf: repeatElement("", count: count - updatedTexts.count))
-            } else if count < updatedTexts.count {
-                updatedTexts.removeLast(updatedTexts.count - count)
-            }
-            actions.updateColumns(blockID, columns.layout, columns.widthMode, updatedTexts)
+            actions.setColumnCount(blockID, count)
         }
     }
 
-    private func columnTextBinding(index: Int) -> Binding<String> {
+    private var supportedLayouts: [String] {
+        let prefix = switch columnTexts.count {
+        case 2: "two_"
+        case 3: "three_"
+        case 4: "four_"
+        default: "five_"
+        }
+        return layouts.filter { $0.hasPrefix(prefix) }
+    }
+
+    private func columnWidthBinding(index: Int) -> Binding<Double> {
         Binding {
-            columnTexts[index]
-        } set: { text in
-            var updatedTexts = columnTexts
-            guard updatedTexts.indices.contains(index) else { return }
-            updatedTexts[index] = text
-            actions.updateColumns(blockID, columns.layout, columns.widthMode, updatedTexts)
+            guard columns.normalizedColumnWidths.indices.contains(index) else { return 1 }
+            return columns.normalizedColumnWidths[index] ?? 1
+        } set: { width in
+            actions.updateColumnWidth(blockID, index, width)
         }
     }
 }
@@ -163,29 +156,12 @@ struct NativeEditorTransclusionSourceEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Synced block ID", text: identifierBinding)
-                .docmostlyTextInputAutocapitalization(.never)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Content", text: textBinding, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...4)
-        }
-    }
-
-    private var identifierBinding: Binding<String> {
-        Binding {
-            source.identifier ?? ""
-        } set: { identifier in
-            actions.updateTransclusionSource(blockID, identifier, source.previewText)
-        }
-    }
-
-    private var textBinding: Binding<String> {
-        Binding {
-            source.previewText
-        } set: { text in
-            actions.updateTransclusionSource(blockID, source.identifier ?? "", text)
+            LabeledContent("Synced block ID") {
+                Text(source.identifier ?? "Pending")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         }
     }
 }

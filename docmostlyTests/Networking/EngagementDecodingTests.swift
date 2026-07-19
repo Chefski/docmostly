@@ -3,6 +3,31 @@ import Testing
 @testable import docmostly
 
 struct EngagementDecodingTests {
+    @Test func decodesUntitledCreatePageResponseWithNullTitle() throws {
+        let data = Data("""
+        {
+          "data": {
+            "id": "page-1",
+            "slugId": "new-note",
+            "title": null,
+            "spaceId": "space-1",
+            "permissions": {
+              "canEdit": true,
+              "hasRestriction": false
+            }
+          },
+          "success": true,
+          "status": 200
+        }
+        """.utf8)
+
+        let envelope = try DocmostJSONDecoder.make().decode(APIEnvelope<DocmostPage>.self, from: data)
+
+        #expect(envelope.data.title == "")
+        #expect(envelope.data.slugId == "new-note")
+        #expect(envelope.data.permissions?.canEdit == true)
+    }
+
     @Test func decodesBreadcrumbs() throws {
         let data = Data("""
         {

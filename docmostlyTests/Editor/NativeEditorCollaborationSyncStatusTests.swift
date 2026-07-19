@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import docmostly
 
@@ -23,7 +24,7 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.isDirty == false)
     }
 
-    @Test func readOnlyCollaborationScopeDiscardsPendingNativeEdits() {
+    @Test func readOnlyCollaborationScopeFreezesPendingNativeEditsAndHistory() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Saved title")
         viewModel.document = NativeEditorDocument(blocks: [block])
@@ -31,17 +32,45 @@ struct NativeEditorCollaborationSyncStatusTests {
         viewModel.resetEditingHistory()
         viewModel.focus(blockID: block.id)
 
+        viewModel.title = "Local title"
+        viewModel.handleTitleChanged()
         viewModel.document.blocks[0].text = AttributedString("Local draft")
         viewModel.handleDocumentChanged()
         #expect(viewModel.isDirty == true)
+        let undoHistory = viewModel.undoStack
+        let redoHistory = viewModel.redoStack
 
         viewModel.applyCollaborationAuthenticationScope(.readonly)
 
         #expect(viewModel.canEdit == false)
         #expect(viewModel.canSave == false)
-        #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
-        #expect(viewModel.isDirty == false)
+        #expect(viewModel.title == "Local title")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.isDirty)
         #expect(viewModel.activeBlockID == nil)
+        #expect(viewModel.undoStack == undoHistory)
+        #expect(viewModel.redoStack == redoHistory)
+
+        viewModel.title = "Late title binding"
+        viewModel.handleTitleChanged()
+        viewModel.document.blocks[0].text = AttributedString("Late document binding")
+        viewModel.handleDocumentChanged()
+
+        #expect(viewModel.title == "Local title")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.undoStack == undoHistory)
+        #expect(viewModel.redoStack == redoHistory)
+
+        let revisionBeforeRestoringAccess = viewModel.localEditRevision
+        viewModel.applyCollaborationAuthenticationScope(.readWrite)
+
+        #expect(viewModel.canEdit)
+        #expect(viewModel.isDirty)
+        #expect(viewModel.title == "Local title")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.localEditRevision == revisionBeforeRestoringAccess + 1)
+        #expect(viewModel.undoStack == undoHistory)
+        #expect(viewModel.redoStack == redoHistory)
     }
 
     @Test func readWriteCollaborationScopeDoesNotOverrideRestrictedPagePermissions() {
@@ -60,6 +89,8 @@ struct NativeEditorCollaborationSyncStatusTests {
         viewModel.lastSavedDocument = viewModel.document
         viewModel.resetEditingHistory()
         viewModel.focus(blockID: block.id)
+        viewModel.title = "Local title"
+        viewModel.handleTitleChanged()
         viewModel.document.blocks[0].text = AttributedString("Local draft")
         viewModel.handleDocumentChanged()
 
@@ -67,9 +98,86 @@ struct NativeEditorCollaborationSyncStatusTests {
 
         #expect(viewModel.canEdit == false)
         #expect(viewModel.canSave == false)
-        #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
-        #expect(viewModel.isDirty == false)
+        #expect(viewModel.title == "Local title")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+        #expect(viewModel.isDirty)
         #expect(viewModel.realtimeStatus == .authenticationFailed("Invalid collab token"))
+    }
+
+    @Test func unavailableCollaborationRuntimeRetainsDirtyNativeDraft() {
+        let viewModel = dirtyViewModel()
+
+        viewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.title == "Local title")
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local draft"])
+        #expect(viewModel.isDirty)
+        #expect(viewModel.hasOutgoingChangesRequiringPersistence)
+        #expect(viewModel.realtimeStatus == .failed("Native CRDT runtime is unavailable."))
+    }
+
+    @Test func revokedPagePermissionRetainsDirtyNativeDraft() {
+        let viewModel = dirtyViewModel()
+
+        viewModel.applyPagePermissions(DocmostPagePermissions(canEdit: false, hasRestriction: true))
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.title == "Local title")
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local draft"])
+        #expect(viewModel.isDirty)
+        #expect(viewModel.hasOutgoingChangesRequiringPersistence)
+    }
+
+    @Test func frozenDraftCanBeMadeDurableWithoutAReadOnlyServerWrite() async throws {
+        let scope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-1")
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        let cacheRepository = CacheRepository(context: context)
+        try cacheRepository.saveEditablePage(
+            DocmostEditablePage(
+                id: "page-1",
+                slugId: "page-1",
+                title: "Saved title",
+                content: NativeEditorDocument(
+                    blocks: [NativeEditorBlock(
+                        kind: .paragraph,
+                        text: AttributedString("Saved"),
+                        alignment: .left
+                    )]
+                ).proseMirrorDocument,
+                icon: nil,
+                spaceId: "space-1",
+                updatedAt: Date(timeIntervalSince1970: 10),
+                permissions: nil,
+                lastUpdatedBy: nil
+            ),
+            scope: scope
+        )
+        let appState = AppState()
+        appState.configure(modelContext: context)
+        appState.configurePreviewCacheScope(scope)
+        let viewModel = dirtyViewModel()
+        let savedBaseline = viewModel.lastSavedDocument.proseMirrorDocument
+        viewModel.applyCollaborationAuthenticationScope(.readonly)
+
+        let didPersist = await viewModel.persistRetainedReadOnlyDraft(appState: appState)
+
+        #expect(didPersist)
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.isDirty)
+        #expect(viewModel.hasDurablyPersistedLocalCRDTDraft)
+        #expect(viewModel.hasOutgoingChangesRequiringPersistence == false)
+        let offlineQueue = try #require(appState.offlineQueue)
+        #expect(try offlineQueue.pending(scope: scope).map(\.payload) == [
+            .updatePage(
+                pageId: "page-1",
+                title: "Local title",
+                document: viewModel.document.proseMirrorDocument,
+                baseTitle: "Saved title",
+                baseDocument: savedBaseline
+            )
+        ])
     }
 
     @Test func unsyncedCollaborationStatusClearsTransientPresenceAndCursors() {
@@ -222,9 +330,22 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.canEdit == false)
         #expect(viewModel.canSave == false)
         #expect(viewModel.activeBlockID == nil)
-        #expect(viewModel.isDirty == false)
+        #expect(viewModel.isDirty)
         #expect(viewModel.errorMessage == "This page was deleted in Docmost.")
-        #expect(String(viewModel.document.blocks[0].text.characters) == "Saved")
+        #expect(String(viewModel.document.blocks[0].text.characters) == "Local draft")
+    }
+
+    private func dirtyViewModel() -> NativeRichEditorViewModel {
+        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Saved"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Saved title")
+        viewModel.document = NativeEditorDocument(blocks: [block])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.title = "Local title"
+        viewModel.handleTitleChanged()
+        viewModel.document.blocks[0].text = AttributedString("Local draft")
+        viewModel.handleDocumentChanged()
+        return viewModel
     }
 }
 

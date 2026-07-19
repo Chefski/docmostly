@@ -62,7 +62,13 @@ struct NativeEditorHorizontalRuleView: View {
 struct NativeEditorCalloutBlockView: View {
     let blockID: UUID
     let callout: NativeEditorCalloutBlock
+    let content: [ProseMirrorNode]
     let actions: NativeEditorRichBlockEditingActions?
+    let pageID: String
+    let spaceID: String?
+    let serverURLString: String?
+    var presenceProjection: NativeEditorRemotePresenceProjection?
+    var presenceScope: [NativeEditorRemotePresenceScope] = []
 
     var body: some View {
         let presentation = NativeEditorCalloutPresentation(style: callout.style)
@@ -72,10 +78,28 @@ struct NativeEditorCalloutBlockView: View {
                 NativeEditorCalloutIcon(presentation: presentation, customIcon: callout.icon)
                     .padding(.top, 1)
 
-                Text(callout.previewText.isEmpty ? "Callout" : callout.previewText)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Group {
+                    if let actions {
+                        NativeEditorNestedDocumentView(
+                            blockID: blockID,
+                            target: .callout,
+                            content: content,
+                            serverURLString: serverURLString,
+                            presenceProjection: presenceProjection,
+                            presenceScope: presenceScope
+                        ) { updatedContent in
+                            actions.updateNestedContent(blockID, .callout, updatedContent)
+                        }
+                    } else {
+                        NativeEditorNestedDocumentPreview(
+                            content: content,
+                            pageID: pageID,
+                            spaceID: spaceID,
+                            serverURLString: serverURLString
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let actions {
@@ -99,13 +123,35 @@ struct NativeEditorCalloutBlockView: View {
 struct NativeEditorDetailsBlockView: View {
     let blockID: UUID
     let details: NativeEditorDetailsBlock
+    let bodyContent: [ProseMirrorNode]
     let actions: NativeEditorRichBlockEditingActions?
+    let pageID: String
+    let spaceID: String?
+    let serverURLString: String?
+    var presenceProjection: NativeEditorRemotePresenceProjection?
+    var presenceScope: [NativeEditorRemotePresenceScope] = []
     @State private var transientIsOpen: Bool
 
-    init(blockID: UUID, details: NativeEditorDetailsBlock, actions: NativeEditorRichBlockEditingActions?) {
+    init(
+        blockID: UUID,
+        details: NativeEditorDetailsBlock,
+        bodyContent: [ProseMirrorNode],
+        actions: NativeEditorRichBlockEditingActions?,
+        pageID: String,
+        spaceID: String?,
+        serverURLString: String?,
+        presenceProjection: NativeEditorRemotePresenceProjection? = nil,
+        presenceScope: [NativeEditorRemotePresenceScope] = []
+    ) {
         self.blockID = blockID
         self.details = details
+        self.bodyContent = bodyContent
         self.actions = actions
+        self.pageID = pageID
+        self.spaceID = spaceID
+        self.serverURLString = serverURLString
+        self.presenceProjection = presenceProjection
+        self.presenceScope = presenceScope
         _transientIsOpen = State(initialValue: details.isOpen)
     }
 
@@ -128,16 +174,27 @@ struct NativeEditorDetailsBlockView: View {
             .accessibilityLabel(isOpen ? "Collapse toggle block" : "Expand toggle block")
 
             if isOpen {
-                if details.previewText.isEmpty == false {
-                    Text(details.previewText)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
                 if let actions {
                     NativeEditorDetailsEditor(blockID: blockID, details: details, actions: actions)
                         .padding(.top, 2)
+
+                    NativeEditorNestedDocumentView(
+                        blockID: blockID,
+                        target: .detailsContent,
+                        content: bodyContent,
+                        serverURLString: serverURLString,
+                        presenceProjection: presenceProjection,
+                        presenceScope: presenceScope
+                    ) { updatedContent in
+                        actions.updateNestedContent(blockID, .detailsContent, updatedContent)
+                    }
+                } else {
+                    NativeEditorNestedDocumentPreview(
+                        content: bodyContent,
+                        pageID: pageID,
+                        spaceID: spaceID,
+                        serverURLString: serverURLString
+                    )
                 }
             }
         }
@@ -161,22 +218,31 @@ struct NativeEditorDetailsBlockView: View {
 struct NativeEditorColumnsBlockView: View {
     let blockID: UUID
     let columns: NativeEditorColumnsBlock
+    let columnNodes: [ProseMirrorNode]
     let actions: NativeEditorRichBlockEditingActions?
+    let pageID: String
+    let spaceID: String?
+    let serverURLString: String?
+    var presenceProjection: NativeEditorRemotePresenceProjection?
+    var parentPresenceScope: [NativeEditorRemotePresenceScope] = []
+    var presenceBlockIndex: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(columns.normalizedColumnTexts.enumerated(), id: \.offset) { item in
-                        NativeEditorColumnPreview(text: item.element)
-                            .frame(minWidth: 180, maxWidth: .infinity, alignment: .topLeading)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(columns.normalizedColumnTexts.enumerated(), id: \.offset) { item in
-                        NativeEditorColumnPreview(text: item.element)
-                    }
+            NativeEditorResponsiveColumnsLayout(weights: columnWeights) {
+                ForEach(columnNodes.enumerated(), id: \.offset) { item in
+                    NativeEditorColumnContent(
+                        blockID: blockID,
+                        index: item.offset,
+                        content: item.element.content ?? [],
+                        actions: actions,
+                        pageID: pageID,
+                        spaceID: spaceID,
+                        serverURLString: serverURLString,
+                        presenceProjection: presenceProjection,
+                        parentPresenceScope: parentPresenceScope,
+                        presenceBlockIndex: presenceBlockIndex
+                    )
                 }
             }
 
@@ -192,18 +258,21 @@ struct NativeEditorColumnsBlockView: View {
 
 }
 
-private struct NativeEditorColumnPreview: View {
-    let text: String
-
-    var body: some View {
-        Text(text.isEmpty ? "Empty column" : text)
-            .font(.body)
-            .foregroundStyle(text.isEmpty ? .secondary : .primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+private extension NativeEditorColumnsBlockView {
+    var columnWeights: [Double] {
+        NativeEditorColumnsLayoutPolicy.weights(
+            layout: columns.layout,
+            explicitWidths: columns.normalizedColumnWidths,
+            count: columnNodes.count
+        )
     }
 }
 
 struct NativeEditorDiagramBlockView: View {
+    @Environment(AppState.self) private var appState
+    @State private var authorizedSourceURL: URL?
+    @State private var resourceCookies: [StoredHTTPCookie] = []
+
     let blockID: UUID
     let diagram: NativeEditorDiagramBlock
     let title: String
@@ -214,15 +283,30 @@ struct NativeEditorDiagramBlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let sourceURL {
-                NativeEditorWebEmbedView(
-                    html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle),
-                    allowedHosts: Set([sourceURL.host()?.lowercased()].compactMap(\.self))
-                )
+                Group {
+                    if authorizedSourceURL == sourceURL {
+                        NativeEditorWebEmbedView(
+                            html: NativeEditorWebEmbedHTML.imageHTML(source: sourceURL, title: displayTitle),
+                            allowedHosts: Set([sourceURL.host()?.lowercased()].compactMap(\.self)),
+                            cookies: resourceCookies
+                        )
+                    } else {
+                        ProgressView("Loading diagram")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
                 .frame(minHeight: 260)
                 .clipShape(.rect(cornerRadius: 10))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(.quaternary, lineWidth: 1)
+                }
+                .task(id: sourceURL) {
+                    authorizedSourceURL = nil
+                    let cookies = await appState.activeSessionCookies(for: sourceURL)
+                    guard Task.isCancelled == false else { return }
+                    resourceCookies = cookies
+                    authorizedSourceURL = sourceURL
                 }
             } else {
                 HStack(alignment: .top, spacing: 10) {

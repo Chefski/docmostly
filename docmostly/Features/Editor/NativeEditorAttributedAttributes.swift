@@ -132,6 +132,13 @@ nonisolated extension AttributedSubstring {
             )
         ]
     }
+
+    mutating func setNativeEditorInlineComments(_ comments: [NativeEditorInlineCommentMark]) {
+        let normalizedComments = comments.normalizedNativeEditorInlineComments
+        self[NativeEditorCommentMarksAttribute.self] = normalizedComments.isEmpty ? nil : normalizedComments
+        self[NativeEditorCommentIDAttribute.self] = normalizedComments.first?.commentID
+        self[NativeEditorCommentResolvedAttribute.self] = normalizedComments.first?.isResolved
+    }
 }
 
 nonisolated extension AttributeContainer {

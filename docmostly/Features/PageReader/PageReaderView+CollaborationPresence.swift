@@ -1,6 +1,19 @@
 import Foundation
+import SwiftUI
 
 extension PageReaderView {
+    func revealCollaborator(_ collaboratorID: String) {
+        guard let blockID = editorViewModel?.rootBlockID(forCollaboratorID: collaboratorID) else { return }
+
+        if accessibilityReduceMotion {
+            scrollPosition.scrollTo(id: blockID, anchor: .center)
+        } else {
+            withAnimation(.snappy) {
+                scrollPosition.scrollTo(id: blockID, anchor: .center)
+            }
+        }
+    }
+
     func monitorCRDTDocumentSnapshots() async {
         guard let editorViewModel else { return }
         let snapshots = await editorViewModel.crdtDocumentSnapshots()
@@ -12,7 +25,7 @@ extension PageReaderView {
         }
     }
 
-    func monitorCollaborationPresence() async {
+    func monitorCollaborationPresence(participation: NativeEditorCollaborationParticipation) async {
         guard let editorViewModel else { return }
         var reconnectPolicy = NativeEditorRealtimeReconnectPolicy()
         var authenticationRetry = NativeEditorCollabAuthRetry()
@@ -20,6 +33,7 @@ extension PageReaderView {
         while Task.isCancelled == false {
             switch await runCollaborationPresenceConnection(
                 editorViewModel: editorViewModel,
+                participation: participation,
                 reconnectPolicy: &reconnectPolicy,
                 authenticationRetry: &authenticationRetry
             ) {
@@ -51,8 +65,10 @@ extension PageReaderView {
                 markCollaborationPresenceConnected(editorViewModel)
             }
         case .awareness(let states, let localClientID):
-            editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
-            await editorViewModel.refreshResolvedRemoteCursors()
+            let remoteCursorsChanged = editorViewModel.applyAwarenessStates(states, localClientID: localClientID)
+            if remoteCursorsChanged {
+                await editorViewModel.refreshResolvedRemoteCursors()
+            }
         case .stateless(let event) where event.type == NativeEditorCollaborationDocument.statelessPageUpdatedType:
             if editorViewModel.usesCRDTDocumentEngine {
                 _ = editorViewModel.handleCRDTBackedPageUpdated(event)
@@ -133,12 +149,16 @@ extension PageReaderView {
 
     private func runCollaborationPresenceConnection(
         editorViewModel: NativeRichEditorViewModel,
+        participation: NativeEditorCollaborationParticipation,
         reconnectPolicy: inout NativeEditorRealtimeReconnectPolicy,
         authenticationRetry: inout NativeEditorCollabAuthRetry
     ) async -> CollaborationPresenceLoopAction {
         do {
             markCollaborationPresenceConnecting(editorViewModel)
-            let events = try await collaborationPresenceEvents(editorViewModel: editorViewModel)
+            let events = try await collaborationPresenceEvents(
+                editorViewModel: editorViewModel,
+                participation: participation
+            )
 
             for try await event in events {
                 try Task.checkCancellation()
@@ -163,18 +183,20 @@ extension PageReaderView {
     }
 
     private func collaborationPresenceEvents(
-        editorViewModel: NativeRichEditorViewModel
+        editorViewModel: NativeRichEditorViewModel,
+        participation: NativeEditorCollaborationParticipation
     ) async throws -> AsyncThrowingStream<NativeEditorCollaborationEvent, any Error> {
         let url = try appState.collaborationWebSocketURL()
         guard let token = try await appState.loadCollaborationToken().token else {
             throw APIError.connectionFailed("Realtime collaboration token is missing.")
         }
-        let collaborationSession = editorViewModel.collaborationSession()
+        let collaborationSession = editorViewModel.collaborationSession(participation: participation)
 
         return await collaborationPresenceClient.events(
             url: url,
             token: token,
             documentName: collaborationSession.documentName,
+            participation: collaborationSession.participation,
             user: appState.currentUser?.user,
             syncDriver: collaborationSession.syncDriver,
             localAwarenessCursor: collaborationSession.localAwarenessCursor,

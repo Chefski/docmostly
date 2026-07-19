@@ -9,11 +9,16 @@ actor NativeEditorCRDTSyncCoordinator {
     nonisolated static let maximumRemoteSyncSessionBytes = 10_000_000
 
     private let documentEngine: any NativeEditorCRDTDocumentEngine
+    private let remoteUpdateHandler: (@Sendable (Data) async throws -> Void)?
     private var pendingLocalEchoCounts: [Data: Int] = [:]
     private var remoteSyncSessionBytes = 0
 
-    init(documentEngine: any NativeEditorCRDTDocumentEngine) {
+    init(
+        documentEngine: any NativeEditorCRDTDocumentEngine,
+        remoteUpdateHandler: (@Sendable (Data) async throws -> Void)? = nil
+    ) {
         self.documentEngine = documentEngine
+        self.remoteUpdateHandler = remoteUpdateHandler
     }
 
     func makeInitialSyncMessage() async throws -> NativeEditorYjsSyncMessage {
@@ -30,7 +35,11 @@ actor NativeEditorCRDTSyncCoordinator {
             try validateRemotePayload(update)
             try recordRemotePayload(update)
             guard consumeLocalEcho(for: update) == false else { return [] }
-            try await documentEngine.applyRemoteUpdate(update)
+            if let remoteUpdateHandler {
+                try await remoteUpdateHandler(update)
+            } else {
+                try await documentEngine.applyRemoteUpdate(update)
+            }
             return []
         }
     }
@@ -47,6 +56,17 @@ actor NativeEditorCRDTSyncCoordinator {
 
     func localUpdates() async -> AsyncStream<Data> {
         await documentEngine.localUpdates()
+    }
+
+    func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
+        try await documentEngine.integrateLocalChange(change)
+    }
+
+    func flushPendingLocalChanges(
+        title: String,
+        document: NativeEditorDocument
+    ) async throws -> NativeEditorCRDTSaveResult {
+        try await documentEngine.flushPendingLocalChanges(title: title, document: document)
     }
 
     private func consumeLocalEcho(for update: Data) -> Bool {

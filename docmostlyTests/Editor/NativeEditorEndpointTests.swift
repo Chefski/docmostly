@@ -32,4 +32,19 @@ struct NativeEditorEndpointTests {
         #expect(object["format"] as? String == "json")
         #expect(content["type"] as? String == "doc")
     }
+
+    @Test func collaborativeTitleUpdateOmitsReplaceContent() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let request = try Endpoint.updatePage(pageId: "page-1", title: "Updated title")
+            .urlRequest(baseURL: baseURL)
+
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        #expect(object["pageId"] as? String == "page-1")
+        #expect(object["title"] as? String == "Updated title")
+        #expect(object["content"] == nil)
+        #expect(object["operation"] == nil)
+        #expect(object["format"] == nil)
+    }
 }

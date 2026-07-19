@@ -16,6 +16,7 @@ struct NativeEditorTableEditor: View {
 
     @State private var selection: NativeEditorTableSelection?
     @State private var dragStartWidths: [Int: CGFloat] = [:]
+    @State private var pendingFocus: NativeEditorTableCellCoordinate?
     @FocusState private var focusedCell: NativeEditorTableCellCoordinate?
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -30,7 +31,8 @@ struct NativeEditorTableEditor: View {
                 selection: $selection,
                 dragStartWidths: $dragStartWidths,
                 focusedCell: $focusedCell,
-                isCompactWidth: isCompactWidth
+                isCompactWidth: isCompactWidth,
+                moveFocus: moveFocus
             )
         }
         .onChange(of: focusedCell) { _, coordinate in
@@ -38,6 +40,13 @@ struct NativeEditorTableEditor: View {
             selection = .cell(rowIndex: coordinate.rowIndex, columnIndex: coordinate.columnIndex)
         }
         .onChange(of: table) { _, updatedTable in
+            if let pendingFocus,
+               updatedTable.rows.indices.contains(pendingFocus.rowIndex),
+               updatedTable.rows[pendingFocus.rowIndex].cells.indices.contains(pendingFocus.columnIndex) {
+                focusedCell = pendingFocus
+                selection = .cell(rowIndex: pendingFocus.rowIndex, columnIndex: pendingFocus.columnIndex)
+                self.pendingFocus = nil
+            }
             guard let selection, updatedTable.contains(selection) == false else { return }
             self.selection = nil
         }
@@ -49,5 +58,27 @@ struct NativeEditorTableEditor: View {
         #else
         false
         #endif
+    }
+
+    private func moveFocus(
+        _ coordinate: NativeEditorTableCellCoordinate,
+        _ direction: NativeEditorTableFocusDirection
+    ) {
+        guard let destination = NativeEditorTableFocusNavigation.destination(
+            from: coordinate,
+            direction: direction,
+            rowCount: table.rows.count,
+            columnCount: table.columnCount
+        ) else {
+            return
+        }
+
+        switch destination {
+        case .cell(let coordinate):
+            focusedCell = coordinate
+        case .appendRowAndFocus(let coordinate):
+            pendingFocus = coordinate
+            actions.insertRowBelow(blockID, max(table.rows.count - 1, 0))
+        }
     }
 }

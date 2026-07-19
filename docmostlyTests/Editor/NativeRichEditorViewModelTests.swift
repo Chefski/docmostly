@@ -323,7 +323,7 @@ struct NativeRichEditorViewModelTests {
         #expect(node?.attrs?["size"] == .int(4096))
     }
 
-    @Test func deletesSelectedBlockAndKeepsAdjacentBlockActive() {
+    @Test func deletesSelectedBlockAndFocusesPrecedingBlockAtItsEnd() throws {
         let firstBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("First"), alignment: .left)
         let selectedBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("Selected"), alignment: .left)
         let lastBlock = NativeEditorBlock(kind: .paragraph, text: AttributedString("Last"), alignment: .left)
@@ -335,7 +335,12 @@ struct NativeRichEditorViewModelTests {
 
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["First", "Last"])
         #expect(viewModel.selectedBlockID == nil)
-        #expect(viewModel.activeBlockID == lastBlock.id)
+        #expect(viewModel.activeBlockID == firstBlock.id)
+        let selection = try #require(NativeEditorCharacterRange.characterRange(
+            for: viewModel.document.blocks[0].selection,
+            in: viewModel.document.blocks[0].text
+        ))
+        #expect(selection == 5..<5)
         #expect(viewModel.isDirty == true)
     }
 

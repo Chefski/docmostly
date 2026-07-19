@@ -3,6 +3,42 @@ import Testing
 @testable import docmostly
 
 struct NativeEditorAwarenessFrameTests {
+    @Test func relativePositionJSONPreservesExplicitNullBoundariesForYjs() throws {
+        let position = NativeEditorYjsRelativePosition(
+            type: nil,
+            targetName: NativeEditorCollaborationDocument.yjsFragmentName,
+            item: nil,
+            assoc: 0
+        )
+
+        let object = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(position)) as? [String: Any]
+        )
+
+        #expect(object["item"] is NSNull)
+        #expect(object["type"] is NSNull)
+        #expect(object["tname"] as? String == NativeEditorCollaborationDocument.yjsFragmentName)
+        #expect(object["assoc"] as? Int == 0)
+    }
+
+    @Test func nestedYjsTypeTargetsPageFragmentWhileAnotherNamedRootDoesNot() {
+        let nestedPosition = NativeEditorYjsRelativePosition(
+            type: .id(NativeEditorYjsID(client: 7, clock: 1)),
+            targetName: nil,
+            item: NativeEditorYjsID(client: 7, clock: 2),
+            assoc: 0
+        )
+        let otherRootPosition = NativeEditorYjsRelativePosition(
+            type: nil,
+            targetName: "another-fragment",
+            item: nil,
+            assoc: 0
+        )
+
+        #expect(nestedPosition.targetsDocmostDefaultFragment)
+        #expect(otherRootPosition.targetsDocmostDefaultFragment == false)
+    }
+
     @Test func encodesMissingAwarenessCursorAsExplicitNull() throws {
         let update = try NativeEditorHocuspocusFrame.awarenessUpdate(states: [
             NativeEditorAwarenessState(

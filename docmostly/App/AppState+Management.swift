@@ -1,6 +1,10 @@
 import Foundation
 
 extension AppState {
+    var hasPageUpdatePersistence: Bool {
+        apiClient != nil || offlineQueue != nil
+    }
+
     func createPage(spaceId: String, parentPageId: String? = nil, title: String? = nil) async throws -> DocmostPage {
         guard let apiClient else {
             throw APIError.connectionFailed("Creating pages requires a network connection.")

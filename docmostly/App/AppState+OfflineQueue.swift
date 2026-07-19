@@ -1,8 +1,19 @@
 import Foundation
 
+// swiftlint:disable file_length
+
+private enum OfflineReplayFailureOutcome {
+    case stop
+    case continueProcessing
+    case quarantineForCurrentPass
+}
+
 extension AppState {
     func canQueueOfflineMutation(after error: Error) -> Bool {
         if error is CancellationError {
+            return false
+        }
+        if error is OfflinePageUpdateReplayConflict {
             return false
         }
 
@@ -88,10 +99,47 @@ extension AppState {
     func queuePageUpdate(
         pageId: String,
         title: String,
-        document: ProseMirrorDocument
+        document: ProseMirrorDocument,
+        baseTitle: String? = nil,
+        baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
-        try await queueOfflineMutation(.updatePage(pageId: pageId, title: title, document: document))
+        try await queueOfflineMutation(.updatePage(
+            pageId: pageId,
+            title: title,
+            document: document,
+            baseTitle: baseTitle,
+            baseDocument: baseDocument
+        ))
         return try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
+    }
+
+    func overlayPendingPageUpdate(on page: DocmostEditablePage) async throws -> DocmostEditablePage {
+        guard let cacheScope else { return page }
+        let pendingRecords = try await pendingOfflineMutations(scope: cacheScope)
+        guard let draft = pendingRecords.reversed().compactMap({ record -> (String, ProseMirrorDocument)? in
+            guard case .updatePage(let pageID, let title, let document, _, _) = record.payload,
+                  pageID == page.id || pageID == page.slugId
+            else {
+                return nil
+            }
+            return (title, document)
+        }).first else {
+            return page
+        }
+
+        return DocmostEditablePage(
+            id: page.id,
+            slugId: page.slugId,
+            title: draft.0,
+            content: draft.1,
+            icon: page.icon,
+            spaceId: page.spaceId,
+            createdAt: page.createdAt,
+            updatedAt: page.updatedAt,
+            permissions: page.permissions,
+            creator: page.creator,
+            lastUpdatedBy: page.lastUpdatedBy
+        )
     }
 
     func setProjectedFavorite(
@@ -124,6 +172,7 @@ extension AppState {
         spaceWatchStatusByID.removeAll(keepingCapacity: true)
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func reconcileOfflineMutations() async {
         defer {
             offlineReplayTask = nil
@@ -132,42 +181,46 @@ extension AppState {
         guard let apiClient, let cacheScope else { return }
 
         var inlineCommentIDMappings: [String: String] = [:]
+        var quarantinedRecordIDs: Set<String> = []
 
         do {
             while true {
-                let records = try await pendingOfflineMutations(scope: cacheScope, limit: 25)
-                guard records.isEmpty == false else {
+                let pendingRecords = try await pendingOfflineMutations(scope: cacheScope)
+                guard pendingRecords.isEmpty == false else {
                     pendingOfflineMutationCount = 0
+                    return
+                }
+                let records = pendingRecords
+                    .filter { quarantinedRecordIDs.contains($0.id) == false }
+                    .prefix(25)
+                guard records.isEmpty == false else {
+                    pendingOfflineMutationCount = pendingRecords.count
                     return
                 }
 
                 for record in records {
+                    let payload = record.payload.replacingCommentIDs(inlineCommentIDMappings)
                     do {
-                        let payload = record.payload.replacingCommentIDs(inlineCommentIDMappings)
                         if let mapping = try await replay(record, payload: payload, using: apiClient) {
                             inlineCommentIDMappings[mapping.localID] = mapping.serverID
                         }
                         try await removeOfflineMutation(id: record.id, scope: cacheScope)
                         await refreshOfflineMutationCount()
                     } catch {
-                        if shouldDropOfflineMutation(after: error) {
-                            try? await removeOfflineMutation(id: record.id, scope: cacheScope)
-                            await refreshOfflineMutationCount()
-                            statusMessage = "Dropped queued offline change: \(error.localizedDescription)"
+                        switch await handleOfflineReplayFailure(
+                            error,
+                            record: record,
+                            payload: payload,
+                            scope: cacheScope
+                        ) {
+                        case .stop:
+                            return
+                        case .continueProcessing:
+                            continue
+                        case .quarantineForCurrentPass:
+                            quarantinedRecordIDs.insert(record.id)
                             continue
                         }
-
-                        try? await markOfflineMutationFailed(
-                            id: record.id,
-                            scope: cacheScope,
-                            message: error.localizedDescription
-                        )
-                        await refreshOfflineMutationCount()
-                        if canQueueOfflineMutation(after: error) {
-                            isOffline = true
-                        }
-                        statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
-                        return
                     }
                 }
             }
@@ -176,21 +229,49 @@ extension AppState {
         }
     }
 
-    private func shouldDropOfflineMutation(after error: Error) -> Bool {
-        if error is CancellationError {
+    private func handleOfflineReplayFailure(
+        _ error: any Error,
+        record: OfflineMutationRecord,
+        payload: OfflineMutationPayload,
+        scope: CacheScope
+    ) async -> OfflineReplayFailureOutcome {
+        switch OfflineMutationReplayFailureDisposition(error: error, payload: payload) {
+        case .stopWithoutMutation:
+            return .stop
+        case .dropRecord:
+            try? await removeOfflineMutation(id: record.id, scope: scope)
+            await refreshOfflineMutationCount()
+            statusMessage = "Dropped queued offline change: \(error.localizedDescription)"
+            return .continueProcessing
+        case .retainForRetry:
+            try? await markOfflineMutationFailed(
+                id: record.id,
+                scope: scope,
+                message: error.localizedDescription
+            )
+            await refreshOfflineMutationCount()
+            if canQueueOfflineMutation(after: error) {
+                isOffline = true
+            }
+            statusMessage = "Could not sync queued offline change: \(error.localizedDescription)"
+            return shouldQuarantineForCurrentPass(error: error, payload: payload) ?
+                .quarantineForCurrentPass : .stop
+        }
+    }
+
+    private func shouldQuarantineForCurrentPass(
+        error: any Error,
+        payload: OfflineMutationPayload
+    ) -> Bool {
+        if error is OfflinePageUpdateReplayConflict {
             return true
         }
-
-        guard let apiError = error as? APIError else {
+        guard payload.canDropAfterPermanentClientFailure == false,
+              let apiError = error as? APIError,
+              case .httpStatus(let status, _) = apiError else {
             return false
         }
-
-        switch apiError {
-        case .httpStatus(let status, _):
-            return status >= 400 && status < 500 && status != 401 && status != 403 && status != 408 && status != 429
-        case .connectionFailed, .invalidResponse, .missingData, .decodingFailed, .responseTooLarge:
-            return false
-        }
+        return status >= 400 && status < 500 && status != 401 && status != 403 && status != 408 && status != 429
     }
 
     private func replay(
@@ -199,11 +280,13 @@ extension AppState {
         using apiClient: DocmostAPIClient
     ) async throws -> (localID: String, serverID: String)? {
         switch payload {
-        case .updatePage(let pageId, let title, let document):
+        case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             try await replayPageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
+                baseTitle: baseTitle,
+                baseDocument: baseDocument,
                 scope: record.scope,
                 using: apiClient
             )
@@ -240,20 +323,40 @@ extension AppState {
         }
     }
 
+    // swiftlint:disable:next function_parameter_count
     private func replayPageUpdate(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
+        baseTitle: String?,
+        baseDocument: ProseMirrorDocument?,
         scope: CacheScope,
         using apiClient: DocmostAPIClient
     ) async throws {
-        let page: DocmostEditablePage = try await apiClient.send(.updatePage(
-            pageId: pageId,
-            title: title,
-            content: document,
-            format: .json,
-            operation: .replace
-        ))
+        let serverPage: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: pageId, format: .json))
+        let page: DocmostEditablePage
+        switch OfflinePageUpdateReplayDecision.resolve(
+            serverPage: serverPage,
+            queuedTitle: title,
+            queuedDocument: document,
+            baseTitle: baseTitle,
+            baseDocument: baseDocument
+        ) {
+        case .alreadySynchronized:
+            page = serverPage
+        case .updateTitleOnly:
+            page = try await apiClient.send(.updatePage(pageId: pageId, title: title))
+        case .replaceDocument(let replacementTitle):
+            page = try await apiClient.send(.updatePage(
+                pageId: pageId,
+                title: replacementTitle,
+                content: document,
+                format: .json,
+                operation: .replace
+            ))
+        case .conflict:
+            throw OfflinePageUpdateReplayConflict(pageID: pageId)
+        }
         scheduleCacheWrite(.saveEditablePage(page, scope: scope))
     }
 
@@ -447,11 +550,11 @@ extension AppState {
     // swiftlint:disable cyclomatic_complexity
     private func applyOfflineProjection(_ payload: OfflineMutationPayload) {
         switch payload {
-        case .createComment(let localId, let pageId, _, let plainText, let type, let selection, _):
+        case .createComment(let localId, let pageId, let content, let plainText, let type, let selection, _):
             applyProjectedCommentCreation(
                 localId: localId,
                 pageId: pageId,
-                plainText: plainText,
+                body: CommentBody(jsonString: content) ?? CommentBody(plainText: plainText),
                 type: type,
                 selection: selection
             )
@@ -494,20 +597,21 @@ extension AppState {
     private func applyProjectedCommentCreation(
         localId: String,
         pageId: String,
-        plainText: String,
+        body: CommentBody,
         type: DocmostCommentType,
         selection: String?
     ) {
         let comment = DocmostComment(
             id: localId,
-            content: plainText,
+            content: body.plainText,
             selection: selection,
             type: type.rawValue,
             creatorId: currentUser?.user.id ?? "offline",
             pageId: pageId,
             workspaceId: currentUser?.workspace.id,
             createdAt: Date.now,
-            creator: currentUser?.user
+            creator: currentUser?.user,
+            body: body
         )
         applyReplayedComment(comment)
     }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarRootView: View {
     @Environment(AppState.self) private var appState
+    @Environment(NotificationStore.self) private var notificationStore
 
     var body: some View {
         List(selection: sidebarSelection) {
@@ -10,7 +11,16 @@ struct SidebarRootView: View {
                     Label("Favorites", systemImage: "star")
                 }
                 NavigationLink(value: SidebarDestination.notifications) {
-                    Label("Notifications", systemImage: "bell")
+                    HStack {
+                        Label("Notifications", systemImage: "bell")
+                        Spacer(minLength: 0)
+                        if notificationStore.unreadCount > 0 {
+                            Text(notificationStore.unreadCount > 99 ? "99+" : notificationStore.unreadCount.formatted())
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel("\(notificationStore.unreadCount) unread")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 

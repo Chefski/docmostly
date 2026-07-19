@@ -4,9 +4,10 @@ struct NativeEditorSlashCommandMenu: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     var importAttachment: (NativeEditorAttachmentImportKind) -> Void = { _ in }
     var applyCommand: ((NativeEditorCommand) -> Void)?
+    var commandFilter: (NativeEditorCommand) -> Bool = { _ in true }
 
     var body: some View {
-        let commands = viewModel.filteredSlashCommands
+        let commands = viewModel.filteredSlashCommands.filter(commandFilter)
 
         DocmostlyGlassPanel(cornerRadius: 18, isInteractive: true) {
             VStack(alignment: .leading, spacing: 0) {

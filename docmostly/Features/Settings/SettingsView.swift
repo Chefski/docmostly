@@ -14,6 +14,7 @@ struct SettingsView: View {
                         systemImage: "person.crop.circle"
                     )
                 }
+                .accessibilityIdentifier("SettingsDestination.account")
             }
 
             Section("Workspace") {
@@ -24,6 +25,7 @@ struct SettingsView: View {
                         systemImage: "building.2"
                     )
                 }
+                .accessibilityIdentifier("SettingsDestination.workspace")
                 NavigationLink(value: SettingsDestination.members) {
                     SettingsSectionRowView(
                         title: "Members",
@@ -31,6 +33,7 @@ struct SettingsView: View {
                         systemImage: "person.2"
                     )
                 }
+                .accessibilityIdentifier("SettingsDestination.members")
                 NavigationLink(value: SettingsDestination.spaces) {
                     SettingsSectionRowView(
                         title: "Spaces",
@@ -38,6 +41,7 @@ struct SettingsView: View {
                         systemImage: "square.stack.3d.up"
                     )
                 }
+                .accessibilityIdentifier("SettingsDestination.spaces")
                 NavigationLink(value: SettingsDestination.groups) {
                     SettingsSectionRowView(
                         title: "Groups",
@@ -45,6 +49,7 @@ struct SettingsView: View {
                         systemImage: "person.3"
                     )
                 }
+                .accessibilityIdentifier("SettingsDestination.groups")
             }
 
             Section("Server") {

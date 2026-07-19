@@ -10,7 +10,7 @@ nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
     }
 }
 
-nonisolated struct NativeEditorCRDTDocumentSnapshot: Sendable {
+nonisolated struct NativeEditorCRDTDocumentSnapshot: Equatable, Sendable {
     let title: String?
     let document: NativeEditorDocument
     let updatedAt: Date?
@@ -28,9 +28,11 @@ nonisolated struct NativeEditorCRDTLocalChange: Sendable {
 }
 
 protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
+    var requiresInitialRemoteSnapshot: Bool { get }
     func encodeStateVector() async throws -> Data
     func encodeStateAsUpdate(for stateVector: Data) async throws -> Data
     func applyRemoteUpdate(_ update: Data) async throws
+    func applyRemoteUpdateCapturingSnapshot(_ update: Data) async throws -> NativeEditorCRDTDocumentSnapshot?
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor?
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
@@ -53,6 +55,15 @@ protocol NativeEditorCRDTDocumentEngineFactory: AnyObject {
 }
 
 extension NativeEditorCRDTDocumentEngine {
+    var requiresInitialRemoteSnapshot: Bool {
+        false
+    }
+
+    func applyRemoteUpdateCapturingSnapshot(_ update: Data) async throws -> NativeEditorCRDTDocumentSnapshot? {
+        try await applyRemoteUpdate(update)
+        return nil
+    }
+
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws { }
 
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws -> NativeEditorResolvedRemoteCursor? {

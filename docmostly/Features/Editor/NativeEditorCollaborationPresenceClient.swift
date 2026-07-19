@@ -26,6 +26,7 @@ actor NativeEditorCollaborationPresenceClient {
         url: URL,
         token: String,
         documentName: String,
+        participation: NativeEditorCollaborationParticipation = .interactive,
         user: DocmostUser?,
         syncDriver: NativeEditorCollaborationSyncDriver? = nil,
         localAwarenessCursor: (@Sendable () async -> NativeEditorAwarenessCursor?)? = nil,
@@ -38,6 +39,7 @@ actor NativeEditorCollaborationPresenceClient {
             url: url,
             token: token,
             documentName: documentName,
+            participation: participation,
             user: user,
             syncDriver: syncDriver,
             localAwarenessCursor: localAwarenessCursor,
@@ -152,8 +154,7 @@ actor NativeEditorCollaborationPresenceClient {
         case .authenticationFailed(let reason):
             throw NativeEditorCollabAuthFailure(reason: reason)
         case .queryAwareness:
-            guard authenticatedScope?.allowsLocalAwarenessUpdates == true else { return }
-            try await sendLocalAwareness(context: context)
+            try await sendLocalAwarenessIfPermitted(context: context)
         case .awareness(let states):
             let currentStates = awarenessStore.apply(states)
             continuation.yield(.awareness(states: currentStates, localClientID: localClientID))
@@ -164,12 +165,19 @@ actor NativeEditorCollaborationPresenceClient {
         case .sync(let syncMessage):
             try await sendCRDTSyncReply(
                 for: syncMessage,
-                authenticatedScope: authenticatedScope,
-                using: context.syncDriver
+                context: context
             )
         case .close(let reason):
             throw APIError.connectionFailed(reason)
         }
+    }
+
+    private func sendLocalAwarenessIfPermitted(
+        context: NativeEditorCollaborationSessionContext
+    ) async throws {
+        guard let authenticatedScope else { return }
+        guard context.allowsLocalAwarenessUpdates(for: authenticatedScope) else { return }
+        try await sendLocalAwareness(context: context)
     }
 }
 
@@ -189,17 +197,17 @@ private extension NativeEditorCollaborationPresenceClient {
     ) async throws {
         authenticatedScope = scope
         try await sendInitialCRDTSync(for: scope, using: context.syncDriver)
-        configureLocalDocumentUpdates(for: scope, syncDriver: context.syncDriver)
+        configureLocalDocumentUpdates(for: scope, context: context)
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
     }
 
     func configureLocalDocumentUpdates(
         for scope: NativeEditorCollaborationScope,
-        syncDriver: NativeEditorCollaborationSyncDriver?
+        context: NativeEditorCollaborationSessionContext
     ) {
-        if scope.allowsLocalDocumentUpdates {
-            startLocalUpdateSender(using: syncDriver)
+        if context.allowsLocalDocumentUpdates(for: scope) {
+            startLocalUpdateSender(using: context.syncDriver)
         } else {
             stopLocalUpdateSender()
         }
@@ -209,7 +217,7 @@ private extension NativeEditorCollaborationPresenceClient {
         for scope: NativeEditorCollaborationScope,
         context: NativeEditorCollaborationSessionContext
     ) async throws {
-        if scope.allowsLocalAwarenessUpdates {
+        if context.allowsLocalAwarenessUpdates(for: scope) {
             try await sendLocalAwareness(context: context)
             startHeartbeat(context: context)
             startLocalAwarenessUpdateSender(context: context)
@@ -240,11 +248,11 @@ private extension NativeEditorCollaborationPresenceClient {
 
     func sendCRDTSyncReply(
         for message: NativeEditorYjsSyncMessage,
-        authenticatedScope: NativeEditorCollaborationScope?,
-        using syncDriver: NativeEditorCollaborationSyncDriver?
+        context: NativeEditorCollaborationSessionContext
     ) async throws {
+        let syncDriver = context.syncDriver
         guard let syncDriver else { return }
-        guard authenticatedScope?.allowsSyncReply(to: message) ?? false else { return }
+        guard context.allowsSyncReply(to: message, authenticatedScope: authenticatedScope) else { return }
         let frames = try await syncDriver.outboundFrames(for: message)
         try await send(frames)
     }

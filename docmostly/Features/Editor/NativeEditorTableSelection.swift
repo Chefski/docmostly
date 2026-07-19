@@ -1,6 +1,6 @@
 import Foundation
 
-struct NativeEditorTableCellCoordinate: Hashable, Sendable {
+nonisolated struct NativeEditorTableCellCoordinate: Hashable, Sendable {
     let rowIndex: Int
     let columnIndex: Int
 }

@@ -39,6 +39,7 @@ nonisolated enum Endpoint: Sendable {
     case changeSpaceMemberRole(spaceId: String, role: String, userId: String? = nil, groupId: String? = nil)
     case sidebarPages(spaceId: String? = nil, pageId: String? = nil, cursor: String? = nil, limit: Int = 100)
     case pageInfo(pageId: String, format: ContentFormat = .html)
+    case transclusionLookup(DocmostTransclusionLookupRequest)
     case createPage(
         spaceId: String,
         parentPageId: String? = nil,
@@ -212,6 +213,8 @@ nonisolated enum Endpoint: Sendable {
             "pages/sidebar-pages"
         case .pageInfo:
             "pages/info"
+        case .transclusionLookup:
+            "pages/transclusion/lookup"
         case .createPage:
             "pages/create"
         case .deletePage:
@@ -408,6 +411,8 @@ nonisolated enum Endpoint: Sendable {
             return try encode(SidebarPagesRequest(spaceId: spaceId, pageId: pageId, cursor: cursor, limit: limit))
         case .pageInfo(let pageId, let format):
             return try encode(PageInfoRequest(pageId: pageId, format: format.rawValue))
+        case .transclusionLookup(let request):
+            return try encode(request)
         case .createPage(let spaceId, let parentPageId, let title, let icon, let content, let format):
             return try encode(CreatePageRequest(
                 title: title,

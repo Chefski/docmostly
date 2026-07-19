@@ -3,13 +3,13 @@ import Foundation
 extension NativeEditorJSCRDTDocumentEngine {
     func resolveRemoteCursor(_ cursor: NativeEditorRemoteCursor) async throws
         -> NativeEditorResolvedRemoteCursor? {
-        let cursor = try optionalRuntimeResult(
+        let resolvedCursor = try optionalRuntimeResult(
             function: "resolveRemoteCursor",
             payload: RuntimeRemoteCursor(cursor: cursor),
             as: RuntimeResolvedRemoteCursor.self
         )
 
-        return cursor?.nativeCursor
+        return resolvedCursor?.nativeCursor(collaboratorID: cursor.collaboratorID)
     }
 
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
@@ -93,9 +93,10 @@ private struct RuntimeResolvedRemoteCursor: Decodable {
     let anchor: RuntimeTextPosition
     let head: RuntimeTextPosition
 
-    var nativeCursor: NativeEditorResolvedRemoteCursor {
+    func nativeCursor(collaboratorID: String) -> NativeEditorResolvedRemoteCursor {
         NativeEditorResolvedRemoteCursor(
             id: id,
+            collaboratorID: collaboratorID,
             name: name,
             colorName: colorName,
             anchor: anchor.nativePosition,
