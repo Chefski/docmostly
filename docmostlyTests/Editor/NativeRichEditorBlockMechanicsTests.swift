@@ -529,7 +529,7 @@ extension NativeRichEditorBlockMechanicsTests {
         #expect(items.first?.attrs?["custom"] == .string("preserved"))
         #expect(leadingContent.contains(where: \.isListContainer) == false)
         #expect(continuationContent.filter(\.isListContainer).count == 1)
-        #expect(continuationContent.last?.content?.first?.content?.first?.text == "Nested")
+        #expect(continuationContent.last?.content?.first?.content?.first?.content?.first?.text == "Nested")
     }
 
     private func configuredViewModel(blocks: [NativeEditorBlock]) -> NativeRichEditorViewModel {
