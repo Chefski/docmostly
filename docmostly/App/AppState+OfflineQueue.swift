@@ -8,6 +8,12 @@ private enum OfflineReplayFailureOutcome {
     case quarantineForCurrentPass
 }
 
+private struct PendingOfflinePageDraft {
+    let pageID: String
+    let title: String
+    let document: ProseMirrorDocument
+}
+
 extension AppState {
     func canQueueOfflineMutation(after error: Error) -> Bool {
         if error is CancellationError {
@@ -116,13 +122,17 @@ extension AppState {
     func overlayPendingPageUpdate(on page: DocmostEditablePage) async throws -> DocmostEditablePage {
         guard let cacheScope else { return page }
         let pendingRecords = try await pendingOfflineMutations(scope: cacheScope)
-        guard let draft = pendingRecords.reversed().compactMap({ record -> (String, ProseMirrorDocument)? in
-            guard case .updatePage(let pageID, let title, let document, _, _) = record.payload,
-                  pageID == page.id || pageID == page.slugId
-            else {
-                return nil
+        guard let draft = pendingRecords.reversed().compactMap({ record -> PendingOfflinePageDraft? in
+            let update: PendingOfflinePageDraft? = switch record.payload {
+            case .updatePage(let pageID, let title, let document, _, _):
+                PendingOfflinePageDraft(pageID: pageID, title: title, document: document)
+            case .updatePageCRDT(let pageID, let title, let document, _, _):
+                PendingOfflinePageDraft(pageID: pageID, title: title, document: document)
+            default:
+                nil
             }
-            return (title, document)
+            guard let update, update.pageID == page.id || update.pageID == page.slugId else { return nil }
+            return update
         }).first else {
             return page
         }
@@ -130,8 +140,8 @@ extension AppState {
         return DocmostEditablePage(
             id: page.id,
             slugId: page.slugId,
-            title: draft.0,
-            content: draft.1,
+            title: draft.title,
+            content: draft.document,
             icon: page.icon,
             spaceId: page.spaceId,
             createdAt: page.createdAt,
@@ -280,6 +290,16 @@ extension AppState {
         using apiClient: DocmostAPIClient
     ) async throws -> (localID: String, serverID: String)? {
         switch payload {
+        case .updatePageCRDT(let pageId, let title, let document, let stateUpdate, let baseTitle):
+            try await replayCRDTPageUpdate(
+                pageId: pageId,
+                title: title,
+                document: document,
+                stateUpdate: stateUpdate,
+                baseTitle: baseTitle,
+                using: apiClient
+            )
+            return nil
         case .updatePage(let pageId, let title, let document, let baseTitle, let baseDocument):
             try await replayPageUpdate(
                 pageId: pageId,
@@ -321,6 +341,73 @@ extension AppState {
             try await apiClient.sendVoid(.movePageToSpace(pageId: pageId, spaceId: spaceId))
             return nil
         }
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    private func replayCRDTPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        stateUpdate: Data,
+        baseTitle: String?,
+        using apiClient: DocmostAPIClient
+    ) async throws {
+        guard stateUpdate.isEmpty == false else {
+            throw APIError.connectionFailed("Queued collaborative document state is empty.")
+        }
+        guard let crdtDocumentEngineFactory else {
+            throw APIError.connectionFailed("Native CRDT replay is unavailable on this device.")
+        }
+
+        let nativeDocument = NativeEditorDocument(proseMirrorDocument: document)
+        let engine = try await crdtDocumentEngineFactory.makeDocumentEngine(
+            pageID: pageId,
+            title: title,
+            document: nativeDocument
+        )
+        try await engine.applyRemoteUpdate(stateUpdate)
+        let saveResult = try await engine.flushPendingLocalChanges(title: title, document: nativeDocument)
+        let preparedState: Data
+        if let stateUpdate = saveResult.documentStateUpdate {
+            preparedState = stateUpdate
+        } else {
+            preparedState = try await engine.encodeDocumentState()
+        }
+        try await persistCRDTStateUpdate(pageID: pageId, update: preparedState)
+
+        let collaborationToken: CollaborationTokenResponse = try await apiClient.send(.collabToken)
+        guard let token = collaborationToken.token else {
+            throw APIError.connectionFailed("Realtime collaboration token is missing.")
+        }
+        try await offlineCRDTSynchronizer.synchronize(
+            pageID: pageId,
+            engine: engine,
+            url: collaborationWebSocketURL(),
+            token: token,
+            user: currentUser?.user
+        )
+        let mergedState = try await engine.encodeDocumentState()
+        try await persistCRDTStateUpdate(pageID: pageId, update: mergedState)
+
+        let serverPage: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: pageId, format: .json))
+        let persistedTitle: String
+        switch OfflinePageTitleReplayDecision.resolve(
+            serverTitle: serverPage.title,
+            queuedTitle: title,
+            baseTitle: baseTitle
+        ) {
+        case .alreadySynchronized:
+            persistedTitle = serverPage.title
+        case .updateTitle:
+            let updatedPage: DocmostEditablePage = try await apiClient.send(.updatePage(pageId: pageId, title: title))
+            persistedTitle = updatedPage.title
+        case .keepRemoteTitle:
+            persistedTitle = serverPage.title
+        case .conflict:
+            throw OfflinePageUpdateReplayConflict(pageID: pageId)
+        }
+
+        _ = try await saveLocalEditableDraft(pageId: pageId, title: persistedTitle, document: document)
     }
 
     // swiftlint:disable:next function_parameter_count
@@ -588,7 +675,7 @@ extension AppState {
             spaceWatchStatusByID[spaceId] = true
         case .unwatchSpace(let spaceId):
             spaceWatchStatusByID[spaceId] = false
-        case .updatePage, .movePage, .movePageToSpace:
+        case .updatePage, .updatePageCRDT, .movePage, .movePageToSpace:
             break
         }
     }

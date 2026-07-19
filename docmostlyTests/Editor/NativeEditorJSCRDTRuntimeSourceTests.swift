@@ -44,13 +44,14 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         defer { try? FileManager.default.removeItem(at: bundle.bundleURL) }
         let appState = AppState.production(crdtRuntimeBundle: bundle)
 
-        let engine = try #require(try await appState.makeCRDTDocumentEngine(
+        let preparedEngine = try #require(try await appState.makeCRDTDocumentEngine(
             pageID: "page-1",
             title: "Page",
             document: document(text: "Seed")
         ))
 
-        #expect(try await engine.encodeStateVector() == Data([1]))
+        #expect(try await preparedEngine.engine.encodeStateVector() == Data([1]))
+        #expect(preparedEngine.restoredLocalState == false)
     }
 
     @Test func productionAppStateDefersMissingRuntimeFailureUntilEngineCreation() async throws {

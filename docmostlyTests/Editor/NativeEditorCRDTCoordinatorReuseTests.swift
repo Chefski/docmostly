@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import docmostly
 
@@ -80,6 +81,43 @@ struct CRDTEngineAttachmentTests {
         #expect(viewModel.collaborationSession().syncDriver == nil)
         #expect(viewModel.canEdit == false)
         #expect(viewModel.realtimeStatus == .failed("Factory failed."))
+    }
+
+    @Test func offlineAttachmentRestoresCachedYjsStateBeforeEnablingEditing() async throws {
+        let cachedState = Data([7, 8, 9])
+        let scope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-1")
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        try CacheRepository(context: context).saveCRDTStateUpdate(
+            pageId: "page-1",
+            update: cachedState,
+            scope: scope
+        )
+        let engine = CoordinatorReuseCRDTDocumentEngine()
+        let appState = AppState(crdtDocumentEngineFactory: CRDTAttachmentEngineFactory(engine: engine))
+        appState.configure(modelContext: context, modelContainer: container)
+        appState.configurePreviewCacheScope(scope)
+        appState.isOffline = true
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(to: viewModel, appState: appState)
+
+        #expect(engine.appliedRemoteUpdates == [cachedState])
+        #expect(viewModel.canEdit)
+    }
+
+    @Test func offlineAttachmentFailsClosedWithoutCachedYjsState() async {
+        let engine = CoordinatorReuseCRDTDocumentEngine()
+        let appState = AppState(crdtDocumentEngineFactory: CRDTAttachmentEngineFactory(engine: engine))
+        appState.isOffline = true
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+
+        await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(to: viewModel, appState: appState)
+
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.realtimeStatus == .failed(
+            "Open this page online once before editing it offline so its collaborative state can be cached."
+        ))
     }
 
     @Test func crdtAttachmentDoesNotConfigureEngineAfterCancellation() async {

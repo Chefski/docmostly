@@ -47,6 +47,9 @@ extension NativeEditorJSCRDTEngineTests {
             if (stateVector === "CQg=") {
               return "BwYF";
             }
+            if (stateVector === "AA==") {
+              return "CQk=";
+            }
             return "";
           },
           applyRemoteUpdate(update) {

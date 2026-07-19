@@ -49,6 +49,27 @@ actor OfflineMutationQueueRepository {
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
+    func supersedePendingCRDTPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        stateUpdate: Data,
+        baseTitle: String? = nil,
+        snapshotCapturedAt: Date,
+        scope: CacheScope
+    ) throws -> OfflinePageUpdateSupersessionResult {
+        try queue().supersedePendingCRDTPageUpdate(
+            pageId: pageId,
+            title: title,
+            document: document,
+            stateUpdate: stateUpdate,
+            baseTitle: baseTitle,
+            snapshotCapturedAt: snapshotCapturedAt,
+            scope: scope
+        )
+    }
+
     func acknowledgePendingPageUpdate(
         pageId: String,
         snapshotCapturedAt: Date,

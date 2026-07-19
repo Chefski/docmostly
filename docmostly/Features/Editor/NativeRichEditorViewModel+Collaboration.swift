@@ -316,10 +316,27 @@ extension NativeRichEditorViewModel {
         }
     }
 
-    func configureCRDTDocumentEngine(_ engine: any NativeEditorCRDTDocumentEngine) {
+    func configureCRDTDocumentEngine(
+        _ engine: any NativeEditorCRDTDocumentEngine,
+        restoredLocalState: Bool = false
+    ) {
         crdtDocumentEngine = engine
         crdtSyncCoordinator = makeCRDTSyncCoordinator(for: engine)
-        isCRDTEngineReadyForLocalChanges = engine.requiresInitialRemoteSnapshot == false
+        isCRDTEngineReadyForLocalChanges = restoredLocalState || engine.requiresInitialRemoteSnapshot == false
+    }
+
+    func persistCurrentCRDTState(appState: AppState) async {
+        await waitForStableCRDTLocalChangeBarrier()
+        guard let crdtDocumentEngine else { return }
+
+        do {
+            let update = try await crdtDocumentEngine.encodeDocumentState()
+            try await appState.persistCRDTStateUpdate(pageID: currentPageID, update: update)
+        } catch is CancellationError {
+            return
+        } catch {
+            appState.statusMessage = "Could not cache the collaborative document: " + error.localizedDescription
+        }
     }
 
     func makeCRDTSyncCoordinator(

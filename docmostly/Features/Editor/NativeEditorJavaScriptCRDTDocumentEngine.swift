@@ -155,7 +155,8 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
 
         return NativeEditorCRDTSaveResult(
             title: result.title,
-            updatedAt: try NativeEditorJSCRDTDateParser.date(from: result.updatedAt)
+            updatedAt: try NativeEditorJSCRDTDateParser.date(from: result.updatedAt),
+            documentStateUpdate: try await encodeDocumentState()
         )
     }
 

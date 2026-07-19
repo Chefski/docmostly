@@ -1,5 +1,24 @@
 import Foundation
 
+nonisolated enum OfflinePageTitleReplayDecision: Equatable, Sendable {
+    case alreadySynchronized
+    case updateTitle
+    case keepRemoteTitle
+    case conflict
+
+    static func resolve(serverTitle: String, queuedTitle: String, baseTitle: String?) -> Self {
+        guard serverTitle != queuedTitle else { return .alreadySynchronized }
+        guard let baseTitle else { return .conflict }
+
+        let localTitleChanged = queuedTitle != baseTitle
+        let remoteTitleChanged = serverTitle != baseTitle
+        if localTitleChanged, remoteTitleChanged {
+            return .conflict
+        }
+        return localTitleChanged ? .updateTitle : .keepRemoteTitle
+    }
+}
+
 nonisolated enum OfflinePageUpdateReplayDecision: Equatable, Sendable {
     case alreadySynchronized
     case updateTitleOnly

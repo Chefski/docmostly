@@ -99,7 +99,8 @@ struct NativeEditorJSCRDTEngineTests {
 
         #expect(result == NativeEditorCRDTSaveResult(
             title: "Saved",
-            updatedAt: Date(timeIntervalSince1970: 30)
+            updatedAt: Date(timeIntervalSince1970: 30),
+            documentStateUpdate: Data([9, 9])
         ))
     }
 
