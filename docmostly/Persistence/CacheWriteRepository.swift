@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 nonisolated enum CacheWriteOperation: Sendable {
@@ -41,6 +42,14 @@ actor CacheWriteRepository {
             document: document,
             scope: scope
         )
+    }
+
+    func saveCRDTStateUpdate(pageId: String, update: Data, scope: CacheScope) throws {
+        try repository().saveCRDTStateUpdate(pageId: pageId, update: update, scope: scope)
+    }
+
+    private func repository() -> CacheRepository {
+        CacheRepository(context: ModelContext(modelContainer))
     }
 }
 

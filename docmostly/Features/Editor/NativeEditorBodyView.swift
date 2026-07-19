@@ -27,6 +27,10 @@ struct NativeEditorBodyView: View {
                     .onSubmit(advanceFromTitle)
                     .disabled(authoringIsAvailable == false)
                     .accessibilityLabel("Page title")
+
+                if let creatorName = viewModel.creator?.name, creatorName.isEmpty == false {
+                    NativeEditorBylineView(authorName: creatorName)
+                }
             }
 
             if let saveErrorMessage = viewModel.saveErrorMessage {

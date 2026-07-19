@@ -15,17 +15,19 @@ final class AppState {
     var selectedPageID: String?
     var selectedCommentID: String?
     var favoriteRevision = 0
+    private(set) var pageDiscoveryRevision = 0
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
     var pendingOfflineMutationCount = 0
 
-    @ObservationIgnored private let settingsStore: LocalSettingsStore
+    @ObservationIgnored let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
+    @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
     @ObservationIgnored var cacheRepository: CacheRepository?
-    @ObservationIgnored private var cacheReader: CacheReadRepository?
+    @ObservationIgnored var cacheReader: CacheReadRepository?
     @ObservationIgnored var cacheWriter: CacheWriteRepository?
     @ObservationIgnored var offlineQueue: OfflineMutationQueue?
     @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
@@ -47,12 +49,14 @@ final class AppState {
         authService: AuthService? = nil,
         cookieJar: SessionCookieJar = SessionCookieJar(),
         crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
+        offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing = NativeEditorOfflineCRDTSynchronizer(),
         apiClient: DocmostAPIClient? = nil
     ) {
         self.settingsStore = settingsStore ?? LocalSettingsStore()
         self.cookieJar = cookieJar
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
+        self.offlineCRDTSynchronizer = offlineCRDTSynchronizer
         self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
         savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()
@@ -102,6 +106,10 @@ final class AppState {
 
             await self.flushScheduledCacheWrites()
         }
+    }
+
+    func markPageDiscoveryChanged() {
+        pageDiscoveryRevision &+= 1
     }
 
     private func flushScheduledCacheWrites() async {

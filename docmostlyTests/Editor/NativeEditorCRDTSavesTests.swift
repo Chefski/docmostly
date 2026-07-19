@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import SwiftData
 import Testing
 @testable import docmostly
 
@@ -127,6 +128,61 @@ struct NativeEditorCRDTSavesTests {
         #expect(engine.flushRequests.first?.document == viewModel.document)
         #expect(viewModel.isDirty == false)
         #expect(viewModel.saveErrorMessage == nil)
+    }
+
+    @Test func offlineCRDTSaveQueuesYjsStateInsteadOfRESTReplacementSnapshot() async throws {
+        let stateUpdate = Data([1, 4, 9])
+        let engine = SavingCRDTDocumentEngine()
+        engine.saveResult = NativeEditorCRDTSaveResult(documentStateUpdate: stateUpdate)
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Page",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = NativeEditorDocument(blocks: [
+            NativeEditorBlock(kind: .paragraph, text: AttributedString("Original"), alignment: .left)
+        ])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.document.blocks[0].text = AttributedString("Offline edit")
+        viewModel.handleDocumentChanged()
+
+        let scope = CacheScope(serverBaseURL: "https://docs.example.com", userID: "user-1")
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        let cacheRepository = CacheRepository(context: context)
+        try cacheRepository.saveEditablePage(
+            DocmostEditablePage(
+                id: "page-1",
+                slugId: "page-1",
+                title: "Page",
+                content: viewModel.lastSavedDocument.proseMirrorDocument,
+                icon: nil,
+                spaceId: "space-1",
+                updatedAt: nil,
+                permissions: DocmostPagePermissions(canEdit: true, hasRestriction: false),
+                lastUpdatedBy: nil
+            ),
+            scope: scope
+        )
+        let appState = AppState()
+        appState.configure(modelContext: context, modelContainer: container)
+        appState.configurePreviewCacheScope(scope)
+
+        let didSave = await viewModel.save(appState: appState)
+
+        #expect(didSave)
+        let pending = try await appState.offlineQueueRepository?.pending(scope: scope)
+        #expect(pending?.map(\.payload) == [
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Page",
+                document: viewModel.document.proseMirrorDocument,
+                stateUpdate: stateUpdate,
+                baseTitle: "Page"
+            )
+        ])
+        #expect(try await appState.cacheReader?.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == stateUpdate)
     }
 }
 

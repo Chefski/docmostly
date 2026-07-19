@@ -3,6 +3,30 @@ import Testing
 @testable import docmostly
 
 struct OfflinePageUpdateReplayDecisionTests {
+    @Test func CRDTReplayOnlyUpdatesAnOfflineTitleWhenRemoteTitleIsUnchanged() {
+        #expect(OfflinePageTitleReplayDecision.resolve(
+            serverTitle: "Base",
+            queuedTitle: "Local",
+            baseTitle: "Base"
+        ) == .updateTitle)
+    }
+
+    @Test func CRDTReplayPreservesAConcurrentRemoteTitleWhenLocalTitleIsUnchanged() {
+        #expect(OfflinePageTitleReplayDecision.resolve(
+            serverTitle: "Remote",
+            queuedTitle: "Base",
+            baseTitle: "Base"
+        ) == .keepRemoteTitle)
+    }
+
+    @Test func CRDTReplayRetainsAConflictForTwoDivergentTitleEdits() {
+        #expect(OfflinePageTitleReplayDecision.resolve(
+            serverTitle: "Remote",
+            queuedTitle: "Local",
+            baseTitle: "Base"
+        ) == .conflict)
+    }
+
     @Test func matchingLocalBodyNeedsNoDocumentReplacement() {
         let localDocument = document("Local")
 

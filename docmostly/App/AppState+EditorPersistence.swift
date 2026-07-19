@@ -15,13 +15,15 @@ extension AppState {
         baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            return try await queuePageUpdate(
+            let page = try await queuePageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
                 baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
+            markPageDiscoveryChanged()
+            return page
         }
 
         do {
@@ -42,18 +44,21 @@ extension AppState {
             } catch {
                 statusMessage = error.localizedDescription
             }
+            markPageDiscoveryChanged()
             return page
         } catch {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            return try await queuePageUpdate(
+            let page = try await queuePageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
                 baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
+            markPageDiscoveryChanged()
+            return page
         }
     }
 
@@ -62,17 +67,20 @@ extension AppState {
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
+        crdtStateUpdate: Data,
         baseTitle: String,
-        baseDocument: ProseMirrorDocument,
         snapshotCapturedAt: Date
     ) async throws -> CollaborativePagePersistenceResult {
+        guard crdtStateUpdate.isEmpty == false else {
+            throw APIError.connectionFailed("The collaborative document returned an empty local state.")
+        }
         guard let apiClient else {
-            return try await persistCollaborativePageLocally(
+            return try await persistCRDTPageLocally(
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
+                stateUpdate: crdtStateUpdate,
                 baseTitle: baseTitle,
-                baseDocument: baseDocument,
                 snapshotCapturedAt: snapshotCapturedAt
             )
         }
@@ -87,53 +95,47 @@ extension AppState {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            return try await persistCollaborativePageLocally(
+            return try await persistCRDTPageLocally(
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
+                stateUpdate: crdtStateUpdate,
                 baseTitle: baseTitle,
-                baseDocument: baseDocument,
                 snapshotCapturedAt: snapshotCapturedAt
             )
         }
 
         isOffline = false
         cacheCollaborativeSnapshot(page: page, document: documentSnapshot)
+        try await persistCRDTStateUpdate(pageID: pageId, update: crdtStateUpdate)
 
         do {
-            let replayDecision = OfflinePageUpdateReplayDecision.resolve(
-                serverPage: page,
-                queuedTitle: title,
-                queuedDocument: documentSnapshot,
-                baseTitle: baseTitle,
-                baseDocument: baseDocument
-            )
-            switch replayDecision {
-            case .alreadySynchronized, .updateTitleOnly:
+            let serverDocument = page.content ?? ProseMirrorDocument()
+            if serverDocument.isCollaborationEquivalent(to: documentSnapshot) {
                 _ = try await acknowledgePendingPageUpdate(
                     pageId: pageId,
                     snapshotCapturedAt: snapshotCapturedAt
                 )
                 await refreshOfflineMutationCount()
                 scheduleOfflineQueueReconciliation()
-            case .replaceDocument, .conflict:
-                _ = try await supersedePendingPageUpdate(
+            } else {
+                _ = try await supersedePendingCRDTPageUpdate(
                     pageId: pageId,
                     title: title,
                     document: documentSnapshot,
+                    stateUpdate: crdtStateUpdate,
                     baseTitle: baseTitle,
-                    baseDocument: baseDocument,
                     snapshotCapturedAt: snapshotCapturedAt
                 )
                 await refreshOfflineMutationCount()
-                statusMessage = replayDecision == .conflict ?
-                    "Saved locally. A newer remote version must be resolved before this draft can sync." :
-                    "Saved locally. Waiting for the collaborative document to sync."
+                scheduleOfflineQueueReconciliation()
+                statusMessage = "Saved locally. Waiting for the collaborative document to sync."
             }
         } catch {
             statusMessage = "Could not make the collaborative document durable: " + error.localizedDescription
             throw error
         }
+        markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,
@@ -217,6 +219,43 @@ private extension AppState {
         )
     }
 
+    // swiftlint:disable:next function_parameter_count
+    func supersedePendingCRDTPageUpdate(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        stateUpdate: Data,
+        baseTitle: String,
+        snapshotCapturedAt: Date
+    ) async throws -> OfflinePageUpdateSupersessionResult {
+        guard let cacheScope else {
+            throw APIError.connectionFailed("Offline document durability is unavailable until you sign in.")
+        }
+        if let offlineQueueRepository {
+            return try await offlineQueueRepository.supersedePendingCRDTPageUpdate(
+                pageId: pageId,
+                title: title,
+                document: document,
+                stateUpdate: stateUpdate,
+                baseTitle: baseTitle,
+                snapshotCapturedAt: snapshotCapturedAt,
+                scope: cacheScope
+            )
+        }
+        guard let offlineQueue else {
+            throw APIError.connectionFailed("Offline document durability is unavailable on this device.")
+        }
+        return try offlineQueue.supersedePendingCRDTPageUpdate(
+            pageId: pageId,
+            title: title,
+            document: document,
+            stateUpdate: stateUpdate,
+            baseTitle: baseTitle,
+            snapshotCapturedAt: snapshotCapturedAt,
+            scope: cacheScope
+        )
+    }
+
     func acknowledgePendingPageUpdate(
         pageId: String,
         snapshotCapturedAt: Date
@@ -269,6 +308,40 @@ private extension AppState {
             title: title,
             document: document
         )
+        markPageDiscoveryChanged()
+        return CollaborativePagePersistenceResult(
+            page: page,
+            persistedTitle: page.title,
+            updatedAt: page.updatedAt
+        )
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func persistCRDTPageLocally(
+        pageId: String,
+        title: String,
+        document: ProseMirrorDocument,
+        stateUpdate: Data,
+        baseTitle: String,
+        snapshotCapturedAt: Date
+    ) async throws -> CollaborativePagePersistenceResult {
+        let supersessionResult = try await supersedePendingCRDTPageUpdate(
+            pageId: pageId,
+            title: title,
+            document: document,
+            stateUpdate: stateUpdate,
+            baseTitle: baseTitle,
+            snapshotCapturedAt: snapshotCapturedAt
+        )
+        await refreshOfflineMutationCount()
+
+        guard supersessionResult != .newerPendingUpdatePreserved else {
+            return CollaborativePagePersistenceResult(page: nil, persistedTitle: title, updatedAt: nil)
+        }
+
+        let page = try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
+        try await persistCRDTStateUpdate(pageID: pageId, update: stateUpdate)
+        markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,

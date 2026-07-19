@@ -6,6 +6,7 @@ enum DocmostlyModelContainer {
             CachedSpace.self,
             CachedPageTreeItem.self,
             CachedPage.self,
+            CachedCRDTDocument.self,
             CachedAttachment.self,
             QueuedOfflineMutation.self
         ])

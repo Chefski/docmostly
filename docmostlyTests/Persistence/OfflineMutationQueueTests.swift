@@ -416,3 +416,102 @@ struct OfflineMutationQueueTests {
         ])
     }
 }
+
+extension OfflineMutationQueueTests {
+    @Test func CRDTPageEditsCoalesceToLatestStateAndOldestTitleBaseline() throws {
+        let queue = makeQueue()
+        let firstDocument = document(text: "First offline edit")
+        let latestDocument = document(text: "Latest offline edit")
+
+        _ = try queue.enqueue(
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "First title",
+                document: firstDocument,
+                stateUpdate: Data([1, 2]),
+                baseTitle: "Server title"
+            ),
+            scope: scope
+        )
+        _ = try queue.enqueue(
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Latest title",
+                document: latestDocument,
+                stateUpdate: Data([3, 4]),
+                baseTitle: "First title"
+            ),
+            scope: scope
+        )
+
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Latest title",
+                document: latestDocument,
+                stateUpdate: Data([3, 4]),
+                baseTitle: "Server title"
+            )
+        ])
+    }
+
+    @Test func CRDTPagePayloadRoundTripsItsYjsState() throws {
+        let payload = OfflineMutationPayload.updatePageCRDT(
+            pageId: "page-1",
+            title: "Offline",
+            document: document(text: "Offline body"),
+            stateUpdate: Data([5, 6, 7]),
+            baseTitle: "Server title"
+        )
+
+        let encoded = try JSONEncoder().encode(payload)
+        let decoded = try JSONDecoder().decode(OfflineMutationPayload.self, from: encoded)
+
+        #expect(decoded == payload)
+        #expect(decoded.kind == .updatePage)
+        #expect(decoded.coalescingKey == "updatePage:page-1")
+    }
+
+    @Test func queuedCommentIDReplacementKeepsCRDTStateForReplayProjectionRepair() throws {
+        let queue = makeQueue()
+        let stateUpdate = Data([8, 6, 7, 5])
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(
+                    type: "text",
+                    marks: [ProseMirrorMark(
+                        type: "comment",
+                        attrs: ["commentId": .string("offline-comment-1")]
+                    )],
+                    text: "Marked"
+                )
+            ])
+        ])
+        _ = try queue.enqueue(
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Draft",
+                document: document,
+                stateUpdate: stateUpdate
+            ),
+            scope: scope
+        )
+
+        try queue.replaceQueuedInlineCommentID(
+            localId: "offline-comment-1",
+            serverId: "comment-1",
+            scope: scope
+        )
+
+        guard case .updatePageCRDT(_, _, let patchedDocument, let retainedState, _) = try #require(
+            queue.pending(scope: scope).first?.payload
+        ) else {
+            Issue.record("Expected a queued CRDT page update")
+            return
+        }
+        #expect(retainedState == stateUpdate)
+        #expect(patchedDocument.content.first?.content?.first?.marks?.first?.attrs?["commentId"] == .string(
+            "comment-1"
+        ))
+    }
+}

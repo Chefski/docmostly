@@ -88,14 +88,76 @@ test("does not duplicate content when syncing with server-converted ydoc", () =>
   }]);
 });
 
+test("restores a cached full document update into an empty native document", () => {
+  const cachedDocument = serverYDocFromJSON(paragraphDocument("Cached offline base"));
+  const cachedState = base64FromBytes(Y.encodeStateAsUpdate(cachedDocument));
+  const restoredDocument = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Stale REST projection")
+  });
+
+  restoredDocument.applyRemoteUpdate(cachedState);
+
+  assert.deepEqual(restoredDocument.drainDocumentSnapshots(), [{
+    title: "Page",
+    document: paragraphDocument("Cached offline base"),
+    updatedAt: null
+  }]);
+});
+
+test("merges non-overlapping edits from two offline native documents", () => {
+  const baseDocument = paragraphsDocument("First", "Second");
+  const serverDocument = serverYDocFromJSON(baseDocument);
+  const baseState = base64FromBytes(Y.encodeStateAsUpdate(serverDocument));
+  const firstEditor = offlineDocument(baseState, baseDocument);
+  const secondEditor = offlineDocument(baseState, baseDocument);
+
+  firstEditor.integrateLocalChange({
+    after: { title: "Page", document: paragraphsDocument("First by A", "Second") }
+  });
+  secondEditor.integrateLocalChange({
+    after: { title: "Page", document: paragraphsDocument("First", "Second by B") }
+  });
+
+  const mergedDocument = new Y.Doc();
+  Y.applyUpdate(mergedDocument, bytesFromBase64(baseState));
+  for (const update of [
+    ...firstEditor.drainLocalUpdates(),
+    ...secondEditor.drainLocalUpdates()
+  ]) {
+    Y.applyUpdate(mergedDocument, bytesFromBase64(update));
+  }
+
+  assert.deepEqual(
+    yDocToProsemirrorJSON(mergedDocument, fragmentName),
+    paragraphsDocument("First by A", "Second by B")
+  );
+});
+
 function paragraphDocument(text) {
+  return paragraphsDocument(text);
+}
+
+function paragraphsDocument(...texts) {
   return {
     type: "doc",
-    content: [{
+    content: texts.map((text) => ({
       type: "paragraph",
       content: [{ type: "text", text }]
-    }]
+    }))
   };
+}
+
+function offlineDocument(baseState, document) {
+  const offline = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document
+  });
+  offline.applyRemoteUpdate(baseState);
+  offline.drainDocumentSnapshots();
+  return offline;
 }
 
 function serverYDocFromJSON(document) {

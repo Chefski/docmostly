@@ -281,13 +281,12 @@ final class NativeEditorWebEmbedCoordinator: NSObject, WKNavigationDelegate {
 
     func webView(
         _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
+        decidePolicyFor navigationAction: WKNavigationAction
+    ) async -> WKNavigationActionPolicy {
         let isAllowed = NativeEditorWebURLPolicy.allowsNavigation(
             to: navigationAction.request.url,
             allowedHosts: allowedHosts
         )
-        decisionHandler(isAllowed ? .allow : .cancel)
+        return isAllowed ? .allow : .cancel
     }
 }

@@ -487,12 +487,16 @@ private extension NativeRichEditorViewModel {
                 let flushedTitle = result.title ?? snapshot.trimmedTitle
 
                 if appState.hasPageUpdatePersistence {
+                    guard let crdtStateUpdate = result.documentStateUpdate,
+                          crdtStateUpdate.isEmpty == false else {
+                        throw APIError.connectionFailed("Collaborative save did not produce durable Yjs state.")
+                    }
                     let persistence = try await appState.updateCollaborativePageTitle(
                         pageId: snapshot.pageID,
                         title: flushedTitle,
                         documentSnapshot: snapshot.document.proseMirrorDocument,
+                        crdtStateUpdate: crdtStateUpdate,
                         baseTitle: snapshot.baseTitle,
-                        baseDocument: snapshot.baseDocument.proseMirrorDocument,
                         snapshotCapturedAt: snapshot.capturedAt
                     )
                     if let page = persistence.page {

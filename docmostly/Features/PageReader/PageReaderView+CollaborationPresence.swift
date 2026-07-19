@@ -21,6 +21,7 @@ extension PageReaderView {
         for await snapshot in snapshots {
             guard Task.isCancelled == false else { return }
             editorViewModel.applyCRDTDocumentSnapshot(snapshot)
+            await editorViewModel.persistCurrentCRDTState(appState: appState)
             await editorViewModel.refreshResolvedRemoteCursors()
         }
     }
@@ -76,12 +77,22 @@ extension PageReaderView {
                 editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
             }
         case .syncStatus(let isSynced):
-            editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
-            if isSynced, editorViewModel.usesCRDTDocumentEngine == false {
-                editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
-            }
+            await handleCollaborationSyncStatus(isSynced, editorViewModel: editorViewModel)
         case .stateless:
             break
+        }
+    }
+
+    private func handleCollaborationSyncStatus(
+        _ isSynced: Bool,
+        editorViewModel: NativeRichEditorViewModel
+    ) async {
+        editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
+        if isSynced {
+            await editorViewModel.persistCurrentCRDTState(appState: appState)
+        }
+        if isSynced, editorViewModel.usesCRDTDocumentEngine == false {
+            editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")
         }
     }
 

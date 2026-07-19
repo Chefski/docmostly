@@ -3,10 +3,12 @@ import Foundation
 nonisolated struct NativeEditorCRDTSaveResult: Equatable, Sendable {
     let title: String?
     let updatedAt: Date?
+    let documentStateUpdate: Data?
 
-    init(title: String? = nil, updatedAt: Date? = nil) {
+    init(title: String? = nil, updatedAt: Date? = nil, documentStateUpdate: Data? = nil) {
         self.title = title
         self.updatedAt = updatedAt
+        self.documentStateUpdate = documentStateUpdate
     }
 }
 
@@ -31,6 +33,7 @@ protocol NativeEditorCRDTDocumentEngine: AnyObject, Sendable {
     var requiresInitialRemoteSnapshot: Bool { get }
     func encodeStateVector() async throws -> Data
     func encodeStateAsUpdate(for stateVector: Data) async throws -> Data
+    func encodeDocumentState() async throws -> Data
     func applyRemoteUpdate(_ update: Data) async throws
     func applyRemoteUpdateCapturingSnapshot(_ update: Data) async throws -> NativeEditorCRDTDocumentSnapshot?
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws
@@ -62,6 +65,11 @@ extension NativeEditorCRDTDocumentEngine {
     func applyRemoteUpdateCapturingSnapshot(_ update: Data) async throws -> NativeEditorCRDTDocumentSnapshot? {
         try await applyRemoteUpdate(update)
         return nil
+    }
+
+    func encodeDocumentState() async throws -> Data {
+        // Yjs update-v1 encodes an empty state vector as a single zero byte.
+        try await encodeStateAsUpdate(for: Data([0]))
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws { }

@@ -213,6 +213,20 @@ nonisolated final class CacheRepository {
         try loadPage(idOrSlugId: idOrSlugId, scope: scope)?.asEditablePage()
     }
 
+    func loadCRDTStateUpdate(pageId: String, scope: CacheScope) throws -> Data? {
+        try loadCRDTDocument(pageId: pageId, scope: scope)?.stateUpdate
+    }
+
+    func saveCRDTStateUpdate(pageId: String, update: Data, scope: CacheScope) throws {
+        if let cachedDocument = try loadCRDTDocument(pageId: pageId, scope: scope) {
+            guard cachedDocument.stateUpdate != update else { return }
+            cachedDocument.update(stateUpdate: update)
+        } else {
+            context.insert(CachedCRDTDocument(pageId: pageId, stateUpdate: update, scope: scope))
+        }
+        try saveIfNeeded(true)
+    }
+
     func saveLocalEditableDraft(
         pageId: String,
         title: String,
@@ -325,6 +339,7 @@ nonisolated final class CacheRepository {
 
     func clearAll() throws {
         try deleteAll(CachedAttachment.self)
+        try deleteAll(CachedCRDTDocument.self)
         try deleteAll(CachedPage.self)
         try deleteAll(CachedPageTreeItem.self)
         try deleteAll(CachedSpace.self)
@@ -382,6 +397,20 @@ nonisolated final class CacheRepository {
             }
         )
         return try context.fetch(descriptor)
+    }
+
+    private func loadCRDTDocument(pageId: String, scope: CacheScope) throws -> CachedCRDTDocument? {
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        var descriptor = FetchDescriptor<CachedCRDTDocument>(
+            predicate: #Predicate { document in
+                document.cacheServerBaseURL == serverBaseURL &&
+                    document.cacheUserID == userID &&
+                    document.pageId == pageId
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     private func syncAttachments(

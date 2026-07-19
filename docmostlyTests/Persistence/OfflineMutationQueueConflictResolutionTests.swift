@@ -73,6 +73,44 @@ struct OfflineQueueConflictResolutionTests {
         ])
     }
 
+    @Test func keepMinePreservesQueuedYjsStateWhenResolvingATitleConflict() throws {
+        let queue = makeQueue()
+        let localDocument = document(text: "Merged collaborative body")
+        let stateUpdate = Data([2, 7, 1, 8])
+        let record = try queue.enqueue(
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Local title",
+                document: localDocument,
+                stateUpdate: stateUpdate,
+                baseTitle: "Original title"
+            ),
+            scope: scope
+        )
+
+        let result = try queue.resolvePendingPageUpdateKeepingLocal(
+            pageId: "page-1",
+            title: "Local title",
+            document: localDocument,
+            remoteBaseTitle: "Remote title",
+            remoteBaseDocument: document(text: "Remote REST projection"),
+            replacingThrough: record.createdAt,
+            resolvedAt: record.createdAt.addingTimeInterval(1),
+            scope: scope
+        )
+
+        #expect(result == .superseded)
+        #expect(try queue.pending(scope: scope).map(\.payload) == [
+            .updatePageCRDT(
+                pageId: "page-1",
+                title: "Local title",
+                document: localDocument,
+                stateUpdate: stateUpdate,
+                baseTitle: "Remote title"
+            )
+        ])
+    }
+
     private func makeQueue() -> OfflineMutationQueue {
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
         return OfflineMutationQueue(context: ModelContext(container))
