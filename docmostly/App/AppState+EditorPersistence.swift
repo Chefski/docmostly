@@ -15,13 +15,15 @@ extension AppState {
         baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            return try await queuePageUpdate(
+            let page = try await queuePageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
                 baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
+            markPageDiscoveryChanged()
+            return page
         }
 
         do {
@@ -42,18 +44,21 @@ extension AppState {
             } catch {
                 statusMessage = error.localizedDescription
             }
+            markPageDiscoveryChanged()
             return page
         } catch {
             guard canQueueOfflineMutation(after: error) else { throw error }
             isOffline = true
             statusMessage = error.localizedDescription
-            return try await queuePageUpdate(
+            let page = try await queuePageUpdate(
                 pageId: pageId,
                 title: title,
                 document: document,
                 baseTitle: baseTitle,
                 baseDocument: baseDocument
             )
+            markPageDiscoveryChanged()
+            return page
         }
     }
 
@@ -130,6 +135,7 @@ extension AppState {
             statusMessage = "Could not make the collaborative document durable: " + error.localizedDescription
             throw error
         }
+        markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,
@@ -302,6 +308,7 @@ private extension AppState {
             title: title,
             document: document
         )
+        markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,
@@ -334,6 +341,7 @@ private extension AppState {
 
         let page = try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
         try await persistCRDTStateUpdate(pageID: pageId, update: stateUpdate)
+        markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,

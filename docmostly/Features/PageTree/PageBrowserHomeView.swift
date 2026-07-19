@@ -55,6 +55,10 @@ struct PageBrowserHomeView: View {
     }
 
     private var pageBrowserTaskKey: PageBrowserTaskKey {
-        PageBrowserTaskKey(spaceID: space.id, scope: viewModel.selectedScope)
+        PageBrowserTaskKey(
+            spaceID: space.id,
+            scope: viewModel.selectedScope,
+            pageDiscoveryRevision: appState.pageDiscoveryRevision
+        )
     }
 }

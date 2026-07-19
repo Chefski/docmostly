@@ -23,6 +23,7 @@ extension AppState {
     func selectSpace(id spaceID: String, clearsPage: Bool = true) {
         selectedSpaceID = spaceID
         selectedSidebarDestination = .space(spaceID)
+        rememberSelectedSpace(id: spaceID)
 
         if clearsPage {
             selectedPageID = nil
@@ -38,6 +39,7 @@ extension AppState {
     ) {
         if let spaceID {
             selectedSpaceID = spaceID
+            rememberSelectedSpace(id: spaceID)
 
             if revealSpaceInSidebar {
                 selectedSidebarDestination = .space(spaceID)
@@ -82,6 +84,12 @@ extension AppState {
             return
         }
 
+        let rememberedSpaceID = cacheScope
+            .flatMap(settingsStore.loadLastSelectedSpaceID(for:))
+            .flatMap { rememberedSpaceID in
+                spaces.contains(where: { $0.id == rememberedSpaceID }) ? rememberedSpaceID : nil
+            }
+
         let shouldRevealDefaultSpace = switch selectedSidebarDestination {
         case nil, .space:
             true
@@ -93,17 +101,23 @@ extension AppState {
         selectedPageID = nil
         selectedCommentID = nil
 
-        guard let firstSpaceID = spaces.first?.id else {
+        guard let defaultSpaceID = rememberedSpaceID ?? spaces.first?.id else {
             if shouldRevealDefaultSpace {
                 selectedSidebarDestination = nil
             }
             return
         }
 
-        selectedSpaceID = firstSpaceID
+        selectedSpaceID = defaultSpaceID
+        rememberSelectedSpace(id: defaultSpaceID)
 
         if shouldRevealDefaultSpace {
-            selectedSidebarDestination = .space(firstSpaceID)
+            selectedSidebarDestination = .space(defaultSpaceID)
         }
+    }
+
+    private func rememberSelectedSpace(id spaceID: String) {
+        guard let cacheScope else { return }
+        settingsStore.saveLastSelectedSpaceID(spaceID, for: cacheScope)
     }
 }

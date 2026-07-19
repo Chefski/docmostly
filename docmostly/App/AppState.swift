@@ -15,12 +15,13 @@ final class AppState {
     var selectedPageID: String?
     var selectedCommentID: String?
     var favoriteRevision = 0
+    private(set) var pageDiscoveryRevision = 0
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
     var pendingOfflineMutationCount = 0
 
-    @ObservationIgnored private let settingsStore: LocalSettingsStore
+    @ObservationIgnored let settingsStore: LocalSettingsStore
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
@@ -105,6 +106,10 @@ final class AppState {
 
             await self.flushScheduledCacheWrites()
         }
+    }
+
+    func markPageDiscoveryChanged() {
+        pageDiscoveryRevision &+= 1
     }
 
     private func flushScheduledCacheWrites() async {

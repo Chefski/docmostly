@@ -40,7 +40,7 @@ struct RecentPagesView: View {
                 }
             }
         }
-        .task {
+        .task(id: appState.pageDiscoveryRevision) {
             await viewModel.load(appState: appState)
         }
         .refreshable {

@@ -167,7 +167,11 @@ struct PageTreeView: View {
     }
 
     private var pageBrowserTaskKey: PageBrowserTaskKey {
-        PageBrowserTaskKey(spaceID: space.id, scope: browserViewModel.selectedScope)
+        PageBrowserTaskKey(
+            spaceID: space.id,
+            scope: browserViewModel.selectedScope,
+            pageDiscoveryRevision: appState.pageDiscoveryRevision
+        )
     }
 
     private var searchTaskKey: PageTreeSearchTaskKey {
