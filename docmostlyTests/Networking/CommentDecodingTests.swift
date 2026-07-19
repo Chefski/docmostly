@@ -231,6 +231,31 @@ struct CommentDecodingTests {
         #expect(comment.isNativelyEditable == false)
     }
 
+    @Test func sharedAPIDecoderReceivesAFreshDocumentBudgetForEveryTopLevelDecode() throws {
+        let decoder = DocmostJSONDecoder.make()
+        let initialBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+        let data = commentData(contentJSON: """
+        {
+          "type": "doc",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Safe" }] }]
+        }
+        """)
+
+        _ = try DocmostJSONDecoder.decode(DocmostComment.self, from: data, using: decoder)
+        let firstDecodeBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+        _ = try DocmostJSONDecoder.decode(DocmostComment.self, from: data, using: decoder)
+        let secondDecodeBudget = try #require(
+            decoder.userInfo[.proseMirrorDecodingBudget] as? ProseMirrorDecodingBudget
+        )
+
+        #expect(initialBudget !== firstDecodeBudget)
+        #expect(firstDecodeBudget !== secondDecodeBudget)
+    }
+
     private func commentData(contentJSON: String) -> Data {
         Data("""
         {

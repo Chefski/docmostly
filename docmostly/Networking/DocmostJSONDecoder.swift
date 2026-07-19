@@ -24,4 +24,13 @@ nonisolated enum DocmostJSONDecoder {
         }
         return decoder
     }
+
+    static func decode<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        using decoder: JSONDecoder
+    ) throws -> T {
+        decoder.userInfo[.proseMirrorDecodingBudget] = ProseMirrorDecodingBudget()
+        return try decoder.decode(type, from: data)
+    }
 }
