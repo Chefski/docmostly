@@ -3,7 +3,13 @@ extension NativeEditorJSCRDTEngineTests {
         let functions = [
             "encodeStateVector": "encodeStateVector() { return \"\"; }",
             "encodeStateAsUpdate": "encodeStateAsUpdate() { return \"\"; }",
+            "validateUpdate": "validateUpdate() { return true; }",
             "applyRemoteUpdate": "applyRemoteUpdate() {}",
+            "currentSnapshot": """
+            currentSnapshot() {
+              return { title: null, updatedAt: null, document: { type: "doc", content: [] } };
+            }
+            """,
             "integrateLocalChange": "integrateLocalChange() {}",
             "flushPendingLocalChanges": "flushPendingLocalChanges() { return { title: null, updatedAt: null }; }",
             "resolveRemoteCursor": "resolveRemoteCursor() { return null; }",
@@ -52,6 +58,9 @@ extension NativeEditorJSCRDTEngineTests {
             }
             return "";
           },
+          validateUpdate() {
+            return true;
+          },
           applyRemoteUpdate(update) {
             if (update === "CAc=") {
               this.snapshots.push({
@@ -66,6 +75,13 @@ extension NativeEditorJSCRDTEngineTests {
                 }
               });
             }
+          },
+          currentSnapshot() {
+            return {
+              title: null,
+              updatedAt: null,
+              document: seed.document
+            };
           },
           integrateLocalChange(change) {
             if (

@@ -248,7 +248,11 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
             return "";
           },
           encodeStateAsUpdate() { return ""; },
+          validateUpdate() { return true; },
           applyRemoteUpdate() {},
+          currentSnapshot() {
+            return { title: null, updatedAt: null, document: seed.document };
+          },
           integrateLocalChange() {},
           flushPendingLocalChanges(title) { return { title, updatedAt: null }; },
           resolveRemoteCursor() { return null; },

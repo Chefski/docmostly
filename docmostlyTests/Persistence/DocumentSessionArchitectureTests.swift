@@ -418,7 +418,7 @@ struct DocumentSessionArchitectureTests {
         let beforeRemoteSync = try await dependencies.peer.load(dependencies.key)
         #expect(beforeRemoteSync.lastCommittedSequence == 0)
         #expect(beforeRemoteSync.retainedDraft == legacyDocument)
-        #expect(session.initialSnapshot?.document.proseMirrorDocument == legacyDocument)
+        #expect(session.initialSnapshot?.document.blocks.first?.text == AttributedString("Unsynced legacy draft"))
         let viewModel = NativeRichEditorViewModel(pageID: dependencies.key.pageID, initialTitle: "Remote title")
         viewModel.configureDocumentSession(session, restoredLocalState: session.restoredLocalState)
         #expect(viewModel.canEdit == false)

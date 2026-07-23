@@ -161,7 +161,6 @@ struct NativeEditorSaveRaceTests {
     @Test func deferredConflictAutosaveQueuesLocalDraftWithoutFlushingYjsOrLoopingHandoff() async throws {
         let engine = SuspendingSaveCRDTDocumentEngine()
         let viewModel = makeViewModel(engine: engine)
-        let originalBaseline = viewModel.lastSavedDocument.proseMirrorDocument
         viewModel.document.blocks[0].text = AttributedString("Local durable draft")
         viewModel.handleDocumentChanged()
         try await viewModel.waitForPendingCRDTLocalChange()
@@ -210,12 +209,10 @@ struct NativeEditorSaveRaceTests {
         #expect(viewModel.hasOutgoingChangesRequiringPersistence == false)
         let offlineQueue = try #require(appState.offlineQueue)
         #expect(try offlineQueue.pending(scope: scope).map(\.payload) == [
-            .updatePage(
+            .updatePageMetadata(
                 pageId: "page-1",
                 title: "Draft",
-                document: viewModel.document.proseMirrorDocument,
-                baseTitle: "Draft",
-                baseDocument: originalBaseline
+                baseTitle: "Draft"
             )
         ])
     }

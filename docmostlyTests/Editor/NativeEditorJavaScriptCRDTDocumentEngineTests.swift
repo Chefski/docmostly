@@ -181,7 +181,9 @@ struct NativeEditorJSCRDTEngineTests {
     @Test(arguments: [
         "encodeStateVector",
         "encodeStateAsUpdate",
+        "validateUpdate",
         "applyRemoteUpdate",
+        "currentSnapshot",
         "integrateLocalChange",
         "flushPendingLocalChanges",
         "resolveRemoteCursor",
@@ -213,7 +215,11 @@ struct NativeEditorJSCRDTEngineTests {
                     return {
                       encodeStateVector() { return ""; },
                       encodeStateAsUpdate() { return ""; },
+                      validateUpdate() { return true; },
                       applyRemoteUpdate() {},
+                      currentSnapshot() {
+                        return { title: null, updatedAt: null, document: { type: "doc", content: [] } };
+                      },
                       integrateLocalChange() {},
                       flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
                       resolveRemoteCursor() { return null; },
@@ -240,7 +246,11 @@ struct NativeEditorJSCRDTEngineTests {
                     return {
                       encodeStateVector() { return ""; },
                       encodeStateAsUpdate() { return ""; },
+                      validateUpdate() { return true; },
                       applyRemoteUpdate() {},
+                      currentSnapshot() {
+                        return { title: null, updatedAt: null, document: { type: "doc", content: [] } };
+                      },
                       integrateLocalChange() {},
                       flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
                       resolveRemoteCursor() { return null; },
@@ -267,7 +277,11 @@ struct NativeEditorJSCRDTEngineTests {
                     return {
                       encodeStateVector() { return ""; },
                       encodeStateAsUpdate() { return ""; },
+                      validateUpdate() { return true; },
                       applyRemoteUpdate() {},
+                      currentSnapshot() {
+                        return { title: null, updatedAt: null, document: { type: "doc", content: [] } };
+                      },
                       integrateLocalChange() {},
                       flushPendingLocalChanges() { return { title: null, updatedAt: null }; },
                       resolveRemoteCursor() { return null; },

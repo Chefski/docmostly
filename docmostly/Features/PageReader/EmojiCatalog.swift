@@ -32,16 +32,20 @@ nonisolated enum EmojiCatalog {
     }
 
     private static func loadSections() -> [EmojiCatalogSection] {
-        let rootURL = Bundle.main.url(forResource: "emoji-16.0", withExtension: "txt")
-        let resourcesURL = Bundle.main.url(
-            forResource: "emoji-16.0",
-            withExtension: "txt",
-            subdirectory: "Resources"
-        )
-        guard let url = rootURL ?? resourcesURL,
-              let source = try? String(contentsOf: url, encoding: .utf8) else {
-            return []
+        var visitedBundleURLs: Set<URL> = []
+        let bundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
+        for bundle in bundles where visitedBundleURLs.insert(bundle.bundleURL).inserted {
+            let rootURL = bundle.url(forResource: "emoji-16.0", withExtension: "txt")
+            let resourcesURL = bundle.url(
+                forResource: "emoji-16.0",
+                withExtension: "txt",
+                subdirectory: "Resources"
+            )
+            if let url = rootURL ?? resourcesURL,
+               let source = try? String(contentsOf: url, encoding: .utf8) {
+                return parse(source)
+            }
         }
-        return parse(source)
+        return []
     }
 }

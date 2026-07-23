@@ -130,7 +130,7 @@ struct NativeEditorCRDTSavesTests {
         #expect(viewModel.saveErrorMessage == nil)
     }
 
-    @Test func offlineCRDTSaveDoesNotPutDocumentBodiesInTheGenericQueue() async throws {
+    @Test func offlineCRDTSaveQueuesOnlyMetadataReconciliation() async throws {
         let engine = SavingCRDTDocumentEngine()
         engine.saveResult = NativeEditorCRDTSaveResult(documentStateUpdate: Data([1, 4, 9]))
         let viewModel = NativeRichEditorViewModel(
@@ -172,7 +172,13 @@ struct NativeEditorCRDTSavesTests {
 
         #expect(didSave)
         let pending = try await appState.offlineQueueRepository?.pending(scope: scope)
-        #expect(pending?.isEmpty == true)
+        #expect(pending?.map(\.payload) == [
+            .updatePageMetadata(
+                pageId: "page-1",
+                title: "Page",
+                baseTitle: "Page"
+            )
+        ])
         #expect(try await appState.cacheReader?.loadCRDTStateUpdate(pageId: "page-1", scope: scope) == nil)
     }
 }
