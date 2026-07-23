@@ -461,7 +461,7 @@ nonisolated final class CacheRepository {
     }
 }
 
-extension CacheRepository {
+nonisolated extension CacheRepository {
     func updatePageIcon(pageID: String, icon: String?, updatedAt: Date?, scope: CacheScope) throws {
         var hasChanges = false
         if let page = try loadPage(idOrSlugId: pageID, scope: scope) {
