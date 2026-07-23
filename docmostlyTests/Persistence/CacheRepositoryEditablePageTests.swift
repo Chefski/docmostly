@@ -142,7 +142,7 @@ struct CacheRepositoryEditablePageTests {
         try repository.saveEditablePage(editablePage(content: originalDocument), scope: scope)
         try repository.upsertEditablePageMetadata(metadata, scope: scope)
 
-        let loadedPage = try #require(repository.loadEditablePage(idOrSlugId: "page-1", scope: scope))
+        let loadedPage = try #require(try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope))
         #expect(loadedPage.icon == "🚀")
         #expect(loadedPage.content == originalDocument)
     }
