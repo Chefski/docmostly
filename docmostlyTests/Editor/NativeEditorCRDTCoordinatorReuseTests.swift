@@ -27,8 +27,8 @@ struct NativeEditorCRDTCoordinatorReuseTests {
 @MainActor
 @Suite(.serialized)
 struct CRDTEngineAttachmentTests {
-    @Test func appStateDoesNotAttachCRDTEngineWithoutFactory() async {
-        let appState = AppState(crdtDocumentEngineFactory: nil)
+    @Test func appStateDoesNotAttachCRDTEngineWithoutFactory() async throws {
+        let appState = try configuredAppState(crdtDocumentEngineFactory: nil)
         let viewModel = NativeRichEditorViewModel(
             pageID: "page-1",
             initialTitle: "Page"
@@ -49,7 +49,7 @@ struct CRDTEngineAttachmentTests {
         let engine = CoordinatorReuseCRDTDocumentEngine()
         engine.encodedStateVector = Data([42])
         let factory = CRDTAttachmentEngineFactory(engine: engine)
-        let appState = AppState(crdtDocumentEngineFactory: factory)
+        let appState = try configuredAppState(crdtDocumentEngineFactory: factory)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(kind: .paragraph, text: AttributedString("Seed"), alignment: .left)
@@ -75,8 +75,10 @@ struct CRDTEngineAttachmentTests {
         #expect(frame.message == .sync(.stepOne(Data([42]))))
     }
 
-    @Test func crdtAttachmentReportsFactoryFailureAsCollaborationFailure() async {
-        let appState = AppState(crdtDocumentEngineFactory: ThrowingCRDTDocumentEngineFactory())
+    @Test func crdtAttachmentReportsFactoryFailureAsCollaborationFailure() async throws {
+        let appState = try configuredAppState(
+            crdtDocumentEngineFactory: ThrowingCRDTDocumentEngineFactory()
+        )
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
         await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
@@ -104,6 +106,7 @@ struct CRDTEngineAttachmentTests {
         let appState = AppState(crdtDocumentEngineFactory: CRDTAttachmentEngineFactory(engine: engine))
         appState.configure(modelContext: context, modelContainer: container)
         appState.configurePreviewCacheScope(scope)
+        appState.currentUser = try currentUser()
         appState.isOffline = true
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
@@ -113,10 +116,12 @@ struct CRDTEngineAttachmentTests {
         #expect(viewModel.canEdit)
     }
 
-    @Test func offlineAttachmentFailsClosedWithoutCachedYjsState() async {
+    @Test func offlineAttachmentFailsClosedWithoutCachedYjsState() async throws {
         let engine = CoordinatorReuseCRDTDocumentEngine()
-        let appState = AppState(crdtDocumentEngineFactory: CRDTAttachmentEngineFactory(engine: engine))
-        appState.isOffline = true
+        let appState = try configuredAppState(
+            crdtDocumentEngineFactory: CRDTAttachmentEngineFactory(engine: engine),
+            isOffline: true
+        )
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
         await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(to: viewModel, appState: appState)
@@ -127,10 +132,10 @@ struct CRDTEngineAttachmentTests {
         ))
     }
 
-    @Test func crdtAttachmentDoesNotConfigureEngineAfterCancellation() async {
+    @Test func crdtAttachmentDoesNotConfigureEngineAfterCancellation() async throws {
         let engine = CoordinatorReuseCRDTDocumentEngine()
         let factory = SuspendingCRDTAttachmentEngineFactory(engine: engine)
-        let appState = AppState(crdtDocumentEngineFactory: factory)
+        let appState = try configuredAppState(crdtDocumentEngineFactory: factory)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
 
         let attachTask = Task {
@@ -148,6 +153,30 @@ struct CRDTEngineAttachmentTests {
         #expect(viewModel.usesCRDTDocumentEngine == false)
         #expect(viewModel.collaborationSession().syncDriver == nil)
         #expect(viewModel.realtimeStatus == .disconnected)
+    }
+
+    private func configuredAppState(
+        crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?,
+        isOffline: Bool = false
+    ) throws -> AppState {
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let appState = AppState(crdtDocumentEngineFactory: crdtDocumentEngineFactory)
+        appState.configure(modelContext: ModelContext(container), modelContainer: container)
+        appState.configurePreviewCacheScope(CacheScope(
+            serverBaseURL: "https://docs.example.com",
+            userID: "user-1"
+        ))
+        appState.currentUser = try currentUser()
+        appState.isOffline = isOffline
+        return appState
+    }
+
+    private func currentUser() throws -> CurrentUserResponse {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "user": ["id": "user-1", "name": "User"],
+            "workspace": ["id": "workspace-1", "name": "Workspace"]
+        ])
+        return try JSONDecoder().decode(CurrentUserResponse.self, from: data)
     }
 }
 
