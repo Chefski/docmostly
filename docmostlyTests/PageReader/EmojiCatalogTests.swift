@@ -42,9 +42,19 @@ struct EmojiCatalogTests {
     }
 
     @Test func bundledCatalogContainsUnicodeEmojiSet() {
-        let sections = EmojiCatalog.loadSections(in: Bundle(for: EmojiCatalogTestsBundleMarker.self))
+        let bundle = Bundle(for: EmojiCatalogTestsBundleMarker.self)
+        let sections = EmojiCatalog.loadSections(in: bundle)
         let itemCount = sections.reduce(into: 0) { count, section in
             count += section.items.count
+        }
+        let directURL = bundle.bundleURL.appending(path: "emoji-16.0.txt")
+        let directByteCount = (try? Data(contentsOf: directURL).count) ?? -1
+
+        guard sections.count == 10, itemCount == 3_781 else {
+            fatalError(
+                "Emoji catalog mismatch: bundle=\(bundle.bundleURL.path()), " +
+                    "directBytes=\(directByteCount), sections=\(sections.count), items=\(itemCount)"
+            )
         }
 
         #expect(sections.count == 10)
