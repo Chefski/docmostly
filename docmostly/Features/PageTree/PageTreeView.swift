@@ -173,7 +173,8 @@ struct PageTreeView: View {
             spaceID: space.id,
             scope: browserViewModel.selectedScope,
             pageDiscoveryRevision: appState.pageDiscoveryRevision,
-            favoriteRevision: appState.favoriteRevision
+            favoriteRevision: appState.favoriteRevision,
+            initializedSpaceID: initializedBrowserSpaceID
         )
     }
 
@@ -262,8 +263,6 @@ struct PageTreeView: View {
         await viewModel.loadRoot(spaceId: space.id, appState: appState)
         guard Task.isCancelled == false else { return }
 
-        await refreshBrowser()
-        guard Task.isCancelled == false else { return }
         initializedBrowserSpaceID = space.id
 
         await viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)

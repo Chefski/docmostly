@@ -10,6 +10,7 @@ final class DocumentSessionRegistry {
     @ObservationIgnored private let compactionPolicy: DocumentCompactionPolicy
     @ObservationIgnored private var sessions: [DocumentStoreKey: DocumentSession] = [:]
     @ObservationIgnored private var creationTasks: [DocumentStoreKey: Task<DocumentSession, any Error>] = [:]
+    @ObservationIgnored private var generation: UInt = 0
 
     init(
         localPeer: DocumentLocalPersistencePeer,
@@ -32,9 +33,16 @@ final class DocumentSessionRegistry {
             return session
         }
         if let creationTask = creationTasks[key] {
-            return try await creationTask.value
+            let creationGeneration = generation
+            let session = try await creationTask.value
+            try Task.checkCancellation()
+            guard generation == creationGeneration else {
+                throw CancellationError()
+            }
+            return session
         }
 
+        let creationGeneration = generation
         let creationTask = Task { @MainActor [localPeer, engineFactory, indexer, compactionPolicy] in
             let engine = try await engineFactory.makeDocumentEngine(
                 pageID: key.pageID,
@@ -48,23 +56,30 @@ final class DocumentSessionRegistry {
                 indexer: indexer,
                 compactionPolicy: compactionPolicy
             )
-            try await session.open(title: title, document: document)
+            try await session.open(title: title)
             return session
         }
         creationTasks[key] = creationTask
 
         do {
             let session = try await creationTask.value
+            try Task.checkCancellation()
+            guard generation == creationGeneration else {
+                throw CancellationError()
+            }
             sessions[key] = session
             creationTasks[key] = nil
             return session
         } catch {
-            creationTasks[key] = nil
+            if generation == creationGeneration {
+                creationTasks[key] = nil
+            }
             throw error
         }
     }
 
     func removeAll() {
+        generation &+= 1
         for task in creationTasks.values {
             task.cancel()
         }

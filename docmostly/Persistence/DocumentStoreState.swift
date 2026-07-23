@@ -13,6 +13,7 @@ nonisolated struct DocumentStoredState: Equatable, Sendable {
     let snapshot: Data?
     let recoverySnapshot: Data?
     let snapshotSequence: Int64
+    let recoverySnapshotSequence: Int64
     let updates: [DocumentStoredUpdate]
     let lastCommittedSequence: Int64
     let localClock: Int64

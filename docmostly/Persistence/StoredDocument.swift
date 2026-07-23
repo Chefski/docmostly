@@ -11,6 +11,7 @@ final class StoredDocument {
     var snapshot: Data?
     var recoverySnapshot: Data?
     var snapshotSequence: Int64 = 0
+    var recoverySnapshotSequence: Int64 = 0
     var nextSequence: Int64 = 1
     var localClock: Int64 = 0
     var remoteClock: Int64 = 0

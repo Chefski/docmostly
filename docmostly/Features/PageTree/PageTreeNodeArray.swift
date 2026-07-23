@@ -7,28 +7,6 @@ nonisolated extension Array where Element == PageTreeNode {
         }
     }
 
-    func preservingLoadedSubtrees(from previousNodes: [PageTreeNode]) -> [PageTreeNode] {
-        let previousNodesByID = previousNodes.reduce(into: [String: PageTreeNode]()) { result, node in
-            result[node.id] = node
-        }
-
-        return map { node in
-            guard
-                node.hasChildren,
-                let previousNode = previousNodesByID[node.id],
-                previousNode.spaceId == node.spaceId,
-                previousNode.isChildrenLoaded
-            else {
-                return node
-            }
-
-            var refreshedNode = node
-            refreshedNode.children = previousNode.children
-            refreshedNode.isChildrenLoaded = true
-            return refreshedNode
-        }
-    }
-
     mutating func updateNode(id: String, update: (inout PageTreeNode) -> Void) {
         for index in indices {
             if self[index].id == id {
@@ -134,6 +112,10 @@ nonisolated extension Array where Element == PageTreeNode {
         return map { existing in
             var nextNode = existing
             if existing.id == parentPageId {
+                guard nextNode.isChildrenLoaded else {
+                    nextNode.hasChildren = true
+                    return nextNode
+                }
                 let insertionIndex = Swift.min(Swift.max(index, 0), nextNode.children.count)
                 nextNode.children.insert(insertedNode, at: insertionIndex)
                 nextNode.hasChildren = true

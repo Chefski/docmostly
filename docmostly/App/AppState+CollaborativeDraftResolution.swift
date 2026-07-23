@@ -29,28 +29,23 @@ extension AppState {
         }
     }
 
-    // swiftlint:disable:next function_parameter_count
     func keepPendingCollaborativeDraft(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
         remoteBaseTitle: String,
-        remoteBaseDocument: ProseMirrorDocument,
         replacingThrough cutoff: Date
     ) async throws -> OfflinePageUpdateSupersessionResult {
         await pauseOfflineReplayForCollaborativeResolution()
-        _ = remoteBaseDocument
         let acknowledgement = try await acknowledgeCollaborativeDraft(pageId: pageId, through: cutoff)
         guard acknowledgement != .newerPendingUpdatePreserved else {
             return .newerPendingUpdatePreserved
         }
-        if title != remoteBaseTitle {
-            _ = try await queueOfflineMutation(.updatePageMetadata(
-                pageId: pageId,
-                title: title,
-                baseTitle: remoteBaseTitle
-            ))
-        }
+        _ = try await queueOfflineMutation(.updatePageMetadata(
+            pageId: pageId,
+            title: title,
+            baseTitle: remoteBaseTitle
+        ))
         _ = try await saveLocalEditableDraft(
             pageId: pageId,
             title: title,

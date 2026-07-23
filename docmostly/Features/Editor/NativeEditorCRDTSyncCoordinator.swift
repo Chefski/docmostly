@@ -12,9 +12,8 @@ actor NativeEditorCRDTSyncCoordinator {
     private let remoteUpdateHandler: (@Sendable (Data) async throws -> Void)?
     private let localUpdateCommitter: @Sendable (Data) async throws -> Bool
     private let pendingLocalUpdatesProvider: @Sendable () async throws -> [Data]
-    private let localUpdateDidSend: @Sendable (Data) async throws -> Void
-    private let committedLocalUpdateStream: AsyncStream<Data>
-    private let committedLocalUpdateContinuation: AsyncStream<Data>.Continuation
+    private let localUpdateDidAcknowledge: @Sendable (Data) async throws -> Void
+    private var committedLocalUpdateContinuations: [UUID: AsyncStream<Data>.Continuation] = [:]
     private var rawLocalUpdateTask: Task<Void, Never>?
     private var pendingLocalEchoCounts: [Data: Int] = [:]
     private var remoteSyncSessionBytes = 0
@@ -24,21 +23,20 @@ actor NativeEditorCRDTSyncCoordinator {
         remoteUpdateHandler: (@Sendable (Data) async throws -> Void)? = nil,
         localUpdateCommitter: @escaping @Sendable (Data) async throws -> Bool = { _ in true },
         pendingLocalUpdatesProvider: @escaping @Sendable () async throws -> [Data] = { [] },
-        localUpdateDidSend: @escaping @Sendable (Data) async throws -> Void = { _ in }
+        localUpdateDidAcknowledge: @escaping @Sendable (Data) async throws -> Void = { _ in }
     ) {
-        let localUpdates = AsyncStream.makeStream(of: Data.self)
         self.documentEngine = documentEngine
         self.remoteUpdateHandler = remoteUpdateHandler
         self.localUpdateCommitter = localUpdateCommitter
         self.pendingLocalUpdatesProvider = pendingLocalUpdatesProvider
-        self.localUpdateDidSend = localUpdateDidSend
-        committedLocalUpdateStream = localUpdates.stream
-        committedLocalUpdateContinuation = localUpdates.continuation
+        self.localUpdateDidAcknowledge = localUpdateDidAcknowledge
     }
 
     deinit {
         rawLocalUpdateTask?.cancel()
-        committedLocalUpdateContinuation.finish()
+        for continuation in committedLocalUpdateContinuations.values {
+            continuation.finish()
+        }
     }
 
     func makeInitialSyncMessage() async throws -> NativeEditorYjsSyncMessage {
@@ -73,8 +71,8 @@ actor NativeEditorCRDTSyncCoordinator {
         try await pendingLocalUpdatesProvider()
     }
 
-    func recordLocalUpdateSent(_ update: Data) async throws {
-        try await localUpdateDidSend(update)
+    func recordLocalUpdateAcknowledged(_ update: Data) async throws {
+        try await localUpdateDidAcknowledge(update)
     }
 
     func encodeLocalAwarenessCursor(for selection: NativeEditorLocalTextSelection) async throws
@@ -84,7 +82,13 @@ actor NativeEditorCRDTSyncCoordinator {
 
     func localUpdates() async -> AsyncStream<Data> {
         startRawLocalUpdateForwardingIfNeeded()
-        return committedLocalUpdateStream
+        let id = UUID()
+        let pair = AsyncStream.makeStream(of: Data.self)
+        committedLocalUpdateContinuations[id] = pair.continuation
+        pair.continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeCommittedLocalUpdateContinuation(id) }
+        }
+        return pair.stream
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
@@ -122,8 +126,14 @@ actor NativeEditorCRDTSyncCoordinator {
 
     private func commitAndPublishLocalUpdate(_ update: Data) async throws {
         if try await localUpdateCommitter(update) {
-            committedLocalUpdateContinuation.yield(update)
+            for continuation in committedLocalUpdateContinuations.values {
+                continuation.yield(update)
+            }
         }
+    }
+
+    private func removeCommittedLocalUpdateContinuation(_ id: UUID) {
+        committedLocalUpdateContinuations[id] = nil
     }
 
     private func startRawLocalUpdateForwardingIfNeeded() {

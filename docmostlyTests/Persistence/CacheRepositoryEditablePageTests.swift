@@ -97,6 +97,30 @@ struct CacheRepositoryEditablePageTests {
         #expect(cached.permissions == nil)
     }
 
+    @Test func updatingOnlyThePageIconPreservesTheDocumentAndRefreshesTreeRows() throws {
+        let (repository, context) = makeRepositoryAndContext()
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(type: "text", text: "Keep this body")
+            ])
+        ])
+        try repository.saveEditablePage(editablePage(content: document), scope: scope)
+        try repository.savePageTree(
+            spaceId: "space-1",
+            parentPageId: nil,
+            pages: [htmlPage(title: "Roadmap")],
+            scope: scope
+        )
+
+        try repository.updatePageIcon(pageID: "page-1", icon: "🚀", updatedAt: nil, scope: scope)
+
+        let editable = try #require(repository.loadEditablePage(idOrSlugId: "page-1", scope: scope))
+        let treeItem = try #require(context.fetch(FetchDescriptor<CachedPageTreeItem>()).first)
+        #expect(editable.content == document)
+        #expect(editable.icon == "🚀")
+        #expect(treeItem.icon == "🚀")
+    }
+
     @Test func savingLocalEditableDraftPreservesRemoteUpdatedAtBaseline() throws {
         let repository = makeRepository()
         let remoteUpdatedAt = try Date("2026-06-28T08:00:00Z", strategy: .iso8601)

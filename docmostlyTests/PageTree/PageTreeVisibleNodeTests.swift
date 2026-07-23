@@ -48,22 +48,14 @@ struct PageTreeVisibleNodeTests {
         #expect(nested.map(\.depth) == [0, 1, 2])
     }
 
-    @Test func refreshingRootNodesPreservesLoadedExpandedSubtrees() {
-        let previousNodes = [
-            node(id: "root", children: [
-                node(id: "child", children: [
-                    node(id: "grandchild")
-                ])
-            ])
-        ]
-        let refreshedNodes = [
-            node(id: "root", hasChildren: true)
-        ].preservingLoadedSubtrees(from: previousNodes)
+    @Test func insertingIntoAnUnloadedParentDoesNotHideUnknownServerChildren() {
+        let nodes = [node(id: "root", hasChildren: true)]
 
-        let visibleNodes = refreshedNodes.visibleNodes(expandedIDs: ["root", "child"])
+        let updated = nodes.inserting(node(id: "new-child"), parentPageId: "root", index: 0)
 
-        #expect(visibleNodes.map(\.id) == ["root", "child", "grandchild"])
-        #expect(refreshedNodes.first?.isChildrenLoaded == true)
+        #expect(updated.first?.hasChildren == true)
+        #expect(updated.first?.isChildrenLoaded == false)
+        #expect(updated.first?.children.isEmpty == true)
     }
 
     private func node(

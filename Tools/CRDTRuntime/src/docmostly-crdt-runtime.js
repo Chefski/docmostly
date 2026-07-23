@@ -254,7 +254,7 @@ class DocmostlyCRDTDocument {
 
   currentSnapshot() {
     return {
-      title: this.title,
+      title: null,
       document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
       updatedAt: null
     };
@@ -342,7 +342,7 @@ class DocmostlyCRDTDocument {
 
   enqueueSnapshot() {
     this.snapshots.push({
-      title: this.title,
+      title: null,
       document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
       updatedAt: null
     });

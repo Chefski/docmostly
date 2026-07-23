@@ -281,6 +281,13 @@ extension AppState {
     ) async throws -> (localID: String, serverID: String)? {
         switch payload {
         case .updatePageMetadata(let pageId, let title, let baseTitle):
+            try await synchronizeQueuedDocument(
+                record: record,
+                pageId: pageId,
+                title: title,
+                document: nil,
+                using: apiClient
+            )
             try await replayPageMetadata(
                 pageId: pageId,
                 title: title,
@@ -289,20 +296,22 @@ extension AppState {
             )
             return nil
         case .updatePageCRDT(let pageId, let title, let document, _, let baseTitle):
-            try await migrateLegacyQueuedDocument(
+            try await synchronizeQueuedDocument(
                 record: record,
                 pageId: pageId,
                 title: title,
-                document: document
+                document: document,
+                using: apiClient
             )
             try await replayPageMetadata(pageId: pageId, title: title, baseTitle: baseTitle, using: apiClient)
             return nil
         case .updatePage(let pageId, let title, let document, let baseTitle, _):
-            try await migrateLegacyQueuedDocument(
+            try await synchronizeQueuedDocument(
                 record: record,
                 pageId: pageId,
                 title: title,
-                document: document
+                document: document,
+                using: apiClient
             )
             try await replayPageMetadata(pageId: pageId, title: title, baseTitle: baseTitle, using: apiClient)
             return nil
@@ -338,11 +347,12 @@ extension AppState {
         }
     }
 
-    private func migrateLegacyQueuedDocument(
+    private func synchronizeQueuedDocument(
         record: OfflineMutationRecord,
         pageId: String,
         title: String,
-        document: ProseMirrorDocument
+        document: ProseMirrorDocument?,
+        using apiClient: DocmostAPIClient
     ) async throws {
         guard let documentSessionRegistry, let workspaceID = currentUser?.workspace.id else {
             throw APIError.connectionFailed("The local document session is unavailable until you sign in.")
@@ -353,10 +363,35 @@ extension AppState {
             workspaceID: workspaceID,
             pageID: pageId
         )
-        _ = try await documentSessionRegistry.session(
+        let seedDocument: ProseMirrorDocument
+        if let document {
+            seedDocument = document
+        } else if let cacheReader,
+                  let page = try await cacheReader.loadEditablePage(idOrSlugId: pageId, scope: record.scope) {
+            seedDocument = page.content ?? ProseMirrorDocument()
+        } else if let cacheRepository,
+                  let page = try cacheRepository.loadEditablePage(idOrSlugId: pageId, scope: record.scope) {
+            seedDocument = page.content ?? ProseMirrorDocument()
+        } else {
+            let page: DocmostEditablePage = try await apiClient.send(.pageInfo(pageId: pageId, format: .json))
+            seedDocument = page.content ?? ProseMirrorDocument()
+        }
+        let session = try await documentSessionRegistry.session(
             for: key,
             title: title,
-            document: NativeEditorDocument(proseMirrorDocument: document)
+            document: NativeEditorDocument(proseMirrorDocument: seedDocument)
+        )
+        guard try await session.hasPendingSynchronization() else { return }
+        let collaborationToken: CollaborationTokenResponse = try await apiClient.send(.collabToken)
+        guard let token = collaborationToken.token else {
+            throw APIError.connectionFailed("Realtime collaboration token is missing.")
+        }
+        try await offlineCRDTSynchronizer.synchronize(
+            pageID: pageId,
+            session: session,
+            url: try collaborationWebSocketURL(),
+            token: token,
+            user: currentUser?.user
         )
     }
 

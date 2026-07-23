@@ -51,6 +51,32 @@ struct FavoritesViewModelTests {
         #expect(viewModel.errorMessage == nil)
     }
 
+    @Test func replacementLoadDiscardsAnInFlightNextPage() async {
+        let first = pageFavorite(id: "favorite-first")
+        let staleNext = pageFavorite(id: "favorite-stale-next")
+        let replacement = pageFavorite(id: "favorite-replacement")
+        let nextPageLoader = FavoritesNextPageLoadStub(response: response(items: [staleNext]))
+        let viewModel = FavoritesViewModel()
+        viewModel.applyInitialPage(response(items: [first], nextCursor: "cursor-1"))
+
+        let nextPageTask = Task {
+            await viewModel.loadNextPage(operation: nextPageLoader.load)
+        }
+        while nextPageLoader.hasStarted == false {
+            await Task.yield()
+        }
+
+        await viewModel.load {
+            response(items: [replacement])
+        }
+        nextPageLoader.finish()
+        await nextPageTask.value
+
+        #expect(viewModel.favorites.map(\.id) == [replacement.id])
+        #expect(viewModel.isLoadingNextPage == false)
+        #expect(viewModel.nextPageErrorMessage == nil)
+    }
+
     @Test func optimisticRemovalRestoresOriginalOrderAfterFailure() async {
         let first = pageFavorite(id: "favorite-page")
         let second = spaceFavorite(id: "favorite-space", name: "Product")
@@ -81,15 +107,16 @@ struct FavoritesViewModelTests {
     }
 
     private func response(
-        items: [DocmostFavorite]
+        items: [DocmostFavorite],
+        nextCursor: String? = nil
     ) -> PaginatedResponse<DocmostFavorite> {
         PaginatedResponse(
             items: items,
             meta: PaginationMeta(
                 limit: 30,
-                hasNextPage: false,
+                hasNextPage: nextCursor != nil,
                 hasPrevPage: false,
-                nextCursor: nil,
+                nextCursor: nextCursor,
                 prevCursor: nil
             )
         )
@@ -153,6 +180,30 @@ struct FavoritesViewModelTests {
                 spaceId: nil
             )
         )
+    }
+}
+
+@MainActor
+private final class FavoritesNextPageLoadStub {
+    private let response: PaginatedResponse<DocmostFavorite>
+    private var continuation: CheckedContinuation<PaginatedResponse<DocmostFavorite>, Never>?
+    private(set) var hasStarted = false
+
+    init(response: PaginatedResponse<DocmostFavorite>) {
+        self.response = response
+    }
+
+    func load(cursor: String) async -> PaginatedResponse<DocmostFavorite> {
+        _ = cursor
+        hasStarted = true
+        return await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func finish() {
+        continuation?.resume(returning: response)
+        continuation = nil
     }
 }
 

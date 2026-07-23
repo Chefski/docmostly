@@ -25,6 +25,7 @@ final class AppState {
     @ObservationIgnored private let authService: AuthService
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
+    @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
     @ObservationIgnored var documentSessionRegistry: DocumentSessionRegistry?
     @ObservationIgnored var cacheRepository: CacheRepository?
     @ObservationIgnored var cacheReader: CacheReadRepository?
@@ -51,6 +52,7 @@ final class AppState {
         cookieJar: SessionCookieJar = SessionCookieJar(),
         crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
         documentSessionRegistry: DocumentSessionRegistry? = nil,
+        offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing = NativeEditorOfflineCRDTSynchronizer(),
         apiClient: DocmostAPIClient? = nil
     ) {
         self.settingsStore = settingsStore ?? LocalSettingsStore()
@@ -58,6 +60,7 @@ final class AppState {
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
         self.documentSessionRegistry = documentSessionRegistry
+        self.offlineCRDTSynchronizer = offlineCRDTSynchronizer
         self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
         savedServerURLStrings = self.settingsStore.loadSavedServerURLStrings()

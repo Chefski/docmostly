@@ -326,6 +326,7 @@ extension NativeRichEditorViewModel {
         crdtDocumentEngine = engine
         crdtSyncCoordinator = makeCRDTSyncCoordinator(for: engine)
         isCRDTEngineReadyForLocalChanges = restoredLocalState || engine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
     }
 
     func configureDocumentSession(
@@ -337,8 +338,13 @@ extension NativeRichEditorViewModel {
         crdtSyncCoordinator = session.syncCoordinator
         isCRDTEngineReadyForLocalChanges = restoredLocalState ||
             session.documentEngine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
         if let initialSnapshot = session.initialSnapshot {
-            applyInitialCRDTDocumentSnapshot(initialSnapshot)
+            if isCRDTEngineReadyForLocalChanges {
+                applyInitialCRDTDocumentSnapshot(initialSnapshot)
+            } else {
+                applyRetainedDraftProjection(initialSnapshot)
+            }
         }
     }
 
@@ -543,6 +549,7 @@ extension NativeRichEditorViewModel {
 
     private func applyInitialCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
         isCRDTEngineReadyForLocalChanges = true
+        updateEditAccess()
 
         guard isDirty else {
             applyCleanCRDTDocumentSnapshot(snapshot)
@@ -586,6 +593,16 @@ extension NativeRichEditorViewModel {
         }
 
         deferCRDTDocumentSnapshot(snapshot)
+    }
+
+    private func applyRetainedDraftProjection(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        if let snapshotTitle = snapshot.title {
+            title = snapshotTitle
+        }
+        document = snapshot.document
+        retainedReadOnlyDraftSnapshot = makeHistorySnapshot()
+        hasDurablyPersistedLocalCRDTDraft = true
+        isDirty = true
     }
 
     private func applyCleanCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {

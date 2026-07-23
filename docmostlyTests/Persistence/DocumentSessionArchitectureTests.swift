@@ -4,6 +4,7 @@ import Testing
 @testable import docmostly
 
 @MainActor
+// swiftlint:disable:next type_body_length
 struct DocumentSessionArchitectureTests {
     @Test func cleanReopenReplaysDurableUpdatesBeforeRemoteSync() async throws {
         let dependencies = makeDependencies()
@@ -161,6 +162,8 @@ struct DocumentSessionArchitectureTests {
         #expect(try await driver.outboundFramesAfterAuthentication().count == 2)
         #expect(try await dependencies.peer.pendingLocalUpdates(dependencies.key).count == 1)
         try await driver.didSendOutboundFramesAfterAuthentication()
+        #expect(try await dependencies.peer.pendingLocalUpdates(dependencies.key).count == 1)
+        try await driver.didReceiveSyncAcknowledgement()
         #expect(try await dependencies.peer.pendingLocalUpdates(dependencies.key).isEmpty)
         #expect(try await driver.outboundFramesAfterAuthentication().count == 1)
     }
@@ -195,6 +198,10 @@ struct DocumentSessionArchitectureTests {
         let coordinator = try #require(firstSession.syncCoordinator)
         try await coordinator.integrateLocalChange(localChange(title: "Edited in first window"))
         #expect(await nextProjection.value != nil)
+
+        let lateSnapshots = secondSession.snapshots()
+        var lateIterator = lateSnapshots.makeAsyncIterator()
+        #expect(await lateIterator.next() == secondSession.initialSnapshot)
     }
 
     @Test func restartDuringSyncRetainsAnUnacknowledgedUpdate() async throws {
@@ -412,6 +419,9 @@ struct DocumentSessionArchitectureTests {
         #expect(beforeRemoteSync.lastCommittedSequence == 0)
         #expect(beforeRemoteSync.retainedDraft == legacyDocument)
         #expect(session.initialSnapshot?.document.proseMirrorDocument == legacyDocument)
+        let viewModel = NativeRichEditorViewModel(pageID: dependencies.key.pageID, initialTitle: "Remote title")
+        viewModel.configureDocumentSession(session, restoredLocalState: session.restoredLocalState)
+        #expect(viewModel.canEdit == false)
 
         _ = try await #require(session.syncCoordinator).receive(.update(Data("remote-base".utf8)))
 
@@ -440,6 +450,84 @@ struct DocumentSessionArchitectureTests {
         let state = try await restartedPeer.load(key)
         #expect(state.snapshot == nil)
         #expect(state.updates.map(\.payload) == [update])
+    }
+}
+
+extension DocumentSessionArchitectureTests {
+    @Test func receiveOnlyAuthenticationDoesNotUploadOrAcknowledgePendingUpdates() async throws {
+        let dependencies = makeDependencies()
+        let update = Data("private-draft".utf8)
+        _ = try await dependencies.peer.append(update, origin: .local, key: dependencies.key)
+        let registry = DocumentSessionRegistry(
+            localPeer: dependencies.peer,
+            engineFactory: dependencies.factory
+        )
+        let session = try await registry.session(
+            for: dependencies.key,
+            title: "Page",
+            document: NativeEditorDocument()
+        )
+        let driver = NativeEditorCollaborationSyncDriver(
+            documentName: "page.\(dependencies.key.pageID)",
+            coordinator: try #require(session.syncCoordinator)
+        )
+
+        let frames = try await driver.outboundFramesAfterAuthentication(includePendingLocalUpdates: false)
+        try await driver.didSendOutboundFramesAfterAuthentication()
+
+        #expect(frames.count == 1)
+        #expect(try await dependencies.peer.pendingLocalUpdates(dependencies.key).map(\.payload) == [update])
+    }
+
+    @Test func laterCompactionKeepsThePreviousSnapshotAndReplayTailForRecovery() async throws {
+        let dependencies = makeDependencies()
+        let firstUpdate = Data("first-remote".utf8)
+        let secondUpdate = Data("second-local".utf8)
+        _ = try await dependencies.peer.append(firstUpdate, origin: .remote, key: dependencies.key)
+        try await dependencies.peer.compact(
+            dependencies.key,
+            snapshot: Data("snapshot-one".utf8),
+            through: 1
+        )
+        _ = try await dependencies.peer.append(secondUpdate, origin: .local, key: dependencies.key)
+        try await dependencies.peer.compact(
+            dependencies.key,
+            snapshot: Data("snapshot-two".utf8),
+            through: 2
+        )
+
+        let compacted = try await dependencies.peer.load(dependencies.key)
+        #expect(compacted.recoverySnapshot == Data("snapshot-one".utf8))
+        #expect(compacted.recoverySnapshotSequence == 1)
+        #expect(compacted.updates.map(\.payload) == [secondUpdate])
+
+        try corruptPrimarySnapshot(in: dependencies.container, key: dependencies.key)
+        let registry = DocumentSessionRegistry(
+            localPeer: DocumentLocalPersistencePeer(modelContainer: dependencies.container),
+            engineFactory: dependencies.factory
+        )
+        _ = try await registry.session(
+            for: dependencies.key,
+            title: "Page",
+            document: NativeEditorDocument()
+        )
+
+        #expect(dependencies.factory.engines.last?.appliedUpdates == [
+            Data("snapshot-one".utf8),
+            secondUpdate
+        ])
+    }
+
+    @Test func acknowledgedCompactedPayloadIsReleasedOnceBothSnapshotsCoverIt() async throws {
+        let dependencies = makeDependencies()
+        let update = Data("local".utf8)
+        _ = try await dependencies.peer.append(update, origin: .local, key: dependencies.key)
+        try await dependencies.peer.compact(dependencies.key, snapshot: Data("one".utf8), through: 1)
+        try await dependencies.peer.compact(dependencies.key, snapshot: Data("two".utf8), through: 1)
+
+        try await dependencies.peer.markPushed(update, key: dependencies.key)
+
+        #expect(try await dependencies.peer.load(dependencies.key).updates.isEmpty)
     }
 }
 

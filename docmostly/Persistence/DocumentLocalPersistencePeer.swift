@@ -25,6 +25,7 @@ actor DocumentLocalPersistencePeer {
                 snapshot: nil,
                 recoverySnapshot: nil,
                 snapshotSequence: 0,
+                recoverySnapshotSequence: 0,
                 updates: [],
                 lastCommittedSequence: 0,
                 localClock: 0,
@@ -35,13 +36,19 @@ actor DocumentLocalPersistencePeer {
             )
         }
 
+        let earliestSnapshotSequence = if document.recoverySnapshot == nil {
+            document.snapshotSequence
+        } else {
+            min(document.snapshotSequence, document.recoverySnapshotSequence)
+        }
         let updates = try fetchUpdates(key, in: context)
-            .filter { $0.sequence > document.snapshotSequence && $0.payload != nil }
+            .filter { $0.sequence > earliestSnapshotSequence && $0.payload != nil }
             .compactMap(Self.storedUpdate)
         return DocumentStoredState(
             snapshot: document.snapshot,
             recoverySnapshot: document.recoverySnapshot,
             snapshotSequence: document.snapshotSequence,
+            recoverySnapshotSequence: document.recoverySnapshotSequence,
             updates: updates,
             lastCommittedSequence: max(0, document.nextSequence - 1),
             localClock: document.localClock,
@@ -157,9 +164,20 @@ actor DocumentLocalPersistencePeer {
         let digest = Self.digest(payload)
         let matches = try fetchUpdates(key, digest: digest, in: context)
         guard matches.isEmpty == false else { return }
+        let safelyCoveredSequence: Int64
+        if let document = try fetchDocument(key, in: context),
+           document.snapshot != nil,
+           document.recoverySnapshot != nil {
+            safelyCoveredSequence = min(document.snapshotSequence, document.recoverySnapshotSequence)
+        } else {
+            safelyCoveredSequence = 0
+        }
 
         let maximumSequence = matches.reduce(Int64(0)) { result, update in
             update.isPushed = true
+            if update.sequence <= safelyCoveredSequence {
+                update.payload = nil
+            }
             return max(result, update.sequence)
         }
         let peer = try fetchOrInsertPeerState(key, in: context)
@@ -196,12 +214,20 @@ actor DocumentLocalPersistencePeer {
         guard sequence >= document.snapshotSequence else { return }
 
         let updates = try fetchUpdates(key, in: context)
+        if let previousSnapshot = document.snapshot {
+            document.recoverySnapshot = previousSnapshot
+            document.recoverySnapshotSequence = document.snapshotSequence
+        } else {
+            document.recoverySnapshot = snapshot
+            document.recoverySnapshotSequence = sequence
+        }
         document.snapshot = snapshot
-        document.recoverySnapshot = snapshot
         document.snapshotSequence = sequence
         document.compactedAt = .now
         document.updatedAt = .now
-        for update in updates where update.sequence <= sequence && (update.isPushed || update.origin == .remote) {
+        let safelyCoveredSequence = min(document.snapshotSequence, document.recoverySnapshotSequence)
+        for update in updates
+        where update.sequence <= safelyCoveredSequence && (update.isPushed || update.origin == .remote) {
             update.payload = nil
         }
 
@@ -270,6 +296,7 @@ actor DocumentLocalPersistencePeer {
             if let snapshot = migration.snapshot, snapshot.isEmpty == false {
                 document.snapshot = snapshot
                 document.recoverySnapshot = snapshot
+                document.recoverySnapshotSequence = document.snapshotSequence
             }
             if let pendingLocalUpdate = migration.pendingLocalUpdate, pendingLocalUpdate.isEmpty == false {
                 document.localClock += 1
@@ -502,7 +529,7 @@ private extension DocumentLocalPersistencePeer {
         guard bodyMutations.isEmpty == false else { return }
 
         let retained = bodyMutations.min { $0.replayOrder < $1.replayOrder }
-        if let retained, let title, title != baseTitle {
+        if let retained, let title {
             let payload = OfflineMutationPayload.updatePageMetadata(
                 pageId: key.pageID,
                 title: title,

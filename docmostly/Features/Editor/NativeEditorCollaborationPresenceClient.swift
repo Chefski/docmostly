@@ -161,6 +161,9 @@ actor NativeEditorCollaborationPresenceClient {
         case .stateless(let event):
             yieldStatelessEvent(event, continuation: continuation)
         case .syncStatus(let isSynced):
+            if isSynced {
+                try? await context.syncDriver?.didReceiveSyncAcknowledgement()
+            }
             continuation.yield(.syncStatus(isSynced))
         case .sync(let syncMessage):
             try await sendCRDTSyncReply(
@@ -242,7 +245,9 @@ private extension NativeEditorCollaborationPresenceClient {
     ) async throws {
         guard scope.allowsInitialDocumentSync else { return }
         guard let syncDriver else { return }
-        let frames = try await syncDriver.outboundFramesAfterAuthentication()
+        let frames = try await syncDriver.outboundFramesAfterAuthentication(
+            includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope)
+        )
         try await send(frames)
         try await syncDriver.didSendOutboundFramesAfterAuthentication()
     }
@@ -292,7 +297,7 @@ private extension NativeEditorCollaborationPresenceClient {
 
                 do {
                     try await self?.send(frame)
-                    try await syncDriver.didSendLocalUpdate(update)
+                    try? await syncDriver.didSendLocalUpdate(update)
                 } catch {
                     return
                 }

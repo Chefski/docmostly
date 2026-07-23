@@ -5,14 +5,8 @@ struct PageBrowserScopeSwitch: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            Group {
-                if #available(iOS 26.0, macOS 26.0, *) {
-                    GlassEffectContainer(spacing: 8) {
-                        PageBrowserScopePills(viewModel: viewModel)
-                    }
-                } else {
-                    PageBrowserScopePills(viewModel: viewModel)
-                }
+            GlassEffectContainer(spacing: 8) {
+                PageBrowserScopePills(viewModel: viewModel)
             }
             .padding(.vertical, PageBrowserMetrics.scopeSwitchVerticalOverflowPadding)
         }
@@ -45,32 +39,14 @@ private struct PageBrowserScopePill: View {
     let select: () -> Void
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, macOS 26.0, *) {
-                Button(action: select) {
-                    PageBrowserScopeLabel(scope: scope, isSelected: isSelected)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(glass, in: .capsule)
-            } else {
-                Button(action: select) {
-                    PageBrowserScopeLabel(scope: scope, isSelected: isSelected)
-                }
-                .buttonStyle(.plain)
-                .background(isSelected ? Color.black : Color.clear, in: .capsule)
-                .background(.regularMaterial, in: .capsule)
-                .overlay {
-                    if isSelected {
-                        Capsule()
-                            .strokeBorder(.primary.opacity(0.18))
-                    }
-                }
-            }
+        Button(action: select) {
+            PageBrowserScopeLabel(scope: scope, isSelected: isSelected)
         }
+        .buttonStyle(.plain)
+        .glassEffect(glass, in: .capsule)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    @available(iOS 26.0, macOS 26.0, *)
     private var glass: Glass {
         if isSelected {
             .regular.tint(.black).interactive()

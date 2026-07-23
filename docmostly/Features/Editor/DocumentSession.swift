@@ -38,7 +38,7 @@ final class DocumentSession {
         kernel.documentEngine
     }
 
-    func open(title: String, document: NativeEditorDocument) async throws {
+    func open(title: String) async throws {
         guard isOpen == false else { return }
         try await migrateLegacyStateIfNeeded()
         var storedState = try await localPeer.load(key)
@@ -91,6 +91,10 @@ final class DocumentSession {
         retainedDraftTitle = nil
         retainedDraft = nil
     }
+
+    func hasPendingSynchronization() async throws -> Bool {
+        retainedDraft != nil || (try await localPeer.pendingLocalUpdates(key).isEmpty == false)
+    }
 }
 
 private extension DocumentSession {
@@ -109,7 +113,7 @@ private extension DocumentSession {
                 guard let self else { return [] }
                 return try await self.pendingLocalUpdatePayloads()
             },
-            localUpdateDidSend: { [weak self] update in
+            localUpdateDidAcknowledge: { [weak self] update in
                 guard let self else { return }
                 try await self.localPeer.markPushed(update, key: self.key)
             }
@@ -163,22 +167,28 @@ private extension DocumentSession {
 
     func restore(_ state: DocumentStoredState) async throws -> NativeEditorCRDTDocumentSnapshot? {
         var latestSnapshot: NativeEditorCRDTDocumentSnapshot?
+        var restoredThroughSequence: Int64 = 0
         if let snapshot = state.snapshot {
             do {
                 try await kernel.validate(snapshot)
                 latestSnapshot = try await kernel.apply(snapshot)
+                restoredThroughSequence = state.snapshotSequence
             } catch {
                 if let recoverySnapshot = state.recoverySnapshot {
                     try await kernel.validate(recoverySnapshot)
                     latestSnapshot = try await kernel.apply(recoverySnapshot)
+                    restoredThroughSequence = state.recoverySnapshotSequence
                 }
             }
         } else if let recoverySnapshot = state.recoverySnapshot {
             try await kernel.validate(recoverySnapshot)
             latestSnapshot = try await kernel.apply(recoverySnapshot)
+            restoredThroughSequence = state.recoverySnapshotSequence
         }
 
-        for update in state.updates.sorted(by: { $0.sequence < $1.sequence }) {
+        for update in state.updates
+            .filter({ $0.sequence > restoredThroughSequence })
+            .sorted(by: { $0.sequence < $1.sequence }) {
             try await kernel.validate(update.payload)
             latestSnapshot = try await kernel.apply(update.payload) ?? latestSnapshot
         }
@@ -244,6 +254,7 @@ private extension DocumentSession {
     }
 
     func publish(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        initialSnapshot = snapshot
         for continuation in snapshotContinuations.values {
             continuation.yield(snapshot)
         }

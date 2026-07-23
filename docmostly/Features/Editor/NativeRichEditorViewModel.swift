@@ -244,8 +244,6 @@ final class NativeRichEditorViewModel {
         let snapshotTitle = title
         let snapshotDocument = document
         let snapshotBaseTitle = lastSavedTitle
-        let snapshotBaseDocument = lastSavedDocument
-        let capturedAt = Date.now
         saveErrorMessage = nil
 
         do {
@@ -257,9 +255,7 @@ final class NativeRichEditorViewModel {
                 pageId: editablePageID,
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 documentSnapshot: snapshotDocument.proseMirrorDocument,
-                baseTitle: snapshotBaseTitle,
-                baseDocument: snapshotBaseDocument.proseMirrorDocument,
-                snapshotCapturedAt: capturedAt
+                baseTitle: snapshotBaseTitle
             )
             if let page = persistence.page {
                 editablePageID = page.id
@@ -412,8 +408,9 @@ final class NativeRichEditorViewModel {
         visibleBlockControlsID = nil
     }
 
-    private func updateEditAccess() {
-        let nextCanEdit = pageAllowsEditing && collaborationAllowsEditing
+    func updateEditAccess() {
+        let crdtAllowsEditing = crdtDocumentEngine == nil || isCRDTEngineReadyForLocalChanges
+        let nextCanEdit = pageAllowsEditing && collaborationAllowsEditing && crdtAllowsEditing
         guard canEdit != nextCanEdit else { return }
 
         canEdit = nextCanEdit
@@ -436,7 +433,6 @@ private extension NativeRichEditorViewModel {
         let baseDocument: NativeEditorDocument
         let localEditRevision: UInt
         let savedBaselineRevision: UInt
-        let capturedAt: Date
         let requiresLocalOnlyCRDTPersistence: Bool
         let crdtFlushTask: Task<NativeEditorCRDTSaveResult, any Error>?
 
@@ -458,7 +454,6 @@ private extension NativeRichEditorViewModel {
             baseDocument: lastSavedDocument,
             localEditRevision: localEditRevision,
             savedBaselineRevision: savedBaselineRevision,
-            capturedAt: .now,
             requiresLocalOnlyCRDTPersistence: requiresLocalOnlyCRDTPersistence,
             crdtFlushTask: requiresLocalOnlyCRDTPersistence ? nil : enqueueCRDTSnapshotFlush(
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -478,9 +473,7 @@ private extension NativeRichEditorViewModel {
                     pageId: snapshot.pageID,
                     title: snapshot.trimmedTitle,
                     documentSnapshot: snapshot.document.proseMirrorDocument,
-                    baseTitle: snapshot.baseTitle,
-                    baseDocument: snapshot.baseDocument.proseMirrorDocument,
-                    snapshotCapturedAt: snapshot.capturedAt
+                    baseTitle: snapshot.baseTitle
                 )
                 if let page = persistence.page {
                     editablePageID = page.id
@@ -502,8 +495,7 @@ private extension NativeRichEditorViewModel {
                         pageId: snapshot.pageID,
                         title: flushedTitle,
                         documentSnapshot: snapshot.document.proseMirrorDocument,
-                        baseTitle: snapshot.baseTitle,
-                        snapshotCapturedAt: snapshot.capturedAt
+                        baseTitle: snapshot.baseTitle
                     )
                     if let page = persistence.page {
                         editablePageID = page.id

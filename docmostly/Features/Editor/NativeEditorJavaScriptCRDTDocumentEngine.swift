@@ -148,29 +148,34 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
-        _ = try integrateLocalChangeAndCaptureUpdates(change)
+        _ = try integrateLocalChangeAndCaptureUpdates(change, publishUpdates: true)
     }
 
     func integrateLocalChangeForCommit(_ change: NativeEditorCRDTLocalChange) async throws -> [Data] {
-        try integrateLocalChangeAndCaptureUpdates(change)
+        try integrateLocalChangeAndCaptureUpdates(change, publishUpdates: false)
     }
 
     private func integrateLocalChangeAndCaptureUpdates(
-        _ change: NativeEditorCRDTLocalChange
+        _ change: NativeEditorCRDTLocalChange,
+        publishUpdates: Bool
     ) throws -> [Data] {
         let payload = RuntimeLocalChange(
             before: RuntimeHistorySnapshot(snapshot: change.before),
             after: RuntimeHistorySnapshot(snapshot: change.after)
         )
         _ = try callRequired("integrateLocalChange", arguments: [Self.javaScriptValue(from: payload, in: context)])
-        return try drainRuntimeOutputs()
+        return try drainRuntimeOutputs(publishUpdates: publishUpdates)
     }
 
     func flushPendingLocalChanges(
         title: String,
         document: NativeEditorDocument
     ) async throws -> NativeEditorCRDTSaveResult {
-        let committed = try await flushPendingLocalChangesAndCaptureUpdates(title: title, document: document)
+        let committed = try await flushPendingLocalChangesAndCaptureUpdates(
+            title: title,
+            document: document,
+            publishUpdates: true
+        )
         return committed.result
     }
 
@@ -178,12 +183,17 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         title: String,
         document: NativeEditorDocument
     ) async throws -> NativeEditorCRDTCommittedSave {
-        try await flushPendingLocalChangesAndCaptureUpdates(title: title, document: document)
+        try await flushPendingLocalChangesAndCaptureUpdates(
+            title: title,
+            document: document,
+            publishUpdates: false
+        )
     }
 
     private func flushPendingLocalChangesAndCaptureUpdates(
         title: String,
-        document: NativeEditorDocument
+        document: NativeEditorDocument,
+        publishUpdates: Bool
     ) async throws -> NativeEditorCRDTCommittedSave {
         let result = try decode(
             NativeEditorJSCRDTRuntimeSaveResult.self,
@@ -193,7 +203,7 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
             ),
             function: "flushPendingLocalChanges"
         )
-        let updates = try drainRuntimeOutputs()
+        let updates = try drainRuntimeOutputs(publishUpdates: publishUpdates)
 
         return NativeEditorCRDTCommittedSave(
             result: NativeEditorCRDTSaveResult(
@@ -213,8 +223,8 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
         snapshotStream
     }
 
-    private func drainRuntimeOutputs() throws -> [Data] {
-        let updates = try drainLocalUpdates()
+    private func drainRuntimeOutputs(publishUpdates: Bool) throws -> [Data] {
+        let updates = try drainLocalUpdates(publish: publishUpdates)
         for snapshot in try takeDocumentSnapshots() {
             snapshotContinuation.yield(snapshot)
         }
@@ -226,11 +236,11 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     ) throws -> [NativeEditorCRDTDocumentSnapshot] {
         try Self.validateRemotePayload(update)
         _ = try callRequired("applyRemoteUpdate", arguments: [update.base64EncodedString()])
-        _ = try drainLocalUpdates()
+        _ = try drainLocalUpdates(publish: false)
         return try takeDocumentSnapshots()
     }
 
-    private func drainLocalUpdates() throws -> [Data] {
+    private func drainLocalUpdates(publish: Bool) throws -> [Data] {
         guard let value = try callOptional("drainLocalUpdates") else { return [] }
         let updates = try decode([String].self, from: value, function: "drainLocalUpdates")
 
@@ -238,7 +248,9 @@ final class NativeEditorJSCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
             guard let data = Data(base64Encoded: update) else {
                 throw NativeEditorJSCRDTEngineError.invalidDataResult("drainLocalUpdates")
             }
-            localUpdateContinuation.yield(data)
+            if publish {
+                localUpdateContinuation.yield(data)
+            }
             return data
         }
     }

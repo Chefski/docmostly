@@ -13329,7 +13329,7 @@ ${err.toString()}`);
     }
     currentSnapshot() {
       return {
-        title: this.title,
+        title: null,
         document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
         updatedAt: null
       };
@@ -13405,7 +13405,7 @@ ${err.toString()}`);
     }
     enqueueSnapshot() {
       this.snapshots.push({
-        title: this.title,
+        title: null,
         document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
         updatedAt: null
       });

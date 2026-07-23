@@ -6,6 +6,7 @@ nonisolated enum CacheWriteOperation: Sendable {
     case savePageTree(spaceId: String, parentPageId: String?, pages: [DocmostPage], scope: CacheScope)
     case savePage(DocmostPage, htmlContent: String, scope: CacheScope)
     case saveEditablePage(DocmostEditablePage, scope: CacheScope)
+    case updatePageIcon(pageID: String, icon: String?, updatedAt: Date?, scope: CacheScope)
     case saveAttachmentLinks(pageId: String, links: [DocmostAttachmentLink], scope: CacheScope)
     case markOpened(idOrSlugId: String, scope: CacheScope)
     case clearAll
@@ -69,6 +70,8 @@ nonisolated extension CacheWriteOperation {
             try repository.savePage(page, htmlContent: htmlContent, scope: scope)
         case let .saveEditablePage(page, scope):
             try repository.saveEditablePage(page, scope: scope)
+        case let .updatePageIcon(pageID, icon, updatedAt, scope):
+            try repository.updatePageIcon(pageID: pageID, icon: icon, updatedAt: updatedAt, scope: scope)
         case let .saveAttachmentLinks(pageId, links, scope):
             try repository.saveAttachmentLinks(links, pageId: pageId, scope: scope)
         case let .markOpened(idOrSlugId, scope):

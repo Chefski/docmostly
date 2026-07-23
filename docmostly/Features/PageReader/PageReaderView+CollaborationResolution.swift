@@ -86,7 +86,6 @@ extension PageReaderView {
                     title: editorViewModel.title,
                     document: editorViewModel.document.proseMirrorDocument,
                     remoteBaseTitle: remoteTitle,
-                    remoteBaseDocument: remoteSnapshot.document.proseMirrorDocument,
                     replacingThrough: cutoff
                 )
                 guard result != .newerPendingUpdatePreserved else {

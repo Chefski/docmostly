@@ -49,16 +49,17 @@ extension AppState {
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
-        baseTitle: String,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
+        if cacheScope != nil, offlineQueue != nil || offlineQueueRepository != nil {
+            try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
+        }
         guard let apiClient else {
             return try await persistCRDTPageLocally(
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
-                baseTitle: baseTitle,
-                snapshotCapturedAt: snapshotCapturedAt
+                baseTitle: baseTitle
             )
         }
 
@@ -76,25 +77,15 @@ extension AppState {
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
-                baseTitle: baseTitle,
-                snapshotCapturedAt: snapshotCapturedAt
+                baseTitle: baseTitle
             )
         }
 
         isOffline = false
         cacheCollaborativeSnapshot(page: page, document: documentSnapshot)
 
-        do {
-            _ = try await acknowledgePendingPageUpdate(
-                pageId: pageId,
-                snapshotCapturedAt: snapshotCapturedAt
-            )
-            await refreshOfflineMutationCount()
-            scheduleOfflineQueueReconciliation()
-        } catch {
-            statusMessage = "Could not make the collaborative document durable: " + error.localizedDescription
-            throw error
-        }
+        await refreshOfflineMutationCount()
+        scheduleOfflineQueueReconciliation()
         markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
@@ -103,22 +94,17 @@ extension AppState {
         )
     }
 
-    // swiftlint:disable:next function_parameter_count
     func persistDeferredCollaborativeDraft(
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
-        baseTitle: String,
-        baseDocument: ProseMirrorDocument,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
         try await persistCollaborativePageLocally(
             pageId: pageId,
             title: title,
             document: documentSnapshot,
-            baseTitle: baseTitle,
-            baseDocument: baseDocument,
-            snapshotCapturedAt: snapshotCapturedAt
+            baseTitle: baseTitle
         )
     }
 }
@@ -142,37 +128,12 @@ private extension AppState {
         scheduleCacheWrite(.saveEditablePage(cachedPage, scope: cacheScope))
     }
 
-    func acknowledgePendingPageUpdate(
-        pageId: String,
-        snapshotCapturedAt: Date
-    ) async throws -> OfflinePageUpdateAcknowledgementResult {
-        guard let cacheScope else { return .noPendingUpdate }
-        if let offlineQueueRepository {
-            return try await offlineQueueRepository.acknowledgePendingPageUpdate(
-                pageId: pageId,
-                snapshotCapturedAt: snapshotCapturedAt,
-                scope: cacheScope
-            )
-        }
-        guard let offlineQueue else { return .noPendingUpdate }
-        return try offlineQueue.acknowledgePendingPageUpdate(
-            pageId: pageId,
-            snapshotCapturedAt: snapshotCapturedAt,
-            scope: cacheScope
-        )
-    }
-
-    // swiftlint:disable:next function_parameter_count
     func persistCollaborativePageLocally(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
-        baseTitle: String,
-        baseDocument: ProseMirrorDocument,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
-        _ = baseDocument
-        _ = snapshotCapturedAt
         try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
         await refreshOfflineMutationCount()
 
@@ -193,10 +154,8 @@ private extension AppState {
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
-        baseTitle: String,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
-        _ = snapshotCapturedAt
         try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
         await refreshOfflineMutationCount()
 
@@ -210,7 +169,6 @@ private extension AppState {
     }
 
     func queuePageMetadataUpdate(pageId: String, title: String, baseTitle: String?) async throws {
-        guard title != baseTitle else { return }
         _ = try await queueOfflineMutation(.updatePageMetadata(
             pageId: pageId,
             title: title,

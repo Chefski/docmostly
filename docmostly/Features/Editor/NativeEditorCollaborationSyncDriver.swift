@@ -4,15 +4,21 @@ actor NativeEditorCollaborationSyncDriver {
     private let documentName: String
     private let coordinator: NativeEditorCRDTSyncCoordinator
     private var initialPendingUpdates: [Data] = []
+    private var awaitingAcknowledgement: [Data] = []
 
     init(documentName: String, coordinator: NativeEditorCRDTSyncCoordinator) {
         self.documentName = documentName
         self.coordinator = coordinator
     }
 
-    func outboundFramesAfterAuthentication() async throws -> [Data] {
+    func outboundFramesAfterAuthentication(includePendingLocalUpdates: Bool = true) async throws -> [Data] {
+        awaitingAcknowledgement = []
         let initialMessage = try await coordinator.makeInitialSyncMessage()
         let initial = frame(for: initialMessage)
+        guard includePendingLocalUpdates else {
+            initialPendingUpdates = []
+            return [initial]
+        }
         initialPendingUpdates = try await coordinator.pendingLocalUpdates()
         var pending: [Data] = []
         pending.reserveCapacity(initialPendingUpdates.count)
@@ -26,9 +32,7 @@ actor NativeEditorCollaborationSyncDriver {
     func didSendOutboundFramesAfterAuthentication() async throws {
         let updates = initialPendingUpdates
         initialPendingUpdates = []
-        for update in updates {
-            try await coordinator.recordLocalUpdateSent(update)
-        }
+        awaitingAcknowledgement.append(contentsOf: updates)
     }
 
     func outboundFrames(for message: NativeEditorYjsSyncMessage) async throws -> [Data] {
@@ -42,7 +46,13 @@ actor NativeEditorCollaborationSyncDriver {
     }
 
     func didSendLocalUpdate(_ update: Data) async throws {
-        try await coordinator.recordLocalUpdateSent(update)
+        awaitingAcknowledgement.append(update)
+    }
+
+    func didReceiveSyncAcknowledgement() async throws {
+        guard let update = awaitingAcknowledgement.first else { return }
+        try await coordinator.recordLocalUpdateAcknowledged(update)
+        awaitingAcknowledgement.removeFirst()
     }
 
     func localUpdates() async -> AsyncStream<Data> {

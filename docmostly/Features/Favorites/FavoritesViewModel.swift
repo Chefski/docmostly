@@ -8,6 +8,7 @@ final class FavoritesViewModel {
 
     private var pages = CursorPageAccumulator<DocmostFavorite>()
     @ObservationIgnored private var loadRequestID: UUID?
+    @ObservationIgnored private var paginationGeneration: UInt = 0
     var isLoading = false
     var isLoadingNextPage = false
     var mutatingFavoriteIDs: Set<String> = []
@@ -45,6 +46,8 @@ final class FavoritesViewModel {
         operation: () async throws -> PaginatedResponse<DocmostFavorite>
     ) async {
         let requestID = UUID()
+        paginationGeneration &+= 1
+        isLoadingNextPage = false
         loadRequestID = requestID
         isLoading = true
         errorMessage = nil
@@ -67,15 +70,30 @@ final class FavoritesViewModel {
     }
 
     func loadNextPage(appState: AppState) async {
+        await loadNextPage {
+            try await appState.loadFavorites(cursor: $0, limit: Self.pageSize)
+        }
+    }
+
+    func loadNextPage(
+        operation: (String) async throws -> PaginatedResponse<DocmostFavorite>
+    ) async {
         guard isLoading == false, isLoadingNextPage == false, let cursor = pages.nextCursor else { return }
+        let generation = paginationGeneration
         isLoadingNextPage = true
         nextPageErrorMessage = nil
-        defer { isLoadingNextPage = false }
+        defer {
+            if paginationGeneration == generation {
+                isLoadingNextPage = false
+            }
+        }
 
         do {
-            let response = try await appState.loadFavorites(cursor: cursor, limit: Self.pageSize)
+            let response = try await operation(cursor)
+            guard paginationGeneration == generation, Task.isCancelled == false else { return }
             applyNextPage(response, requestedCursor: cursor)
         } catch {
+            guard paginationGeneration == generation, Task.isCancelled == false else { return }
             guard Self.isCancelledLoadError(error) == false else { return }
             nextPageErrorMessage = error.localizedDescription
         }
