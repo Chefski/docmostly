@@ -93,7 +93,10 @@ final class DocumentSession {
     }
 
     func hasPendingSynchronization() async throws -> Bool {
-        retainedDraft != nil || (try await localPeer.pendingLocalUpdates(key).isEmpty == false)
+        if retainedDraft != nil {
+            return true
+        }
+        return try await localPeer.pendingLocalUpdates(key).isEmpty == false
     }
 }
 

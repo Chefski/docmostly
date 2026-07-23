@@ -199,7 +199,11 @@ private extension NativeEditorCollaborationPresenceClient {
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         authenticatedScope = scope
-        try await sendInitialCRDTSync(for: scope, using: context.syncDriver)
+        try await sendInitialCRDTSync(
+            for: scope,
+            includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope),
+            using: context.syncDriver
+        )
         configureLocalDocumentUpdates(for: scope, context: context)
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
@@ -241,12 +245,13 @@ private extension NativeEditorCollaborationPresenceClient {
 
     func sendInitialCRDTSync(
         for scope: NativeEditorCollaborationScope,
+        includePendingLocalUpdates: Bool,
         using syncDriver: NativeEditorCollaborationSyncDriver?
     ) async throws {
         guard scope.allowsInitialDocumentSync else { return }
         guard let syncDriver else { return }
         let frames = try await syncDriver.outboundFramesAfterAuthentication(
-            includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope)
+            includePendingLocalUpdates: includePendingLocalUpdates
         )
         try await send(frames)
         try await syncDriver.didSendOutboundFramesAfterAuthentication()
