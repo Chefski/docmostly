@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
-private final class EmojiCatalogTestsBundleMarker {}
+private final class EmojiCatalogTestsBundleMarker: NSObject {}
 
 struct EmojiCatalogTests {
     @Test func parsesGroupedEmojiCatalog() throws {
