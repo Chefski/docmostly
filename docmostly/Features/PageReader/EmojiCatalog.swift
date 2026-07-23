@@ -32,60 +32,36 @@ nonisolated enum EmojiCatalog {
     }
 
     private static func loadSections() -> [EmojiCatalogSection] {
-        for url in resourceURLs() {
-            if let source = try? String(contentsOf: url, encoding: .utf8) {
-                return parse(source)
-            }
-        }
-        return []
-    }
-
-    static func loadSections(in bundle: Bundle) -> [EmojiCatalogSection] {
-        let urls = [
-            bundle.url(forResource: "emoji-16.0", withExtension: "txt"),
-            bundle.url(
-                forResource: "emoji-16.0",
-                withExtension: "txt",
-                subdirectory: "Resources"
-            )
-        ]
-
-        for url in urls.compactMap({ $0 }) {
-            if let source = try? String(contentsOf: url, encoding: .utf8) {
-                return parse(source)
-            }
-        }
-        return []
-    }
-
-    private static func resourceURLs() -> [URL] {
         var visitedBundleURLs: Set<URL> = []
-        var visitedResourceURLs: Set<URL> = []
-        var resourceURLs: [URL] = []
         let bundles = [Bundle(for: PageEmojiPickerViewModel.self), Bundle.main] +
             Bundle.allBundles + Bundle.allFrameworks
 
         for bundle in bundles where visitedBundleURLs.insert(bundle.bundleURL).inserted {
-            appendResourceURLs(from: bundle, to: &resourceURLs, visited: &visitedResourceURLs)
+            let sections = loadSections(in: bundle)
+            if sections.isEmpty == false {
+                return sections
+            }
 
             // Hosted unit tests live in App.app/PlugIns/Tests.xctest. The host app is
             // not guaranteed to appear in Bundle.allBundles, so also inspect the
             // enclosing app bundle that owns the copied production resource.
             if let appBundleURL = enclosingAppBundleURL(for: bundle.bundleURL),
+               visitedBundleURLs.insert(appBundleURL).inserted,
                let appBundle = Bundle(url: appBundleURL) {
-                appendResourceURLs(from: appBundle, to: &resourceURLs, visited: &visitedResourceURLs)
+                let appSections = loadSections(in: appBundle)
+                if appSections.isEmpty == false {
+                    return appSections
+                }
             }
         }
 
-        return resourceURLs
+        return []
     }
 
-    private static func appendResourceURLs(
-        from bundle: Bundle,
-        to resourceURLs: inout [URL],
-        visited: inout Set<URL>
-    ) {
-        let candidates = [
+    static func loadSections(in bundle: Bundle) -> [EmojiCatalogSection] {
+        let candidates: [URL?] = [
+            bundle.bundleURL.appending(path: "emoji-16.0.txt"),
+            bundle.resourceURL?.appending(path: "emoji-16.0.txt"),
             bundle.url(forResource: "emoji-16.0", withExtension: "txt"),
             bundle.url(
                 forResource: "emoji-16.0",
@@ -94,9 +70,13 @@ nonisolated enum EmojiCatalog {
             )
         ]
 
-        for url in candidates.compactMap({ $0 }) where visited.insert(url).inserted {
-            resourceURLs.append(url)
+        var visitedURLs: Set<URL> = []
+        for url in candidates.compactMap({ $0 }) where visitedURLs.insert(url).inserted {
+            if let source = try? String(contentsOf: url, encoding: .utf8) {
+                return parse(source)
+            }
         }
+        return []
     }
 
     private static func enclosingAppBundleURL(for url: URL) -> URL? {
