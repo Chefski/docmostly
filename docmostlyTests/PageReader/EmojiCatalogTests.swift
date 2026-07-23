@@ -47,15 +47,6 @@ struct EmojiCatalogTests {
         let itemCount = sections.reduce(into: 0) { count, section in
             count += section.items.count
         }
-        let directURL = bundle.bundleURL.appending(path: "emoji-16.0.txt")
-        let directByteCount = (try? Data(contentsOf: directURL).count) ?? -1
-
-        guard sections.count == 10, itemCount == 3_781 else {
-            fatalError(
-                "Emoji catalog mismatch: bundle=\(bundle.bundleURL.path()), " +
-                    "directBytes=\(directByteCount), sections=\(sections.count), items=\(itemCount)"
-            )
-        }
 
         #expect(sections.count == 10)
         #expect(itemCount == 3_781)
