@@ -32,21 +32,60 @@ nonisolated enum EmojiCatalog {
     }
 
     private static func loadSections() -> [EmojiCatalogSection] {
-        var visitedBundleURLs: Set<URL> = []
-        let bundles = [Bundle(for: PageEmojiPickerViewModel.self), Bundle.main] +
-            Bundle.allBundles + Bundle.allFrameworks
-        for bundle in bundles where visitedBundleURLs.insert(bundle.bundleURL).inserted {
-            let rootURL = bundle.url(forResource: "emoji-16.0", withExtension: "txt")
-            let resourcesURL = bundle.url(
-                forResource: "emoji-16.0",
-                withExtension: "txt",
-                subdirectory: "Resources"
-            )
-            if let url = rootURL ?? resourcesURL,
-               let source = try? String(contentsOf: url, encoding: .utf8) {
+        for url in resourceURLs() {
+            if let source = try? String(contentsOf: url, encoding: .utf8) {
                 return parse(source)
             }
         }
         return []
+    }
+
+    private static func resourceURLs() -> [URL] {
+        var visitedBundleURLs: Set<URL> = []
+        var visitedResourceURLs: Set<URL> = []
+        var resourceURLs: [URL] = []
+        let bundles = [Bundle(for: PageEmojiPickerViewModel.self), Bundle.main] +
+            Bundle.allBundles + Bundle.allFrameworks
+
+        for bundle in bundles where visitedBundleURLs.insert(bundle.bundleURL).inserted {
+            appendResourceURLs(from: bundle, to: &resourceURLs, visited: &visitedResourceURLs)
+
+            // Hosted unit tests live in App.app/PlugIns/Tests.xctest. The host app is
+            // not guaranteed to appear in Bundle.allBundles, so also inspect the
+            // enclosing app bundle that owns the copied production resource.
+            if let appBundleURL = enclosingAppBundleURL(for: bundle.bundleURL),
+               let appBundle = Bundle(url: appBundleURL) {
+                appendResourceURLs(from: appBundle, to: &resourceURLs, visited: &visitedResourceURLs)
+            }
+        }
+
+        return resourceURLs
+    }
+
+    private static func appendResourceURLs(
+        from bundle: Bundle,
+        to resourceURLs: inout [URL],
+        visited: inout Set<URL>
+    ) {
+        let candidates = [
+            bundle.url(forResource: "emoji-16.0", withExtension: "txt"),
+            bundle.url(
+                forResource: "emoji-16.0",
+                withExtension: "txt",
+                subdirectory: "Resources"
+            )
+        ]
+
+        for url in candidates.compactMap({ $0 }) where visited.insert(url).inserted {
+            resourceURLs.append(url)
+        }
+    }
+
+    private static func enclosingAppBundleURL(for url: URL) -> URL? {
+        var candidate = url
+        while candidate.pathExtension != "app", candidate.pathComponents.count > 1 {
+            candidate.deleteLastPathComponent()
+        }
+        return candidate.pathExtension == "app" ? candidate : nil
     }
 }
