@@ -51,8 +51,15 @@ extension AppState {
         documentSnapshot: ProseMirrorDocument,
         baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
+        let reconciliationMarker: OfflineMutationRecord?
         if cacheScope != nil, offlineQueue != nil || offlineQueueRepository != nil {
-            try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
+            reconciliationMarker = try await queuePageMetadataUpdate(
+                pageId: pageId,
+                title: title,
+                baseTitle: baseTitle
+            )
+        } else {
+            reconciliationMarker = nil
         }
         guard let apiClient else {
             return try await persistCRDTPageLocally(
@@ -70,7 +77,12 @@ extension AppState {
                 title: title
             ))
         } catch {
-            guard canQueueOfflineMutation(after: error) else { throw error }
+            guard canQueueOfflineMutation(after: error) else {
+                if let reconciliationMarker {
+                    try await removeQueuedOfflineMutation(reconciliationMarker)
+                }
+                throw error
+            }
             isOffline = true
             statusMessage = error.localizedDescription
             return try await persistCRDTPageLocally(
@@ -168,8 +180,13 @@ private extension AppState {
         )
     }
 
-    func queuePageMetadataUpdate(pageId: String, title: String, baseTitle: String?) async throws {
-        _ = try await queueOfflineMutation(.updatePageMetadata(
+    @discardableResult
+    func queuePageMetadataUpdate(
+        pageId: String,
+        title: String,
+        baseTitle: String?
+    ) async throws -> OfflineMutationRecord {
+        try await queueOfflineMutation(.updatePageMetadata(
             pageId: pageId,
             title: title,
             baseTitle: baseTitle

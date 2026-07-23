@@ -116,6 +116,22 @@ final class CachedPage {
         cachedAt = Date.now
     }
 
+    func updateMetadata(editablePage: DocmostEditablePage) {
+        id = editablePage.id
+        slugId = editablePage.slugId
+        title = editablePage.title
+        icon = editablePage.icon
+        spaceId = editablePage.spaceId
+        if let updatedAt = editablePage.updatedAt {
+            self.updatedAt = updatedAt
+        }
+        if let permissions = editablePage.permissions {
+            canEdit = permissions.canEdit
+            hasRestriction = permissions.hasRestriction
+        }
+        cachedAt = .now
+    }
+
     func updateLocalDraft(title: String, document: ProseMirrorDocument) throws {
         let data = try JSONEncoder().encode(document)
         self.title = title

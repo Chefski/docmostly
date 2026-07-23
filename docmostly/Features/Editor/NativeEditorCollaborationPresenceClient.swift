@@ -199,22 +199,29 @@ private extension NativeEditorCollaborationPresenceClient {
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         authenticatedScope = scope
+        let localUpdates: AsyncStream<Data>? = if context.allowsLocalDocumentUpdates(for: scope),
+                                                  let syncDriver = context.syncDriver {
+            await syncDriver.localUpdates()
+        } else {
+            nil
+        }
         try await sendInitialCRDTSync(
             for: scope,
             includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope),
             using: context.syncDriver
         )
-        configureLocalDocumentUpdates(for: scope, context: context)
+        configureLocalDocumentUpdates(for: scope, context: context, updates: localUpdates)
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
     }
 
     func configureLocalDocumentUpdates(
         for scope: NativeEditorCollaborationScope,
-        context: NativeEditorCollaborationSessionContext
+        context: NativeEditorCollaborationSessionContext,
+        updates: AsyncStream<Data>?
     ) {
-        if context.allowsLocalDocumentUpdates(for: scope) {
-            startLocalUpdateSender(using: context.syncDriver)
+        if context.allowsLocalDocumentUpdates(for: scope), let updates {
+            startLocalUpdateSender(using: context.syncDriver, updates: updates)
         } else {
             stopLocalUpdateSender()
         }
@@ -288,17 +295,20 @@ private extension NativeEditorCollaborationPresenceClient {
         awarenessPruneTask = nil
     }
 
-    func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
+    func startLocalUpdateSender(
+        using syncDriver: NativeEditorCollaborationSyncDriver?,
+        updates: AsyncStream<Data>
+    ) {
         stopLocalUpdateSender()
 
         guard let syncDriver else { return }
 
-        localUpdateTask = Task { [weak self, syncDriver] in
-            let updates = await syncDriver.localUpdates()
-
+        localUpdateTask = Task { [weak self, syncDriver, updates] in
             for await update in updates {
                 guard Task.isCancelled == false else { return }
-                let frame = await syncDriver.outboundFrame(forLocalUpdate: update)
+                guard let frame = await syncDriver.outboundFrameIfNeeded(forLocalUpdate: update) else {
+                    continue
+                }
 
                 do {
                     try await self?.send(frame)

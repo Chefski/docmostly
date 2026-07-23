@@ -66,6 +66,7 @@ final class PageTreeViewModel {
             children[index] = try await reloadExpandedSubtree(children[index], appState: appState)
         }
         refreshedNode.children = children
+        refreshedNode.hasChildren = children.isEmpty == false
         refreshedNode.isChildrenLoaded = true
         return refreshedNode
     }
@@ -154,6 +155,7 @@ final class PageTreeViewModel {
             let childNodes = children.map(PageTreeNode.init(page:)).sortedByPosition()
             nodes.updateNode(id: node.id) { existing in
                 existing.children = childNodes
+                existing.hasChildren = childNodes.isEmpty == false
                 existing.isChildrenLoaded = true
             }
             rebuildVisibleNodes()

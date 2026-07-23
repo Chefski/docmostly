@@ -161,6 +161,43 @@ struct AppStateOfflineReplayRecoveryTests {
     }
 
     @MainActor
+    @Test func metadataReplayDoesNotRequireCreatingADocumentSession() async throws {
+        let loader = OfflineReplayHTTPDataLoader(stubs: [
+            .init(statusCode: 200, data: try editablePageEnvelope(title: "Remote", body: "Remote body")),
+            .init(statusCode: 200, data: try editablePageEnvelope(title: "Local", body: "Remote body"))
+        ])
+        let (appState, scope) = try makeConfiguredAppStateWithoutCRDT(loader: loader)
+        _ = try await appState.queueOfflineMutation(.updatePageMetadata(
+            pageId: "page-1",
+            title: "Local",
+            baseTitle: "Remote"
+        ))
+
+        appState.scheduleOfflineQueueReconciliation()
+        await appState.offlineReplayTask?.value
+
+        #expect(try await appState.offlineQueueRepository?.pending(scope: scope).isEmpty == true)
+        #expect(await loader.requestedPaths == ["/api/pages/info", "/api/pages/update"])
+    }
+
+    @MainActor
+    @Test func permanentTitleFailureRemovesThePreflightReconciliationMarker() async throws {
+        let loader = OfflineReplayHTTPDataLoader(stubs: [.init(statusCode: 403)])
+        let (appState, scope) = try makeConfiguredAppStateWithoutCRDT(loader: loader)
+
+        await #expect(throws: APIError.self) {
+            try await appState.updateCollaborativePageTitle(
+                pageId: "page-1",
+                title: "Rejected",
+                documentSnapshot: self.document(text: "Local body"),
+                baseTitle: "Remote"
+            )
+        }
+
+        #expect(try await appState.offlineQueueRepository?.pending(scope: scope).isEmpty == true)
+    }
+
+    @MainActor
     private func makeConfiguredAppState(
         loader: OfflineReplayHTTPDataLoader
     ) throws -> (AppState, CacheScope) {
@@ -172,6 +209,21 @@ struct AppStateOfflineReplayRecoveryTests {
             offlineCRDTSynchronizer: OfflineReplayCRDTSynchronizer(),
             apiClient: DocmostAPIClient(baseURL: baseURL, loader: loader)
         )
+        let scope = CacheScope(serverBaseURL: baseURL, userID: "user-1")
+        appState.configure(modelContext: ModelContext(container), modelContainer: container)
+        appState.configurePreviewCacheScope(scope)
+        appState.currentUser = try currentUser()
+        appState.serverURLString = baseURL.absoluteString
+        return (appState, scope)
+    }
+
+    @MainActor
+    private func makeConfiguredAppStateWithoutCRDT(
+        loader: OfflineReplayHTTPDataLoader
+    ) throws -> (AppState, CacheScope) {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let appState = AppState(apiClient: DocmostAPIClient(baseURL: baseURL, loader: loader))
         let scope = CacheScope(serverBaseURL: baseURL, userID: "user-1")
         appState.configure(modelContext: ModelContext(container), modelContainer: container)
         appState.configurePreviewCacheScope(scope)

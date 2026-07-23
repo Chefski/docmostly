@@ -27,12 +27,7 @@ extension AppState {
         let page: DocmostEditablePage = try await apiClient.send(.updatePage(pageId: pageId, icon: icon))
         isOffline = false
         if let cacheScope {
-            scheduleCacheWrite(.updatePageIcon(
-                pageID: page.id,
-                icon: page.icon,
-                updatedAt: page.updatedAt,
-                scope: cacheScope
-            ))
+            scheduleCacheWrite(.upsertEditablePageMetadata(page, scope: cacheScope))
         }
         markPageDiscoveryChanged()
         return page

@@ -41,7 +41,18 @@ nonisolated extension Array where Element == PageTreeNode {
 
     func movePayload(sourceID: String, operation: PageTreeDropOperation) throws -> PageTreeMovePayload {
         let moveResult = try moving(sourceID: sourceID, operation: operation)
-        guard let info = moveResult.tree.siblingsInfo(for: sourceID) else {
+        let info: PageTreeSiblingsInfo
+        if let insertedInfo = moveResult.tree.siblingsInfo(for: sourceID) {
+            info = insertedInfo
+        } else if case .makeChild(let targetID) = operation,
+                  let target = node(id: targetID),
+                  target.isChildrenLoaded == false {
+            let position = try PagePositionKeyGenerator.key(
+                between: target.children.last?.position,
+                and: nil
+            )
+            return PageTreeMovePayload(pageId: sourceID, parentPageId: targetID, position: position)
+        } else {
             throw PageTreeError.missingMoveResult
         }
 

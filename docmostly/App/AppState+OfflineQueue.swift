@@ -281,11 +281,9 @@ extension AppState {
     ) async throws -> (localID: String, serverID: String)? {
         switch payload {
         case .updatePageMetadata(let pageId, let title, let baseTitle):
-            try await synchronizeQueuedDocument(
+            try await synchronizeExistingQueuedDocument(
                 record: record,
                 pageId: pageId,
-                title: title,
-                document: nil,
                 using: apiClient
             )
             try await replayPageMetadata(
@@ -382,6 +380,33 @@ extension AppState {
             document: NativeEditorDocument(proseMirrorDocument: seedDocument)
         )
         guard try await session.hasPendingSynchronization() else { return }
+        let collaborationToken: CollaborationTokenResponse = try await apiClient.send(.collabToken)
+        guard let token = collaborationToken.token else {
+            throw APIError.connectionFailed("Realtime collaboration token is missing.")
+        }
+        try await offlineCRDTSynchronizer.synchronize(
+            pageID: pageId,
+            session: session,
+            url: try collaborationWebSocketURL(),
+            token: token,
+            user: currentUser?.user
+        )
+    }
+
+    private func synchronizeExistingQueuedDocument(
+        record: OfflineMutationRecord,
+        pageId: String,
+        using apiClient: DocmostAPIClient
+    ) async throws {
+        guard let documentSessionRegistry, let workspaceID = currentUser?.workspace.id else { return }
+        let key = DocumentStoreKey(
+            serverBaseURL: record.scope.serverBaseURL,
+            userID: record.scope.userID,
+            workspaceID: workspaceID,
+            pageID: pageId
+        )
+        guard let session = documentSessionRegistry.existingSession(for: key),
+              try await session.hasPendingSynchronization() else { return }
         let collaborationToken: CollaborationTokenResponse = try await apiClient.send(.collabToken)
         guard let token = collaborationToken.token else {
             throw APIError.connectionFailed("Realtime collaboration token is missing.")
@@ -547,6 +572,11 @@ extension AppState {
             return
         }
         try offlineQueue?.remove(id: id, scope: scope)
+    }
+
+    func removeQueuedOfflineMutation(_ record: OfflineMutationRecord) async throws {
+        try await removeOfflineMutation(id: record.id, scope: record.scope)
+        await refreshOfflineMutationCount()
     }
 
     private func removeCoalescedOfflineMutations(for payload: OfflineMutationPayload, scope: CacheScope) async throws {

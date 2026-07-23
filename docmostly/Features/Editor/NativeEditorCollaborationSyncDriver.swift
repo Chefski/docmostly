@@ -5,6 +5,7 @@ actor NativeEditorCollaborationSyncDriver {
     private let coordinator: NativeEditorCRDTSyncCoordinator
     private var initialPendingUpdates: [Data] = []
     private var awaitingAcknowledgement: [Data] = []
+    private var initialLiveUpdateSuppressionCounts: [Data: Int] = [:]
 
     init(documentName: String, coordinator: NativeEditorCRDTSyncCoordinator) {
         self.documentName = documentName
@@ -13,6 +14,7 @@ actor NativeEditorCollaborationSyncDriver {
 
     func outboundFramesAfterAuthentication(includePendingLocalUpdates: Bool = true) async throws -> [Data] {
         awaitingAcknowledgement = []
+        initialLiveUpdateSuppressionCounts = [:]
         let initialMessage = try await coordinator.makeInitialSyncMessage()
         let initial = frame(for: initialMessage)
         guard includePendingLocalUpdates else {
@@ -20,6 +22,9 @@ actor NativeEditorCollaborationSyncDriver {
             return [initial]
         }
         initialPendingUpdates = try await coordinator.pendingLocalUpdates()
+        for update in initialPendingUpdates {
+            initialLiveUpdateSuppressionCounts[update, default: 0] += 1
+        }
         var pending: [Data] = []
         pending.reserveCapacity(initialPendingUpdates.count)
         for update in initialPendingUpdates {
@@ -45,14 +50,27 @@ actor NativeEditorCollaborationSyncDriver {
         return frame(for: message)
     }
 
+    func outboundFrameIfNeeded(forLocalUpdate update: Data) async -> Data? {
+        if let count = initialLiveUpdateSuppressionCounts[update] {
+            if count == 1 {
+                initialLiveUpdateSuppressionCounts[update] = nil
+            } else {
+                initialLiveUpdateSuppressionCounts[update] = count - 1
+            }
+            return nil
+        }
+        return await outboundFrame(forLocalUpdate: update)
+    }
+
     func didSendLocalUpdate(_ update: Data) async throws {
         awaitingAcknowledgement.append(update)
     }
 
     func didReceiveSyncAcknowledgement() async throws {
-        guard let update = awaitingAcknowledgement.first else { return }
-        try await coordinator.recordLocalUpdateAcknowledged(update)
-        awaitingAcknowledgement.removeFirst()
+        while let update = awaitingAcknowledgement.first {
+            try await coordinator.recordLocalUpdateAcknowledged(update)
+            awaitingAcknowledgement.removeFirst()
+        }
     }
 
     func localUpdates() async -> AsyncStream<Data> {

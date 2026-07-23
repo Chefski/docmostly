@@ -33,7 +33,8 @@ nonisolated enum EmojiCatalog {
 
     private static func loadSections() -> [EmojiCatalogSection] {
         var visitedBundleURLs: Set<URL> = []
-        let bundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
+        let bundles = [Bundle(for: PageEmojiPickerViewModel.self), Bundle.main] +
+            Bundle.allBundles + Bundle.allFrameworks
         for bundle in bundles where visitedBundleURLs.insert(bundle.bundleURL).inserted {
             let rootURL = bundle.url(forResource: "emoji-16.0", withExtension: "txt")
             let resourcesURL = bundle.url(

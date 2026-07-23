@@ -63,12 +63,12 @@ final class DocumentSessionRegistry {
 
         do {
             let session = try await creationTask.value
-            try Task.checkCancellation()
             guard generation == creationGeneration else {
                 throw CancellationError()
             }
             sessions[key] = session
             creationTasks[key] = nil
+            try Task.checkCancellation()
             return session
         } catch {
             if generation == creationGeneration {
@@ -76,6 +76,10 @@ final class DocumentSessionRegistry {
             }
             throw error
         }
+    }
+
+    func existingSession(for key: DocumentStoreKey) -> DocumentSession? {
+        sessions[key]
     }
 
     func removeAll() {
