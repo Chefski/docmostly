@@ -59,7 +59,8 @@ struct PageBrowserHomeView: View {
             spaceID: space.id,
             scope: viewModel.selectedScope,
             pageDiscoveryRevision: appState.pageDiscoveryRevision,
-            favoriteRevision: appState.favoriteRevision
+            favoriteRevision: appState.favoriteRevision,
+            initializedSpaceID: nil
         )
     }
 }

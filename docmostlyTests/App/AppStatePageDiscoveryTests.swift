@@ -17,13 +17,15 @@ struct AppStatePageDiscoveryTests {
             spaceID: "space-1",
             scope: .recentlyUpdated,
             pageDiscoveryRevision: 0,
-            favoriteRevision: 0
+            favoriteRevision: 0,
+            initializedSpaceID: nil
         )
         let refreshedKey = PageBrowserTaskKey(
             spaceID: "space-1",
             scope: .recentlyUpdated,
             pageDiscoveryRevision: 1,
-            favoriteRevision: 0
+            favoriteRevision: 0,
+            initializedSpaceID: nil
         )
 
         #expect(initialKey != refreshedKey)
