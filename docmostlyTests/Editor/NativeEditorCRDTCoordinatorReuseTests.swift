@@ -27,15 +27,22 @@ struct NativeEditorCRDTCoordinatorReuseTests {
 @MainActor
 @Suite(.serialized)
 struct CRDTEngineAttachmentTests {
-    @Test func appStateDoesNotCreateCRDTEngineWithoutFactory() async throws {
+    @Test func appStateDoesNotAttachCRDTEngineWithoutFactory() async {
         let appState = AppState(crdtDocumentEngineFactory: nil)
-        let engine = try await appState.makeCRDTDocumentEngine(
+        let viewModel = NativeRichEditorViewModel(
             pageID: "page-1",
-            title: "Page",
-            document: NativeEditorDocument()
+            initialTitle: "Page"
         )
 
-        #expect(engine == nil)
+        await NativeEditorCRDTDocumentEngineAttachment.attachIfAvailable(
+            to: viewModel,
+            appState: appState
+        )
+
+        #expect(viewModel.usesCRDTDocumentEngine == false)
+        #expect(viewModel.collaborationSession().syncDriver == nil)
+        #expect(viewModel.canEdit == false)
+        #expect(viewModel.realtimeStatus == .failed("Native CRDT runtime is unavailable."))
     }
 
     @Test func crdtAttachmentConfiguresFactoryEngineBeforeCollaborationSession() async throws {
