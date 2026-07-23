@@ -23,6 +23,27 @@ struct NativeEditorCollaborationSyncDriverTests {
         #expect(await acknowledgements.updates == updates)
     }
 
+    @Test func sessionSyncAcknowledgementDoesNotCoverALiveUpdate() async throws {
+        let initialUpdate = Data([1])
+        let liveUpdate = Data([2])
+        let acknowledgements = SyncAcknowledgementRecorder()
+        let coordinator = NativeEditorCRDTSyncCoordinator(
+            documentEngine: SessionTestDocumentEngine(),
+            pendingLocalUpdatesProvider: { [initialUpdate] },
+            localUpdateDidAcknowledge: { update in
+                await acknowledgements.append(update)
+            }
+        )
+        let driver = NativeEditorCollaborationSyncDriver(documentName: "page.page-1", coordinator: coordinator)
+
+        #expect(try await driver.outboundFramesAfterAuthentication().count == 2)
+        try await driver.didSendOutboundFramesAfterAuthentication()
+        #expect(await driver.outboundFrameIfNeeded(forLocalUpdate: liveUpdate) != nil)
+        try await driver.didReceiveSyncAcknowledgement()
+
+        #expect(await acknowledgements.updates == [initialUpdate])
+    }
+
     @Test func preSubscribedLocalStreamDoesNotDuplicateAnUpdateInTheInitialBatch() async throws {
         let persistedUpdates = PersistedSyncUpdateStore()
         let coordinator = NativeEditorCRDTSyncCoordinator(
@@ -45,6 +66,20 @@ struct NativeEditorCollaborationSyncDriverTests {
         let bufferedUpdate = try #require(await iterator.next())
 
         #expect(await driver.outboundFrameIfNeeded(forLocalUpdate: bufferedUpdate) == nil)
+    }
+
+    @Test func cancelledPreAuthenticationSubscriptionStopsBufferingLocalUpdates() async throws {
+        let coordinator = NativeEditorCRDTSyncCoordinator(
+            documentEngine: SessionTestDocumentEngine()
+        )
+        let driver = NativeEditorCollaborationSyncDriver(documentName: "page.page-1", coordinator: coordinator)
+        let subscription = await driver.localUpdateSubscription()
+
+        await subscription.cancel()
+        try await coordinator.integrateLocalChange(localChange())
+        var iterator = subscription.updates.makeAsyncIterator()
+
+        #expect(await iterator.next() == nil)
     }
 
     private func localChange() -> NativeEditorCRDTLocalChange {

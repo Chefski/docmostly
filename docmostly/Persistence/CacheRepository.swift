@@ -466,7 +466,7 @@ nonisolated extension CacheRepository {
         if let cachedPage = try loadPage(idOrSlugId: page.id, scope: scope) {
             cachedPage.updateMetadata(editablePage: page)
         } else {
-            context.insert(CachedPage(editablePage: page, scope: scope))
+            context.insert(CachedPage(editablePageMetadata: page, scope: scope))
         }
 
         let serverBaseURL = scope.serverBaseURL

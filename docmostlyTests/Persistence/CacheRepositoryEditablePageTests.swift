@@ -137,7 +137,12 @@ struct CacheRepositoryEditablePageTests {
         let metadata = editablePage(content: replacementDocument, icon: "🚀")
 
         try repository.upsertEditablePageMetadata(metadata, scope: scope)
-        #expect(try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)?.icon == "🚀")
+        let metadataOnlyPage = try #require(
+            try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
+        )
+        #expect(metadataOnlyPage.icon == "🚀")
+        #expect(metadataOnlyPage.content == ProseMirrorDocument())
+        #expect(metadataOnlyPage.content != replacementDocument)
 
         try repository.saveEditablePage(editablePage(content: originalDocument), scope: scope)
         try repository.upsertEditablePageMetadata(metadata, scope: scope)

@@ -81,14 +81,24 @@ actor NativeEditorCRDTSyncCoordinator {
     }
 
     func localUpdates() async -> AsyncStream<Data> {
+        localUpdateSubscription().updates
+    }
+
+    func localUpdateSubscription() -> (
+        updates: AsyncStream<Data>,
+        cancel: @Sendable () async -> Void
+    ) {
         startRawLocalUpdateForwardingIfNeeded()
         let id = UUID()
         let pair = AsyncStream.makeStream(of: Data.self)
-        committedLocalUpdateContinuations[id] = pair.continuation
-        pair.continuation.onTermination = { [weak self] _ in
-            Task { await self?.removeCommittedLocalUpdateContinuation(id) }
+        let cancel: @Sendable () async -> Void = { [weak self] in
+            await self?.removeCommittedLocalUpdateContinuation(id)
         }
-        return pair.stream
+        committedLocalUpdateContinuations[id] = pair.continuation
+        pair.continuation.onTermination = { _ in
+            Task { await cancel() }
+        }
+        return (pair.stream, cancel)
     }
 
     func integrateLocalChange(_ change: NativeEditorCRDTLocalChange) async throws {
@@ -133,7 +143,7 @@ actor NativeEditorCRDTSyncCoordinator {
     }
 
     private func removeCommittedLocalUpdateContinuation(_ id: UUID) {
-        committedLocalUpdateContinuations[id] = nil
+        committedLocalUpdateContinuations.removeValue(forKey: id)?.finish()
     }
 
     private func startRawLocalUpdateForwardingIfNeeded() {

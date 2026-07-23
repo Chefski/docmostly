@@ -4,7 +4,7 @@ actor NativeEditorCollaborationSyncDriver {
     private let documentName: String
     private let coordinator: NativeEditorCRDTSyncCoordinator
     private var initialPendingUpdates: [Data] = []
-    private var awaitingAcknowledgement: [Data] = []
+    private var initialUpdatesAwaitingAcknowledgement: [Data] = []
     private var initialLiveUpdateSuppressionCounts: [Data: Int] = [:]
 
     init(documentName: String, coordinator: NativeEditorCRDTSyncCoordinator) {
@@ -13,7 +13,7 @@ actor NativeEditorCollaborationSyncDriver {
     }
 
     func outboundFramesAfterAuthentication(includePendingLocalUpdates: Bool = true) async throws -> [Data] {
-        awaitingAcknowledgement = []
+        initialUpdatesAwaitingAcknowledgement = []
         initialLiveUpdateSuppressionCounts = [:]
         let initialMessage = try await coordinator.makeInitialSyncMessage()
         let initial = frame(for: initialMessage)
@@ -37,7 +37,7 @@ actor NativeEditorCollaborationSyncDriver {
     func didSendOutboundFramesAfterAuthentication() async throws {
         let updates = initialPendingUpdates
         initialPendingUpdates = []
-        awaitingAcknowledgement.append(contentsOf: updates)
+        initialUpdatesAwaitingAcknowledgement.append(contentsOf: updates)
     }
 
     func outboundFrames(for message: NativeEditorYjsSyncMessage) async throws -> [Data] {
@@ -62,15 +62,18 @@ actor NativeEditorCollaborationSyncDriver {
         return await outboundFrame(forLocalUpdate: update)
     }
 
-    func didSendLocalUpdate(_ update: Data) async throws {
-        awaitingAcknowledgement.append(update)
+    func didReceiveSyncAcknowledgement() async throws {
+        while let update = initialUpdatesAwaitingAcknowledgement.first {
+            try await coordinator.recordLocalUpdateAcknowledged(update)
+            initialUpdatesAwaitingAcknowledgement.removeFirst()
+        }
     }
 
-    func didReceiveSyncAcknowledgement() async throws {
-        while let update = awaitingAcknowledgement.first {
-            try await coordinator.recordLocalUpdateAcknowledged(update)
-            awaitingAcknowledgement.removeFirst()
-        }
+    func localUpdateSubscription() async -> (
+        updates: AsyncStream<Data>,
+        cancel: @Sendable () async -> Void
+    ) {
+        await coordinator.localUpdateSubscription()
     }
 
     func localUpdates() async -> AsyncStream<Data> {

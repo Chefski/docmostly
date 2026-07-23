@@ -199,18 +199,32 @@ private extension NativeEditorCollaborationPresenceClient {
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         authenticatedScope = scope
-        let localUpdates: AsyncStream<Data>? = if context.allowsLocalDocumentUpdates(for: scope),
-                                                  let syncDriver = context.syncDriver {
-            await syncDriver.localUpdates()
+        let localUpdateSubscription: (
+            updates: AsyncStream<Data>,
+            cancel: @Sendable () async -> Void
+        )? = if context.allowsLocalDocumentUpdates(for: scope),
+                let syncDriver = context.syncDriver {
+            await syncDriver.localUpdateSubscription()
         } else {
             nil
         }
-        try await sendInitialCRDTSync(
+        do {
+            try await sendInitialCRDTSync(
+                for: scope,
+                includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope),
+                using: context.syncDriver
+            )
+        } catch {
+            if let localUpdateSubscription {
+                await localUpdateSubscription.cancel()
+            }
+            throw error
+        }
+        configureLocalDocumentUpdates(
             for: scope,
-            includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope),
-            using: context.syncDriver
+            context: context,
+            updates: localUpdateSubscription?.updates
         )
-        configureLocalDocumentUpdates(for: scope, context: context, updates: localUpdates)
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
     }
@@ -312,7 +326,6 @@ private extension NativeEditorCollaborationPresenceClient {
 
                 do {
                     try await self?.send(frame)
-                    try? await syncDriver.didSendLocalUpdate(update)
                 } catch {
                     return
                 }

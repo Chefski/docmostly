@@ -65,6 +65,22 @@ final class CachedPage {
         lastOpenedAt = cachedAt
     }
 
+    init(editablePageMetadata: DocmostEditablePage, scope: CacheScope, cachedAt: Date = Date.now) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
+        id = editablePageMetadata.id
+        slugId = editablePageMetadata.slugId
+        title = editablePageMetadata.title
+        proseMirrorJSONData = try? JSONEncoder().encode(ProseMirrorDocument())
+        icon = editablePageMetadata.icon
+        spaceId = editablePageMetadata.spaceId
+        updatedAt = editablePageMetadata.updatedAt
+        canEdit = editablePageMetadata.permissions?.canEdit
+        hasRestriction = editablePageMetadata.permissions?.hasRestriction
+        self.cachedAt = cachedAt
+        lastOpenedAt = cachedAt
+    }
+
     func update(page: DocmostPage, htmlContent: String) {
         id = page.id
         slugId = page.slugId
