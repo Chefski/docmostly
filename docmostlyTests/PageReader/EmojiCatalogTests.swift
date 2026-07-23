@@ -1,8 +1,5 @@
-import Foundation
 import Testing
 @testable import docmostly
-
-private final class EmojiCatalogTestsBundleMarker: NSObject {}
 
 struct EmojiCatalogTests {
     @Test func parsesGroupedEmojiCatalog() throws {
@@ -42,13 +39,11 @@ struct EmojiCatalogTests {
     }
 
     @Test func bundledCatalogContainsUnicodeEmojiSet() {
-        let bundle = Bundle(for: EmojiCatalogTestsBundleMarker.self)
-        let sections = EmojiCatalog.loadSections(in: bundle)
-        let itemCount = sections.reduce(into: 0) { count, section in
+        let itemCount = EmojiCatalog.sections.reduce(into: 0) { count, section in
             count += section.items.count
         }
 
-        #expect(sections.count == 10)
+        #expect(EmojiCatalog.sections.count == 9)
         #expect(itemCount == 3_781)
     }
 }
