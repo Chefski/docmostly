@@ -10,6 +10,7 @@
 		3FEC0B2EC8EF1D5311589C30 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */; };
 		470013002FFD8842006F135C /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */; };
 		BA1551ED7F4ACCE1C5452A4E /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9ED94873D837F0482A6F599C /* YouTubePlayerKit */; };
+		E0A16C0D5B7F4A419D215201 /* emoji-16.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = E0A16C0E5B7F4A419D215201 /* emoji-16.0.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +51,7 @@
 		47D95DD22FE294E500ECEA87 /* docmostly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = docmostly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		47D95DE12FE294E700ECEA87 /* docmostlyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = docmostlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		47D95DEB2FE294E700ECEA87 /* docmostlyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = docmostlyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0A16C0E5B7F4A419D215201 /* emoji-16.0.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docmostly/Resources/emoji-16.0.txt"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -411,6 +413,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E0A16C0D5B7F4A419D215201 /* emoji-16.0.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

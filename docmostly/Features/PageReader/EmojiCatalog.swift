@@ -40,6 +40,24 @@ nonisolated enum EmojiCatalog {
         return []
     }
 
+    static func loadSections(in bundle: Bundle) -> [EmojiCatalogSection] {
+        let urls = [
+            bundle.url(forResource: "emoji-16.0", withExtension: "txt"),
+            bundle.url(
+                forResource: "emoji-16.0",
+                withExtension: "txt",
+                subdirectory: "Resources"
+            )
+        ]
+
+        for url in urls.compactMap({ $0 }) {
+            if let source = try? String(contentsOf: url, encoding: .utf8) {
+                return parse(source)
+            }
+        }
+        return []
+    }
+
     private static func resourceURLs() -> [URL] {
         var visitedBundleURLs: Set<URL> = []
         var visitedResourceURLs: Set<URL> = []
