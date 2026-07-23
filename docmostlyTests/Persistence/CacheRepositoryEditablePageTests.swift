@@ -114,7 +114,8 @@ struct CacheRepositoryEditablePageTests {
 
         try repository.updatePageIcon(pageID: "page-1", icon: "🚀", updatedAt: nil, scope: scope)
 
-        let editable = try #require(repository.loadEditablePage(idOrSlugId: "page-1", scope: scope))
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
+        let editable = try #require(loadedPage)
         let treeItem = try #require(context.fetch(FetchDescriptor<CachedPageTreeItem>()).first)
         #expect(editable.content == document)
         #expect(editable.icon == "🚀")
