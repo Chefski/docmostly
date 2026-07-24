@@ -33,6 +33,7 @@ struct PageReaderView: View {
     @State var isConfirmingPageTrash = false
     @State var isShowingLabelEditor = false
     @State var isShowingMoveToSpace = false
+    @State var isShowingEmojiPicker = false
     @State var pendingInlineCommentID: String?
     @State var pendingInlineCommentDraft: CommentBody?
     @State var pendingInlineCommentYjsSelection: NativeEditorYjsSelection?
@@ -76,6 +77,8 @@ struct PageReaderView: View {
                     } else {
                         PageReaderMetadataView(
                             breadcrumbs: viewModel.breadcrumbs,
+                            currentPageID: editorViewModel.currentPageID,
+                            currentPageIcon: editorViewModel.icon,
                             labels: viewModel.labels,
                             selectPage: selectBreadcrumb
                         )
@@ -91,7 +94,8 @@ struct PageReaderView: View {
                             },
                             keepPendingLocalUpdate: {
                                 resolvePendingRemoteUpdate(.keepLocal)
-                            }
+                            },
+                            pickPageEmoji: showEmojiPicker
                         )
                         AttachmentLinksView(
                             links: viewModel.attachmentLinks,
@@ -205,6 +209,11 @@ struct PageReaderView: View {
                 ) { targetSpaceID in
                     await moveCurrentPage(to: targetSpaceID)
                 }
+            }
+        }
+        .sheet(isPresented: $isShowingEmojiPicker) {
+            if let editorViewModel {
+                PageEmojiPickerSheet(editorViewModel: editorViewModel)
             }
         }
         .sheet(isPresented: $isShowingPageHistory) {

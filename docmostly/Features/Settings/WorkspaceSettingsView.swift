@@ -28,20 +28,37 @@ struct WorkspaceSettingsView: View {
 
             Section("Security") {
                 Toggle("Disable public sharing", isOn: $viewModel.workspaceDraft.disablePublicSharing)
+                    .disabled(viewModel.hasWorkspaceFeature(.sharingControls) == false)
                 Toggle("Restrict API keys to admins", isOn: $viewModel.workspaceDraft.restrictApiToAdmins)
+                    .disabled(viewModel.hasWorkspaceFeature(.apiKeys) == false)
                 Stepper(
                     "Trash retention: \(viewModel.workspaceDraft.trashRetentionDays.formatted(.number)) days",
                     value: $viewModel.workspaceDraft.trashRetentionDays,
                     in: 1...365
                 )
+                .disabled(viewModel.hasWorkspaceFeature(.retention) == false)
             }
             .disabled(viewModel.canManageWorkspace == false)
 
-            Section("Workspace Features") {
+            Section {
                 Toggle("Member templates", isOn: $viewModel.workspaceDraft.allowMemberTemplates)
+                    .disabled(viewModel.hasWorkspaceFeature(.templates) == false)
                 Toggle("AI search", isOn: $viewModel.workspaceDraft.aiSearch)
+                    .disabled(viewModel.hasWorkspaceFeature(.artificialIntelligence) == false)
                 Toggle("Generative AI", isOn: $viewModel.workspaceDraft.generativeAi)
+                    .disabled(viewModel.hasWorkspaceFeature(.artificialIntelligence) == false)
                 Toggle("MCP", isOn: $viewModel.workspaceDraft.mcpEnabled)
+                    .disabled(viewModel.hasWorkspaceFeature(.mcp) == false)
+            } header: {
+                Text("Workspace Features")
+            } footer: {
+                if viewModel.isLoading == false {
+                    if viewModel.workspaceEntitlements == nil {
+                        Text("Feature availability could not be verified. Licensed controls are unavailable.")
+                    } else if viewModel.hasUnavailableLicensedSettings {
+                        Text("Unavailable settings require a compatible workspace plan or license.")
+                    }
+                }
             }
             .disabled(viewModel.canManageWorkspace == false)
 
@@ -68,10 +85,10 @@ struct WorkspaceSettingsView: View {
     }
 
     private var canSave: Bool {
-        guard let workspace = viewModel.workspace else { return false }
+        guard viewModel.workspace != nil else { return false }
         return viewModel.canManageWorkspace &&
         viewModel.workspaceDraft.validationMessage == nil &&
-        viewModel.workspaceDraft.hasChanges(comparedTo: workspace) &&
+        viewModel.hasWorkspaceChanges &&
         viewModel.isSaving == false
     }
 

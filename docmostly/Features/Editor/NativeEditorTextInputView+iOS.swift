@@ -426,7 +426,13 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private func platformFont(for kind: NativeEditorBlockKind) -> UIFont {
         switch kind {
         case .heading(let level):
-            return UIFont.preferredFont(forTextStyle: level == 1 ? .title1 : .title2)
+            let font = UIFont.preferredFont(forTextStyle: level == 1 ? .title1 : .title2)
+            var traits = font.fontDescriptor.symbolicTraits
+            traits.insert(.traitBold)
+            guard let descriptor = font.fontDescriptor.withSymbolicTraits(traits) else {
+                return font
+            }
+            return UIFont(descriptor: descriptor, size: font.pointSize)
         case .codeBlock:
             let bodyFont = UIFont.preferredFont(forTextStyle: .body)
             let baseFont = UIFont.monospacedSystemFont(ofSize: bodyFont.pointSize, weight: .regular)

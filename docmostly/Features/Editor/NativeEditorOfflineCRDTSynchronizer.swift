@@ -20,7 +20,7 @@ nonisolated enum NativeEditorOfflineCRDTSyncError: LocalizedError, Equatable, Se
 protocol NativeEditorOfflineCRDTSynchronizing: Sendable {
     func synchronize(
         pageID: String,
-        engine: any NativeEditorCRDTDocumentEngine,
+        session: DocumentSession,
         url: URL,
         token: String,
         user: DocmostUser?
@@ -38,14 +38,18 @@ actor NativeEditorOfflineCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing 
 
     func synchronize(
         pageID: String,
-        engine: any NativeEditorCRDTDocumentEngine,
+        session: DocumentSession,
         url: URL,
         token: String,
         user: DocmostUser?
     ) async throws {
+        guard try await session.hasPendingSynchronization() else { return }
+        guard let coordinator = await session.syncCoordinator else {
+            throw APIError.connectionFailed("The local document session could not start collaboration.")
+        }
+
         let client = NativeEditorCollaborationPresenceClient(urlSession: urlSession)
         let document = NativeEditorCollaborationDocument(pageID: pageID)
-        let coordinator = NativeEditorCRDTSyncCoordinator(documentEngine: engine)
         let syncDriver = NativeEditorCollaborationSyncDriver(
             documentName: document.name,
             coordinator: coordinator
@@ -60,7 +64,7 @@ actor NativeEditorOfflineCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing 
         )
 
         do {
-            try await waitForSynchronization(events: events)
+            try await waitForSynchronization(events: events, session: session)
             await client.disconnect()
         } catch {
             await client.disconnect()
@@ -69,7 +73,8 @@ actor NativeEditorOfflineCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing 
     }
 
     private func waitForSynchronization(
-        events: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>
+        events: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>,
+        session: DocumentSession
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -82,7 +87,9 @@ actor NativeEditorOfflineCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing 
                         }
                         hasWriteAccess = true
                     case .syncStatus(true) where hasWriteAccess:
-                        return
+                        if try await session.hasPendingSynchronization() == false {
+                            return
+                        }
                     case .awareness, .stateless, .syncStatus:
                         continue
                     }

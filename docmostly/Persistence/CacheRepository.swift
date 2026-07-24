@@ -460,3 +460,59 @@ nonisolated final class CacheRepository {
         }
     }
 }
+
+nonisolated extension CacheRepository {
+    func upsertEditablePageMetadata(_ page: DocmostEditablePage, scope: CacheScope) throws {
+        if let cachedPage = try loadPage(idOrSlugId: page.id, scope: scope) {
+            cachedPage.updateMetadata(editablePage: page)
+        } else {
+            context.insert(CachedPage(editablePageMetadata: page, scope: scope))
+        }
+
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let pageID = page.id
+        let descriptor = FetchDescriptor<CachedPageTreeItem>(
+            predicate: #Predicate { item in
+                item.cacheServerBaseURL == serverBaseURL &&
+                    item.cacheUserID == userID &&
+                    item.id == pageID
+            }
+        )
+        for item in try context.fetch(descriptor) where item.icon != page.icon {
+            item.icon = page.icon
+            item.cachedAt = .now
+        }
+        try saveIfNeeded(true)
+    }
+
+    func updatePageIcon(pageID: String, icon: String?, updatedAt: Date?, scope: CacheScope) throws {
+        var hasChanges = false
+        if let page = try loadPage(idOrSlugId: pageID, scope: scope) {
+            if page.icon != icon || (updatedAt != nil && page.updatedAt != updatedAt) {
+                page.icon = icon
+                if let updatedAt {
+                    page.updatedAt = updatedAt
+                }
+                page.cachedAt = .now
+                hasChanges = true
+            }
+        }
+
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<CachedPageTreeItem>(
+            predicate: #Predicate { item in
+                item.cacheServerBaseURL == serverBaseURL &&
+                    item.cacheUserID == userID &&
+                    item.id == pageID
+            }
+        )
+        for item in try context.fetch(descriptor) where item.icon != icon {
+            item.icon = icon
+            item.cachedAt = .now
+            hasChanges = true
+        }
+        try saveIfNeeded(hasChanges)
+    }
+}

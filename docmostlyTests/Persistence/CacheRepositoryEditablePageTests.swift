@@ -97,6 +97,61 @@ struct CacheRepositoryEditablePageTests {
         #expect(cached.permissions == nil)
     }
 
+    @Test func updatingOnlyThePageIconPreservesTheDocumentAndRefreshesTreeRows() throws {
+        let (repository, context) = makeRepositoryAndContext()
+        let document = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(type: "text", text: "Keep this body")
+            ])
+        ])
+        try repository.saveEditablePage(editablePage(content: document), scope: scope)
+        try repository.savePageTree(
+            spaceId: "space-1",
+            parentPageId: nil,
+            pages: [htmlPage(title: "Roadmap")],
+            scope: scope
+        )
+
+        try repository.updatePageIcon(pageID: "page-1", icon: "🚀", updatedAt: nil, scope: scope)
+
+        let loadedPage = try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
+        let editable = try #require(loadedPage)
+        let treeItem = try #require(context.fetch(FetchDescriptor<CachedPageTreeItem>()).first)
+        #expect(editable.content == document)
+        #expect(editable.icon == "🚀")
+        #expect(treeItem.icon == "🚀")
+    }
+
+    @Test func upsertingPageMetadataCreatesMissingRowsAndPreservesExistingDocuments() throws {
+        let repository = makeRepository()
+        let originalDocument = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(type: "text", text: "Keep this body")
+            ])
+        ])
+        let replacementDocument = ProseMirrorDocument(content: [
+            ProseMirrorNode(type: "paragraph", content: [
+                ProseMirrorNode(type: "text", text: "Do not cache this body")
+            ])
+        ])
+        let metadata = editablePage(content: replacementDocument, icon: "🚀")
+
+        try repository.upsertEditablePageMetadata(metadata, scope: scope)
+        let metadataOnlyPage = try #require(
+            try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope)
+        )
+        #expect(metadataOnlyPage.icon == "🚀")
+        #expect(metadataOnlyPage.content == ProseMirrorDocument())
+        #expect(metadataOnlyPage.content != replacementDocument)
+
+        try repository.saveEditablePage(editablePage(content: originalDocument), scope: scope)
+        try repository.upsertEditablePageMetadata(metadata, scope: scope)
+
+        let loadedPage = try #require(try repository.loadEditablePage(idOrSlugId: "page-1", scope: scope))
+        #expect(loadedPage.icon == "🚀")
+        #expect(loadedPage.content == originalDocument)
+    }
+
     @Test func savingLocalEditableDraftPreservesRemoteUpdatedAtBaseline() throws {
         let repository = makeRepository()
         let remoteUpdatedAt = try Date("2026-06-28T08:00:00Z", strategy: .iso8601)
@@ -259,14 +314,15 @@ struct CacheRepositoryEditablePageTests {
     private func editablePage(
         content: ProseMirrorDocument?,
         updatedAt: Date? = nil,
-        permissions: DocmostPagePermissions? = DocmostPagePermissions(canEdit: true, hasRestriction: false)
+        permissions: DocmostPagePermissions? = DocmostPagePermissions(canEdit: true, hasRestriction: false),
+        icon: String? = nil
     ) -> DocmostEditablePage {
         DocmostEditablePage(
             id: "page-1",
             slugId: "roadmap",
             title: "Roadmap",
             content: content,
-            icon: nil,
+            icon: icon,
             spaceId: "space-1",
             updatedAt: updatedAt,
             permissions: permissions,

@@ -60,6 +60,28 @@ struct AppStateNavigationSelectionTests {
         #expect(appState.selectedPageID == nil)
     }
 
+    @Test func leavingSpaceSettingsReturnsToTheOriginatingSpace() {
+        let appState = makeAppState()
+        appState.selectSpace(id: "space-1")
+        appState.selectSidebarUtilityDestination(.settings, returningTo: .space("space-1"))
+
+        appState.selectSidebarDestination(nil)
+
+        #expect(appState.selectedSidebarDestination == .space("space-1"))
+        #expect(appState.selectedSpaceID == "space-1")
+    }
+
+    @Test func leavingAUtilityDestinationWithoutAReturnDestinationShowsTheSidebar() {
+        let appState = makeAppState()
+        appState.selectSpace(id: "space-1")
+        appState.selectSidebarUtilityDestination(.settings)
+
+        appState.selectSidebarDestination(nil)
+
+        #expect(appState.selectedSidebarDestination == nil)
+        #expect(appState.selectedSpaceID == "space-1")
+    }
+
     @Test func leavingTheSelectedPageClearsItsPageAndCommentSelection() {
         let appState = makeAppState()
         appState.selectPage(id: "page-1", commentID: "comment-1")

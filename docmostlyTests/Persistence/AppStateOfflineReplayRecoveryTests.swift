@@ -34,6 +34,7 @@ struct AppStateOfflineReplayRecoveryTests {
     @MainActor
     @Test func pageConflictDoesNotBlockAnUnrelatedQueuedMutation() async throws {
         let loader = OfflineReplayHTTPDataLoader(stubs: [
+            .init(statusCode: 200, data: try collaborationTokenEnvelope()),
             .init(statusCode: 200, data: try editablePageEnvelope(title: "Remote", body: "Remote change")),
             .init(statusCode: 200)
         ])
@@ -60,12 +61,13 @@ struct AppStateOfflineReplayRecoveryTests {
         #expect(pending.count == 1)
         #expect(pending.first?.kind == .updatePage)
         #expect(pending.first?.attemptCount == 1)
-        #expect(requestedPaths == ["/api/pages/info", "/api/pages/move"])
+        #expect(requestedPaths == ["/api/auth/collab-token", "/api/pages/info", "/api/pages/move"])
     }
 
     @MainActor
     @Test func rejectedPageContentIsRetainedWithoutBlockingLaterQueuedWork() async throws {
         let loader = OfflineReplayHTTPDataLoader(stubs: [
+            .init(statusCode: 200, data: try collaborationTokenEnvelope()),
             .init(statusCode: 422),
             .init(statusCode: 200)
         ])
@@ -92,31 +94,30 @@ struct AppStateOfflineReplayRecoveryTests {
         #expect(pending.count == 1)
         #expect(pending.first?.kind == .updatePage)
         #expect(pending.first?.attemptCount == 1)
-        #expect(requestedPaths == ["/api/pages/info", "/api/pages/move"])
+        #expect(requestedPaths == ["/api/auth/collab-token", "/api/pages/info", "/api/pages/move"])
     }
 
     @MainActor
-    @Test func CRDTPageReplayMergesThroughCollaborationWithoutRESTBodyReplacement() async throws {
+    @Test func legacyCRDTPageReplayMigratesIntoTheDocumentSessionWithoutRESTBodyReplacement() async throws {
         let queuedState = Data([1, 2, 3])
-        let preparedState = Data([4, 5, 6])
-        let engine = OfflineReplayCRDTDocumentEngine(preparedState: preparedState)
+        let engine = OfflineReplayCRDTDocumentEngine(preparedState: Data([4, 5, 6]))
         let factory = OfflineReplayCRDTDocumentEngineFactory(engine: engine)
-        let synchronizer = OfflineReplayCRDTSynchronizer()
         let loader = OfflineReplayHTTPDataLoader(stubs: [
-            .init(statusCode: 200, data: try collaborationTokenEnvelope()),
-            .init(statusCode: 200, data: try editablePageEnvelope(title: "Page", body: "Remote body"))
+            .init(statusCode: 200, data: try collaborationTokenEnvelope())
         ])
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
         let appState = AppState(
             crdtDocumentEngineFactory: factory,
-            offlineCRDTSynchronizer: synchronizer,
+            offlineCRDTSynchronizer: OfflineReplayCRDTSynchronizer(),
             apiClient: DocmostAPIClient(baseURL: baseURL, loader: loader)
         )
+        appState.serverURLString = baseURL.absoluteString
         let scope = CacheScope(serverBaseURL: baseURL, userID: "user-1")
         appState.configure(modelContext: context, modelContainer: container)
         appState.configurePreviewCacheScope(scope)
+        appState.currentUser = try currentUser()
         try appState.cacheRepository?.saveEditablePage(
             DocmostEditablePage(
                 id: "page-1",
@@ -144,16 +145,56 @@ struct AppStateOfflineReplayRecoveryTests {
         await replayTask.value
 
         let pending = try await appState.offlineQueueRepository?.pending(scope: scope)
-        let synchronizedStates = await synchronizer.synchronizedStates
         let requestedPaths = await loader.requestedPaths
+        let storedState = try await DocumentLocalPersistencePeer(modelContainer: container).load(
+            DocumentStoreKey(
+                serverBaseURL: scope.serverBaseURL,
+                userID: scope.userID,
+                workspaceID: "workspace-1",
+                pageID: "page-1"
+            )
+        )
         #expect(pending?.isEmpty == true)
         #expect(engine.appliedUpdates == [queuedState])
-        #expect(synchronizedStates == [preparedState])
-        #expect(requestedPaths == ["/api/auth/collab-token", "/api/pages/info"])
-        #expect(try await appState.cacheReader?.loadCRDTStateUpdate(
+        #expect(storedState.updates.map(\.payload) == [queuedState])
+        #expect(requestedPaths == ["/api/auth/collab-token"])
+    }
+
+    @MainActor
+    @Test func metadataReplayDoesNotRequireCreatingADocumentSession() async throws {
+        let loader = OfflineReplayHTTPDataLoader(stubs: [
+            .init(statusCode: 200, data: try editablePageEnvelope(title: "Remote", body: "Remote body")),
+            .init(statusCode: 200, data: try editablePageEnvelope(title: "Local", body: "Remote body"))
+        ])
+        let (appState, scope) = try makeConfiguredAppStateWithoutCRDT(loader: loader)
+        _ = try await appState.queueOfflineMutation(.updatePageMetadata(
             pageId: "page-1",
-            scope: scope
-        ) == preparedState)
+            title: "Local",
+            baseTitle: "Remote"
+        ))
+
+        appState.scheduleOfflineQueueReconciliation()
+        await appState.offlineReplayTask?.value
+
+        #expect(try await appState.offlineQueueRepository?.pending(scope: scope).isEmpty == true)
+        #expect(await loader.requestedPaths == ["/api/pages/info", "/api/pages/update"])
+    }
+
+    @MainActor
+    @Test func permanentTitleFailureRemovesThePreflightReconciliationMarker() async throws {
+        let loader = OfflineReplayHTTPDataLoader(stubs: [.init(statusCode: 403)])
+        let (appState, scope) = try makeConfiguredAppStateWithoutCRDT(loader: loader)
+
+        await #expect(throws: APIError.self) {
+            try await appState.updateCollaborativePageTitle(
+                pageId: "page-1",
+                title: "Rejected",
+                documentSnapshot: self.document(text: "Local body"),
+                baseTitle: "Remote"
+            )
+        }
+
+        #expect(try await appState.offlineQueueRepository?.pending(scope: scope).isEmpty == true)
     }
 
     @MainActor
@@ -162,10 +203,32 @@ struct AppStateOfflineReplayRecoveryTests {
     ) throws -> (AppState, CacheScope) {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
+        let engine = OfflineReplayCRDTDocumentEngine(preparedState: Data([4, 5, 6]))
+        let appState = AppState(
+            crdtDocumentEngineFactory: OfflineReplayCRDTDocumentEngineFactory(engine: engine),
+            offlineCRDTSynchronizer: OfflineReplayCRDTSynchronizer(),
+            apiClient: DocmostAPIClient(baseURL: baseURL, loader: loader)
+        )
+        let scope = CacheScope(serverBaseURL: baseURL, userID: "user-1")
+        appState.configure(modelContext: ModelContext(container), modelContainer: container)
+        appState.configurePreviewCacheScope(scope)
+        appState.currentUser = try currentUser()
+        appState.serverURLString = baseURL.absoluteString
+        return (appState, scope)
+    }
+
+    @MainActor
+    private func makeConfiguredAppStateWithoutCRDT(
+        loader: OfflineReplayHTTPDataLoader
+    ) throws -> (AppState, CacheScope) {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
         let appState = AppState(apiClient: DocmostAPIClient(baseURL: baseURL, loader: loader))
         let scope = CacheScope(serverBaseURL: baseURL, userID: "user-1")
         appState.configure(modelContext: ModelContext(container), modelContainer: container)
         appState.configurePreviewCacheScope(scope)
+        appState.currentUser = try currentUser()
+        appState.serverURLString = baseURL.absoluteString
         return (appState, scope)
     }
 
@@ -190,9 +253,17 @@ struct AppStateOfflineReplayRecoveryTests {
         ])
     }
 
+    private func currentUser() throws -> CurrentUserResponse {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "user": ["id": "user-1", "name": "User"],
+            "workspace": ["id": "workspace-1", "name": "Workspace"]
+        ])
+        return try JSONDecoder().decode(CurrentUserResponse.self, from: data)
+    }
+
     private func collaborationTokenEnvelope() throws -> Data {
         try JSONSerialization.data(withJSONObject: [
-            "data": ["token": "collaboration-token"],
+            "data": ["token": "test-token"],
             "success": true,
             "status": 200
         ])
@@ -205,6 +276,30 @@ struct AppStateOfflineReplayRecoveryTests {
                 content: [ProseMirrorNode(type: "text", text: text)]
             )
         ])
+    }
+}
+
+private actor OfflineReplayCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing {
+    func synchronize(
+        pageID: String,
+        session: DocumentSession,
+        url: URL,
+        token: String,
+        user: DocmostUser?
+    ) async throws {
+        _ = pageID
+        _ = url
+        _ = token
+        _ = user
+        guard let coordinator = await session.syncCoordinator else {
+            throw APIError.connectionFailed("Missing test collaboration coordinator.")
+        }
+        if try await coordinator.pendingLocalUpdates().isEmpty {
+            _ = try await coordinator.receive(.stepTwo(Data([9])))
+        }
+        for update in try await coordinator.pendingLocalUpdates() {
+            try await coordinator.recordLocalUpdateAcknowledged(update)
+        }
     }
 }
 
@@ -258,20 +353,6 @@ private final class OfflineReplayCRDTDocumentEngine: NativeEditorCRDTDocumentEng
     ) async throws -> NativeEditorCRDTSaveResult {
         state = preparedState
         return NativeEditorCRDTSaveResult(documentStateUpdate: preparedState)
-    }
-}
-
-private actor OfflineReplayCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing {
-    private(set) var synchronizedStates: [Data] = []
-
-    func synchronize(
-        pageID: String,
-        engine: any NativeEditorCRDTDocumentEngine,
-        url: URL,
-        token: String,
-        user: DocmostUser?
-    ) async throws {
-        synchronizedStates.append(try await engine.encodeDocumentState())
     }
 }
 

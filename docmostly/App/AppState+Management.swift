@@ -19,6 +19,20 @@ extension AppState {
         return page
     }
 
+    func updatePageIcon(pageId: String, icon: String) async throws -> DocmostEditablePage {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Changing a page emoji requires a network connection.")
+        }
+
+        let page: DocmostEditablePage = try await apiClient.send(.updatePage(pageId: pageId, icon: icon))
+        isOffline = false
+        if let cacheScope {
+            scheduleCacheWrite(.upsertEditablePageMetadata(page, scope: cacheScope))
+        }
+        markPageDiscoveryChanged()
+        return page
+    }
+
     func deletePage(pageId: String, permanentlyDelete: Bool = false) async throws {
         guard let apiClient else {
             throw APIError.connectionFailed("Deleting pages requires a network connection.")
@@ -237,6 +251,16 @@ extension AppState {
         }
         isOffline = false
         return workspace
+    }
+
+    func loadWorkspaceEntitlements() async throws -> DocmostWorkspaceEntitlements {
+        guard let apiClient else {
+            throw APIError.connectionFailed("Workspace feature availability requires a network connection.")
+        }
+
+        let entitlements: DocmostWorkspaceEntitlements = try await apiClient.send(.workspaceEntitlements)
+        isOffline = false
+        return entitlements
     }
 
     func updateWorkspace(_ update: WorkspaceUpdate) async throws -> DocmostWorkspace {

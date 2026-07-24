@@ -43,15 +43,18 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
     var editorFont: Font {
         switch self {
         case .heading(let level):
-            level == 1 ? .title : .title2
+            if level == 1 {
+                return .title.bold()
+            }
+            return .title2.bold()
         case .codeBlock:
-            .body.monospaced()
+            return .body.monospaced()
         case .paragraph, .bulletListItem, .orderedListItem, .taskListItem, .blockquote:
-            .body
+            return .body
         case .table, .image, .video, .audio, .pdf, .attachment, .callout, .details, .pageBreak, .divider,
                 .columns, .subpages, .transclusionSource, .transclusionReference, .base, .embed, .drawio,
                 .excalidraw, .mathBlock, .unsupported:
-            .body
+            return .body
         }
     }
 

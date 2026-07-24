@@ -205,6 +205,9 @@ extension NativeRichEditorViewModel {
     }
 
     func crdtDocumentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot> {
+        if let documentSession {
+            return documentSession.snapshots()
+        }
         guard let crdtDocumentEngine else {
             let (stream, continuation) = AsyncStream.makeStream(of: NativeEditorCRDTDocumentSnapshot.self)
             continuation.finish()
@@ -323,19 +326,25 @@ extension NativeRichEditorViewModel {
         crdtDocumentEngine = engine
         crdtSyncCoordinator = makeCRDTSyncCoordinator(for: engine)
         isCRDTEngineReadyForLocalChanges = restoredLocalState || engine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
     }
 
-    func persistCurrentCRDTState(appState: AppState) async {
-        await waitForStableCRDTLocalChangeBarrier()
-        guard let crdtDocumentEngine else { return }
-
-        do {
-            let update = try await crdtDocumentEngine.encodeDocumentState()
-            try await appState.persistCRDTStateUpdate(pageID: currentPageID, update: update)
-        } catch is CancellationError {
-            return
-        } catch {
-            appState.statusMessage = "Could not cache the collaborative document: " + error.localizedDescription
+    func configureDocumentSession(
+        _ session: DocumentSession,
+        restoredLocalState: Bool = false
+    ) {
+        documentSession = session
+        crdtDocumentEngine = session.documentEngine
+        crdtSyncCoordinator = session.syncCoordinator
+        isCRDTEngineReadyForLocalChanges = restoredLocalState ||
+            session.documentEngine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
+        if let initialSnapshot = session.initialSnapshot {
+            if isCRDTEngineReadyForLocalChanges {
+                applyInitialCRDTDocumentSnapshot(initialSnapshot)
+            } else {
+                applyRetainedDraftProjection(initialSnapshot)
+            }
         }
     }
 
@@ -414,6 +423,18 @@ extension NativeRichEditorViewModel {
             localAwarenessCursor: localAwarenessCursor,
             localAwarenessUpdates: localAwarenessUpdates
         )
+    }
+
+    func markDocumentRemotePeerConnected() async {
+        await documentSession?.markRemoteConnected()
+    }
+
+    func retainCurrentDocumentDraft(title: String, document: ProseMirrorDocument) async throws {
+        try await documentSession?.retainDraft(title: title, document: document)
+    }
+
+    func clearRetainedDocumentDraft() async {
+        await documentSession?.clearRetainedDraft()
     }
 
     func refreshResolvedRemoteCursors() async {
@@ -528,6 +549,7 @@ extension NativeRichEditorViewModel {
 
     private func applyInitialCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
         isCRDTEngineReadyForLocalChanges = true
+        updateEditAccess()
 
         guard isDirty else {
             applyCleanCRDTDocumentSnapshot(snapshot)
@@ -571,6 +593,16 @@ extension NativeRichEditorViewModel {
         }
 
         deferCRDTDocumentSnapshot(snapshot)
+    }
+
+    private func applyRetainedDraftProjection(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        if let snapshotTitle = snapshot.title {
+            title = snapshotTitle
+        }
+        document = snapshot.document
+        retainedReadOnlyDraftSnapshot = makeHistorySnapshot()
+        hasDurablyPersistedLocalCRDTDraft = true
+        isDirty = true
     }
 
     private func applyCleanCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {

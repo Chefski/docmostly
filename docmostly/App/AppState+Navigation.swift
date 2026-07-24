@@ -2,25 +2,32 @@ import Foundation
 
 extension AppState {
     func selectSidebarDestination(_ destination: SidebarDestination?) {
-        selectedSidebarDestination = destination
+        let resolvedDestination = destination ?? sidebarReturnDestination
+        sidebarReturnDestination = nil
+        selectedSidebarDestination = resolvedDestination
 
-        if case .space(let spaceID) = destination {
+        if case .space(let spaceID) = resolvedDestination {
             selectSpace(id: spaceID)
         }
     }
 
-    func selectSidebarUtilityDestination(_ destination: SidebarDestination) {
+    func selectSidebarUtilityDestination(
+        _ destination: SidebarDestination,
+        returningTo returnDestination: SidebarDestination? = nil
+    ) {
         if case .space(let spaceID) = destination {
             selectSpace(id: spaceID)
             return
         }
 
+        sidebarReturnDestination = returnDestination
         selectedSidebarDestination = destination
         selectedPageID = nil
         selectedCommentID = nil
     }
 
     func selectSpace(id spaceID: String, clearsPage: Bool = true) {
+        sidebarReturnDestination = nil
         selectedSpaceID = spaceID
         selectedSidebarDestination = .space(spaceID)
         rememberSelectedSpace(id: spaceID)
@@ -70,6 +77,7 @@ extension AppState {
     }
 
     func resetNavigationSelection() {
+        sidebarReturnDestination = nil
         selectedSidebarDestination = nil
         selectedSpaceID = nil
         selectedPageID = nil

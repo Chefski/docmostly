@@ -161,6 +161,9 @@ actor NativeEditorCollaborationPresenceClient {
         case .stateless(let event):
             yieldStatelessEvent(event, continuation: continuation)
         case .syncStatus(let isSynced):
+            if isSynced {
+                try? await context.syncDriver?.didReceiveSyncAcknowledgement()
+            }
             continuation.yield(.syncStatus(isSynced))
         case .sync(let syncMessage):
             try await sendCRDTSyncReply(
@@ -196,18 +199,43 @@ private extension NativeEditorCollaborationPresenceClient {
         continuation: AsyncThrowingStream<NativeEditorCollaborationEvent, any Error>.Continuation
     ) async throws {
         authenticatedScope = scope
-        try await sendInitialCRDTSync(for: scope, using: context.syncDriver)
-        configureLocalDocumentUpdates(for: scope, context: context)
+        let localUpdateSubscription: (
+            updates: AsyncStream<Data>,
+            cancel: @Sendable () async -> Void
+        )? = if context.allowsLocalDocumentUpdates(for: scope),
+                let syncDriver = context.syncDriver {
+            await syncDriver.localUpdateSubscription()
+        } else {
+            nil
+        }
+        do {
+            try await sendInitialCRDTSync(
+                for: scope,
+                includePendingLocalUpdates: context.allowsLocalDocumentUpdates(for: scope),
+                using: context.syncDriver
+            )
+        } catch {
+            if let localUpdateSubscription {
+                await localUpdateSubscription.cancel()
+            }
+            throw error
+        }
+        configureLocalDocumentUpdates(
+            for: scope,
+            context: context,
+            updates: localUpdateSubscription?.updates
+        )
         try await configureLocalAwarenessUpdates(for: scope, context: context)
         continuation.yield(.authenticated(scope))
     }
 
     func configureLocalDocumentUpdates(
         for scope: NativeEditorCollaborationScope,
-        context: NativeEditorCollaborationSessionContext
+        context: NativeEditorCollaborationSessionContext,
+        updates: AsyncStream<Data>?
     ) {
-        if context.allowsLocalDocumentUpdates(for: scope) {
-            startLocalUpdateSender(using: context.syncDriver)
+        if context.allowsLocalDocumentUpdates(for: scope), let updates {
+            startLocalUpdateSender(using: context.syncDriver, updates: updates)
         } else {
             stopLocalUpdateSender()
         }
@@ -238,12 +266,16 @@ private extension NativeEditorCollaborationPresenceClient {
 
     func sendInitialCRDTSync(
         for scope: NativeEditorCollaborationScope,
+        includePendingLocalUpdates: Bool,
         using syncDriver: NativeEditorCollaborationSyncDriver?
     ) async throws {
         guard scope.allowsInitialDocumentSync else { return }
         guard let syncDriver else { return }
-        let frames = try await syncDriver.outboundFramesAfterAuthentication()
+        let frames = try await syncDriver.outboundFramesAfterAuthentication(
+            includePendingLocalUpdates: includePendingLocalUpdates
+        )
         try await send(frames)
+        try await syncDriver.didSendOutboundFramesAfterAuthentication()
     }
 
     func sendCRDTSyncReply(
@@ -277,17 +309,20 @@ private extension NativeEditorCollaborationPresenceClient {
         awarenessPruneTask = nil
     }
 
-    func startLocalUpdateSender(using syncDriver: NativeEditorCollaborationSyncDriver?) {
+    func startLocalUpdateSender(
+        using syncDriver: NativeEditorCollaborationSyncDriver?,
+        updates: AsyncStream<Data>
+    ) {
         stopLocalUpdateSender()
 
         guard let syncDriver else { return }
 
-        localUpdateTask = Task { [weak self, syncDriver] in
-            let updates = await syncDriver.localUpdates()
-
+        localUpdateTask = Task { [weak self, syncDriver, updates] in
             for await update in updates {
                 guard Task.isCancelled == false else { return }
-                let frame = await syncDriver.outboundFrame(forLocalUpdate: update)
+                guard let frame = await syncDriver.outboundFrameIfNeeded(forLocalUpdate: update) else {
+                    continue
+                }
 
                 do {
                     try await self?.send(frame)

@@ -61,7 +61,7 @@ test("applies remote document update to empty native state", () => {
   secondDocument.applyRemoteUpdate(update);
 
   assert.deepEqual(secondDocument.drainDocumentSnapshots(), [{
-    title: "Page",
+    title: null,
     document: paragraphDocument("Shared edit"),
     updatedAt: null
   }]);
@@ -82,7 +82,7 @@ test("does not duplicate content when syncing with server-converted ydoc", () =>
   nativeDocument.applyRemoteUpdate(serverUpdate);
 
   assert.deepEqual(nativeDocument.drainDocumentSnapshots(), [{
-    title: "Page",
+    title: null,
     document: paragraphDocument("Seed"),
     updatedAt: null
   }]);
@@ -100,10 +100,39 @@ test("restores a cached full document update into an empty native document", () 
   restoredDocument.applyRemoteUpdate(cachedState);
 
   assert.deepEqual(restoredDocument.drainDocumentSnapshots(), [{
-    title: "Page",
+    title: null,
     document: paragraphDocument("Cached offline base"),
     updatedAt: null
   }]);
+});
+
+test("validates an update without mutating the live document", () => {
+  const source = serverYDocFromJSON(paragraphDocument("Validated"));
+  const update = base64FromBytes(Y.encodeStateAsUpdate(source));
+  const document = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Stale projection")
+  });
+
+  assert.equal(document.validateUpdate(update), true);
+  assert.deepEqual(document.currentSnapshot(), {
+    title: null,
+    document: { type: "doc", content: [] },
+    updatedAt: null
+  });
+  assert.deepEqual(document.drainDocumentSnapshots(), []);
+});
+
+test("rejects corrupt updates during validation", () => {
+  const document = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+
+  assert.throws(() => document.validateUpdate("AQIDBA=="));
+  assert.deepEqual(document.drainDocumentSnapshots(), []);
 });
 
 test("merges non-overlapping edits from two offline native documents", () => {

@@ -43,24 +43,25 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         let bundle = try makeBundle(runtimeSource: Self.runtimeSource)
         defer { try? FileManager.default.removeItem(at: bundle.bundleURL) }
         let appState = AppState.production(crdtRuntimeBundle: bundle)
+        let factory = try #require(appState.crdtDocumentEngineFactory)
 
-        let preparedEngine = try #require(try await appState.makeCRDTDocumentEngine(
+        let engine = try await factory.makeDocumentEngine(
             pageID: "page-1",
             title: "Page",
             document: document(text: "Seed")
-        ))
+        )
 
-        #expect(try await preparedEngine.engine.encodeStateVector() == Data([1]))
-        #expect(preparedEngine.restoredLocalState == false)
+        #expect(try await engine.encodeStateVector() == Data([1]))
     }
 
     @Test func productionAppStateDefersMissingRuntimeFailureUntilEngineCreation() async throws {
         let bundle = try makeBundle(runtimeSource: nil)
         defer { try? FileManager.default.removeItem(at: bundle.bundleURL) }
         let appState = AppState.production(crdtRuntimeBundle: bundle)
+        let factory = try #require(appState.crdtDocumentEngineFactory)
 
         do {
-            _ = try await appState.makeCRDTDocumentEngine(
+            _ = try await factory.makeDocumentEngine(
                 pageID: "page-1",
                 title: "Page",
                 document: document(text: "Seed")
@@ -122,8 +123,35 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
         try await secondEngine.applyRemoteUpdate(update)
 
         let snapshot = try #require(await snapshotIterator.next())
-        #expect(snapshot.title == "Page")
+        #expect(snapshot.title == nil)
         #expect(snapshot.document.blocks.map { String($0.text.characters) } == ["Shared edit"])
+    }
+
+    @Test func coordinatorCommitsEachExplicitRuntimeUpdateOnlyOnce() async throws {
+        let source = try NativeEditorJSCRDTRuntimeSource.bundled(in: .main)
+        let engine = try NativeEditorJSCRDTDocumentEngine(
+            pageID: "page-1",
+            title: "Page",
+            document: document(text: "Seed"),
+            runtimeSource: source
+        )
+        let counter = CRDTCommitCounter()
+        let coordinator = NativeEditorCRDTSyncCoordinator(
+            documentEngine: engine,
+            localUpdateCommitter: { _ in
+                await counter.increment()
+                return true
+            }
+        )
+        _ = await coordinator.localUpdates()
+
+        try await coordinator.integrateLocalChange(NativeEditorCRDTLocalChange(
+            before: historySnapshot(title: "Page", text: "Seed"),
+            after: historySnapshot(title: "Page", text: "Edited once")
+        ))
+        await Task.yield()
+
+        #expect(await counter.value == 1)
     }
 
     @Test func mainBundleRuntimeRoundTripsAwarenessCursorAfterSync() async throws {
@@ -220,7 +248,11 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
             return "";
           },
           encodeStateAsUpdate() { return ""; },
+          validateUpdate() { return true; },
           applyRemoteUpdate() {},
+          currentSnapshot() {
+            return { title: null, updatedAt: null, document: seed.document };
+          },
           integrateLocalChange() {},
           flushPendingLocalChanges(title) { return { title, updatedAt: null }; },
           resolveRemoteCursor() { return null; },
@@ -279,4 +311,12 @@ struct NativeEditorJSCRDTRuntimeSourceTests {
     </dict>
     </plist>
     """
+}
+
+private actor CRDTCommitCounter {
+    private(set) var value = 0
+
+    func increment() {
+        value += 1
+    }
 }

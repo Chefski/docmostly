@@ -237,9 +237,27 @@ class DocmostlyCRDTDocument {
     return base64FromBytes(Y.encodeStateAsUpdate(this.ydoc, bytesFromBase64(stateVector)));
   }
 
+  validateUpdate(update) {
+    const validationDocument = new Y.Doc();
+    try {
+      Y.applyUpdate(validationDocument, bytesFromBase64(update));
+      return true;
+    } finally {
+      validationDocument.destroy();
+    }
+  }
+
   applyRemoteUpdate(update) {
     Y.applyUpdate(this.ydoc, bytesFromBase64(update), this.remoteOrigin);
     this.enqueueSnapshot();
+  }
+
+  currentSnapshot() {
+    return {
+      title: null,
+      document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
+      updatedAt: null
+    };
   }
 
   integrateLocalChange(change) {
@@ -324,7 +342,7 @@ class DocmostlyCRDTDocument {
 
   enqueueSnapshot() {
     this.snapshots.push({
-      title: this.title,
+      title: null,
       document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
       updatedAt: null
     });
