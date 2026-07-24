@@ -26,21 +26,21 @@ extension NativeEditorMarkdownParser {
             in: remaining,
             autolinksBareWebURLs: autolinksBareWebURLs
         ) {
-            output += AttributedString(String(remaining[..<match.range.lowerBound]))
+            output += AttributedString(unescapedMarkdownPlainText(String(remaining[..<match.range.lowerBound])))
             output += match.text
             remaining = remaining[match.range.upperBound...]
         }
 
-        output += AttributedString(String(remaining))
+        output += AttributedString(unescapedMarkdownPlainText(String(remaining)))
         return output
     }
 
     static func inlineRunMarkdown(from run: AttributedString.Runs.Run, text: String) -> String {
-        var output = text
+        var output = escapedMarkdownPlainText(text)
         let intent = run.inlinePresentationIntent ?? []
 
         if intent.contains(.code) {
-            output = codeMarkdown(from: output)
+            output = codeMarkdown(from: text)
         } else {
             if intent.contains(.stronglyEmphasized) {
                 output = "**\(output)**"
@@ -56,7 +56,7 @@ extension NativeEditorMarkdownParser {
         }
 
         if let href = run[NativeEditorLinkAttribute.self]?.href ?? run.link?.absoluteString {
-            output = "[\(escapedMarkdownLinkLabel(output))](\(href))"
+            output = "[\(output)](\(href))"
         }
 
         return output
@@ -99,13 +99,6 @@ extension NativeEditorMarkdownParser {
         }
 
         return longestRunLength
-    }
-
-    private static func escapedMarkdownLinkLabel(_ text: String) -> String {
-        text
-            .replacing("\\", with: "\\\\")
-            .replacing("[", with: "\\[")
-            .replacing("]", with: "\\]")
     }
 
     private static func inlineMarkdownInputRuleChanged(
@@ -214,8 +207,15 @@ extension NativeEditorMarkdownParser {
         in markdown: Substring,
         startingAt searchStart: String.Index
     ) -> Range<String.Index>? {
-        guard searchStart < markdown.endIndex,
-              let runStart = markdown[searchStart...].firstIndex(of: "`") else { return nil }
+        guard searchStart < markdown.endIndex else { return nil }
+        var runStart = searchStart
+        while runStart < markdown.endIndex {
+            if markdown[runStart] == "`", isEscapedMarkdownCharacter(at: runStart, in: markdown) == false {
+                break
+            }
+            runStart = markdown.index(after: runStart)
+        }
+        guard runStart < markdown.endIndex else { return nil }
 
         var runEnd = runStart
         while runEnd < markdown.endIndex, markdown[runEnd] == "`" {
@@ -229,23 +229,30 @@ extension NativeEditorMarkdownParser {
         var searchStart = markdown.startIndex
 
         while searchStart < markdown.endIndex,
-              let openLabelIndex = markdown[searchStart...].firstIndex(of: "[") {
+              let openLabelRange = firstUnescapedRange(of: "[", in: markdown, startingAt: searchStart) {
+            let openLabelIndex = openLabelRange.lowerBound
             if isImageMarker(before: openLabelIndex, in: markdown) {
                 searchStart = markdown.index(after: openLabelIndex)
                 continue
             }
 
             guard
-                let closeLabelIndex = markdown[markdown.index(after: openLabelIndex)...].firstIndex(of: "]"),
-                markdown.index(after: closeLabelIndex) < markdown.endIndex,
-                markdown[markdown.index(after: closeLabelIndex)] == "(",
+                let closeLabelRange = firstUnescapedRange(
+                    of: "]",
+                    in: markdown,
+                    startingAt: markdown.index(after: openLabelIndex)
+                ),
+                markdown.index(after: closeLabelRange.lowerBound) < markdown.endIndex,
+                markdown[markdown.index(after: closeLabelRange.lowerBound)] == "(",
                 let closeDestinationIndex = closingMarkdownLinkDestinationIndex(
                     in: markdown,
-                    startingAt: markdown.index(after: markdown.index(after: closeLabelIndex))
+                    startingAt: markdown.index(after: markdown.index(after: closeLabelRange.lowerBound))
                 )
             else {
                 return nil
             }
+
+            let closeLabelIndex = closeLabelRange.lowerBound
 
             let labelStartIndex = markdown.index(after: openLabelIndex)
             let destinationStartIndex = markdown.index(after: markdown.index(after: closeLabelIndex))
@@ -281,8 +288,12 @@ extension NativeEditorMarkdownParser {
         priority: Int
     ) -> InlineMarkdownMatch? {
         guard
-            let openRange = markdown.range(of: delimiter),
-            let closeRange = markdown[openRange.upperBound...].range(of: delimiter)
+            let openRange = firstUnescapedRange(of: delimiter, in: markdown),
+            let closeRange = firstUnescapedRange(
+                of: delimiter,
+                in: markdown,
+                startingAt: openRange.upperBound
+            )
         else {
             return nil
         }

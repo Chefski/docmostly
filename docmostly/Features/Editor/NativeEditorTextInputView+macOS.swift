@@ -130,6 +130,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             renderedText(
                 sourceText,
                 font: platformFont(for: parent.block.kind),
+                kind: parent.block.kind,
                 alignment: platformAlignment(parent.block.alignment)
             )
         )
@@ -351,6 +352,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             renderedText(
                 source,
                 font: platformFont(for: parent.block.kind),
+                kind: parent.block.kind,
                 alignment: platformAlignment(parent.block.alignment)
             )
         )
@@ -405,6 +407,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
     private func renderedText(
         _ text: AttributedString,
         font: NSFont,
+        kind: NativeEditorBlockKind,
         alignment: NSTextAlignment
     ) -> NSAttributedString {
         let rendered = NSMutableAttributedString(
@@ -415,7 +418,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
         paragraphStyle.alignment = alignment
 
         rendered.addAttribute(.font, value: font, range: fullRange)
-        applyInlinePresentationFonts(from: text, baseFont: font, to: rendered)
+        applyInlinePresentationFonts(from: text, baseFont: font, kind: kind, to: rendered)
         var rangesMissingForegroundColor: [NSRange] = []
         rendered.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
             if value == nil {
@@ -432,6 +435,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
     private func applyInlinePresentationFonts(
         from text: AttributedString,
         baseFont: NSFont,
+        kind: NativeEditorBlockKind,
         to rendered: NSMutableAttributedString
     ) {
         let plainText = String(text.characters)
@@ -441,10 +445,21 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             let upperBound = text.characters.distance(from: text.startIndex, to: run.range.upperBound)
             let characterRange = lowerBound..<upperBound
             let range = NativeEditorCharacterRange.nsRange(for: characterRange, in: plainText)
-            var runFont = intent.contains(.code)
-                ? NSFont.monospacedSystemFont(ofSize: baseFont.pointSize, weight: .regular)
-                : baseFont
-            if intent.contains(.stronglyEmphasized) {
+            let hasStrongEmphasis = intent.contains(.stronglyEmphasized)
+            let usesHeavyHeadingWeight = hasStrongEmphasis && kind.isHeading
+            let emphasizedWeight: NSFont.Weight = usesHeavyHeadingWeight ? .heavy : .regular
+            var runFont: NSFont
+            if intent.contains(.code) {
+                runFont = NSFont.monospacedSystemFont(
+                    ofSize: baseFont.pointSize,
+                    weight: emphasizedWeight
+                )
+            } else if usesHeavyHeadingWeight {
+                runFont = NSFont.systemFont(ofSize: baseFont.pointSize, weight: emphasizedWeight)
+            } else {
+                runFont = baseFont
+            }
+            if hasStrongEmphasis && usesHeavyHeadingWeight == false {
                 runFont = NSFontManager.shared.convert(runFont, toHaveTrait: .boldFontMask)
             }
             if intent.contains(.emphasized) {
@@ -463,9 +478,9 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
 
     private func platformFont(for kind: NativeEditorBlockKind) -> NSFont {
         switch kind {
-        case .heading(let level):
+        case .heading:
             let font = NSFont.preferredFont(
-                forTextStyle: level == 1 ? .title1 : .title2,
+                forTextStyle: kind.headingTextStyle,
                 options: [:]
             )
             return NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
@@ -487,6 +502,27 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             .right
         case .justify:
             .justified
+        }
+    }
+}
+
+private extension NativeEditorBlockKind {
+    var isHeading: Bool {
+        if case .heading = self {
+            return true
+        }
+        return false
+    }
+
+    var headingTextStyle: NSFont.TextStyle {
+        guard case .heading(let level) = self else { return .body }
+        return switch level {
+        case 1: .title1
+        case 2: .title2
+        case 3: .title3
+        case 4: .headline
+        case 5: .subheadline
+        default: .footnote
         }
     }
 }

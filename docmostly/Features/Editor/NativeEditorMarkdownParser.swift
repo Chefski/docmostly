@@ -13,7 +13,9 @@ enum NativeEditorMarkdownParser {
     }
 
     static func blocks(from markdown: String) -> [NativeEditorBlock] {
-        let markdown = removingLeadingYAMLFrontMatter(from: markdown)
+        let markdown = resolvingReferenceStyleLinks(
+            in: removingLeadingYAMLFrontMatter(from: markdown)
+        )
         let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var blocks: [NativeEditorBlock] = []
         var index = lines.startIndex
@@ -22,6 +24,12 @@ enum NativeEditorMarkdownParser {
             if let fencedCode = fencedCodeBlock(in: lines, startingAt: index) {
                 blocks.append(fencedCode.block)
                 index = fencedCode.endIndex
+                continue
+            }
+
+            if let commonMarkBlock = commonMarkBlock(in: lines, startingAt: index) {
+                blocks.append(commonMarkBlock.block)
+                index = commonMarkBlock.endIndex
                 continue
             }
 
@@ -64,25 +72,6 @@ enum NativeEditorMarkdownParser {
         }
 
         return blocks.isEmpty ? [NativeEditorDocument.emptyBlock()] : blocks
-    }
-
-    private static func removingLeadingYAMLFrontMatter(from markdown: String) -> String {
-        var start = markdown.startIndex
-        while start < markdown.endIndex, markdown[start].isWhitespace {
-            start = markdown.index(after: start)
-        }
-
-        guard start < markdown.endIndex, markdown[start...].hasPrefix("---") else { return markdown }
-
-        let bodyStart = markdown.index(start, offsetBy: 3)
-        guard let closeRange = markdown[bodyStart...].range(of: "---") else { return markdown }
-
-        var contentStart = closeRange.upperBound
-        while contentStart < markdown.endIndex, markdown[contentStart].isWhitespace {
-            contentStart = markdown.index(after: contentStart)
-        }
-
-        return String(markdown[contentStart...])
     }
 
     private static func paragraphBlock(
@@ -409,7 +398,7 @@ enum NativeEditorMarkdownParser {
         case .table(let table):
             return tableMarkdown(from: table)
         default:
-            return richMarkdownLine(from: block) ?? text
+            return richMarkdownLine(from: block) ?? escapedBlockLeadingMarkdown(in: text)
         }
     }
 

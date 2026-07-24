@@ -168,10 +168,23 @@ struct NativeEditorRichBlockPreviewView: View {
         case .unsupported:
             NativeEditorUnsupportedBlockView(block: block)
         case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
-            Text(block.text)
+            Text(previewText)
                 .font(block.kind.editorFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private var previewText: AttributedString {
+        var text = block.text
+        guard case .heading = block.kind else { return text }
+
+        let stronglyEmphasizedRanges = text.runs.compactMap { run in
+            run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true ? run.range : nil
+        }
+        for range in stronglyEmphasizedRanges {
+            text[range].font = block.kind.stronglyEmphasizedEditorFont
+        }
+        return text
     }
 
     private func previewShell<Content: View>(

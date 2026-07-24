@@ -43,10 +43,14 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
     var editorFont: Font {
         switch self {
         case .heading(let level):
-            if level == 1 {
-                return .title.bold()
+            return switch level {
+            case 1: .title.bold()
+            case 2: .title2.bold()
+            case 3: .title3.bold()
+            case 4: .headline.bold()
+            case 5: .subheadline.bold()
+            default: .footnote.bold()
             }
-            return .title2.bold()
         case .codeBlock:
             return .body.monospaced()
         case .paragraph, .bulletListItem, .orderedListItem, .taskListItem, .blockquote:
@@ -55,6 +59,22 @@ nonisolated enum NativeEditorBlockKind: Equatable, Sendable {
                 .columns, .subpages, .transclusionSource, .transclusionReference, .base, .embed, .drawio,
                 .excalidraw, .mathBlock, .unsupported:
             return .body
+        }
+    }
+
+    var stronglyEmphasizedEditorFont: Font {
+        switch self {
+        case .heading(let level):
+            return switch level {
+            case 1: .title.weight(.heavy)
+            case 2: .title2.weight(.heavy)
+            case 3: .title3.weight(.heavy)
+            case 4: .headline.weight(.heavy)
+            case 5: .subheadline.weight(.heavy)
+            default: .footnote.weight(.heavy)
+            }
+        default:
+            return editorFont.bold()
         }
     }
 
