@@ -123,7 +123,7 @@ enum NativeEditorMarkdownParser {
             return nil
         }
 
-        return String(block.text.characters)
+        return lines[index].trimmingCharacters(in: .whitespaces)
     }
 
     static func inputRule(from text: String) -> NativeEditorMarkdownInputRule? {
