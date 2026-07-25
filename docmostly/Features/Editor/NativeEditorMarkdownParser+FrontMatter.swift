@@ -7,16 +7,16 @@ extension NativeEditorMarkdownParser {
             start = markdown.index(after: start)
         }
 
-        guard start < markdown.endIndex, markdown[start...].hasPrefix("---") else { return markdown }
-
-        let bodyStart = markdown.index(start, offsetBy: 3)
-        guard let closeRange = markdown[bodyStart...].range(of: "---") else { return markdown }
-
-        var contentStart = closeRange.upperBound
-        while contentStart < markdown.endIndex, markdown[contentStart].isWhitespace {
-            contentStart = markdown.index(after: contentStart)
+        let lines = markdown[start...].split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) == "---",
+              let closingIndex = lines.dropFirst().firstIndex(where: {
+                  $0.trimmingCharacters(in: .whitespacesAndNewlines) == "---"
+              }) else {
+            return markdown
         }
 
-        return String(markdown[contentStart...])
+        let content = lines[lines.index(after: closingIndex)...].joined(separator: "\n")
+        guard let contentStart = content.firstIndex(where: { $0.isWhitespace == false }) else { return "" }
+        return String(content[contentStart...])
     }
 }

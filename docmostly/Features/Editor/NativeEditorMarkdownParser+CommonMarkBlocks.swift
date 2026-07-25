@@ -13,6 +13,10 @@ extension NativeEditorMarkdownParser {
         in lines: [String],
         startingAt index: Array<String>.Index
     ) -> (block: NativeEditorBlock, endIndex: Array<String>.Index)? {
+        let trimmedLine = lines[index].trimmingCharacters(in: .whitespaces)
+        if isIndentedListItem(trimmedLine) {
+            return nil
+        }
         guard let firstLine = indentedCodeLine(from: lines[index]) else { return nil }
 
         var content = [firstLine]
@@ -53,6 +57,16 @@ extension NativeEditorMarkdownParser {
         }
         guard columns >= 4 else { return nil }
         return String(line[index...])
+    }
+
+    private static func isIndentedListItem(_ line: String) -> Bool {
+        guard let kind = inputRule(from: line)?.kind else { return false }
+        switch kind {
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            true
+        default:
+            false
+        }
     }
 
     private static func setextHeadingBlock(

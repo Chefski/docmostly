@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import docmostly
 
@@ -44,5 +45,18 @@ struct NativeEditorHeadingMarkdownTests {
         #expect(blocks[1].kind == .heading(level: 5))
         #expect(blocks[2].kind == .heading(level: 6))
         #expect(NativeEditorMarkdownParser.markdown(from: blocks) == markdown)
+    }
+
+    @Test func previewFormatterAppliesAFontOnlyToStrongHeadingRuns() throws {
+        var source = AttributedString("Release today")
+        let strongRange = try #require(source.range(of: "today"))
+        source[strongRange].inlinePresentationIntent = .stronglyEmphasized
+
+        let formatted = NativeEditorPreviewTextFormatter.text(source, for: .heading(level: 2))
+        let releaseRun = try #require(formatted.runs.first)
+        let strongRun = try #require(formatted.runs.last)
+
+        #expect(releaseRun.font == nil)
+        #expect(strongRun.font != nil)
     }
 }

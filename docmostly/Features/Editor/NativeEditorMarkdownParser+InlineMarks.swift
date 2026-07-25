@@ -237,22 +237,16 @@ extension NativeEditorMarkdownParser {
             }
 
             guard
-                let closeLabelRange = firstUnescapedRange(
-                    of: "]",
-                    in: markdown,
-                    startingAt: markdown.index(after: openLabelIndex)
-                ),
-                markdown.index(after: closeLabelRange.lowerBound) < markdown.endIndex,
-                markdown[markdown.index(after: closeLabelRange.lowerBound)] == "(",
+                let closeLabelIndex = closingInlineMarkdownLabelIndex(in: markdown, after: openLabelIndex),
+                markdown.index(after: closeLabelIndex) < markdown.endIndex,
+                markdown[markdown.index(after: closeLabelIndex)] == "(",
                 let closeDestinationIndex = closingMarkdownLinkDestinationIndex(
                     in: markdown,
-                    startingAt: markdown.index(after: markdown.index(after: closeLabelRange.lowerBound))
+                    startingAt: markdown.index(after: markdown.index(after: closeLabelIndex))
                 )
             else {
                 return nil
             }
-
-            let closeLabelIndex = closeLabelRange.lowerBound
 
             let labelStartIndex = markdown.index(after: openLabelIndex)
             let destinationStartIndex = markdown.index(after: markdown.index(after: closeLabelIndex))
@@ -279,6 +273,37 @@ extension NativeEditorMarkdownParser {
         }
 
         return nil
+    }
+
+    private static func closingInlineMarkdownLabelIndex(
+        in markdown: Substring,
+        after openLabelIndex: String.Index
+    ) -> String.Index? {
+        var index = markdown.index(after: openLabelIndex)
+        while index < markdown.endIndex {
+            if markdown[index] == "`", let codeRange = inlineCodeSpanRange(in: markdown, startingAt: index) {
+                index = codeRange.upperBound
+                continue
+            }
+            if markdown[index] == "]", isEscapedMarkdownCharacter(at: index, in: markdown) == false {
+                return index
+            }
+            index = markdown.index(after: index)
+        }
+        return nil
+    }
+
+    private static func inlineCodeSpanRange(
+        in markdown: Substring,
+        startingAt openingStart: String.Index
+    ) -> Range<String.Index>? {
+        var openingEnd = openingStart
+        while openingEnd < markdown.endIndex, markdown[openingEnd] == "`" {
+            openingEnd = markdown.index(after: openingEnd)
+        }
+        let delimiter = String(markdown[openingStart..<openingEnd])
+        guard let closeRange = markdown[openingEnd...].range(of: delimiter) else { return nil }
+        return openingStart..<closeRange.upperBound
     }
 
     private static func delimitedInlineMarkdownMatch(

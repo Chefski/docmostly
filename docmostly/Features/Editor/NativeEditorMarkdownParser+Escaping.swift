@@ -71,20 +71,28 @@ extension NativeEditorMarkdownParser {
         let exactMarkers = ["---", "***", "___"]
         let startsFixedSyntax = fixedPrefixes.contains { text.hasPrefix($0) }
         let startsFence = text.hasPrefix("```") || text.hasPrefix("~~~")
-        let startsOrderedList = startsWithOrderedListMarker(text)
+        let isSetextUnderline = text.isEmpty == false &&
+            (text.allSatisfy { $0 == "-" } || text.allSatisfy { $0 == "=" })
         let isExactMarker = exactMarkers.contains(text)
-        guard startsFixedSyntax || startsFence || startsOrderedList || isExactMarker else { return text }
+
+        if let orderedListDotIndex = orderedListDotIndex(in: text) {
+            var escaped = text
+            escaped.insert("\\", at: orderedListDotIndex)
+            return escaped
+        }
+
+        guard startsFixedSyntax || startsFence || isSetextUnderline || isExactMarker else { return text }
         return "\\\(text)"
     }
 
-    private static func startsWithOrderedListMarker(_ text: String) -> Bool {
+    private static func orderedListDotIndex(in text: String) -> String.Index? {
         guard let dotIndex = text.firstIndex(of: "."),
               text.distance(from: text.startIndex, to: dotIndex) <= 4,
               Int(text[..<dotIndex]) != nil else {
-            return false
+            return nil
         }
         let spaceIndex = text.index(after: dotIndex)
-        return spaceIndex < text.endIndex && text[spaceIndex] == " "
+        return spaceIndex < text.endIndex && text[spaceIndex] == " " ? dotIndex : nil
     }
 
     private static let markdownEscapableCharacters: Set<Character> = [

@@ -34,6 +34,13 @@ extension NativeEditorMarkdownParser {
         }
 
         guard definitions.isEmpty == false else { return markdown }
+        return resolvingReferenceLinks(in: contentLines, definitions: definitions)
+    }
+
+    private static func resolvingReferenceLinks(
+        in contentLines: [String],
+        definitions: [String: ReferenceDefinition]
+    ) -> String {
         var resolvedFence: (marker: Character, length: Int)?
         return contentLines.map { line in
             if let activeFence = resolvedFence {
@@ -46,6 +53,9 @@ extension NativeEditorMarkdownParser {
                 resolvedFence = openingFence
                 return line
             }
+            if isReferenceIndentedCodeLine(line) {
+                return line
+            }
             return replacingReferenceStyleLinks(in: line, definitions: definitions)
         }
         .joined(separator: "\n")
@@ -54,9 +64,9 @@ extension NativeEditorMarkdownParser {
     private static func referenceDefinition(from line: String) -> (label: String, destination: String)? {
         let leadingSpaces = line.prefix { $0 == " " }.count
         guard leadingSpaces <= 3 else { return nil }
-        let trimmed = line.dropFirst(leadingSpaces)
+        let trimmed = String(line.dropFirst(leadingSpaces))
         guard trimmed.first == "[",
-              let closeLabel = trimmed.firstIndex(of: "]") else {
+              let closeLabel = closingReferenceBracket(in: trimmed, after: trimmed.startIndex) else {
             return nil
         }
 
@@ -96,7 +106,11 @@ extension NativeEditorMarkdownParser {
             let isImage = line[index] == "!" && line.index(after: index) < line.endIndex &&
                 line[line.index(after: index)] == "["
             let openLabel = isImage ? line.index(after: index) : index
-            if line[openLabel] == "[",
+            let lineSlice = line[...]
+            let openingIsEscaped = isEscapedMarkdownCharacter(at: openLabel, in: lineSlice) ||
+                (isImage && isEscapedMarkdownCharacter(at: index, in: lineSlice))
+            if openingIsEscaped == false,
+               line[openLabel] == "[",
                let match = referenceStyleLinkMatch(
                    in: line,
                    openingLabelAt: openLabel,
@@ -169,10 +183,28 @@ extension NativeEditorMarkdownParser {
     }
 
     private static func normalizedReferenceLabel(_ label: String) -> String {
-        label
+        unescapedMarkdownPlainText(label)
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
             .lowercased()
+    }
+
+    private static func isReferenceIndentedCodeLine(_ line: String) -> Bool {
+        let leadingSpaces = line.prefix { $0 == " " }.count
+        let startsWithTab = line.first == "\t"
+        guard leadingSpaces >= 4 || startsWithTab else { return false }
+        let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+        return isReferenceListItem(trimmedLine) == false
+    }
+
+    private static func isReferenceListItem(_ line: String) -> Bool {
+        guard let kind = inputRule(from: line)?.kind else { return false }
+        switch kind {
+        case .bulletListItem, .orderedListItem, .taskListItem:
+            true
+        default:
+            false
+        }
     }
 
     private static func markdownCodeSpanRange(

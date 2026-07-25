@@ -52,7 +52,7 @@ struct NativeEditorMarkdownParityTests {
         let guideRun = try #require(blocks[0].text.runs.first { run in
             blocks[0].text[run.range].characters.elementsEqual("Guide")
         })
-        #expect(guideRun[NativeEditorLinkAttribute.self]?.href == "https://docs.example.com/guide")
+        #expect(linkDestination(in: guideRun) == "https://docs.example.com/guide")
 
         guard case .image(let image) = blocks[1].kind else {
             Issue.record("Expected a reference-style image to become a native image block.")
@@ -62,7 +62,55 @@ struct NativeEditorMarkdownParityTests {
         #expect(image.title == "System diagram")
 
         let shortcutRun = try #require(blocks[2].text.runs.first)
-        #expect(shortcutRun[NativeEditorLinkAttribute.self]?.href == "https://example.com")
+        #expect(linkDestination(in: shortcutRun) == "https://example.com")
+    }
+
+    @Test func referenceDefinitionsSupportEscapedClosingBrackets() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: #"""
+        [Guide][foo\]bar]
+
+        [foo\]bar]: https://docs.example.com/guide
+        """#).first)
+        let linkRun = try #require(block.text.runs.first)
+
+        #expect(String(block.text.characters) == "Guide")
+        #expect(linkDestination(in: linkRun) == "https://docs.example.com/guide")
+    }
+
+    @Test func referenceSyntaxIsNotResolvedInsideIndentedCode() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: """
+            [Guide][docs]
+
+        [docs]: https://docs.example.com/guide
+        """).first)
+
+        guard case .codeBlock(language: nil) = block.kind else {
+            Issue.record("Expected indented code.")
+            return
+        }
+        #expect(String(block.text.characters) == "[Guide][docs]")
+    }
+
+    @Test func escapedReferenceOpeningRemainsLiteral() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: #"""
+        \[Guide][docs]
+
+        [docs]: https://docs.example.com/guide
+        """#).first)
+
+        #expect(String(block.text.characters) == "[Guide][docs]")
+        #expect(block.text.runs.allSatisfy { linkDestination(in: $0) == nil })
+    }
+
+    @Test func inlineCodeLinkLabelsMayContainClosingBrackets() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(
+            from: "[`value]`](https://docs.example.com/code)"
+        ).first)
+        let run = try #require(block.text.runs.first)
+
+        #expect(String(block.text.characters) == "value]")
+        #expect(run.inlinePresentationIntent?.contains(.code) == true)
+        #expect(linkDestination(in: run) == "https://docs.example.com/code")
     }
 
     @Test func referenceDefinitionsDoNotRewriteFencedCode() throws {
@@ -93,6 +141,8 @@ struct NativeEditorMarkdownParityTests {
         "![image](not-an-image.png)",
         "<span>literal HTML</span>",
         "---",
+        "----",
+        "====",
         #"path\name"#
     ])
     func literalMarkdownSyntaxRoundTripsAsParagraph(_ source: String) throws {
@@ -102,5 +152,9 @@ struct NativeEditorMarkdownParityTests {
 
         #expect(imported.kind == .paragraph)
         #expect(String(imported.text.characters) == source)
+    }
+
+    private func linkDestination(in run: AttributedString.Runs.Run) -> String? {
+        run[NativeEditorLinkAttribute.self]?.href ?? run.link?.absoluteString
     }
 }
