@@ -201,9 +201,9 @@ extension NativeEditorMarkdownParser {
         guard let kind = inputRule(from: line)?.kind else { return false }
         switch kind {
         case .bulletListItem, .orderedListItem, .taskListItem:
-            true
+            return true
         default:
-            false
+            return false
         }
     }
 
