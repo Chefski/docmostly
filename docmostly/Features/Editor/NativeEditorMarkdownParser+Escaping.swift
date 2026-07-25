@@ -71,8 +71,9 @@ extension NativeEditorMarkdownParser {
         let exactMarkers = ["---", "***", "___"]
         let startsFixedSyntax = fixedPrefixes.contains { text.hasPrefix($0) }
         let startsFence = text.hasPrefix("```") || text.hasPrefix("~~~")
-        let isSetextUnderline = text.isEmpty == false &&
-            (text.allSatisfy { $0 == "-" } || text.allSatisfy { $0 == "=" })
+        let setextCandidate = text.trimmingCharacters(in: .whitespaces)
+        let isSetextUnderline = setextCandidate.isEmpty == false &&
+            (setextCandidate.allSatisfy { $0 == "-" } || setextCandidate.allSatisfy { $0 == "=" })
         let isExactMarker = exactMarkers.contains(text)
 
         if let orderedListDotIndex = orderedListDotIndex(in: text) {
@@ -81,7 +82,13 @@ extension NativeEditorMarkdownParser {
             return escaped
         }
 
-        guard startsFixedSyntax || startsFence || isSetextUnderline || isExactMarker else { return text }
+        if isSetextUnderline, let markerIndex = text.firstIndex(where: { $0.isWhitespace == false }) {
+            var escaped = text
+            escaped.insert("\\", at: markerIndex)
+            return escaped
+        }
+
+        guard startsFixedSyntax || startsFence || isExactMarker else { return text }
         return "\\\(text)"
     }
 

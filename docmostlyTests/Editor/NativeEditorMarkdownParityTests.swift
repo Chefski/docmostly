@@ -113,6 +113,19 @@ struct NativeEditorMarkdownParityTests {
         #expect(linkDestination(in: run) == "https://docs.example.com/code")
     }
 
+    @Test func setextLikeLinesWithWhitespaceRemainParagraphContent() throws {
+        let source = NativeEditorBlock(
+            kind: .paragraph,
+            text: AttributedString("Release notes\n---- "),
+            alignment: .left
+        )
+        let markdown = NativeEditorMarkdownParser.markdown(from: [source])
+        let imported = try #require(NativeEditorMarkdownParser.blocks(from: markdown).first)
+
+        #expect(imported.kind == .paragraph)
+        #expect(String(imported.text.characters) == "Release notes\n----")
+    }
+
     @Test func referenceDefinitionsDoNotRewriteFencedCode() throws {
         let block = try #require(NativeEditorMarkdownParser.blocks(from: """
         ```markdown
