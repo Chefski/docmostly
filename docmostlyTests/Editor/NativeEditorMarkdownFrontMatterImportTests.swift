@@ -24,4 +24,18 @@ struct NativeEditorFrontMatterImportTests {
         #expect(paragraph.kind == .paragraph)
         #expect(String(paragraph.text.characters) == "Ready to ship")
     }
+
+    @Test func frontMatterDelimiterMustBeOnItsOwnLine() throws {
+        let block = try #require(NativeEditorMarkdownParser.blocks(from: """
+        ---
+        title: Launch --- plan
+        summary: Keep parsing metadata
+        ---
+
+        Ready to ship
+        """).first)
+
+        #expect(block.kind == .paragraph)
+        #expect(String(block.text.characters) == "Ready to ship")
+    }
 }
