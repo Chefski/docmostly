@@ -109,6 +109,12 @@ extension NativeEditorMarkdownParser {
             let lineSlice = line[...]
             let openingIsEscaped = isEscapedMarkdownCharacter(at: openLabel, in: lineSlice) ||
                 (isImage && isEscapedMarkdownCharacter(at: index, in: lineSlice))
+            if openingIsEscaped,
+               let escapedReferenceEnd = escapedReferenceLiteralEnd(in: line, openingLabelAt: openLabel) {
+                output += line[index..<escapedReferenceEnd]
+                index = escapedReferenceEnd
+                continue
+            }
             if openingIsEscaped == false,
                line[openLabel] == "[",
                let match = referenceStyleLinkMatch(
@@ -127,6 +133,19 @@ extension NativeEditorMarkdownParser {
         }
 
         return output
+    }
+
+    private static func escapedReferenceLiteralEnd(
+        in line: String,
+        openingLabelAt openLabel: String.Index
+    ) -> String.Index? {
+        guard let closeLabel = closingReferenceBracket(in: line, after: openLabel) else { return nil }
+        let afterLabel = line.index(after: closeLabel)
+        guard afterLabel < line.endIndex, line[afterLabel] == "[",
+              let closeReference = closingReferenceBracket(in: line, after: afterLabel) else {
+            return afterLabel
+        }
+        return line.index(after: closeReference)
     }
 
     private static func referenceStyleLinkMatch(
