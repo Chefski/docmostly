@@ -201,12 +201,7 @@ struct NativeEditorBlockRow: View {
     }
 
     private var hasVisiblePrefix: Bool {
-        switch block.kind {
-        case .bulletListItem, .orderedListItem, .taskListItem, .unsupported:
-            true
-        default:
-            false
-        }
+        NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: block.kind)
     }
 
     private var blockIndentPadding: CGFloat {

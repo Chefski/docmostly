@@ -88,12 +88,21 @@ struct NativeEditorNestedDocumentPreview: View {
 
         VStack(alignment: .leading, spacing: 6) {
             ForEach(document.blocks) { block in
-                NativeEditorRichBlockPreviewView(
-                    block: block,
-                    pageID: pageID,
-                    spaceID: spaceID,
-                    serverURLString: serverURLString
-                )
+                HStack(alignment: .top, spacing: 8) {
+                    if NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: block.kind) {
+                        NativeEditorBlockPrefix(block: .constant(block), allowsTaskToggle: false)
+                            .frame(width: 24, alignment: .center)
+                    }
+
+                    NativeEditorRichBlockPreviewView(
+                        block: block,
+                        pageID: pageID,
+                        spaceID: spaceID,
+                        serverURLString: serverURLString
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.leading, CGFloat(block.indentLevel) * 22)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

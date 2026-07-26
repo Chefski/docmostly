@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct NativeEditorBodyView: View {
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
@@ -21,10 +20,9 @@ struct NativeEditorBodyView: View {
         LazyVStack(alignment: .leading, spacing: 6) {
             if showsTitle {
                 HStack(alignment: .firstTextBaseline) {
-                    if isEditingTitle, let pickPageEmoji {
+                    if let pickPageEmoji {
                         NativeEditorPageTitleIconButton(icon: viewModel.icon, action: pickPageEmoji)
                             .disabled(authoringIsAvailable == false)
-                            .transition(NativeEditorPageTitleIconTransition())
                     }
 
                     TextField("Page title", text: $viewModel.title, axis: .vertical)
@@ -37,7 +35,6 @@ struct NativeEditorBodyView: View {
                         .disabled(authoringIsAvailable == false)
                         .accessibilityLabel("Page title")
                 }
-                .animation(titleEditingAnimation, value: isEditingTitle)
 
                 if let creatorName = viewModel.creator?.name, creatorName.isEmpty == false {
                     NativeEditorBylineView(authorName: creatorName)
@@ -169,14 +166,6 @@ struct NativeEditorBodyView: View {
 
     private var authoringIsAvailable: Bool {
         isAuthoringEnabled && viewModel.canEdit && viewModel.isResolvingConflict == false
-    }
-
-    private var isEditingTitle: Bool {
-        focusedField.wrappedValue == .title
-    }
-
-    private var titleEditingAnimation: Animation? {
-        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.22)
     }
 
     private var activePresenceProjection: NativeEditorRemotePresenceProjection {
