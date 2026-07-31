@@ -11,6 +11,7 @@ struct PageTreeView: View {
     @State private var copyRequest: PageTreeNode?
     @State private var isShowingTrash = false
     @State private var initializedBrowserSpaceID: String?
+    @State private var navigationState = PageTreeNavigationState()
 
     let space: DocmostSpace
 
@@ -132,6 +133,9 @@ struct PageTreeView: View {
         .navigationDestination(for: PageTreeNode.self) { node in
             PageReaderDestinationView(pageID: node.slugId)
         }
+        .navigationDestination(item: $navigationState.spaceSettingsSpaceID) { spaceID in
+            SpaceSettingsDestinationView(spaceID: spaceID)
+        }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
                 await createPage(title: title, parentPageId: request.parentPageId)
@@ -248,7 +252,7 @@ struct PageTreeView: View {
     }
 
     private func showSpaceSettings() {
-        appState.selectSidebarUtilityDestination(.settings, returningTo: .space(space.id))
+        navigationState.showSpaceSettings(spaceID: space.id)
     }
 
     private func refreshPages() async {

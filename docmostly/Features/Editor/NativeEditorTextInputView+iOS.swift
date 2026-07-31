@@ -4,8 +4,10 @@ import UIKit
 
 struct NativeEditorTextInputView: UIViewRepresentable {
     @Binding var block: NativeEditorBlock
-    @Binding var isFocused: Bool
 
+    let isFocused: Bool
+    let focusRequestID: UUID?
+    let focusChanged: (Bool) -> Void
     let accessibilityLabel: String
     let actions: NativeEditorTextInputActions
     var remotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
@@ -46,6 +48,18 @@ struct NativeEditorTextInputView: UIViewRepresentable {
         textView.updateRemotePresence(remotePresenceSegments)
     }
 
+    static func dismantleUIView(
+        _ textView: NativeEditorUITextView,
+        coordinator: NativeEditorTextInputCoordinator
+    ) {
+        textView.requestsFirstResponder = false
+        if textView.isFirstResponder {
+            textView.resignFirstResponder()
+        }
+        coordinator.parent.focusChanged(false)
+        textView.delegate = nil
+    }
+
     func sizeThatFits(
         _ proposal: ProposedViewSize,
         uiView: NativeEditorUITextView,
@@ -68,6 +82,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private var isApplyingSource = false
     private var pendingTextDelta: NativeEditorTextDelta?
     private var pendingSelectionCorrection: Range<Int>?
+    private var handledFocusRequestID: UUID?
     private var bindingEchoReconciler = NativeEditorTextBindingEchoReconciler()
     private var focusBindingEchoReconciler = NativeEditorFocusBindingEchoReconciler()
 
@@ -158,6 +173,14 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     }
 
     func updateFocus(_ textView: NativeEditorUITextView) {
+        if let focusRequestID = parent.focusRequestID,
+           focusRequestID != handledFocusRequestID,
+           parent.isFocused {
+            handledFocusRequestID = focusRequestID
+            textView.requestsFirstResponder = true
+            textView.requestFirstResponderIfPossible()
+        }
+
         switch focusBindingEchoReconciler.disposition(
             for: parent.isFocused,
             platformIsFocused: textView.isFirstResponder
@@ -186,12 +209,12 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
     func textViewDidBeginEditing(_ textView: UITextView) {
         focusBindingEchoReconciler.recordLocalActivation()
-        parent.isFocused = true
+        parent.focusChanged(true)
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
         focusBindingEchoReconciler.recordLocalDeactivation()
-        parent.isFocused = false
+        parent.focusChanged(false)
     }
 
     func textView(

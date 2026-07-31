@@ -34,7 +34,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         #expect(viewModel.isDirty == false)
     }
 
-    @Test func defersDivergentCRDTSnapshotWithoutReplacingDirtyLocalDocument() {
+    @Test func appliesMergedCRDTSnapshotWithoutConflictingWithDirtyLocalDocument() {
         let engine = SnapshotCRDTDocumentEngine()
         let viewModel = NativeRichEditorViewModel(
             pageID: "page-1",
@@ -55,17 +55,15 @@ struct NativeEditorCRDTDocumentSnapshotTests {
 
         viewModel.applyCRDTDocumentSnapshot(snapshot)
 
-        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local draft"])
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Merged draft"])
         #expect(viewModel.isDirty == true)
-        #expect(viewModel.pendingRemoteUpdate?.title == "Local")
-        #expect(
-            viewModel.pendingRemoteCRDTSnapshot?.document.proseMirrorDocument ==
-                snapshot.document.proseMirrorDocument
-        )
-        #expect(viewModel.realtimeStatus == .conflict)
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.pendingRemoteCRDTSnapshot == nil)
+        #expect(viewModel.realtimeStatus == .connected)
+        #expect(viewModel.canUndo == false)
     }
 
-    @Test func laterMatchingOrPartialSnapshotCannotClearEarlierDeferredConflict() {
+    @Test func laterMergedSnapshotsRemainAutomaticWhileLocalAutosaveIsDirty() {
         let engine = SnapshotCRDTDocumentEngine()
         let localText = "Second line survives autosave — merged after Backspace"
         let viewModel = NativeRichEditorViewModel(
@@ -83,11 +81,13 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         viewModel.applyCRDTDocumentSnapshot(snapshot(text: localText, updatedAt: 21))
         viewModel.applyCRDTDocumentSnapshot(snapshot(text: "Second line survives autosave", updatedAt: 22))
 
-        #expect(viewModel.document.blocks.map { String($0.text.characters) } == [localText])
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == [
+            "Second line survives autosave"
+        ])
         #expect(viewModel.lastSavedDocument.blocks.map { String($0.text.characters) } == ["Original"])
-        #expect(viewModel.pendingRemoteCRDTSnapshot?.updatedAt == Date(timeIntervalSince1970: 22))
-        #expect(viewModel.pendingRemoteUpdate != nil)
-        #expect(viewModel.realtimeStatus == .conflict)
+        #expect(viewModel.pendingRemoteCRDTSnapshot == nil)
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.realtimeStatus == .connected)
         #expect(viewModel.isDirty)
     }
 
@@ -150,6 +150,46 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         #expect(viewModel.isDirty)
     }
 
+    @Test func ownCanonicalProjectionDoesNotShowConflictOrReplaceTheLiveDraft() {
+        let engine = SnapshotCRDTDocumentEngine()
+        let viewModel = NativeRichEditorViewModel(
+            pageID: "page-1",
+            initialTitle: "Daily notes",
+            crdtDocumentEngine: engine
+        )
+        viewModel.document = document(text: "Original")
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
+        viewModel.document.blocks[0].text = AttributedString("Current draft")
+        viewModel.handleDocumentChanged()
+        let liveBlockID = viewModel.document.blocks[0].id
+        let canonicalDocument = NativeEditorDocument(proseMirrorDocument: ProseMirrorDocument(content: [
+            ProseMirrorNode(
+                type: "paragraph",
+                attrs: ["id": .string("canonical-anchor")],
+                content: [ProseMirrorNode(type: "text", text: "Current draft")]
+            )
+        ]))
+        let ownProjection = NativeEditorCRDTDocumentSnapshot(
+            title: "Daily notes",
+            document: canonicalDocument,
+            updatedAt: Date(timeIntervalSince1970: 20)
+        )
+        #expect(ownProjection.document.proseMirrorDocument.isCollaborationEquivalent(
+            to: viewModel.document.proseMirrorDocument
+        ) == false)
+
+        viewModel.applyCRDTDocumentSnapshot(ownProjection)
+
+        #expect(viewModel.document.blocks[0].id == liveBlockID)
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Current draft"])
+        #expect(viewModel.pendingRemoteCRDTSnapshot == nil)
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.realtimeStatus == .connected)
+        #expect(viewModel.canUndo == false)
+        #expect(viewModel.isDirty)
+    }
+
     @Test func paragraphIDChangeIsNotTreatedAsMatchingSelfEcho() {
         let local = ProseMirrorDocument(content: [
             ProseMirrorNode(
@@ -198,7 +238,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     @Test func coordinatorAppliesRemoteUpdateOnlyAfterQueuedLocalIntegration() async throws {
-        let engine = SnapshotCRDTDocumentEngine()
+        let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = NativeRichEditorViewModel(
             pageID: "page-1",
             initialTitle: "Daily notes",
@@ -218,7 +258,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     @Test func applyInstallsDeferredCRDTSnapshotAndClearsLocalHistory() {
-        let engine = SnapshotCRDTDocumentEngine()
+        let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = makeDirtyViewModel(engine: engine)
         let remoteSnapshot = snapshot(text: "Remote body", title: "Remote title", updatedAt: 20)
         viewModel.applyCRDTDocumentSnapshot(remoteSnapshot)
@@ -236,7 +276,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     @Test func keepMineRebasesToRemoteAndPublishesRetainedLocalDocument() async throws {
-        let engine = SnapshotCRDTDocumentEngine()
+        let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = makeDirtyViewModel(engine: engine)
         viewModel.applyCRDTDocumentSnapshot(snapshot(text: "Remote body", updatedAt: 20))
 
@@ -254,7 +294,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     @Test func capturedConflictCannotAcceptNewerPendingSnapshot() {
-        let engine = SnapshotCRDTDocumentEngine()
+        let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = makeDirtyViewModel(engine: engine)
         let capturedSnapshot = snapshot(text: "First remote body", updatedAt: 20)
         let newerSnapshot = snapshot(text: "Newer remote body", updatedAt: 21)
@@ -271,7 +311,7 @@ struct NativeEditorCRDTDocumentSnapshotTests {
     }
 
     @Test func capturedConflictCannotRejectNewerPendingSnapshot() {
-        let engine = SnapshotCRDTDocumentEngine()
+        let engine = SnapshotCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
         let viewModel = makeDirtyViewModel(engine: engine)
         let capturedSnapshot = snapshot(text: "First remote body", updatedAt: 20)
         let newerSnapshot = snapshot(text: "Newer remote body", updatedAt: 21)
@@ -350,10 +390,11 @@ struct NativeEditorCRDTDocumentSnapshotTests {
             )
         ]))
     }
+
 }
 
 @MainActor
-private final class SnapshotCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+final class SnapshotCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
     nonisolated let requiresInitialRemoteSnapshot: Bool
     var snapshotStream: AsyncStream<NativeEditorCRDTDocumentSnapshot>?
     private(set) var integratedDocuments: [NativeEditorDocument] = []

@@ -2,7 +2,8 @@ import SwiftUI
 
 struct NativeEditorBlockRow: View {
     @Binding var block: NativeEditorBlock
-    let focusedField: FocusState<NativeEditorFocus?>.Binding
+    let isActive: Bool
+    let focusRequestID: UUID?
     let isSelected: Bool
     let isShowingControls: Bool
     let isReadOnly: Bool
@@ -20,6 +21,7 @@ struct NativeEditorBlockRow: View {
     let presenceScope: [NativeEditorRemotePresenceScope]
     let presenceBlockIndex: Int
     let focusBlock: () -> Void
+    let textInputFocusChanged: (Bool) -> Void
     let moveBefore: (UUID) -> Void
     let splitBlock: (Range<Int>) -> Bool
     let insertHardBreak: (Range<Int>) -> Bool
@@ -63,7 +65,9 @@ struct NativeEditorBlockRow: View {
                 NativeEditorBlockTextSurface(kind: block.kind) {
                     NativeEditorTextInputView(
                         block: $block,
-                        isFocused: blockFocusBinding,
+                        isFocused: isActive,
+                        focusRequestID: focusRequestID,
+                        focusChanged: textInputFocusChanged,
                         accessibilityLabel: block.kind.accessibilityLabel,
                         actions: NativeEditorTextInputActions(
                             handleReturn: handleReturn,
@@ -201,12 +205,7 @@ struct NativeEditorBlockRow: View {
     }
 
     private var hasVisiblePrefix: Bool {
-        switch block.kind {
-        case .bulletListItem, .orderedListItem, .taskListItem, .unsupported:
-            true
-        default:
-            false
-        }
+        NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: block.kind)
     }
 
     private var blockIndentPadding: CGFloat {
@@ -226,18 +225,6 @@ struct NativeEditorBlockRow: View {
 
     private var activeRichBlockActions: NativeEditorRichBlockEditingActions? {
         showsControls ? richBlockActions : nil
-    }
-
-    private var blockFocusBinding: Binding<Bool> {
-        Binding {
-            focusedField.wrappedValue == .block(block.id)
-        } set: { shouldFocus in
-            if shouldFocus {
-                focusedField.wrappedValue = .block(block.id)
-            } else if focusedField.wrappedValue == .block(block.id) {
-                focusedField.wrappedValue = nil
-            }
-        }
     }
 
     private func handleReturn(_ selection: Range<Int>) -> Bool {

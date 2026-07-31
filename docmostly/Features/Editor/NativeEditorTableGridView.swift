@@ -10,16 +10,18 @@ struct NativeEditorTableReadOnlyGrid: View {
         if table.rows.isEmpty || table.columnCount == 0 {
             NativeEditorEmptyTableView()
         } else {
+            let columnWidths = (0..<table.columnCount).map { columnWidth(for: $0) }
+
             ScrollView(.horizontal) {
-                Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+                VStack(spacing: 0) {
                     ForEach(table.rows.indices, id: \.self) { rowIndex in
-                        GridRow {
+                        NativeEditorTableRowLayout(columnWidths: columnWidths) {
                             ForEach(0..<table.columnCount, id: \.self) { columnIndex in
                                 NativeEditorTableReadOnlyCell(
                                     cell: cell(rowIndex: rowIndex, columnIndex: columnIndex),
                                     rowIndex: rowIndex,
                                     columnIndex: columnIndex,
-                                    width: columnWidth(for: columnIndex)
+                                    width: columnWidths[columnIndex]
                                 )
                             }
                         }
@@ -71,18 +73,21 @@ struct NativeEditorTableEditableGrid: View {
         if table.rows.isEmpty || table.columnCount == 0 {
             NativeEditorEditableEmptyTableView(blockID: blockID, actions: actions)
         } else {
+            let columnWidths = (0..<table.columnCount).map { columnWidth(for: $0) }
+            let editableColumnWidths = [NativeEditorTableLayout.rowHandleWidth] + columnWidths
+
             ScrollView(.horizontal) {
-                Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+                VStack(spacing: 0) {
                     NativeEditorTableColumnHandleRow(
                         blockID: blockID,
                         table: table,
                         actions: actions,
                         selection: $selection,
-                        isCompactWidth: isCompactWidth
+                        columnWidths: columnWidths
                     )
 
                     ForEach(table.rows.indices, id: \.self) { rowIndex in
-                        GridRow {
+                        NativeEditorTableRowLayout(columnWidths: editableColumnWidths) {
                             NativeEditorTableRowHandle(
                                 blockID: blockID,
                                 table: table,
@@ -100,7 +105,7 @@ struct NativeEditorTableEditableGrid: View {
                                         columnIndex: columnIndex,
                                         rowCount: table.rows.count,
                                         columnCount: table.columnCount,
-                                        width: columnWidth(for: columnIndex),
+                                        width: columnWidths[columnIndex],
                                         actions: actions,
                                         selection: $selection,
                                         dragStartWidths: $dragStartWidths,
@@ -111,7 +116,7 @@ struct NativeEditorTableEditableGrid: View {
                                     NativeEditorTableMissingCell(
                                         rowIndex: rowIndex,
                                         columnIndex: columnIndex,
-                                        width: columnWidth(for: columnIndex)
+                                        width: columnWidths[columnIndex]
                                     )
                                 }
                             }
@@ -147,10 +152,13 @@ private struct NativeEditorTableColumnHandleRow: View {
     let table: NativeEditorTable
     let actions: NativeEditorTableEditingActions
     @Binding var selection: NativeEditorTableSelection?
-    let isCompactWidth: Bool
+    let columnWidths: [CGFloat]
 
     var body: some View {
-        GridRow {
+        NativeEditorTableRowLayout(
+            columnWidths: [NativeEditorTableLayout.rowHandleWidth] + columnWidths,
+            minimumHeight: NativeEditorTableLayout.columnHandleHeight
+        ) {
             Color.clear
                 .frame(
                     width: NativeEditorTableLayout.rowHandleWidth,
@@ -163,11 +171,7 @@ private struct NativeEditorTableColumnHandleRow: View {
                     table: table,
                     actions: actions,
                     columnIndex: columnIndex,
-                    width: NativeEditorTableLayout.columnWidth(
-                        for: table,
-                        columnIndex: columnIndex,
-                        isCompactWidth: isCompactWidth
-                    ),
+                    width: columnWidths[columnIndex],
                     isSelected: selection == .column(columnIndex),
                     selection: $selection
                 )
@@ -241,7 +245,10 @@ private struct NativeEditorTableRowHandle: View {
             isSelected ? NativeEditorTableLayout.selectionAccent : NativeEditorTableLayout.handleForeground
         )
         .frame(width: NativeEditorTableLayout.rowHandleWidth)
-        .frame(minHeight: NativeEditorTableLayout.rowMinimumHeight)
+        .frame(
+            minHeight: NativeEditorTableLayout.rowMinimumHeight,
+            maxHeight: .infinity
+        )
         .help("Row \(rowIndex + 1) actions")
     }
 
@@ -269,7 +276,7 @@ private struct NativeEditorTableEditableCell: View {
             .textFieldStyle(.plain)
             .font(NativeEditorTableLayout.font(for: cell))
             .foregroundStyle(cell.isHeader ? .primary : NativeEditorTableLayout.bodyForeground)
-            .lineLimit(4)
+            .lineLimit(1...)
             .focused(focusedCell, equals: NativeEditorTableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex))
             .onKeyPress(.tab, phases: .down) { keyPress in
                 moveFocus(
@@ -284,6 +291,7 @@ private struct NativeEditorTableEditableCell: View {
                 minWidth: width,
                 maxWidth: width,
                 minHeight: NativeEditorTableLayout.rowMinimumHeight,
+                maxHeight: .infinity,
                 alignment: .topLeading
             )
             .background(NativeEditorTableLayout.cellBackground(for: cell))
@@ -357,6 +365,7 @@ private struct NativeEditorTableReadOnlyCell: View {
                 minWidth: width,
                 maxWidth: width,
                 minHeight: NativeEditorTableLayout.rowMinimumHeight,
+                maxHeight: .infinity,
                 alignment: .topLeading
             )
             .background(cell.map(NativeEditorTableLayout.cellBackground) ?? Color.clear)
@@ -393,7 +402,8 @@ private struct NativeEditorTableMissingCell: View {
             .frame(
                 minWidth: width,
                 maxWidth: width,
-                minHeight: NativeEditorTableLayout.rowMinimumHeight
+                minHeight: NativeEditorTableLayout.rowMinimumHeight,
+                maxHeight: .infinity
             )
             .overlay(alignment: .top) {
                 NativeEditorTableCellBorder(edge: .top, isVisible: rowIndex == 0)

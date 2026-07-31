@@ -36,37 +36,30 @@ struct NativeEditorToolbar: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            if isShowingSearchReplace {
-                NativeEditorToolbarSurface {
-                    NativeEditorSearchReplaceBar(viewModel: viewModel)
+        GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
+            VStack(spacing: NativeEditorToolbarMetrics.groupSpacing) {
+                if isShowingSearchReplace {
+                    NativeEditorToolbarSurface {
+                        NativeEditorSearchReplaceBar(viewModel: viewModel)
+                    }
                 }
-            }
 
-            HStack(spacing: NativeEditorToolbarMetrics.groupSpacing) {
-                ScrollView(.horizontal) {
-                    NativeEditorToolbarContent(
-                        viewModel: viewModel,
-                        isUploadingAttachment: isUploadingAttachment,
-                        importAttachment: importAttachment,
-                        applyCommand: applyCommand,
-                        isShowingLinkPrompt: $isShowingLinkPrompt,
-                        isShowingSearchReplace: $isShowingSearchReplace,
-                        isShowingStatusPrompt: $isShowingStatusPrompt,
-                        isShowingMathPrompt: $isShowingMathPrompt,
-                        showMentionPicker: showMentionPicker,
-                        showInlineCommentComposer: showInlineCommentComposer
-                    )
-                        .padding(.leading, 10)
-                        .padding(.vertical, 4)
-                }
-                .scrollIndicators(.hidden)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                NativeEditorKeyboardDismissToolbarButton(dismissKeyboard: dismissKeyboard)
-                    .padding(.trailing, 10)
+                NativeEditorToolbarBar(
+                    viewModel: viewModel,
+                    isUploadingAttachment: isUploadingAttachment,
+                    importAttachment: importAttachment,
+                    applyCommand: applyCommand,
+                    isShowingLinkPrompt: $isShowingLinkPrompt,
+                    isShowingSearchReplace: $isShowingSearchReplace,
+                    isShowingStatusPrompt: $isShowingStatusPrompt,
+                    isShowingMathPrompt: $isShowingMathPrompt,
+                    showMentionPicker: showMentionPicker,
+                    showInlineCommentComposer: showInlineCommentComposer,
+                    dismissKeyboard: dismissKeyboard
+                )
             }
         }
+        .padding(.horizontal)
         .padding(.bottom, 6)
         .alert("Link", isPresented: $isShowingLinkPrompt) {
             TextField("URL", text: $linkURLString)
@@ -107,7 +100,7 @@ struct NativeEditorToolbar: View {
     }
 }
 
-private struct NativeEditorToolbarContent: View {
+private struct NativeEditorToolbarBar: View {
     @Bindable var viewModel: NativeRichEditorViewModel
     let isUploadingAttachment: Bool
     let importAttachment: (NativeEditorAttachmentImportKind) -> Void
@@ -118,21 +111,46 @@ private struct NativeEditorToolbarContent: View {
     @Binding var isShowingMathPrompt: Bool
     let showMentionPicker: () -> Void
     let showInlineCommentComposer: () -> Void
+    let dismissKeyboard: () -> Void
 
     var body: some View {
-        GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
-            NativeEditorToolbarGroups(
-                viewModel: viewModel,
-                isUploadingAttachment: isUploadingAttachment,
-                importAttachment: importAttachment,
-                applyCommand: applyCommand,
-                isShowingLinkPrompt: $isShowingLinkPrompt,
-                isShowingSearchReplace: $isShowingSearchReplace,
-                isShowingStatusPrompt: $isShowingStatusPrompt,
-                isShowingMathPrompt: $isShowingMathPrompt,
-                showMentionPicker: showMentionPicker,
-                showInlineCommentComposer: showInlineCommentComposer
-            )
+        DocmostlyGlassPanel(shape: .capsule, isInteractive: true) {
+            HStack(spacing: 0) {
+                ScrollView(.horizontal) {
+                    NativeEditorToolbarGroups(
+                        viewModel: viewModel,
+                        isUploadingAttachment: isUploadingAttachment,
+                        importAttachment: importAttachment,
+                        applyCommand: applyCommand,
+                        isShowingLinkPrompt: $isShowingLinkPrompt,
+                        isShowingSearchReplace: $isShowingSearchReplace,
+                        isShowingStatusPrompt: $isShowingStatusPrompt,
+                        isShowingMathPrompt: $isShowingMathPrompt,
+                        showMentionPicker: showMentionPicker,
+                        showInlineCommentComposer: showInlineCommentComposer
+                    )
+                    .padding(.horizontal, NativeEditorToolbarMetrics.horizontalPadding)
+                    .padding(.vertical, NativeEditorToolbarMetrics.verticalPadding)
+                }
+                .scrollIndicators(.hidden)
+                .scrollClipDisabled(false)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+                    .padding(.vertical, NativeEditorToolbarMetrics.dividerVerticalPadding)
+                    .accessibilityHidden(true)
+
+                NativeEditorKeyboardDismissToolbarButton(dismissKeyboard: dismissKeyboard)
+                    .padding(.horizontal, NativeEditorToolbarMetrics.horizontalPadding)
+                    .padding(.vertical, NativeEditorToolbarMetrics.verticalPadding)
+            }
+            // Prevent transient keyboard safe-area proposals from stretching the horizontal scroller.
+            .frame(height: NativeEditorToolbarMetrics.barHeight)
+            .buttonStyle(.plain)
+            .controlSize(.regular)
+            .labelStyle(.iconOnly)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Editor toolbar")
         }
     }
 }
@@ -151,22 +169,16 @@ private struct NativeEditorToolbarGroups: View {
 
     var body: some View {
         HStack(spacing: NativeEditorToolbarMetrics.groupSpacing) {
-            NativeEditorToolbarSurface {
-                NativeEditorHistoryToolbarGroup(viewModel: viewModel)
-            }
+            NativeEditorHistoryToolbarGroup(viewModel: viewModel)
 
-            NativeEditorToolbarSurface {
-                NativeEditorBlockCommandMenu(viewModel: viewModel, applyCommand: applyCommand)
-            }
+            NativeEditorBlockCommandMenu(viewModel: viewModel, applyCommand: applyCommand)
 
-            NativeEditorToolbarSurface {
-                NativeEditorQuickFormattingToolbarGroup(
-                    viewModel: viewModel,
-                    isShowingLinkPrompt: $isShowingLinkPrompt
-                )
-            }
+            NativeEditorQuickFormattingToolbarGroup(
+                viewModel: viewModel,
+                isShowingLinkPrompt: $isShowingLinkPrompt
+            )
 
-            NativeEditorToolbarSurface {
+            HStack(spacing: NativeEditorToolbarMetrics.controlSpacing) {
                 NativeEditorAttachmentToolbarGroup(
                     isUploading: isUploadingAttachment,
                     importAttachment: importAttachment
@@ -182,9 +194,6 @@ private struct NativeEditorToolbarGroups: View {
                 )
             }
         }
-        .buttonStyle(.plain)
-        .controlSize(.regular)
-        .labelStyle(.iconOnly)
     }
 }
 
@@ -192,16 +201,9 @@ private struct NativeEditorKeyboardDismissToolbarButton: View {
     let dismissKeyboard: () -> Void
 
     var body: some View {
-        GlassEffectContainer(spacing: NativeEditorToolbarMetrics.groupSpacing) {
-            NativeEditorToolbarSurface {
-                Button(action: dismissKeyboard) {
-                    Label("Dismiss Keyboard", systemImage: "keyboard.chevron.compact.down")
-                }
-                .nativeEditorToolbarControlFrame()
-            }
+        Button(action: dismissKeyboard) {
+            Label("Dismiss Keyboard", systemImage: "keyboard.chevron.compact.down")
         }
-        .buttonStyle(.plain)
-        .controlSize(.regular)
-        .labelStyle(.iconOnly)
+        .nativeEditorToolbarControlFrame()
     }
 }

@@ -19,11 +19,18 @@ final class SettingsManagementViewModel {
     private var currentUserRole: String?
 
     var canManageWorkspace: Bool {
-        currentUserRole == "owner" || currentUserRole == "admin"
+        SpaceManagementAuthorization.canManageWorkspace(role: currentUserRole)
     }
 
     var currentUserIsOwner: Bool {
         currentUserRole == "owner"
+    }
+
+    func canManageSpace(_ space: DocmostSpace) -> Bool {
+        SpaceManagementAuthorization.canManageSpace(
+            workspaceRole: currentUserRole,
+            membershipRole: space.membership?.role
+        )
     }
 
     var hasWorkspaceChanges: Bool {

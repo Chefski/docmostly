@@ -17,7 +17,11 @@ const schema = new Schema({
     paragraph: {
       group: "block",
       content: "inline*",
-      attrs: { textAlign: { default: null } }
+      attrs: {
+        id: { default: null },
+        indent: { default: 0 },
+        textAlign: { default: null }
+      }
     }
   },
   marks: {}
@@ -63,6 +67,45 @@ test("applies remote document update to empty native state", () => {
   assert.deepEqual(secondDocument.drainDocumentSnapshots(), [{
     title: null,
     document: paragraphDocument("Shared edit"),
+    updatedAt: null
+  }]);
+});
+
+test("preserves Docmost block identity and indentation in Yjs projections", () => {
+  const source = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+  const target = globalThis.docmostlyCRDT.createDocument({
+    pageID: "page-1",
+    title: "Page",
+    document: paragraphDocument("Seed")
+  });
+  const identifiedDocument = {
+    type: "doc",
+    content: [{
+      type: "paragraph",
+      attrs: {
+        id: "stableanchor",
+        indent: 2
+      },
+      content: [{ type: "text", text: "Shared edit" }]
+    }]
+  };
+
+  source.integrateLocalChange({
+    after: {
+      title: "Page",
+      document: identifiedDocument
+    }
+  });
+  const [update] = source.drainLocalUpdates();
+  target.applyRemoteUpdate(update);
+
+  assert.deepEqual(target.drainDocumentSnapshots(), [{
+    title: null,
+    document: identifiedDocument,
     updatedAt: null
   }]);
 });
@@ -164,15 +207,48 @@ test("merges non-overlapping edits from two offline native documents", () => {
   );
 });
 
+test("two live native editors converge after exchanging concurrent updates", () => {
+  const baseDocument = paragraphsDocument("First", "Second");
+  const serverDocument = serverYDocFromJSON(baseDocument);
+  const baseState = base64FromBytes(Y.encodeStateAsUpdate(serverDocument));
+  const firstEditor = offlineDocument(baseState, baseDocument);
+  const secondEditor = offlineDocument(baseState, baseDocument);
+
+  firstEditor.integrateLocalChange({
+    after: { title: "Page", document: paragraphsDocument("First by A", "Second") }
+  });
+  secondEditor.integrateLocalChange({
+    after: { title: "Page", document: paragraphsDocument("First", "Second by B") }
+  });
+  const firstUpdates = firstEditor.drainLocalUpdates();
+  const secondUpdates = secondEditor.drainLocalUpdates();
+
+  for (const update of secondUpdates) {
+    firstEditor.applyRemoteUpdate(update);
+  }
+  for (const update of firstUpdates) {
+    secondEditor.applyRemoteUpdate(update);
+  }
+
+  const expectedDocument = paragraphsDocument("First by A", "Second by B");
+  assert.deepEqual(firstEditor.currentSnapshot().document, expectedDocument);
+  assert.deepEqual(secondEditor.currentSnapshot().document, expectedDocument);
+});
+
 function paragraphDocument(text) {
   return paragraphsDocument(text);
 }
 
 function paragraphsDocument(...texts) {
+  const blockIDs = ["firstblockid", "secondblocki"];
   return {
     type: "doc",
-    content: texts.map((text) => ({
+    content: texts.map((text, index) => ({
       type: "paragraph",
+      attrs: {
+        id: blockIDs[index] ?? `fallbackblock${index}`,
+        indent: 0
+      },
       content: [{ type: "text", text }]
     }))
   };

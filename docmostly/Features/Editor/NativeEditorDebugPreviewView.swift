@@ -48,6 +48,7 @@ struct NativeEditorDebugPreviewView: View {
         case .block(let blockID):
             viewModel.focus(blockID: blockID)
         case nil:
+            guard viewModel.isTitleFocused else { return }
             viewModel.clearFocus()
         }
     }

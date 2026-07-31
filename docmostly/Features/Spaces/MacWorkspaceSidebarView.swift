@@ -70,6 +70,8 @@ struct MacWorkspaceSidebarView: View {
                         action: beginCreateRoot
                     )
 
+                    Divider()
+
                     MacSidebarPagesHeaderView(
                         space: selectedSpace,
                         viewModel: viewModel,

@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 nonisolated enum NativeEditorTextAlignment: String, Equatable, Sendable {
     case left
@@ -13,5 +13,27 @@ nonisolated enum NativeEditorTextAlignment: String, Equatable, Sendable {
 
     var proseMirrorValue: ProseMirrorJSONValue? {
         self == .left ? nil : .string(rawValue)
+    }
+
+    var swiftUITextAlignment: TextAlignment {
+        switch self {
+        case .left, .justify:
+            .leading
+        case .center:
+            .center
+        case .right:
+            .trailing
+        }
+    }
+
+    var swiftUIFrameAlignment: Alignment {
+        switch self {
+        case .left, .justify:
+            .leading
+        case .center:
+            .center
+        case .right:
+            .trailing
+        }
     }
 }

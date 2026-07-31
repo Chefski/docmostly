@@ -27,4 +27,13 @@ struct NativeEditorBlockRowPolicyTests {
         #expect(NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: false))
         #expect(NativeEditorBlockRowPolicy.allowsTaskToggle(isReadOnly: true) == false)
     }
+
+    @Test func readModePreservesPrefixesForListAndUnsupportedBlocks() {
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .bulletListItem))
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .orderedListItem(ordinal: 2)))
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .taskListItem(isChecked: true)))
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .unsupported(type: "custom")))
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .paragraph) == false)
+        #expect(NativeEditorBlockRowPolicy.hasVisiblePrefix(kind: .blockquote) == false)
+    }
 }

@@ -4,8 +4,10 @@ import SwiftUI
 
 struct NativeEditorTextInputView: NSViewRepresentable {
     @Binding var block: NativeEditorBlock
-    @Binding var isFocused: Bool
 
+    let isFocused: Bool
+    let focusRequestID: UUID?
+    let focusChanged: (Bool) -> Void
     let accessibilityLabel: String
     let actions: NativeEditorTextInputActions
     var remotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
@@ -30,6 +32,7 @@ struct NativeEditorTextInputView: NSViewRepresentable {
         textView.textContainer?.heightTracksTextView = false
         textView.setAccessibilityLabel(accessibilityLabel)
         context.coordinator.applySource(to: textView)
+        context.coordinator.updateFocus(textView)
         textView.updateRemotePresence(remotePresenceSegments)
         return textView
     }
@@ -41,6 +44,18 @@ struct NativeEditorTextInputView: NSViewRepresentable {
         context.coordinator.updateFromBoundBlock(textView)
         context.coordinator.updateFocus(textView)
         textView.updateRemotePresence(remotePresenceSegments)
+    }
+
+    static func dismantleNSView(
+        _ textView: NativeEditorNSTextView,
+        coordinator: NativeEditorTextInputCoordinator
+    ) {
+        textView.requestsFirstResponder = false
+        if textView.window?.firstResponder === textView {
+            textView.window?.makeFirstResponder(nil)
+        }
+        coordinator.parent.focusChanged(false)
+        textView.delegate = nil
     }
 
     func sizeThatFits(
@@ -75,6 +90,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
     private var isApplyingSource = false
     private var pendingTextDelta: NativeEditorTextDelta?
     private var pendingSelectionCorrection: Range<Int>?
+    private var handledFocusRequestID: UUID?
     private var bindingEchoReconciler = NativeEditorTextBindingEchoReconciler()
     private var focusBindingEchoReconciler = NativeEditorFocusBindingEchoReconciler()
 
@@ -164,33 +180,6 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
         isApplyingSource = true
         textView.setSelectedRange(requestedSelection)
         isApplyingSource = false
-    }
-
-    func updateFocus(_ textView: NativeEditorNSTextView) {
-        switch focusBindingEchoReconciler.disposition(
-            for: parent.isFocused,
-            platformIsFocused: textView.window?.firstResponder === textView
-        ) {
-        case .activate:
-            textView.requestsFirstResponder = true
-            textView.requestFirstResponderIfPossible()
-        case .preserveLocalActivation:
-            textView.requestsFirstResponder = true
-        case .deactivate:
-            textView.requestsFirstResponder = false
-            guard textView.window?.firstResponder === textView else { return }
-            textView.window?.makeFirstResponder(nil)
-        }
-    }
-
-    func textDidBeginEditing(_ notification: Notification) {
-        focusBindingEchoReconciler.recordLocalActivation()
-        parent.isFocused = true
-    }
-
-    func textDidEndEditing(_ notification: Notification) {
-        focusBindingEchoReconciler.recordLocalDeactivation()
-        parent.isFocused = false
     }
 
     func textDidChange(_ notification: Notification) {
@@ -503,6 +492,43 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
         case .justify:
             .justified
         }
+    }
+}
+
+extension NativeEditorTextInputCoordinator {
+    func updateFocus(_ textView: NativeEditorNSTextView) {
+        if let focusRequestID = parent.focusRequestID,
+           focusRequestID != handledFocusRequestID,
+           parent.isFocused {
+            handledFocusRequestID = focusRequestID
+            textView.requestsFirstResponder = true
+            textView.requestFirstResponderIfPossible()
+        }
+
+        switch focusBindingEchoReconciler.disposition(
+            for: parent.isFocused,
+            platformIsFocused: textView.window?.firstResponder === textView
+        ) {
+        case .activate:
+            textView.requestsFirstResponder = true
+            textView.requestFirstResponderIfPossible()
+        case .preserveLocalActivation:
+            textView.requestsFirstResponder = true
+        case .deactivate:
+            textView.requestsFirstResponder = false
+            guard textView.window?.firstResponder === textView else { return }
+            textView.window?.makeFirstResponder(nil)
+        }
+    }
+
+    func textDidBeginEditing(_ notification: Notification) {
+        focusBindingEchoReconciler.recordLocalActivation()
+        parent.focusChanged(true)
+    }
+
+    func textDidEndEditing(_ notification: Notification) {
+        focusBindingEchoReconciler.recordLocalDeactivation()
+        parent.focusChanged(false)
     }
 }
 
