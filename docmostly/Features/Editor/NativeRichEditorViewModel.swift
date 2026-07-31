@@ -26,6 +26,7 @@ final class NativeRichEditorViewModel {
     var errorMessage: String?
     var saveErrorMessage: String?
     var activeBlockID: UUID?
+    var focusedTextInputBlockID: UUID?
     var selectedBlockID: UUID?
     var visibleBlockControlsID: UUID?
     var isTitleFocused = false
@@ -88,6 +89,7 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
     @ObservationIgnored var documentSession: DocumentSession?
     @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
+    @ObservationIgnored let crdtSessionAttachmentID = UUID()
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, any Error>?
     @ObservationIgnored var activeSaveTask: Task<Bool, Never>?
     @ObservationIgnored let autosaveCoordinator = NativeEditorAutosaveCoordinator()
@@ -121,7 +123,7 @@ final class NativeRichEditorViewModel {
     }
 
     var isEditing: Bool {
-        isTitleFocused || activeBlockID != nil
+        isTitleFocused || focusedTextInputBlockID != nil
     }
 
     var currentPageID: String {
@@ -300,6 +302,7 @@ final class NativeRichEditorViewModel {
         }
         isTitleFocused = true
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         selectedBlockID = nil
         visibleBlockControlsID = nil
         notifyLocalAwarenessChanged()
@@ -308,6 +311,12 @@ final class NativeRichEditorViewModel {
     func focus(blockID: UUID) {
         guard canEdit else {
             clearAuthoringState()
+            return
+        }
+        guard document.blocks.contains(where: { $0.id == blockID && $0.isEditable }) else { return }
+        guard
+            isTitleFocused || activeBlockID != blockID || selectedBlockID != nil || visibleBlockControlsID != nil
+        else {
             return
         }
         isTitleFocused = false
@@ -320,6 +329,7 @@ final class NativeRichEditorViewModel {
     func clearFocus() {
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         notifyLocalAwarenessChanged()
     }
 
@@ -328,6 +338,7 @@ final class NativeRichEditorViewModel {
         guard document.blocks.contains(where: { $0.id == blockID }) else { return }
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         visibleBlockControlsID = blockID
         selectedBlockID = selectedBlockID == blockID ? nil : blockID
         notifyLocalAwarenessChanged()
@@ -342,6 +353,7 @@ final class NativeRichEditorViewModel {
         guard document.blocks.contains(where: { $0.id == blockID }) else { return }
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         visibleBlockControlsID = blockID
         notifyLocalAwarenessChanged()
     }
@@ -404,6 +416,7 @@ final class NativeRichEditorViewModel {
     func clearAuthoringState() {
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         selectedBlockID = nil
         visibleBlockControlsID = nil
     }

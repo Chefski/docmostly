@@ -12,6 +12,12 @@ final class DocumentSession {
     @ObservationIgnored private var snapshotContinuations: [
         UUID: AsyncStream<NativeEditorCRDTDocumentSnapshot>.Continuation
     ] = [:]
+    @ObservationIgnored private var localChangeBarriers: [
+        UUID: @MainActor @Sendable () async throws -> Bool
+    ] = [:]
+    @ObservationIgnored private var remoteProjectionHandlers: [
+        UUID: @MainActor @Sendable (NativeEditorCRDTDocumentSnapshot) -> Bool
+    ] = [:]
     @ObservationIgnored private var isCompacting = false
     @ObservationIgnored private var retainedDraftTitle: String?
     @ObservationIgnored private var retainedDraft: ProseMirrorDocument?
@@ -92,6 +98,22 @@ final class DocumentSession {
         retainedDraft = nil
     }
 
+    func attachEditor(
+        sourceID: UUID,
+        localChangeBarrier: @escaping @MainActor @Sendable () async throws -> Bool,
+        remoteProjectionHandler: @escaping @MainActor @Sendable (
+            NativeEditorCRDTDocumentSnapshot
+        ) -> Bool
+    ) {
+        localChangeBarriers[sourceID] = localChangeBarrier
+        remoteProjectionHandlers[sourceID] = remoteProjectionHandler
+    }
+
+    func detachEditor(sourceID: UUID) {
+        localChangeBarriers[sourceID] = nil
+        remoteProjectionHandlers[sourceID] = nil
+    }
+
     func hasPendingSynchronization() async throws -> Bool {
         if retainedDraft != nil {
             return true
@@ -138,18 +160,23 @@ private extension DocumentSession {
     }
 
     func commitRemoteUpdate(_ update: Data) async throws {
+        try await waitForAttachedEditorsToIntegrateLocalChanges()
         try await kernel.validate(update)
         let committed = try await localPeer.append(update, origin: .remote, key: key)
-        guard committed.wasInserted else { return }
+        try await waitForAttachedEditorsToIntegrateLocalChanges()
         var snapshot = try await kernel.apply(update)
-        await indexer.documentUpdateCommitted(committed)
+        if committed.wasInserted {
+            await indexer.documentUpdateCommitted(committed)
+        }
         if retainedDraft != nil {
             snapshot = try await promoteRetainedDraft() ?? snapshot
         }
         if let snapshot {
-            publish(snapshot)
+            publish(snapshot, notifyingAttachedEditors: true)
         }
-        try await compactIfNeeded()
+        if committed.wasInserted {
+            try await compactIfNeeded()
+        }
     }
 
     func pendingLocalUpdatePayloads() async throws -> [Data] {
@@ -256,8 +283,27 @@ private extension DocumentSession {
         return try await kernel.snapshot()
     }
 
-    func publish(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+    func waitForAttachedEditorsToIntegrateLocalChanges() async throws {
+        let barriers = localChangeBarriers
+        for (sourceID, barrier) in barriers {
+            guard try await barrier() else {
+                detachEditor(sourceID: sourceID)
+                continue
+            }
+        }
+    }
+
+    func publish(
+        _ snapshot: NativeEditorCRDTDocumentSnapshot,
+        notifyingAttachedEditors: Bool = false
+    ) {
         initialSnapshot = snapshot
+        if notifyingAttachedEditors {
+            let handlers = remoteProjectionHandlers
+            for (sourceID, handler) in handlers where handler(snapshot) == false {
+                detachEditor(sourceID: sourceID)
+            }
+        }
         for continuation in snapshotContinuations.values {
             continuation.yield(snapshot)
         }

@@ -7,4 +7,6 @@ enum NativeEditorToolbarMetrics {
     static let controlSideLength: CGFloat = 38
     static let horizontalPadding: CGFloat = 10
     static let verticalPadding: CGFloat = 4
+    static let dividerVerticalPadding: CGFloat = 8
+    static let barHeight = controlSideLength + (verticalPadding * 2)
 }

@@ -36,7 +36,6 @@ final class AppState {
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
     @ObservationIgnored private var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
-    @ObservationIgnored var sidebarReturnDestination: SidebarDestination?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
     @ObservationIgnored var offlineReplayTask: Task<Void, Never>?

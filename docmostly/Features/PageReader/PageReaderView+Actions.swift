@@ -114,6 +114,7 @@ extension PageReaderView {
         case .block(let blockID):
             editorViewModel.focus(blockID: blockID)
         case nil:
+            guard editorViewModel.isTitleFocused else { return }
             editorViewModel.clearFocus()
             autosaveInlineEdits()
         }

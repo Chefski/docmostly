@@ -5,6 +5,7 @@ import Foundation
 final class SessionTestDocumentEngine: NativeEditorCRDTDocumentEngine {
     let requiresInitialRemoteSnapshot = true
     private(set) var appliedUpdates: [Data] = []
+    private(set) var events: [String] = []
     private var localSequence = 0
 
     func encodeStateVector() async throws -> Data {
@@ -37,6 +38,7 @@ final class SessionTestDocumentEngine: NativeEditorCRDTDocumentEngine {
         try await validateUpdate(update)
         if appliedUpdates.contains(update) == false {
             appliedUpdates.append(update)
+            events.append("remote")
         }
         return NativeEditorCRDTDocumentSnapshot(title: "Page", document: NativeEditorDocument())
     }
@@ -48,6 +50,7 @@ final class SessionTestDocumentEngine: NativeEditorCRDTDocumentEngine {
     func integrateLocalChangeForCommit(_ change: NativeEditorCRDTLocalChange) async throws -> [Data] {
         _ = change
         localSequence += 1
+        events.append("local")
         return [Data("local-\(localSequence)".utf8)]
     }
 

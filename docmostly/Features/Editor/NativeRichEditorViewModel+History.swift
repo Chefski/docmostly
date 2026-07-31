@@ -181,19 +181,16 @@ extension NativeRichEditorViewModel {
         try await crdtLocalChangeTask?.value
     }
 
-    func waitForStableCRDTLocalChangeBarrier() async {
+    func waitForStableCRDTLocalChangeBarrier() async throws {
         var stableGeneration = crdtOperationGeneration
 
         while Task.isCancelled == false {
-            do {
-                try await crdtLocalChangeTask?.value
-            } catch {
-                return
-            }
+            try await crdtLocalChangeTask?.value
 
             guard stableGeneration != crdtOperationGeneration else { return }
             stableGeneration = crdtOperationGeneration
         }
+        throw CancellationError()
     }
 
     func enqueueCRDTSnapshotFlush(

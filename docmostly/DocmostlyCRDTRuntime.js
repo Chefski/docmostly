@@ -13102,16 +13102,8 @@ ${err.toString()}`);
     nodes: {
       doc: { content: "block+" },
       text: { group: "inline" },
-      paragraph: {
-        group: "block",
-        content: "inline*",
-        attrs: { textAlign: { default: null } }
-      },
-      heading: {
-        group: "block",
-        content: "inline*",
-        attrs: { level: { default: 1 }, textAlign: { default: null } }
-      },
+      paragraph: textBlockAttrs(),
+      heading: textBlockAttrs({ level: { default: 1 } }),
       blockquote: { group: "block", content: "block+" },
       codeBlock: {
         group: "block",
@@ -13242,6 +13234,18 @@ ${err.toString()}`);
   });
   function leafBlockAttrs(attrs = {}) {
     return { group: "block", atom: true, attrs };
+  }
+  function textBlockAttrs(attrs = {}) {
+    return {
+      group: "block",
+      content: "inline*",
+      attrs: {
+        id: { default: null },
+        indent: { default: 0 },
+        textAlign: { default: null },
+        ...attrs
+      }
+    };
   }
   function inlineAtomAttrs(attrs = {}) {
     return { inline: true, group: "inline", atom: true, attrs };
