@@ -48,8 +48,19 @@ struct PageTreeVisibleNodeTests {
         #expect(nested.map(\.depth) == [0, 1, 2])
     }
 
+    @Test func insertingIntoAnUnloadedParentDoesNotHideUnknownServerChildren() {
+        let nodes = [node(id: "root", hasChildren: true)]
+
+        let updated = nodes.inserting(node(id: "new-child"), parentPageId: "root", index: 0)
+
+        #expect(updated.first?.hasChildren == true)
+        #expect(updated.first?.isChildrenLoaded == false)
+        #expect(updated.first?.children.isEmpty == true)
+    }
+
     private func node(
         id: String,
+        hasChildren: Bool? = nil,
         children: [PageTreeNode] = []
     ) -> PageTreeNode {
         PageTreeNode(
@@ -60,7 +71,7 @@ struct PageTreeVisibleNodeTests {
             spaceId: "space-1",
             parentPageId: nil,
             position: nil,
-            hasChildren: children.isEmpty == false,
+            hasChildren: hasChildren ?? children.isEmpty == false,
             children: children,
             isChildrenLoaded: children.isEmpty == false
         )

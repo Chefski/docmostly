@@ -10,6 +10,8 @@ struct PageTreeView: View {
     @State private var moveRequest: PageTreeNode?
     @State private var copyRequest: PageTreeNode?
     @State private var isShowingTrash = false
+    @State private var initializedBrowserSpaceID: String?
+    @State private var navigationState = PageTreeNavigationState()
 
     let space: DocmostSpace
 
@@ -27,7 +29,7 @@ struct PageTreeView: View {
             } else {
                 RecentPagesRailView(
                     items: browserViewModel.items,
-                    isLoading: browserViewModel.isLoading,
+                    isLoading: browserViewModel.isLoading || initializedBrowserSpaceID != space.id,
                     errorMessage: browserViewModel.errorMessage,
                     isOffline: appState.isOffline
                 )
@@ -113,9 +115,10 @@ struct PageTreeView: View {
             await refreshPages()
         }
         .task(id: space.id) {
-            await refreshTreeState()
+            await loadInitialSpaceState()
         }
         .task(id: pageBrowserTaskKey) {
+            guard initializedBrowserSpaceID == space.id else { return }
             await refreshBrowser()
         }
         .task(id: searchTaskKey) {
@@ -129,6 +132,9 @@ struct PageTreeView: View {
         .pageOpenDestination()
         .navigationDestination(for: PageTreeNode.self) { node in
             PageReaderDestinationView(pageID: node.slugId)
+        }
+        .navigationDestination(item: $navigationState.spaceSettingsSpaceID) { spaceID in
+            SpaceSettingsDestinationView(spaceID: spaceID)
         }
         .sheet(item: $creationRequest) { request in
             PageCreationSheet(request: request) { title in
@@ -170,7 +176,9 @@ struct PageTreeView: View {
         PageBrowserTaskKey(
             spaceID: space.id,
             scope: browserViewModel.selectedScope,
-            pageDiscoveryRevision: appState.pageDiscoveryRevision
+            pageDiscoveryRevision: appState.pageDiscoveryRevision,
+            favoriteRevision: appState.favoriteRevision,
+            initializedSpaceID: initializedBrowserSpaceID
         )
     }
 
@@ -244,7 +252,7 @@ struct PageTreeView: View {
     }
 
     private func showSpaceSettings() {
-        appState.selectSidebarUtilityDestination(.settings)
+        navigationState.showSpaceSettings(spaceID: space.id)
     }
 
     private func refreshPages() async {
@@ -252,6 +260,16 @@ struct PageTreeView: View {
         async let loadTreeState: Void = refreshTreeState()
         await loadBrowser
         await loadTreeState
+    }
+
+    private func loadInitialSpaceState() async {
+        initializedBrowserSpaceID = nil
+        await viewModel.loadRoot(spaceId: space.id, appState: appState)
+        guard Task.isCancelled == false else { return }
+
+        initializedBrowserSpaceID = space.id
+
+        await viewModel.loadSpaceActionState(spaceId: space.id, appState: appState)
     }
 
     private func refreshBrowser() async {

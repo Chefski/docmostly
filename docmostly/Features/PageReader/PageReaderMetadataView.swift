@@ -2,13 +2,20 @@ import SwiftUI
 
 struct PageReaderMetadataView: View {
     let breadcrumbs: [DocmostPage]
+    let currentPageID: String
+    let currentPageIcon: String?
     let labels: [DocmostLabel]
     let selectPage: (DocmostPage) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if breadcrumbs.isEmpty == false {
-                PageBreadcrumbTrailView(breadcrumbs: breadcrumbs, selectPage: selectPage)
+                PageBreadcrumbTrailView(
+                    breadcrumbs: breadcrumbs,
+                    currentPageID: currentPageID,
+                    currentPageIcon: currentPageIcon,
+                    selectPage: selectPage
+                )
             }
 
             if labels.isEmpty == false {
@@ -20,14 +27,24 @@ struct PageReaderMetadataView: View {
 
 private struct PageBreadcrumbTrailView: View {
     let breadcrumbs: [DocmostPage]
+    let currentPageID: String
+    let currentPageIcon: String?
     let selectPage: (DocmostPage) -> Void
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 4) {
                 ForEach(breadcrumbs.enumerated(), id: \.element.id) { index, page in
-                    Button(page.title.isEmpty ? "Untitled" : page.title) {
+                    Button {
                         selectPage(page)
+                    } label: {
+                        HStack(spacing: 4) {
+                            if let icon = icon(for: page), icon.isEmpty == false {
+                                Text(icon)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(page.title.isEmpty ? "Untitled" : page.title)
+                        }
                     }
                     .buttonStyle(.borderless)
                     .font(.caption)
@@ -42,6 +59,10 @@ private struct PageBreadcrumbTrailView: View {
             }
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func icon(for page: DocmostPage) -> String? {
+        page.id == currentPageID ? currentPageIcon : page.icon
     }
 }
 

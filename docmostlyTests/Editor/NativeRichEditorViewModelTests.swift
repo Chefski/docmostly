@@ -331,10 +331,11 @@ struct NativeRichEditorViewModelTests {
         viewModel.document = NativeEditorDocument(blocks: [firstBlock, selectedBlock, lastBlock])
 
         viewModel.selectBlock(selectedBlock.id)
-        viewModel.deleteSelectedBlock()
+        let destinationBlockID = viewModel.deleteSelectedBlock()
 
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["First", "Last"])
         #expect(viewModel.selectedBlockID == nil)
+        #expect(destinationBlockID == firstBlock.id)
         #expect(viewModel.activeBlockID == firstBlock.id)
         let selection = try #require(NativeEditorCharacterRange.characterRange(
             for: viewModel.document.blocks[0].selection,

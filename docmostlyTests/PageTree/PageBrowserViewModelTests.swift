@@ -44,6 +44,42 @@ struct PageBrowserViewModelTests {
         #expect(provider.createdRequests == [PageBrowserProviderSpy.Request(spaceId: "space-1", userId: "user-1")])
     }
 
+    @Test func loadsRecentlyUpdatedPagesAcrossAllSpaces() async throws {
+        let provider = PageBrowserProviderSpy()
+        provider.recentPages = [Self.page(id: "recent-1", title: "Roadmap")]
+        let viewModel = PageBrowserViewModel()
+
+        await viewModel.load(spaces: [Self.space], provider: provider)
+
+        #expect(viewModel.items.map(\.title) == ["Roadmap"])
+        #expect(viewModel.items.map(\.subtitle) == ["Jumpseat"])
+        #expect(provider.recentRequests == [PageBrowserProviderSpy.Request(spaceId: nil, userId: nil)])
+    }
+
+    @Test func loadsFavoritePagesAcrossAllSpaces() async throws {
+        let provider = PageBrowserProviderSpy()
+        provider.favorites = [Self.favorite(id: "favorite-1", title: "Launch Plan")]
+        let viewModel = PageBrowserViewModel()
+        viewModel.selectedScope = .favorites
+
+        await viewModel.load(spaces: [Self.space], provider: provider)
+
+        #expect(viewModel.items.map(\.subtitle) == ["Jumpseat"])
+        #expect(provider.favoriteRequests == [PageBrowserProviderSpy.Request(spaceId: nil, userId: nil)])
+    }
+
+    @Test func loadsCreatedByMePagesAcrossAllSpaces() async throws {
+        let provider = PageBrowserProviderSpy()
+        provider.currentPageBrowserUserID = "user-1"
+        provider.createdPages = [Self.page(id: "created-1", title: "My Notes")]
+        let viewModel = PageBrowserViewModel()
+        viewModel.selectedScope = .createdByMe
+
+        await viewModel.load(spaces: [Self.space], provider: provider)
+
+        #expect(provider.createdRequests == [PageBrowserProviderSpy.Request(spaceId: nil, userId: "user-1")])
+    }
+
     private static let space = DocmostSpace(
         id: "space-1",
         name: "Jumpseat",

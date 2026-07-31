@@ -26,6 +26,7 @@ final class AppState {
     @ObservationIgnored private let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
     @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
+    @ObservationIgnored var documentSessionRegistry: DocumentSessionRegistry?
     @ObservationIgnored var cacheRepository: CacheRepository?
     @ObservationIgnored var cacheReader: CacheReadRepository?
     @ObservationIgnored var cacheWriter: CacheWriteRepository?
@@ -49,6 +50,7 @@ final class AppState {
         authService: AuthService? = nil,
         cookieJar: SessionCookieJar = SessionCookieJar(),
         crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)? = nil,
+        documentSessionRegistry: DocumentSessionRegistry? = nil,
         offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing = NativeEditorOfflineCRDTSynchronizer(),
         apiClient: DocmostAPIClient? = nil
     ) {
@@ -56,6 +58,7 @@ final class AppState {
         self.cookieJar = cookieJar
         self.authService = authService ?? AuthService(cookieJar: cookieJar)
         self.crdtDocumentEngineFactory = crdtDocumentEngineFactory
+        self.documentSessionRegistry = documentSessionRegistry
         self.offlineCRDTSynchronizer = offlineCRDTSynchronizer
         self.apiClient = apiClient
         serverURLString = self.settingsStore.loadServerURLString()
@@ -83,6 +86,14 @@ final class AppState {
         }
         if offlineQueueRepository == nil, let modelContainer {
             offlineQueueRepository = OfflineMutationQueueRepository(modelContainer: modelContainer)
+        }
+        if documentSessionRegistry == nil,
+           let modelContainer,
+           let crdtDocumentEngineFactory {
+            documentSessionRegistry = DocumentSessionRegistry(
+                localPeer: DocumentLocalPersistencePeer(modelContainer: modelContainer),
+                engineFactory: crdtDocumentEngineFactory
+            )
         }
     }
 
@@ -190,6 +201,7 @@ final class AppState {
         savedServerURLStrings = settingsStore.loadSavedServerURLStrings()
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
+        documentSessionRegistry?.removeAll()
         apiClient = client
         currentUser = nil
         cacheScope = nil
@@ -219,6 +231,7 @@ final class AppState {
         try? await authService.logout(client: apiClient)
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
+        documentSessionRegistry?.removeAll()
         currentUser = nil
         cacheScope = nil
         pendingOfflineMutationCount = 0

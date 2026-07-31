@@ -9,6 +9,7 @@ import SwiftUI
 final class NativeRichEditorViewModel {
     let pageID: String
     var title: String
+    var icon: String?
     var document = NativeEditorDocument() {
         didSet {
             rebuildResolvedRemoteCursorIndex()
@@ -25,6 +26,7 @@ final class NativeRichEditorViewModel {
     var errorMessage: String?
     var saveErrorMessage: String?
     var activeBlockID: UUID?
+    var focusedTextInputBlockID: UUID?
     var selectedBlockID: UUID?
     var visibleBlockControlsID: UUID?
     var isTitleFocused = false
@@ -85,7 +87,9 @@ final class NativeRichEditorViewModel {
     @ObservationIgnored var lastKnownSnapshot: NativeEditorHistorySnapshot?
     @ObservationIgnored var isApplyingHistory = false
     @ObservationIgnored var crdtDocumentEngine: (any NativeEditorCRDTDocumentEngine)?
+    @ObservationIgnored var documentSession: DocumentSession?
     @ObservationIgnored var crdtSyncCoordinator: NativeEditorCRDTSyncCoordinator?
+    @ObservationIgnored let crdtSessionAttachmentID = UUID()
     @ObservationIgnored var crdtLocalChangeTask: Task<Void, any Error>?
     @ObservationIgnored var activeSaveTask: Task<Bool, Never>?
     @ObservationIgnored let autosaveCoordinator = NativeEditorAutosaveCoordinator()
@@ -99,6 +103,7 @@ final class NativeRichEditorViewModel {
     ) {
         self.pageID = pageID
         title = initialTitle
+        icon = nil
         editablePageID = pageID
         editablePageSlugID = pageID
         lastSavedTitle = initialTitle
@@ -118,7 +123,7 @@ final class NativeRichEditorViewModel {
     }
 
     var isEditing: Bool {
-        isTitleFocused || activeBlockID != nil
+        isTitleFocused || focusedTextInputBlockID != nil
     }
 
     var currentPageID: String {
@@ -241,18 +246,18 @@ final class NativeRichEditorViewModel {
         let snapshotTitle = title
         let snapshotDocument = document
         let snapshotBaseTitle = lastSavedTitle
-        let snapshotBaseDocument = lastSavedDocument
-        let capturedAt = Date.now
         saveErrorMessage = nil
 
         do {
+            try await retainCurrentDocumentDraft(
+                title: snapshotTitle,
+                document: snapshotDocument.proseMirrorDocument
+            )
             let persistence = try await appState.persistDeferredCollaborativeDraft(
                 pageId: editablePageID,
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 documentSnapshot: snapshotDocument.proseMirrorDocument,
-                baseTitle: snapshotBaseTitle,
-                baseDocument: snapshotBaseDocument.proseMirrorDocument,
-                snapshotCapturedAt: capturedAt
+                baseTitle: snapshotBaseTitle
             )
             if let page = persistence.page {
                 editablePageID = page.id
@@ -297,6 +302,7 @@ final class NativeRichEditorViewModel {
         }
         isTitleFocused = true
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         selectedBlockID = nil
         visibleBlockControlsID = nil
         notifyLocalAwarenessChanged()
@@ -305,6 +311,12 @@ final class NativeRichEditorViewModel {
     func focus(blockID: UUID) {
         guard canEdit else {
             clearAuthoringState()
+            return
+        }
+        guard document.blocks.contains(where: { $0.id == blockID && $0.isEditable }) else { return }
+        guard
+            isTitleFocused || activeBlockID != blockID || selectedBlockID != nil || visibleBlockControlsID != nil
+        else {
             return
         }
         isTitleFocused = false
@@ -317,6 +329,7 @@ final class NativeRichEditorViewModel {
     func clearFocus() {
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         notifyLocalAwarenessChanged()
     }
 
@@ -325,6 +338,7 @@ final class NativeRichEditorViewModel {
         guard document.blocks.contains(where: { $0.id == blockID }) else { return }
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         visibleBlockControlsID = blockID
         selectedBlockID = selectedBlockID == blockID ? nil : blockID
         notifyLocalAwarenessChanged()
@@ -339,6 +353,7 @@ final class NativeRichEditorViewModel {
         guard document.blocks.contains(where: { $0.id == blockID }) else { return }
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         visibleBlockControlsID = blockID
         notifyLocalAwarenessChanged()
     }
@@ -401,12 +416,14 @@ final class NativeRichEditorViewModel {
     func clearAuthoringState() {
         isTitleFocused = false
         activeBlockID = nil
+        focusedTextInputBlockID = nil
         selectedBlockID = nil
         visibleBlockControlsID = nil
     }
 
-    private func updateEditAccess() {
-        let nextCanEdit = pageAllowsEditing && collaborationAllowsEditing
+    func updateEditAccess() {
+        let crdtAllowsEditing = crdtDocumentEngine == nil || isCRDTEngineReadyForLocalChanges
+        let nextCanEdit = pageAllowsEditing && collaborationAllowsEditing && crdtAllowsEditing
         guard canEdit != nextCanEdit else { return }
 
         canEdit = nextCanEdit
@@ -429,7 +446,6 @@ private extension NativeRichEditorViewModel {
         let baseDocument: NativeEditorDocument
         let localEditRevision: UInt
         let savedBaselineRevision: UInt
-        let capturedAt: Date
         let requiresLocalOnlyCRDTPersistence: Bool
         let crdtFlushTask: Task<NativeEditorCRDTSaveResult, any Error>?
 
@@ -451,7 +467,6 @@ private extension NativeRichEditorViewModel {
             baseDocument: lastSavedDocument,
             localEditRevision: localEditRevision,
             savedBaselineRevision: savedBaselineRevision,
-            capturedAt: .now,
             requiresLocalOnlyCRDTPersistence: requiresLocalOnlyCRDTPersistence,
             crdtFlushTask: requiresLocalOnlyCRDTPersistence ? nil : enqueueCRDTSnapshotFlush(
                 title: snapshotTitle.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -463,13 +478,15 @@ private extension NativeRichEditorViewModel {
     func persist(snapshot: SaveSnapshot, appState: AppState) async -> Bool {
         do {
             if snapshot.requiresLocalOnlyCRDTPersistence {
+                try await retainCurrentDocumentDraft(
+                    title: snapshot.trimmedTitle,
+                    document: snapshot.document.proseMirrorDocument
+                )
                 let persistence = try await appState.persistDeferredCollaborativeDraft(
                     pageId: snapshot.pageID,
                     title: snapshot.trimmedTitle,
                     documentSnapshot: snapshot.document.proseMirrorDocument,
-                    baseTitle: snapshot.baseTitle,
-                    baseDocument: snapshot.baseDocument.proseMirrorDocument,
-                    snapshotCapturedAt: snapshot.capturedAt
+                    baseTitle: snapshot.baseTitle
                 )
                 if let page = persistence.page {
                     editablePageID = page.id
@@ -487,17 +504,11 @@ private extension NativeRichEditorViewModel {
                 let flushedTitle = result.title ?? snapshot.trimmedTitle
 
                 if appState.hasPageUpdatePersistence {
-                    guard let crdtStateUpdate = result.documentStateUpdate,
-                          crdtStateUpdate.isEmpty == false else {
-                        throw APIError.connectionFailed("Collaborative save did not produce durable Yjs state.")
-                    }
                     let persistence = try await appState.updateCollaborativePageTitle(
                         pageId: snapshot.pageID,
                         title: flushedTitle,
                         documentSnapshot: snapshot.document.proseMirrorDocument,
-                        crdtStateUpdate: crdtStateUpdate,
-                        baseTitle: snapshot.baseTitle,
-                        snapshotCapturedAt: snapshot.capturedAt
+                        baseTitle: snapshot.baseTitle
                     )
                     if let page = persistence.page {
                         editablePageID = page.id

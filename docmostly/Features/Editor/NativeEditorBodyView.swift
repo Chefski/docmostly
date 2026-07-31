@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NativeEditorBodyView: View {
+    @State private var textInputFocusRequest: NativeEditorTextInputFocusRequest?
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
@@ -9,6 +10,7 @@ struct NativeEditorBodyView: View {
     var applyCommand: ((NativeEditorCommand) -> Void)?
     var applyPendingRemoteUpdate: (() -> Void)?
     var keepPendingLocalUpdate: (() -> Void)?
+    var pickPageEmoji: (() -> Void)?
     var slashCommandFilter: (NativeEditorCommand) -> Bool = { _ in true }
     var showsTitle = true
     var showsCollaborationStatus = true
@@ -18,15 +20,22 @@ struct NativeEditorBodyView: View {
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 6) {
             if showsTitle {
-                TextField("Page title", text: $viewModel.title, axis: .vertical)
-                    .font(.largeTitle)
-                    .bold()
-                    .textFieldStyle(.plain)
-                    .focused(focusedField, equals: .title)
-                    .submitLabel(.next)
-                    .onSubmit(advanceFromTitle)
-                    .disabled(authoringIsAvailable == false)
-                    .accessibilityLabel("Page title")
+                HStack(alignment: .firstTextBaseline) {
+                    if let pickPageEmoji {
+                        NativeEditorPageTitleIconButton(icon: viewModel.icon, action: pickPageEmoji)
+                            .disabled(authoringIsAvailable == false)
+                    }
+
+                    TextField("Page title", text: $viewModel.title, axis: .vertical)
+                        .font(.largeTitle)
+                        .bold()
+                        .textFieldStyle(.plain)
+                        .focused(focusedField, equals: .title)
+                        .submitLabel(.next)
+                        .onSubmit(advanceFromTitle)
+                        .disabled(authoringIsAvailable == false)
+                        .accessibilityLabel("Page title")
+                }
 
                 if let creatorName = viewModel.creator?.name, creatorName.isEmpty == false {
                     NativeEditorBylineView(authorName: creatorName)
@@ -49,7 +58,10 @@ struct NativeEditorBodyView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     NativeEditorBlockRow(
                         block: $block,
-                        focusedField: focusedField,
+                        isActive: viewModel.activeBlockID == block.id,
+                        focusRequestID: textInputFocusRequest?.blockID == block.id
+                            ? textInputFocusRequest?.id
+                            : nil,
                         isSelected: viewModel.selectedBlockID == block.id,
                         isShowingControls: viewModel.visibleBlockControlsID == block.id,
                         isReadOnly: authoringIsAvailable == false,
@@ -64,10 +76,12 @@ struct NativeEditorBodyView: View {
                         insertBelow: {
                             guard authoringIsAvailable else { return }
                             viewModel.insertBlock(after: block.id)
+                            requestActiveBlockFocus()
                         },
                         delete: {
                             guard authoringIsAvailable else { return }
-                            viewModel.deleteBlock(block.id)
+                            guard let destinationBlockID = viewModel.deleteBlock(block.id) else { return }
+                            requestBlockFocus(destinationBlockID)
                         },
                         tableActions: authoringIsAvailable ? tableEditingActions : nil,
                         richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
@@ -82,13 +96,28 @@ struct NativeEditorBodyView: View {
                             guard authoringIsAvailable else { return }
                             viewModel.focus(blockID: block.id)
                         },
+                        textInputFocusChanged: { isFocused in
+                            if isFocused {
+                                guard authoringIsAvailable else { return }
+                                viewModel.textInputDidBeginEditing(blockID: block.id)
+                            } else {
+                                viewModel.textInputDidEndEditing(blockID: block.id)
+                            }
+                        },
                         moveBefore: { movedBlockID in
                             guard authoringIsAvailable else { return }
                             viewModel.moveBlock(movedBlockID, before: block.id)
                         },
                         splitBlock: { characterRange in
                             guard authoringIsAvailable else { return false }
-                            return viewModel.splitBlock(block.id, replacing: characterRange) != nil
+                            guard let continuationBlockID = viewModel.splitBlock(
+                                block.id,
+                                replacing: characterRange
+                            ) else {
+                                return false
+                            }
+                            requestBlockFocus(continuationBlockID)
+                            return true
                         },
                         insertHardBreak: { characterRange in
                             guard authoringIsAvailable else { return false }
@@ -96,7 +125,11 @@ struct NativeEditorBodyView: View {
                         },
                         mergeBlockBackward: {
                             guard authoringIsAvailable else { return false }
-                            return viewModel.mergeBlockBackward(block.id)
+                            guard viewModel.mergeBlockBackward(block.id) else { return false }
+                            if let destinationBlockID = viewModel.activeBlockID {
+                                requestBlockFocus(destinationBlockID)
+                            }
+                            return true
                         },
                         blockChanged: {
                             guard authoringIsAvailable else { return }
@@ -114,7 +147,7 @@ struct NativeEditorBodyView: View {
                     .id(block.id)
 
                     if authoringIsAvailable, viewModel.selectedBlockID == block.id {
-                        NativeEditorBlockSelectionBar(delete: viewModel.deleteSelectedBlock)
+                        NativeEditorBlockSelectionBar(delete: deleteSelectedBlock)
                     }
 
                     if authoringIsAvailable, viewModel.activeBlockID == block.id, viewModel.isShowingSlashCommands {
@@ -131,7 +164,7 @@ struct NativeEditorBodyView: View {
             }
 
             if authoringIsAvailable {
-                Button("Add Block", systemImage: "plus", action: viewModel.appendBlock)
+                Button("Add Block", systemImage: "plus", action: appendBlock)
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
             }
@@ -140,8 +173,13 @@ struct NativeEditorBodyView: View {
             viewModel.handleTitleChanged()
         }
         .onChange(of: viewModel.activeBlockID) { _, blockID in
-            guard let blockID else { return }
-            focusedField.wrappedValue = .block(blockID)
+            guard let blockID else {
+                textInputFocusRequest = nil
+                return
+            }
+            guard viewModel.focusedTextInputBlockID != blockID else { return }
+            guard textInputFocusRequest?.blockID != blockID else { return }
+            enqueueBlockFocusRequest(blockID)
         }
     }
 
@@ -167,10 +205,64 @@ struct NativeEditorBodyView: View {
     private func advanceFromTitle() {
         guard authoringIsAvailable else { return }
         if let firstEditableBlock = viewModel.document.blocks.first(where: \.isEditable) {
-            viewModel.focus(blockID: firstEditableBlock.id)
+            requestBlockFocus(firstEditableBlock.id)
         } else {
-            viewModel.appendBlock()
+            appendBlock()
         }
+    }
+
+    private func requestBlockFocus(_ blockID: UUID) {
+        guard
+            authoringIsAvailable,
+            viewModel.document.blocks.contains(where: { $0.id == blockID && $0.isEditable })
+        else {
+            return
+        }
+
+        viewModel.focus(blockID: blockID)
+        enqueueBlockFocusRequest(blockID)
+    }
+
+    private func enqueueBlockFocusRequest(_ blockID: UUID) {
+        textInputFocusRequest = NativeEditorTextInputFocusRequest(blockID: blockID)
+
+        Task { @MainActor in
+            await Task.yield()
+            guard
+                authoringIsAvailable,
+                viewModel.activeBlockID == blockID,
+                viewModel.document.blocks.contains(where: { $0.id == blockID && $0.isEditable })
+            else {
+                return
+            }
+            textInputFocusRequest = NativeEditorTextInputFocusRequest(blockID: blockID)
+
+            try? await Task.sleep(for: .milliseconds(250))
+            guard
+                authoringIsAvailable,
+                viewModel.activeBlockID == blockID,
+                viewModel.focusedTextInputBlockID != blockID,
+                viewModel.document.blocks.contains(where: { $0.id == blockID && $0.isEditable })
+            else {
+                return
+            }
+            textInputFocusRequest = NativeEditorTextInputFocusRequest(blockID: blockID)
+        }
+    }
+
+    private func requestActiveBlockFocus() {
+        guard let activeBlockID = viewModel.activeBlockID else { return }
+        requestBlockFocus(activeBlockID)
+    }
+
+    private func appendBlock() {
+        viewModel.appendBlock()
+        requestActiveBlockFocus()
+    }
+
+    private func deleteSelectedBlock() {
+        guard let destinationBlockID = viewModel.deleteSelectedBlock() else { return }
+        requestBlockFocus(destinationBlockID)
     }
 
     private var tableEditingActions: NativeEditorTableEditingActions {
@@ -212,4 +304,9 @@ struct NativeEditorBodyView: View {
             updateMathBlock: viewModel.updateMathBlock
         )
     }
+}
+
+private struct NativeEditorTextInputFocusRequest {
+    let id = UUID()
+    let blockID: UUID
 }

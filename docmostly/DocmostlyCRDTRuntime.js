@@ -13102,16 +13102,8 @@ ${err.toString()}`);
     nodes: {
       doc: { content: "block+" },
       text: { group: "inline" },
-      paragraph: {
-        group: "block",
-        content: "inline*",
-        attrs: { textAlign: { default: null } }
-      },
-      heading: {
-        group: "block",
-        content: "inline*",
-        attrs: { level: { default: 1 }, textAlign: { default: null } }
-      },
+      paragraph: textBlockAttrs(),
+      heading: textBlockAttrs({ level: { default: 1 } }),
       blockquote: { group: "block", content: "block+" },
       codeBlock: {
         group: "block",
@@ -13243,6 +13235,18 @@ ${err.toString()}`);
   function leafBlockAttrs(attrs = {}) {
     return { group: "block", atom: true, attrs };
   }
+  function textBlockAttrs(attrs = {}) {
+    return {
+      group: "block",
+      content: "inline*",
+      attrs: {
+        id: { default: null },
+        indent: { default: 0 },
+        textAlign: { default: null },
+        ...attrs
+      }
+    };
+  }
   function inlineAtomAttrs(attrs = {}) {
     return { inline: true, group: "inline", atom: true, attrs };
   }
@@ -13314,9 +13318,25 @@ ${err.toString()}`);
     encodeStateAsUpdate(stateVector) {
       return base64FromBytes(encodeStateAsUpdate(this.ydoc, bytesFromBase64(stateVector)));
     }
+    validateUpdate(update) {
+      const validationDocument = new Doc();
+      try {
+        applyUpdate(validationDocument, bytesFromBase64(update));
+        return true;
+      } finally {
+        validationDocument.destroy();
+      }
+    }
     applyRemoteUpdate(update) {
       applyUpdate(this.ydoc, bytesFromBase64(update), this.remoteOrigin);
       this.enqueueSnapshot();
+    }
+    currentSnapshot() {
+      return {
+        title: null,
+        document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
+        updatedAt: null
+      };
     }
     integrateLocalChange(change) {
       this.applyDocument(change.after.title, change.after.document, this.localOrigin);
@@ -13389,7 +13409,7 @@ ${err.toString()}`);
     }
     enqueueSnapshot() {
       this.snapshots.push({
-        title: this.title,
+        title: null,
         document: yDocToProsemirrorJSON(this.ydoc, fragmentName),
         updatedAt: null
       });

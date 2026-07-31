@@ -205,6 +205,9 @@ extension NativeRichEditorViewModel {
     }
 
     func crdtDocumentSnapshots() async -> AsyncStream<NativeEditorCRDTDocumentSnapshot> {
+        if let documentSession {
+            return documentSession.snapshots()
+        }
         guard let crdtDocumentEngine else {
             let (stream, continuation) = AsyncStream.makeStream(of: NativeEditorCRDTDocumentSnapshot.self)
             continuation.finish()
@@ -220,32 +223,21 @@ extension NativeRichEditorViewModel {
             return
         }
 
-        guard isDirty else {
-            applyCleanCRDTDocumentSnapshot(snapshot)
+        if pendingRemoteCRDTSnapshot != nil {
+            deferCRDTDocumentSnapshot(snapshot)
             return
         }
 
-        let hasEarlierDeferredConflict = pendingRemotePage != nil ||
-            pendingRemoteUpdate != nil ||
-            pendingRemoteCRDTSnapshot != nil ||
-            realtimeStatus == .conflict
         let titleMatches = snapshot.title == nil || snapshot.title == title
         let documentMatches = snapshot.document.proseMirrorDocument.isCollaborationEquivalent(
             to: document.proseMirrorDocument
         )
-
-        if hasEarlierDeferredConflict == false, titleMatches, documentMatches {
-            pendingRemotePage = nil
-            pendingRemoteUpdate = nil
-            pendingRemoteCRDTSnapshot = nil
-            hasDurablyPersistedLocalCRDTDraft = false
-            markRemoteBaseline(updatedAt: snapshot.updatedAt ?? lastRemoteUpdatedAt)
-            lastKnownSnapshot = makeHistorySnapshot()
-            isDirty = true
+        if titleMatches, documentMatches {
+            acknowledgeCRDTDocumentProjection(snapshot)
             return
         }
 
-        deferCRDTDocumentSnapshot(snapshot)
+        applyAuthoritativeCRDTDocumentProjection(snapshot)
     }
 
     @discardableResult
@@ -320,22 +312,44 @@ extension NativeRichEditorViewModel {
         _ engine: any NativeEditorCRDTDocumentEngine,
         restoredLocalState: Bool = false
     ) {
+        documentSession?.detachEditor(sourceID: crdtSessionAttachmentID)
+        documentSession = nil
         crdtDocumentEngine = engine
         crdtSyncCoordinator = makeCRDTSyncCoordinator(for: engine)
         isCRDTEngineReadyForLocalChanges = restoredLocalState || engine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
     }
 
-    func persistCurrentCRDTState(appState: AppState) async {
-        await waitForStableCRDTLocalChangeBarrier()
-        guard let crdtDocumentEngine else { return }
-
-        do {
-            let update = try await crdtDocumentEngine.encodeDocumentState()
-            try await appState.persistCRDTStateUpdate(pageID: currentPageID, update: update)
-        } catch is CancellationError {
-            return
-        } catch {
-            appState.statusMessage = "Could not cache the collaborative document: " + error.localizedDescription
+    func configureDocumentSession(
+        _ session: DocumentSession,
+        restoredLocalState: Bool = false
+    ) {
+        documentSession?.detachEditor(sourceID: crdtSessionAttachmentID)
+        documentSession = session
+        session.attachEditor(
+            sourceID: crdtSessionAttachmentID,
+            localChangeBarrier: { [weak self] in
+                guard let self else { return false }
+                try await self.waitForStableCRDTLocalChangeBarrier()
+                return true
+            },
+            remoteProjectionHandler: { [weak self] snapshot in
+                guard let self else { return false }
+                self.applyCRDTDocumentSnapshot(snapshot)
+                return true
+            }
+        )
+        crdtDocumentEngine = session.documentEngine
+        crdtSyncCoordinator = session.syncCoordinator
+        isCRDTEngineReadyForLocalChanges = restoredLocalState ||
+            session.documentEngine.requiresInitialRemoteSnapshot == false
+        updateEditAccess()
+        if let initialSnapshot = session.initialSnapshot {
+            if isCRDTEngineReadyForLocalChanges {
+                applyInitialCRDTDocumentSnapshot(initialSnapshot)
+            } else {
+                applyRetainedDraftProjection(initialSnapshot)
+            }
         }
     }
 
@@ -352,7 +366,7 @@ extension NativeRichEditorViewModel {
     }
 
     private func applyOrderedCRDTRemoteUpdate(_ update: Data) async throws {
-        await waitForStableCRDTLocalChangeBarrier()
+        try await waitForStableCRDTLocalChangeBarrier()
         try Task.checkCancellation()
         guard let crdtDocumentEngine else { return }
 
@@ -414,6 +428,18 @@ extension NativeRichEditorViewModel {
             localAwarenessCursor: localAwarenessCursor,
             localAwarenessUpdates: localAwarenessUpdates
         )
+    }
+
+    func markDocumentRemotePeerConnected() async {
+        await documentSession?.markRemoteConnected()
+    }
+
+    func retainCurrentDocumentDraft(title: String, document: ProseMirrorDocument) async throws {
+        try await documentSession?.retainDraft(title: title, document: document)
+    }
+
+    func clearRetainedDocumentDraft() async {
+        await documentSession?.clearRetainedDraft()
     }
 
     func refreshResolvedRemoteCursors() async {
@@ -528,6 +554,7 @@ extension NativeRichEditorViewModel {
 
     private func applyInitialCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
         isCRDTEngineReadyForLocalChanges = true
+        updateEditAccess()
 
         guard isDirty else {
             applyCleanCRDTDocumentSnapshot(snapshot)
@@ -573,6 +600,16 @@ extension NativeRichEditorViewModel {
         deferCRDTDocumentSnapshot(snapshot)
     }
 
+    private func applyRetainedDraftProjection(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        if let snapshotTitle = snapshot.title {
+            title = snapshotTitle
+        }
+        document = snapshot.document
+        retainedReadOnlyDraftSnapshot = makeHistorySnapshot()
+        hasDurablyPersistedLocalCRDTDraft = true
+        isDirty = true
+    }
+
     private func applyCleanCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
         if let snapshotTitle = snapshot.title {
             title = snapshotTitle
@@ -589,6 +626,91 @@ extension NativeRichEditorViewModel {
         markRemoteBaseline(updatedAt: snapshot.updatedAt ?? lastRemoteUpdatedAt)
         resetEditingHistory()
         isDirty = false
+    }
+
+    private func acknowledgeCRDTDocumentProjection(_ snapshot: NativeEditorCRDTDocumentSnapshot) {
+        hasDurablyPersistedLocalCRDTDraft = false
+        recordCRDTProjectionTimestamp(snapshot.updatedAt)
+        lastKnownSnapshot = makeHistorySnapshot()
+        if pendingRemoteUpdate == nil {
+            realtimeStatus = .connected
+        }
+    }
+
+    private func applyAuthoritativeCRDTDocumentProjection(
+        _ snapshot: NativeEditorCRDTDocumentSnapshot
+    ) {
+        let hadLocalDocumentChanges = document != lastSavedDocument
+        let hadLocalTitleChanges = title != lastSavedTitle
+        let previousPendingUpdate = pendingRemoteUpdate
+        let reconciledDocument = snapshot.document.reconcilingEditorState(from: document)
+        let documentChanged = reconciledDocument.proseMirrorDocument.isCollaborationEquivalent(
+            to: document.proseMirrorDocument
+        ) == false
+
+        isApplyingHistory = true
+        if documentChanged {
+            document = reconciledDocument
+            retainValidAuthoringState()
+        }
+        if let projectedTitle = snapshot.title {
+            if hadLocalTitleChanges, projectedTitle != title {
+                pendingRemoteUpdate = NativeEditorRemoteUpdate(
+                    updatedAt: snapshot.updatedAt ?? previousPendingUpdate?.updatedAt,
+                    title: projectedTitle,
+                    lastUpdatedBy: previousPendingUpdate?.lastUpdatedBy
+                )
+            } else {
+                title = projectedTitle
+                if hadLocalTitleChanges == false {
+                    lastSavedTitle = projectedTitle
+                    rebaseEditingHistoryTitle(to: projectedTitle)
+                }
+            }
+        }
+        isApplyingHistory = false
+
+        if hadLocalDocumentChanges == false {
+            lastSavedDocument = document
+        }
+        pendingRemotePage = nil
+        pendingRemoteCRDTSnapshot = nil
+        hasDurablyPersistedLocalCRDTDraft = false
+        retainedReadOnlyDraftSnapshot = nil
+        recordCRDTProjectionTimestamp(snapshot.updatedAt)
+
+        if documentChanged {
+            resolvedRemoteCursors = []
+            resetEditingHistory()
+            notifyLocalAwarenessChanged()
+        } else {
+            lastKnownSnapshot = makeHistorySnapshot()
+        }
+
+        isDirty = hadLocalDocumentChanges || hadLocalTitleChanges
+        realtimeStatus = pendingRemoteUpdate == nil ? .connected : .conflict
+    }
+
+    private func retainValidAuthoringState() {
+        let blockIDs = Set(document.blocks.map(\.id))
+        if let activeBlockID, blockIDs.contains(activeBlockID) == false {
+            self.activeBlockID = nil
+        }
+        if let selectedBlockID, blockIDs.contains(selectedBlockID) == false {
+            self.selectedBlockID = nil
+        }
+        if let visibleBlockControlsID, blockIDs.contains(visibleBlockControlsID) == false {
+            self.visibleBlockControlsID = nil
+        }
+    }
+
+    private func recordCRDTProjectionTimestamp(_ projectedUpdatedAt: Date?) {
+        guard let projectedUpdatedAt else { return }
+        let latestUpdatedAt = lastRemoteUpdatedAt.map {
+            max($0, projectedUpdatedAt)
+        } ?? projectedUpdatedAt
+        updatedAt = latestUpdatedAt
+        lastRemoteUpdatedAt = latestUpdatedAt
     }
 
     private func deferCRDTDocumentSnapshot(_ snapshot: NativeEditorCRDTDocumentSnapshot) {

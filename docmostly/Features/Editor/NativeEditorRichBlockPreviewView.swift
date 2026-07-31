@@ -168,9 +168,12 @@ struct NativeEditorRichBlockPreviewView: View {
         case .unsupported:
             NativeEditorUnsupportedBlockView(block: block)
         case .paragraph, .heading, .bulletListItem, .orderedListItem, .taskListItem, .blockquote, .codeBlock:
-            Text(block.text)
-                .font(block.kind.editorFont)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            NativeEditorBlockTextSurface(kind: block.kind) {
+                Text(NativeEditorPreviewTextFormatter.text(block.text, for: block.kind))
+                    .font(block.kind.editorFont)
+                    .multilineTextAlignment(block.alignment.swiftUITextAlignment)
+                    .frame(maxWidth: .infinity, alignment: block.alignment.swiftUIFrameAlignment)
+            }
         }
     }
 

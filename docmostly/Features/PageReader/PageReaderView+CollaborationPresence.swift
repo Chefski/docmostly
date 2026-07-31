@@ -21,7 +21,6 @@ extension PageReaderView {
         for await snapshot in snapshots {
             guard Task.isCancelled == false else { return }
             editorViewModel.applyCRDTDocumentSnapshot(snapshot)
-            await editorViewModel.persistCurrentCRDTState(appState: appState)
             await editorViewModel.refreshResolvedRemoteCursors()
         }
     }
@@ -89,7 +88,7 @@ extension PageReaderView {
     ) async {
         editorViewModel.applyCollaborationSyncStatus(isSynced: isSynced)
         if isSynced {
-            await editorViewModel.persistCurrentCRDTState(appState: appState)
+            await editorViewModel.markDocumentRemotePeerConnected()
         }
         if isSynced, editorViewModel.usesCRDTDocumentEngine == false {
             editorViewModel.markCollaborationUnavailable("Native CRDT runtime is unavailable.")

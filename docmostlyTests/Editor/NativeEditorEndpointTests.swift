@@ -47,4 +47,20 @@ struct NativeEditorEndpointTests {
         #expect(object["operation"] == nil)
         #expect(object["format"] == nil)
     }
+
+    @Test func pageEmojiUpdateSendsIconWithoutDocumentContent() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let request = try Endpoint.updatePage(pageId: "page-1", icon: "🎯")
+            .urlRequest(baseURL: baseURL)
+
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        #expect(object["pageId"] as? String == "page-1")
+        #expect(object["icon"] as? String == "🎯")
+        #expect(object["title"] == nil)
+        #expect(object["content"] == nil)
+        #expect(object["operation"] == nil)
+        #expect(object["format"] == nil)
+    }
 }

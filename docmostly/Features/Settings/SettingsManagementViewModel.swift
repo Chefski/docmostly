@@ -7,6 +7,7 @@ final class SettingsManagementViewModel {
     var accountDraft = AccountSettingsDraft()
     var workspaceDraft = WorkspaceSettingsDraft()
     var workspace: DocmostWorkspace?
+    var workspaceEntitlements: DocmostWorkspaceEntitlements?
     var workspaceMembers: [DocmostUser] = []
     var workspaceInvitations: [DocmostWorkspaceInvitation] = []
     var groups: [DocmostGroup] = []
@@ -18,11 +19,46 @@ final class SettingsManagementViewModel {
     private var currentUserRole: String?
 
     var canManageWorkspace: Bool {
-        currentUserRole == "owner" || currentUserRole == "admin"
+        SpaceManagementAuthorization.canManageWorkspace(role: currentUserRole)
     }
 
     var currentUserIsOwner: Bool {
         currentUserRole == "owner"
+    }
+
+    func canManageSpace(_ space: DocmostSpace) -> Bool {
+        SpaceManagementAuthorization.canManageSpace(
+            workspaceRole: currentUserRole,
+            membershipRole: space.membership?.role
+        )
+    }
+
+    var hasWorkspaceChanges: Bool {
+        guard let workspace else { return false }
+        return workspaceDraft.hasChanges(
+            comparedTo: workspace,
+            availableFeatures: availableWorkspaceFeatures
+        )
+    }
+
+    var hasUnavailableSecurityFeatures: Bool {
+        [
+            DocmostWorkspaceFeature.sharingControls,
+            .apiKeys,
+            .retention
+        ].contains { hasWorkspaceFeature($0) == false }
+    }
+
+    var hasUnavailableWorkspaceFeatures: Bool {
+        [
+            DocmostWorkspaceFeature.templates,
+            .artificialIntelligence,
+            .mcp
+        ].contains { hasWorkspaceFeature($0) == false }
+    }
+
+    var hasUnavailableLicensedSettings: Bool {
+        hasUnavailableSecurityFeatures || hasUnavailableWorkspaceFeatures
     }
 
     func seed(from appState: AppState) {
@@ -34,10 +70,13 @@ final class SettingsManagementViewModel {
     }
 
     func loadWorkspace(appState: AppState) async {
+        workspaceEntitlements = nil
         await load {
+            async let entitlements = try? await appState.loadWorkspaceEntitlements()
             let workspace = try await appState.loadWorkspaceInfo()
             self.workspace = workspace
             workspaceDraft = WorkspaceSettingsDraft(workspace: workspace)
+            workspaceEntitlements = await entitlements
         }
     }
 
@@ -66,7 +105,10 @@ final class SettingsManagementViewModel {
             return false
         }
 
-        let update = workspaceDraft.update(comparedTo: workspace)
+        let update = workspaceDraft.update(
+            comparedTo: workspace,
+            availableFeatures: availableWorkspaceFeatures
+        )
         guard update.hasChanges else { return true }
 
         return await save(successMessage: "Workspace updated.") {
@@ -194,6 +236,14 @@ final class SettingsManagementViewModel {
     func clearMessages() {
         errorMessage = nil
         statusMessage = nil
+    }
+
+    func hasWorkspaceFeature(_ feature: DocmostWorkspaceFeature) -> Bool {
+        workspaceEntitlements?.contains(feature) == true
+    }
+
+    private var availableWorkspaceFeatures: Set<DocmostWorkspaceFeature> {
+        Set(DocmostWorkspaceFeature.allCases.filter(hasWorkspaceFeature))
     }
 
     private func load(_ operation: () async throws -> Void) async {

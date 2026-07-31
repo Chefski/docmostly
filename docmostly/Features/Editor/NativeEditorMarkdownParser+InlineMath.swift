@@ -68,7 +68,10 @@ extension NativeEditorMarkdownParser {
         after result: AttributedString
     ) -> Bool {
         let trimmedMarkdown = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        return result.characters.isEmpty && trimmedMarkdown.hasPrefix("<") == false
+        let requiresNativeInlineParser = markdown.contains("\\[") || markdown.contains("`")
+        return result.characters.isEmpty &&
+            trimmedMarkdown.hasPrefix("<") == false &&
+            requiresNativeInlineParser == false
     }
 
     private static func appendInlineMath(_ text: String, to result: inout AttributedString) {

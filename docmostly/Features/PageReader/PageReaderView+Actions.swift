@@ -12,6 +12,11 @@ extension PageReaderView {
         isShowingMentionPicker = true
     }
 
+    func showEmojiPicker() {
+        guard readerMode == .edit, editorViewModel?.canEdit == true else { return }
+        isShowingEmojiPicker = true
+    }
+
     func applyEditorCommand(_ command: NativeEditorCommand) {
         guard command.requiresServerBackedBaseCreation else {
             editorViewModel?.applySlashCommand(command)
@@ -109,6 +114,7 @@ extension PageReaderView {
         case .block(let blockID):
             editorViewModel.focus(blockID: blockID)
         case nil:
+            guard editorViewModel.isTitleFocused else { return }
             editorViewModel.clearFocus()
             autosaveInlineEdits()
         }

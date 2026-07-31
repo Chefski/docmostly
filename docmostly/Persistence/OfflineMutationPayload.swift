@@ -1,5 +1,6 @@
 import Foundation
 
+// swiftlint:disable:next type_body_length
 nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
     case updatePage(
         pageId: String,
@@ -15,6 +16,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         stateUpdate: Data,
         baseTitle: String? = nil
     )
+    case updatePageMetadata(pageId: String, title: String, baseTitle: String? = nil)
     case createComment(
         localId: String,
         pageId: String,
@@ -39,6 +41,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case updatePage
         case updatePageCRDT
+        case updatePageMetadata
         case createComment
         case resolveComment
         case addPageLabels
@@ -81,7 +84,14 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        if container.contains(.updatePageCRDT) {
+        if container.contains(.updatePageMetadata) {
+            let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageMetadata)
+            self = try .updatePageMetadata(
+                pageId: payload.decode(String.self, forKey: .pageId),
+                title: payload.decode(String.self, forKey: .title),
+                baseTitle: payload.decodeIfPresent(String.self, forKey: .baseTitle)
+            )
+        } else if container.contains(.updatePageCRDT) {
             let payload = try container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageCRDT)
             self = try .updatePageCRDT(
                 pageId: payload.decode(String.self, forKey: .pageId),
@@ -184,11 +194,16 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
+        case .updatePageMetadata(let pageId, let title, let baseTitle):
+            var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageMetadata)
+            try payload.encode(pageId, forKey: .pageId)
+            try payload.encode(title, forKey: .title)
+            try payload.encodeIfPresent(baseTitle, forKey: .baseTitle)
         case .updatePageCRDT(let pageId, let title, let document, let stateUpdate, let baseTitle):
             var payload = container.nestedContainer(keyedBy: PayloadCodingKeys.self, forKey: .updatePageCRDT)
             try payload.encode(pageId, forKey: .pageId)
@@ -271,7 +286,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var kind: OfflineMutationKind {
         switch self {
-        case .updatePage, .updatePageCRDT:
+        case .updatePage, .updatePageCRDT, .updatePageMetadata:
             .updatePage
         case .createComment:
             .createComment
@@ -302,7 +317,8 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
 
     var coalescingKey: String? {
         switch self {
-        case .updatePage(let pageId, _, _, _, _),
+        case .updatePageMetadata(let pageId, _, _),
+                .updatePage(let pageId, _, _, _, _),
                 .updatePageCRDT(let pageId, _, _, _, _):
             "\(kind.rawValue):\(pageId)"
         case .resolveComment(let commentId, _, _):
@@ -337,7 +353,7 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
                 .movePage,
                 .movePageToSpace:
             true
-        case .updatePage, .updatePageCRDT, .createComment, .addPageLabels:
+        case .updatePage, .updatePageCRDT, .updatePageMetadata, .createComment, .addPageLabels:
             false
         }
     }
@@ -346,6 +362,8 @@ nonisolated enum OfflineMutationPayload: Codable, Equatable, Sendable {
         guard mappings.isEmpty == false else { return self }
 
         switch self {
+        case .updatePageMetadata:
+            return self
         case .updatePageCRDT(let pageId, let title, let document, let stateUpdate, let baseTitle):
             var patchedDocument = document
             var didReplace = false

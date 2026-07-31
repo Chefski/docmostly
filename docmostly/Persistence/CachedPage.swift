@@ -65,6 +65,22 @@ final class CachedPage {
         lastOpenedAt = cachedAt
     }
 
+    init(editablePageMetadata: DocmostEditablePage, scope: CacheScope, cachedAt: Date = Date.now) {
+        cacheServerBaseURL = scope.serverBaseURL
+        cacheUserID = scope.userID
+        id = editablePageMetadata.id
+        slugId = editablePageMetadata.slugId
+        title = editablePageMetadata.title
+        proseMirrorJSONData = try? JSONEncoder().encode(ProseMirrorDocument())
+        icon = editablePageMetadata.icon
+        spaceId = editablePageMetadata.spaceId
+        updatedAt = editablePageMetadata.updatedAt
+        canEdit = editablePageMetadata.permissions?.canEdit
+        hasRestriction = editablePageMetadata.permissions?.hasRestriction
+        self.cachedAt = cachedAt
+        lastOpenedAt = cachedAt
+    }
+
     func update(page: DocmostPage, htmlContent: String) {
         id = page.id
         slugId = page.slugId
@@ -114,6 +130,22 @@ final class CachedPage {
         canEdit = editablePage.permissions?.canEdit
         hasRestriction = editablePage.permissions?.hasRestriction
         cachedAt = Date.now
+    }
+
+    func updateMetadata(editablePage: DocmostEditablePage) {
+        id = editablePage.id
+        slugId = editablePage.slugId
+        title = editablePage.title
+        icon = editablePage.icon
+        spaceId = editablePage.spaceId
+        if let updatedAt = editablePage.updatedAt {
+            self.updatedAt = updatedAt
+        }
+        if let permissions = editablePage.permissions {
+            canEdit = permissions.canEdit
+            hasRestriction = permissions.hasRestriction
+        }
+        cachedAt = .now
     }
 
     func updateLocalDraft(title: String, document: ProseMirrorDocument) throws {

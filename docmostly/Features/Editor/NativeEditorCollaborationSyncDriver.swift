@@ -3,14 +3,41 @@ import Foundation
 actor NativeEditorCollaborationSyncDriver {
     private let documentName: String
     private let coordinator: NativeEditorCRDTSyncCoordinator
+    private var initialPendingUpdates: [Data] = []
+    private var initialUpdatesAwaitingAcknowledgement: [Data] = []
+    private var initialLiveUpdateSuppressionCounts: [Data: Int] = [:]
 
     init(documentName: String, coordinator: NativeEditorCRDTSyncCoordinator) {
         self.documentName = documentName
         self.coordinator = coordinator
     }
 
-    func outboundFramesAfterAuthentication() async throws -> [Data] {
-        [try await frame(for: coordinator.makeInitialSyncMessage())]
+    func outboundFramesAfterAuthentication(includePendingLocalUpdates: Bool = true) async throws -> [Data] {
+        initialUpdatesAwaitingAcknowledgement = []
+        initialLiveUpdateSuppressionCounts = [:]
+        let initialMessage = try await coordinator.makeInitialSyncMessage()
+        let initial = frame(for: initialMessage)
+        guard includePendingLocalUpdates else {
+            initialPendingUpdates = []
+            return [initial]
+        }
+        initialPendingUpdates = try await coordinator.pendingLocalUpdates()
+        for update in initialPendingUpdates {
+            initialLiveUpdateSuppressionCounts[update, default: 0] += 1
+        }
+        var pending: [Data] = []
+        pending.reserveCapacity(initialPendingUpdates.count)
+        for update in initialPendingUpdates {
+            let message = await coordinator.broadcastLocalUpdate(update)
+            pending.append(frame(for: message))
+        }
+        return [initial] + pending
+    }
+
+    func didSendOutboundFramesAfterAuthentication() async throws {
+        let updates = initialPendingUpdates
+        initialPendingUpdates = []
+        initialUpdatesAwaitingAcknowledgement.append(contentsOf: updates)
     }
 
     func outboundFrames(for message: NativeEditorYjsSyncMessage) async throws -> [Data] {
@@ -21,6 +48,32 @@ actor NativeEditorCollaborationSyncDriver {
     func outboundFrame(forLocalUpdate update: Data) async -> Data {
         let message = await coordinator.broadcastLocalUpdate(update)
         return frame(for: message)
+    }
+
+    func outboundFrameIfNeeded(forLocalUpdate update: Data) async -> Data? {
+        if let count = initialLiveUpdateSuppressionCounts[update] {
+            if count == 1 {
+                initialLiveUpdateSuppressionCounts[update] = nil
+            } else {
+                initialLiveUpdateSuppressionCounts[update] = count - 1
+            }
+            return nil
+        }
+        return await outboundFrame(forLocalUpdate: update)
+    }
+
+    func didReceiveSyncAcknowledgement() async throws {
+        while let update = initialUpdatesAwaitingAcknowledgement.first {
+            try await coordinator.recordLocalUpdateAcknowledged(update)
+            initialUpdatesAwaitingAcknowledgement.removeFirst()
+        }
+    }
+
+    func localUpdateSubscription() async -> (
+        updates: AsyncStream<Data>,
+        cancel: @Sendable () async -> Void
+    ) {
+        await coordinator.localUpdateSubscription()
     }
 
     func localUpdates() async -> AsyncStream<Data> {

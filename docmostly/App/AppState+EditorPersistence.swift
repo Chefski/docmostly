@@ -15,15 +15,9 @@ extension AppState {
         baseDocument: ProseMirrorDocument? = nil
     ) async throws -> DocmostEditablePage {
         guard let apiClient else {
-            let page = try await queuePageUpdate(
-                pageId: pageId,
-                title: title,
-                document: document,
-                baseTitle: baseTitle,
-                baseDocument: baseDocument
+            throw APIError.connectionFailed(
+                "Offline document edits require the local collaborative document store."
             )
-            markPageDiscoveryChanged()
-            return page
         }
 
         do {
@@ -47,41 +41,32 @@ extension AppState {
             markPageDiscoveryChanged()
             return page
         } catch {
-            guard canQueueOfflineMutation(after: error) else { throw error }
-            isOffline = true
-            statusMessage = error.localizedDescription
-            let page = try await queuePageUpdate(
-                pageId: pageId,
-                title: title,
-                document: document,
-                baseTitle: baseTitle,
-                baseDocument: baseDocument
-            )
-            markPageDiscoveryChanged()
-            return page
+            throw error
         }
     }
 
-    // swiftlint:disable:next function_parameter_count
     func updateCollaborativePageTitle(
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
-        crdtStateUpdate: Data,
-        baseTitle: String,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
-        guard crdtStateUpdate.isEmpty == false else {
-            throw APIError.connectionFailed("The collaborative document returned an empty local state.")
+        let reconciliationMarker: OfflineMutationRecord?
+        if cacheScope != nil, offlineQueue != nil || offlineQueueRepository != nil {
+            reconciliationMarker = try await queuePageMetadataUpdate(
+                pageId: pageId,
+                title: title,
+                baseTitle: baseTitle
+            )
+        } else {
+            reconciliationMarker = nil
         }
         guard let apiClient else {
             return try await persistCRDTPageLocally(
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
-                stateUpdate: crdtStateUpdate,
-                baseTitle: baseTitle,
-                snapshotCapturedAt: snapshotCapturedAt
+                baseTitle: baseTitle
             )
         }
 
@@ -92,49 +77,27 @@ extension AppState {
                 title: title
             ))
         } catch {
-            guard canQueueOfflineMutation(after: error) else { throw error }
+            guard canQueueOfflineMutation(after: error) else {
+                if let reconciliationMarker {
+                    try await removeQueuedOfflineMutation(reconciliationMarker)
+                }
+                throw error
+            }
             isOffline = true
             statusMessage = error.localizedDescription
             return try await persistCRDTPageLocally(
                 pageId: pageId,
                 title: title,
                 document: documentSnapshot,
-                stateUpdate: crdtStateUpdate,
-                baseTitle: baseTitle,
-                snapshotCapturedAt: snapshotCapturedAt
+                baseTitle: baseTitle
             )
         }
 
         isOffline = false
         cacheCollaborativeSnapshot(page: page, document: documentSnapshot)
-        try await persistCRDTStateUpdate(pageID: pageId, update: crdtStateUpdate)
 
-        do {
-            let serverDocument = page.content ?? ProseMirrorDocument()
-            if serverDocument.isCollaborationEquivalent(to: documentSnapshot) {
-                _ = try await acknowledgePendingPageUpdate(
-                    pageId: pageId,
-                    snapshotCapturedAt: snapshotCapturedAt
-                )
-                await refreshOfflineMutationCount()
-                scheduleOfflineQueueReconciliation()
-            } else {
-                _ = try await supersedePendingCRDTPageUpdate(
-                    pageId: pageId,
-                    title: title,
-                    document: documentSnapshot,
-                    stateUpdate: crdtStateUpdate,
-                    baseTitle: baseTitle,
-                    snapshotCapturedAt: snapshotCapturedAt
-                )
-                await refreshOfflineMutationCount()
-                scheduleOfflineQueueReconciliation()
-                statusMessage = "Saved locally. Waiting for the collaborative document to sync."
-            }
-        } catch {
-            statusMessage = "Could not make the collaborative document durable: " + error.localizedDescription
-            throw error
-        }
+        await refreshOfflineMutationCount()
+        scheduleOfflineQueueReconciliation()
         markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
@@ -143,22 +106,17 @@ extension AppState {
         )
     }
 
-    // swiftlint:disable:next function_parameter_count
     func persistDeferredCollaborativeDraft(
         pageId: String,
         title: String,
         documentSnapshot: ProseMirrorDocument,
-        baseTitle: String,
-        baseDocument: ProseMirrorDocument,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
         try await persistCollaborativePageLocally(
             pageId: pageId,
             title: title,
             document: documentSnapshot,
-            baseTitle: baseTitle,
-            baseDocument: baseDocument,
-            snapshotCapturedAt: snapshotCapturedAt
+            baseTitle: baseTitle
         )
     }
 }
@@ -182,126 +140,14 @@ private extension AppState {
         scheduleCacheWrite(.saveEditablePage(cachedPage, scope: cacheScope))
     }
 
-    // swiftlint:disable:next function_parameter_count
-    func supersedePendingPageUpdate(
-        pageId: String,
-        title: String,
-        document: ProseMirrorDocument,
-        baseTitle: String,
-        baseDocument: ProseMirrorDocument,
-        snapshotCapturedAt: Date
-    ) async throws -> OfflinePageUpdateSupersessionResult {
-        guard let cacheScope else {
-            throw APIError.connectionFailed("Offline document durability is unavailable until you sign in.")
-        }
-        if let offlineQueueRepository {
-            return try await offlineQueueRepository.supersedePendingPageUpdate(
-                pageId: pageId,
-                title: title,
-                document: document,
-                baseTitle: baseTitle,
-                baseDocument: baseDocument,
-                snapshotCapturedAt: snapshotCapturedAt,
-                scope: cacheScope
-            )
-        }
-        guard let offlineQueue else {
-            throw APIError.connectionFailed("Offline document durability is unavailable on this device.")
-        }
-        return try offlineQueue.supersedePendingPageUpdate(
-            pageId: pageId,
-            title: title,
-            document: document,
-            baseTitle: baseTitle,
-            baseDocument: baseDocument,
-            snapshotCapturedAt: snapshotCapturedAt,
-            scope: cacheScope
-        )
-    }
-
-    // swiftlint:disable:next function_parameter_count
-    func supersedePendingCRDTPageUpdate(
-        pageId: String,
-        title: String,
-        document: ProseMirrorDocument,
-        stateUpdate: Data,
-        baseTitle: String,
-        snapshotCapturedAt: Date
-    ) async throws -> OfflinePageUpdateSupersessionResult {
-        guard let cacheScope else {
-            throw APIError.connectionFailed("Offline document durability is unavailable until you sign in.")
-        }
-        if let offlineQueueRepository {
-            return try await offlineQueueRepository.supersedePendingCRDTPageUpdate(
-                pageId: pageId,
-                title: title,
-                document: document,
-                stateUpdate: stateUpdate,
-                baseTitle: baseTitle,
-                snapshotCapturedAt: snapshotCapturedAt,
-                scope: cacheScope
-            )
-        }
-        guard let offlineQueue else {
-            throw APIError.connectionFailed("Offline document durability is unavailable on this device.")
-        }
-        return try offlineQueue.supersedePendingCRDTPageUpdate(
-            pageId: pageId,
-            title: title,
-            document: document,
-            stateUpdate: stateUpdate,
-            baseTitle: baseTitle,
-            snapshotCapturedAt: snapshotCapturedAt,
-            scope: cacheScope
-        )
-    }
-
-    func acknowledgePendingPageUpdate(
-        pageId: String,
-        snapshotCapturedAt: Date
-    ) async throws -> OfflinePageUpdateAcknowledgementResult {
-        guard let cacheScope else { return .noPendingUpdate }
-        if let offlineQueueRepository {
-            return try await offlineQueueRepository.acknowledgePendingPageUpdate(
-                pageId: pageId,
-                snapshotCapturedAt: snapshotCapturedAt,
-                scope: cacheScope
-            )
-        }
-        guard let offlineQueue else { return .noPendingUpdate }
-        return try offlineQueue.acknowledgePendingPageUpdate(
-            pageId: pageId,
-            snapshotCapturedAt: snapshotCapturedAt,
-            scope: cacheScope
-        )
-    }
-
-    // swiftlint:disable:next function_parameter_count
     func persistCollaborativePageLocally(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
-        baseTitle: String,
-        baseDocument: ProseMirrorDocument,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
-        let supersessionResult = try await supersedePendingPageUpdate(
-            pageId: pageId,
-            title: title,
-            document: document,
-            baseTitle: baseTitle,
-            baseDocument: baseDocument,
-            snapshotCapturedAt: snapshotCapturedAt
-        )
+        try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
         await refreshOfflineMutationCount()
-
-        guard supersessionResult != .newerPendingUpdatePreserved else {
-            return CollaborativePagePersistenceResult(
-                page: nil,
-                persistedTitle: title,
-                updatedAt: nil
-            )
-        }
 
         let page = try await saveLocalEditableDraft(
             pageId: pageId,
@@ -316,36 +162,34 @@ private extension AppState {
         )
     }
 
-    // swiftlint:disable:next function_parameter_count
     func persistCRDTPageLocally(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
-        stateUpdate: Data,
-        baseTitle: String,
-        snapshotCapturedAt: Date
+        baseTitle: String
     ) async throws -> CollaborativePagePersistenceResult {
-        let supersessionResult = try await supersedePendingCRDTPageUpdate(
-            pageId: pageId,
-            title: title,
-            document: document,
-            stateUpdate: stateUpdate,
-            baseTitle: baseTitle,
-            snapshotCapturedAt: snapshotCapturedAt
-        )
+        try await queuePageMetadataUpdate(pageId: pageId, title: title, baseTitle: baseTitle)
         await refreshOfflineMutationCount()
 
-        guard supersessionResult != .newerPendingUpdatePreserved else {
-            return CollaborativePagePersistenceResult(page: nil, persistedTitle: title, updatedAt: nil)
-        }
-
         let page = try await saveLocalEditableDraft(pageId: pageId, title: title, document: document)
-        try await persistCRDTStateUpdate(pageID: pageId, update: stateUpdate)
         markPageDiscoveryChanged()
         return CollaborativePagePersistenceResult(
             page: page,
             persistedTitle: page.title,
             updatedAt: page.updatedAt
         )
+    }
+
+    @discardableResult
+    func queuePageMetadataUpdate(
+        pageId: String,
+        title: String,
+        baseTitle: String?
+    ) async throws -> OfflineMutationRecord {
+        try await queueOfflineMutation(.updatePageMetadata(
+            pageId: pageId,
+            title: title,
+            baseTitle: baseTitle
+        ))
     }
 }

@@ -20,6 +20,9 @@ struct SpaceSettingsDetailFormView: View {
             selectedTabContent
                 .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        #if os(iOS)
+        .frame(maxHeight: .infinity, alignment: .top)
+        #endif
         .navigationTitle(viewModel.space.name)
         .toolbar {
             if showsCloseButton {
@@ -65,7 +68,7 @@ struct SpaceSettingsDetailFormView: View {
                     Text("Details")
                         .font(.headline)
 
-                    SpaceSettingsLabeledRow(title: "Icon") {
+                    SpaceSettingsLabeledRow(title: "Icon", alignment: .center) {
                         SpaceIconView(space: viewModel.space, size: 44)
                     }
 
@@ -314,22 +317,30 @@ private struct SpaceSettingsPanelScrollView<Content: View>: View {
                 .padding(.top, 18)
                 .padding(.bottom, 24)
         }
+        #if os(macOS)
         .frame(maxHeight: maxHeight)
         .fixedSize(horizontal: false, vertical: maxHeight == nil)
+        #endif
     }
 }
 
 private struct SpaceSettingsLabeledRow<Content: View>: View {
     let title: String
+    let alignment: VerticalAlignment
     @ViewBuilder let content: Content
 
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(
+        title: String,
+        alignment: VerticalAlignment = .firstTextBaseline,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
+        self.alignment = alignment
         self.content = content()
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: alignment, spacing: 12) {
             Text(title)
                 .frame(width: SpaceSettingsDialogMetrics.labelWidth, alignment: .trailing)
 

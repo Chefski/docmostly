@@ -4,8 +4,10 @@ import UIKit
 
 struct NativeEditorTextInputView: UIViewRepresentable {
     @Binding var block: NativeEditorBlock
-    @Binding var isFocused: Bool
 
+    let isFocused: Bool
+    let focusRequestID: UUID?
+    let focusChanged: (Bool) -> Void
     let accessibilityLabel: String
     let actions: NativeEditorTextInputActions
     var remotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
@@ -46,6 +48,18 @@ struct NativeEditorTextInputView: UIViewRepresentable {
         textView.updateRemotePresence(remotePresenceSegments)
     }
 
+    static func dismantleUIView(
+        _ textView: NativeEditorUITextView,
+        coordinator: NativeEditorTextInputCoordinator
+    ) {
+        textView.requestsFirstResponder = false
+        if textView.isFirstResponder {
+            textView.resignFirstResponder()
+        }
+        coordinator.parent.focusChanged(false)
+        textView.delegate = nil
+    }
+
     func sizeThatFits(
         _ proposal: ProposedViewSize,
         uiView: NativeEditorUITextView,
@@ -68,6 +82,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private var isApplyingSource = false
     private var pendingTextDelta: NativeEditorTextDelta?
     private var pendingSelectionCorrection: Range<Int>?
+    private var handledFocusRequestID: UUID?
     private var bindingEchoReconciler = NativeEditorTextBindingEchoReconciler()
     private var focusBindingEchoReconciler = NativeEditorFocusBindingEchoReconciler()
 
@@ -122,6 +137,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         textView.attributedText = renderedText(
             sourceText,
             font: platformFont(for: parent.block.kind),
+            kind: parent.block.kind,
             alignment: platformAlignment(parent.block.alignment)
         )
         (textView as? NativeEditorUITextView)?.invalidateRemotePresenceRendering()
@@ -157,6 +173,14 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     }
 
     func updateFocus(_ textView: NativeEditorUITextView) {
+        if let focusRequestID = parent.focusRequestID,
+           focusRequestID != handledFocusRequestID,
+           parent.isFocused {
+            handledFocusRequestID = focusRequestID
+            textView.requestsFirstResponder = true
+            textView.requestFirstResponderIfPossible()
+        }
+
         switch focusBindingEchoReconciler.disposition(
             for: parent.isFocused,
             platformIsFocused: textView.isFirstResponder
@@ -185,12 +209,12 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
     func textViewDidBeginEditing(_ textView: UITextView) {
         focusBindingEchoReconciler.recordLocalActivation()
-        parent.isFocused = true
+        parent.focusChanged(true)
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
         focusBindingEchoReconciler.recordLocalDeactivation()
-        parent.isFocused = false
+        parent.focusChanged(false)
     }
 
     func textView(
@@ -305,6 +329,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         textView.attributedText = renderedText(
             source,
             font: platformFont(for: parent.block.kind),
+            kind: parent.block.kind,
             alignment: platformAlignment(parent.block.alignment)
         )
         (textView as? NativeEditorUITextView)?.invalidateRemotePresenceRendering()
@@ -359,6 +384,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private func renderedText(
         _ text: AttributedString,
         font: UIFont,
+        kind: NativeEditorBlockKind,
         alignment: NSTextAlignment
     ) -> NSAttributedString {
         let rendered = NSMutableAttributedString(
@@ -369,7 +395,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         paragraphStyle.alignment = alignment
 
         rendered.addAttribute(.font, value: font, range: fullRange)
-        applyInlinePresentationFonts(from: text, baseFont: font, to: rendered)
+        applyInlinePresentationFonts(from: text, baseFont: font, kind: kind, to: rendered)
         var rangesMissingForegroundColor: [NSRange] = []
         rendered.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
             if value == nil {
@@ -386,6 +412,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private func applyInlinePresentationFonts(
         from text: AttributedString,
         baseFont: UIFont,
+        kind: NativeEditorBlockKind,
         to rendered: NSMutableAttributedString
     ) {
         let plainText = String(text.characters)
@@ -395,12 +422,16 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
             let upperBound = text.characters.distance(from: text.startIndex, to: run.range.upperBound)
             let characterRange = lowerBound..<upperBound
             let range = NativeEditorCharacterRange.nsRange(for: characterRange, in: plainText)
-            var descriptor = baseFont.fontDescriptor
+            let hasStrongEmphasis = intent.contains(.stronglyEmphasized)
+            let usesHeavyHeadingWeight = hasStrongEmphasis && kind.isHeading
+            var descriptor = usesHeavyHeadingWeight
+                ? UIFont.systemFont(ofSize: baseFont.pointSize, weight: .heavy).fontDescriptor
+                : baseFont.fontDescriptor
             if intent.contains(.code), let monospacedDescriptor = descriptor.withDesign(.monospaced) {
                 descriptor = monospacedDescriptor
             }
             var traits = descriptor.symbolicTraits
-            if intent.contains(.stronglyEmphasized) {
+            if hasStrongEmphasis && usesHeavyHeadingWeight == false {
                 traits.insert(.traitBold)
             }
             if intent.contains(.emphasized) {
@@ -425,8 +456,14 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
     private func platformFont(for kind: NativeEditorBlockKind) -> UIFont {
         switch kind {
-        case .heading(let level):
-            return UIFont.preferredFont(forTextStyle: level == 1 ? .title1 : .title2)
+        case .heading:
+            let font = UIFont.preferredFont(forTextStyle: kind.headingTextStyle)
+            var traits = font.fontDescriptor.symbolicTraits
+            traits.insert(.traitBold)
+            guard let descriptor = font.fontDescriptor.withSymbolicTraits(traits) else {
+                return font
+            }
+            return UIFont(descriptor: descriptor, size: font.pointSize)
         case .codeBlock:
             let bodyFont = UIFont.preferredFont(forTextStyle: .body)
             let baseFont = UIFont.monospacedSystemFont(ofSize: bodyFont.pointSize, weight: .regular)
@@ -446,6 +483,27 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
             .right
         case .justify:
             .justified
+        }
+    }
+}
+
+private extension NativeEditorBlockKind {
+    var isHeading: Bool {
+        if case .heading = self {
+            return true
+        }
+        return false
+    }
+
+    var headingTextStyle: UIFont.TextStyle {
+        guard case .heading(let level) = self else { return .body }
+        return switch level {
+        case 1: .title1
+        case 2: .title2
+        case 3: .title3
+        case 4: .headline
+        case 5: .subheadline
+        default: .footnote
         }
     }
 }

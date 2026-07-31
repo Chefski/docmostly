@@ -10,7 +10,7 @@ struct SpacesSettingsView: View {
         List {
             ForEach(filteredSpaces) { space in
                 NavigationLink {
-                    SpaceSettingsDetailView(space: space, canManage: canManage(space))
+                    SpaceSettingsDetailView(space: space, canManage: viewModel.canManageSpace(space))
                 } label: {
                     SpaceRowView(space: space)
                 }
@@ -49,9 +49,5 @@ struct SpacesSettingsView: View {
 
     private func showCreateSpace() {
         isShowingCreateSpace = true
-    }
-
-    private func canManage(_ space: DocmostSpace) -> Bool {
-        viewModel.canManageWorkspace || space.membership?.role == "admin"
     }
 }

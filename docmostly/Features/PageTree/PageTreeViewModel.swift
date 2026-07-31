@@ -30,11 +30,45 @@ final class PageTreeViewModel {
 
         do {
             let pages = try await appState.loadSidebarPages(spaceId: spaceId)
-            nodes = pages.map(PageTreeNode.init(page:)).sortedByPosition()
+            var refreshedNodes = pages
+                .map(PageTreeNode.init(page:))
+                .sortedByPosition()
+            for index in refreshedNodes.indices {
+                refreshedNodes[index] = try await reloadExpandedSubtree(
+                    refreshedNodes[index],
+                    appState: appState
+                )
+            }
+            nodes = refreshedNodes
             rebuildVisibleNodes()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func reloadExpandedSubtree(
+        _ node: PageTreeNode,
+        appState: AppState
+    ) async throws -> PageTreeNode {
+        guard expandedIDs.contains(node.id) else { return node }
+
+        var refreshedNode = node
+        guard node.hasChildren else {
+            refreshedNode.children = []
+            refreshedNode.isChildrenLoaded = true
+            return refreshedNode
+        }
+
+        var children = try await appState.loadSidebarPages(spaceId: node.spaceId, pageId: node.id)
+            .map(PageTreeNode.init(page:))
+            .sortedByPosition()
+        for index in children.indices {
+            children[index] = try await reloadExpandedSubtree(children[index], appState: appState)
+        }
+        refreshedNode.children = children
+        refreshedNode.hasChildren = children.isEmpty == false
+        refreshedNode.isChildrenLoaded = true
+        return refreshedNode
     }
 
     func clearPages() {
@@ -121,6 +155,7 @@ final class PageTreeViewModel {
             let childNodes = children.map(PageTreeNode.init(page:)).sortedByPosition()
             nodes.updateNode(id: node.id) { existing in
                 existing.children = childNodes
+                existing.hasChildren = childNodes.isEmpty == false
                 existing.isChildrenLoaded = true
             }
             rebuildVisibleNodes()
@@ -243,7 +278,7 @@ final class PageTreeViewModel {
         nodes.updateNode(id: parentPageId) { existing in
             existing.children = children.map(PageTreeNode.init(page:)).sortedByPosition()
             existing.isChildrenLoaded = true
-            existing.hasChildren = true
+            existing.hasChildren = existing.children.isEmpty == false
         }
         rebuildVisibleNodes()
     }

@@ -60,6 +60,17 @@ struct AppStateNavigationSelectionTests {
         #expect(appState.selectedPageID == nil)
     }
 
+    @Test func leavingAUtilityDestinationShowsTheSidebar() {
+        let appState = makeAppState()
+        appState.selectSpace(id: "space-1")
+        appState.selectSidebarUtilityDestination(.settings)
+
+        appState.selectSidebarDestination(nil)
+
+        #expect(appState.selectedSidebarDestination == nil)
+        #expect(appState.selectedSpaceID == "space-1")
+    }
+
     @Test func leavingTheSelectedPageClearsItsPageAndCommentSelection() {
         let appState = makeAppState()
         appState.selectPage(id: "page-1", commentID: "comment-1")

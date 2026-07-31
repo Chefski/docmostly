@@ -83,6 +83,9 @@ struct ManagementEndpointTests {
     @Test func buildsWorkspaceAndGroupManagementRequests() throws {
         let baseURL = try #require(URL(string: "https://docs.example.com"))
 
+        let entitlements = try Endpoint.workspaceEntitlements.urlRequest(baseURL: baseURL)
+        #expect(entitlements.url?.absoluteString == "https://docs.example.com/api/workspace/entitlements")
+
         let workspace = try Endpoint.updateWorkspace(WorkspaceUpdate(
             name: "Jumpseat",
             logo: "✈️"

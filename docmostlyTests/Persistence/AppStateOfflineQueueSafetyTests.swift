@@ -147,7 +147,6 @@ struct AppStateOfflineQueueSafetyTests {
             title: "Local",
             document: localDocument,
             remoteBaseTitle: "Remote title",
-            remoteBaseDocument: remoteDocument,
             replacingThrough: oldRecord.createdAt.addingTimeInterval(1)
         )
 
@@ -155,16 +154,46 @@ struct AppStateOfflineQueueSafetyTests {
         let cached = try appState.cacheRepository?.loadEditablePage(idOrSlugId: "page-1", scope: scope)
         #expect(result == .superseded)
         #expect(pending?.map(\.payload) == [
-            .updatePage(
+            .updatePageMetadata(
                 pageId: "page-1",
                 title: "Local",
-                document: localDocument,
-                baseTitle: "Remote title",
-                baseDocument: remoteDocument
+                baseTitle: "Remote title"
             )
         ])
         #expect(cached?.title == "Local")
         #expect(cached?.content == localDocument)
+    }
+
+    @MainActor
+    @Test func collaborativeBodyDraftQueuesAReplayMarkerWhenTheTitleIsUnchanged() async throws {
+        let (appState, scope) = makeConfiguredAppState()
+        let localDocument = document(text: "Unacknowledged body")
+        try appState.cacheRepository?.saveEditablePage(
+            DocmostEditablePage(
+                id: "page-1",
+                slugId: "page-1",
+                title: "Same title",
+                content: document(text: "Remote body"),
+                icon: nil,
+                spaceId: "space-1",
+                updatedAt: .now,
+                permissions: nil,
+                lastUpdatedBy: nil
+            ),
+            scope: scope
+        )
+
+        _ = try await appState.persistDeferredCollaborativeDraft(
+            pageId: "page-1",
+            title: "Same title",
+            documentSnapshot: localDocument,
+            baseTitle: "Same title"
+        )
+
+        let pending = try await appState.offlineQueueRepository?.pending(scope: scope)
+        #expect(pending?.map(\.payload) == [
+            .updatePageMetadata(pageId: "page-1", title: "Same title", baseTitle: "Same title")
+        ])
     }
 
     @MainActor

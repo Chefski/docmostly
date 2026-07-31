@@ -225,6 +225,24 @@ struct NativeEditorTextMutationTests {
         )
     }
 
+    @Test func activeBlockHandoffDeactivatesPreviousInputAndActivatesContinuation() {
+        var previousBlockReconciler = NativeEditorFocusBindingEchoReconciler()
+        var continuationBlockReconciler = NativeEditorFocusBindingEchoReconciler()
+
+        #expect(
+            previousBlockReconciler.disposition(
+                for: false,
+                platformIsFocused: true
+            ) == .deactivate
+        )
+        #expect(
+            continuationBlockReconciler.disposition(
+                for: true,
+                platformIsFocused: false
+            ) == .activate
+        )
+    }
+
     @Test func partialAtomicInlineEditsRemoveWholeAtomWithoutTouchingNeighbors() throws {
         let atomicText = try textWithAtomicInlineRuns()
 

@@ -29,56 +29,30 @@ extension AppState {
         }
     }
 
-    // swiftlint:disable:next function_parameter_count
     func keepPendingCollaborativeDraft(
         pageId: String,
         title: String,
         document: ProseMirrorDocument,
         remoteBaseTitle: String,
-        remoteBaseDocument: ProseMirrorDocument,
         replacingThrough cutoff: Date
     ) async throws -> OfflinePageUpdateSupersessionResult {
         await pauseOfflineReplayForCollaborativeResolution()
-        let scope = try requireCacheScope(
-            message: "The local draft cannot be secured until you sign in again."
-        )
-        let resolvedAt = Date.now
-        let result: OfflinePageUpdateSupersessionResult
-
-        if let offlineQueueRepository {
-            result = try await offlineQueueRepository.resolvePendingPageUpdateKeepingLocal(
-                pageId: pageId,
-                title: title,
-                document: document,
-                remoteBaseTitle: remoteBaseTitle,
-                remoteBaseDocument: remoteBaseDocument,
-                replacingThrough: cutoff,
-                resolvedAt: resolvedAt,
-                scope: scope
-            )
-        } else if let offlineQueue {
-            result = try offlineQueue.resolvePendingPageUpdateKeepingLocal(
-                pageId: pageId,
-                title: title,
-                document: document,
-                remoteBaseTitle: remoteBaseTitle,
-                remoteBaseDocument: remoteBaseDocument,
-                replacingThrough: cutoff,
-                resolvedAt: resolvedAt,
-                scope: scope
-            )
-        } else {
-            throw APIError.connectionFailed("Local draft storage is unavailable on this device.")
+        let acknowledgement = try await acknowledgeCollaborativeDraft(pageId: pageId, through: cutoff)
+        guard acknowledgement != .newerPendingUpdatePreserved else {
+            return .newerPendingUpdatePreserved
         }
-
-        guard result != .newerPendingUpdatePreserved else { return result }
+        _ = try await queueOfflineMutation(.updatePageMetadata(
+            pageId: pageId,
+            title: title,
+            baseTitle: remoteBaseTitle
+        ))
         _ = try await saveLocalEditableDraft(
             pageId: pageId,
             title: title,
             document: document
         )
         await refreshOfflineMutationCount()
-        return result
+        return .superseded
     }
 
     private func acknowledgeCollaborativeDraft(

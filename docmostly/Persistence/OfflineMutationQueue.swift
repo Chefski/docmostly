@@ -13,6 +13,7 @@ nonisolated enum OfflinePageUpdateAcknowledgementResult: Equatable, Sendable {
     case newerPendingUpdatePreserved
 }
 
+// swiftlint:disable:next type_body_length
 nonisolated final class OfflineMutationQueue {
     private let context: ModelContext
     private let encoder = JSONEncoder()
@@ -316,6 +317,12 @@ nonisolated final class OfflineMutationQueue {
         let existingPayload = try decoder.decode(OfflineMutationPayload.self, from: existingMutation.payloadData)
 
         switch payload {
+        case .updatePageMetadata(let pageId, let title, _):
+            return .updatePageMetadata(
+                pageId: pageId,
+                title: title,
+                baseTitle: existingPayload.pageUpdateBaseTitle
+            )
         case .updatePage(let pageId, let title, let document, _, let baseDocument):
             let oldestBaseDocument = if case .updatePage(_, _, _, _, let document) = existingPayload {
                 document
@@ -562,7 +569,8 @@ nonisolated extension OfflineMutationQueue {
 nonisolated private extension OfflineMutationPayload {
     var pageUpdateBaseTitle: String? {
         switch self {
-        case .updatePage(_, _, _, let baseTitle, _),
+        case .updatePageMetadata(_, _, let baseTitle),
+                .updatePage(_, _, _, let baseTitle, _),
                 .updatePageCRDT(_, _, _, _, let baseTitle):
             baseTitle
         default:

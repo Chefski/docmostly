@@ -29,6 +29,21 @@ struct PageTreeMovePayloadTests {
         #expect(payload == PageTreeMovePayload(pageId: "b", parentPageId: "a", position: "a2"))
     }
 
+    @Test func makeChildOfUnloadedParentKeepsTheParentUnloaded() throws {
+        let unloadedTree = [
+            node(id: "a", position: "a0", hasChildren: true),
+            node(id: "b", position: "a1")
+        ]
+
+        let payload = try unloadedTree.movePayload(sourceID: "b", operation: .makeChild(targetID: "a"))
+        let movedTree = try unloadedTree.moving(sourceID: "b", operation: .makeChild(targetID: "a")).tree
+
+        #expect(payload == PageTreeMovePayload(pageId: "b", parentPageId: "a", position: "a0"))
+        #expect(movedTree.node(id: "b") == nil)
+        #expect(movedTree.node(id: "a")?.hasChildren == true)
+        #expect(movedTree.node(id: "a")?.isChildrenLoaded == false)
+    }
+
     @Test func adjacentMovesUsePostMoveNeighbors() throws {
         let adjacent = [
             node(id: "a", position: "a0"),
@@ -64,7 +79,8 @@ struct PageTreeMovePayloadTests {
         id: String,
         parentPageId: String? = nil,
         position: String,
-        children: [PageTreeNode] = []
+        children: [PageTreeNode] = [],
+        hasChildren: Bool? = nil
     ) -> PageTreeNode {
         PageTreeNode(
             id: id,
@@ -74,7 +90,7 @@ struct PageTreeMovePayloadTests {
             spaceId: "space-1",
             parentPageId: parentPageId,
             position: position,
-            hasChildren: children.isEmpty == false,
+            hasChildren: hasChildren ?? (children.isEmpty == false),
             children: children,
             isChildrenLoaded: children.isEmpty == false
         )

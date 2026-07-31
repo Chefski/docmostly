@@ -158,7 +158,6 @@ struct NativeEditorCollaborationSyncStatusTests {
         appState.configure(modelContext: context)
         appState.configurePreviewCacheScope(scope)
         let viewModel = dirtyViewModel()
-        let savedBaseline = viewModel.lastSavedDocument.proseMirrorDocument
         viewModel.applyCollaborationAuthenticationScope(.readonly)
 
         let didPersist = await viewModel.persistRetainedReadOnlyDraft(appState: appState)
@@ -170,12 +169,10 @@ struct NativeEditorCollaborationSyncStatusTests {
         #expect(viewModel.hasOutgoingChangesRequiringPersistence == false)
         let offlineQueue = try #require(appState.offlineQueue)
         #expect(try offlineQueue.pending(scope: scope).map(\.payload) == [
-            .updatePage(
+            .updatePageMetadata(
                 pageId: "page-1",
                 title: "Local title",
-                document: viewModel.document.proseMirrorDocument,
-                baseTitle: "Saved title",
-                baseDocument: savedBaseline
+                baseTitle: "Saved title"
             )
         ])
     }

@@ -9,11 +9,11 @@ enum NativeEditorTableLayout {
         var opacity: Double
     }
 
-    static let minimumColumnWidth: CGFloat = 128
+    nonisolated static let minimumColumnWidth: CGFloat = 128
     static let defaultColumnWidth: CGFloat = 184
     static let compactColumnWidth: CGFloat = 168
     static let maximumColumnWidth: CGFloat = 480
-    static let rowMinimumHeight: CGFloat = 48
+    nonisolated static let rowMinimumHeight: CGFloat = 48
     static let columnHandleHeight: CGFloat = 24
     static let rowHandleWidth: CGFloat = 24
     static let resizeHandleWidth: CGFloat = 14
