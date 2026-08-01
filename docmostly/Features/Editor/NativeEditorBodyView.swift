@@ -62,6 +62,8 @@ struct NativeEditorBodyView: View {
                         focusRequestID: textInputFocusRequest?.blockID == block.id
                             ? textInputFocusRequest?.id
                             : nil,
+                        retainsResponderDuringFocusHandoff: viewModel.activeBlockID != nil &&
+                            viewModel.activeBlockID != block.id,
                         isSelected: viewModel.selectedBlockID == block.id,
                         isShowingControls: viewModel.visibleBlockControlsID == block.id,
                         isReadOnly: authoringIsAvailable == false,
@@ -92,10 +94,6 @@ struct NativeEditorBodyView: View {
                         presenceProjection: activePresenceProjection,
                         presenceScope: presenceScope,
                         presenceBlockIndex: blockIndex(for: block.id),
-                        focusBlock: {
-                            guard authoringIsAvailable else { return }
-                            viewModel.focus(blockID: block.id)
-                        },
                         textInputFocusChanged: { isFocused in
                             if isFocused {
                                 guard authoringIsAvailable else { return }
@@ -103,6 +101,10 @@ struct NativeEditorBodyView: View {
                             } else {
                                 viewModel.textInputDidEndEditing(blockID: block.id)
                             }
+                        },
+                        typingInlineMarks: viewModel.typingInlineMarks(for: block.id),
+                        invalidateInlineTypingContext: {
+                            viewModel.invalidateInlineTypingContext(for: block.id)
                         },
                         moveBefore: { movedBlockID in
                             guard authoringIsAvailable else { return }

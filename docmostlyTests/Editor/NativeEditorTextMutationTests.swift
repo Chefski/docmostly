@@ -92,6 +92,33 @@ struct NativeEditorTextMutationTests {
         #expect(try attributes(for: "!", in: mentionInsertion)[NativeEditorMentionAttribute.self] == nil)
     }
 
+    @Test func explicitTypingMarksOnlyApplyToInsertedText() throws {
+        let text = AttributedString("Plain")
+        let updated = NativeEditorTextDelta(
+            replacedCharacterRange: text.characters.count..<text.characters.count,
+            replacement: " styled"
+        ).applying(to: text, typingInlineMarks: [.bold, .italic, .code])
+
+        let existingAttributes = try attributes(for: "Plain", in: updated)
+        let insertedAttributes = try attributes(for: "styled", in: updated)
+        #expect(existingAttributes.inlinePresentationIntent == nil)
+        #expect(insertedAttributes.inlinePresentationIntent?.contains(.stronglyEmphasized) == true)
+        #expect(insertedAttributes.inlinePresentationIntent?.contains(.emphasized) == true)
+        #expect(insertedAttributes.inlinePresentationIntent?.contains(.code) == true)
+    }
+
+    @Test func explicitEmptyTypingMarksCanEndInheritedFormatting() throws {
+        var text = AttributedString("Bold")
+        text.inlinePresentationIntent = .stronglyEmphasized
+        let updated = NativeEditorTextDelta(
+            replacedCharacterRange: text.characters.count..<text.characters.count,
+            replacement: " plain"
+        ).applying(to: text, typingInlineMarks: [])
+
+        #expect(try attributes(for: "Bold", in: updated).inlinePresentationIntent == .stronglyEmphasized)
+        #expect(try attributes(for: "plain", in: updated).inlinePresentationIntent == nil)
+    }
+
     @Test func insertedTextPreservesLinkHighlightAndCommentMarks() throws {
         var text = AttributedString("linked")
         let fullRange = text.startIndex..<text.endIndex
@@ -225,21 +252,29 @@ struct NativeEditorTextMutationTests {
         )
     }
 
-    @Test func activeBlockHandoffDeactivatesPreviousInputAndActivatesContinuation() {
+    @Test func activeBlockHandoffPreservesPreviousInputUntilContinuationActivates() {
         var previousBlockReconciler = NativeEditorFocusBindingEchoReconciler()
         var continuationBlockReconciler = NativeEditorFocusBindingEchoReconciler()
 
         #expect(
             previousBlockReconciler.disposition(
                 for: false,
-                platformIsFocused: true
-            ) == .deactivate
+                platformIsFocused: true,
+                preservesPlatformFocusDuringHandoff: true
+            ) == .preserveDuringHandoff
         )
         #expect(
             continuationBlockReconciler.disposition(
                 for: true,
                 platformIsFocused: false
             ) == .activate
+        )
+        #expect(
+            previousBlockReconciler.disposition(
+                for: false,
+                platformIsFocused: false,
+                preservesPlatformFocusDuringHandoff: true
+            ) == .deactivate
         )
     }
 

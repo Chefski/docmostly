@@ -13,19 +13,6 @@ struct NativeRichEditorViewModelTests {
         #expect(NativeRichEditorViewModel.isCancelledLoadError(APIError.connectionFailed("offline")) == false)
     }
 
-    @Test func togglesInlineMarkAcrossActiveBlockWhenSelectionIsMissing() {
-        let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Native editor"), alignment: .left)
-        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
-        viewModel.document = NativeEditorDocument(blocks: [block])
-        viewModel.focus(blockID: block.id)
-
-        viewModel.toggleInlineMark(.bold)
-
-        let updatedBlock = viewModel.document.blocks[0]
-        #expect(updatedBlock.text.runs.first?.inlinePresentationIntent?.contains(.stronglyEmphasized) == true)
-        #expect(viewModel.isDirty == true)
-    }
-
     @Test func changesActiveBlockKind() {
         let block = NativeEditorBlock(kind: .paragraph, text: AttributedString("Section"), alignment: .left)
         let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")

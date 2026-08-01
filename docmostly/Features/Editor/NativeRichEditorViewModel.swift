@@ -25,8 +25,15 @@ final class NativeRichEditorViewModel {
     var hasPageRestriction = false
     var errorMessage: String?
     var saveErrorMessage: String?
-    var activeBlockID: UUID?
+    var activeBlockID: UUID? {
+        didSet {
+            if activeBlockID != oldValue {
+                inlineTypingContext = nil
+            }
+        }
+    }
     var focusedTextInputBlockID: UUID?
+    var inlineTypingContext: NativeEditorInlineTypingContext?
     var selectedBlockID: UUID?
     var visibleBlockControlsID: UUID?
     var isTitleFocused = false

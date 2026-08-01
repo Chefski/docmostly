@@ -4,6 +4,7 @@ struct NativeEditorBlockRow: View {
     @Binding var block: NativeEditorBlock
     let isActive: Bool
     let focusRequestID: UUID?
+    let retainsResponderDuringFocusHandoff: Bool
     let isSelected: Bool
     let isShowingControls: Bool
     let isReadOnly: Bool
@@ -20,8 +21,9 @@ struct NativeEditorBlockRow: View {
     let presenceProjection: NativeEditorRemotePresenceProjection
     let presenceScope: [NativeEditorRemotePresenceScope]
     let presenceBlockIndex: Int
-    let focusBlock: () -> Void
     let textInputFocusChanged: (Bool) -> Void
+    let typingInlineMarks: Set<NativeEditorInlineMark>
+    let invalidateInlineTypingContext: () -> Void
     let moveBefore: (UUID) -> Void
     let splitBlock: (Range<Int>) -> Bool
     let insertHardBreak: (Range<Int>) -> Bool
@@ -61,13 +63,17 @@ struct NativeEditorBlockRow: View {
                     .frame(width: 24, alignment: .center)
             }
 
-            if showsEditableTextEditor {
+            if usesTextInputSurface {
                 NativeEditorBlockTextSurface(kind: block.kind) {
                     NativeEditorTextInputView(
                         block: $block,
+                        isEditable: isReadOnly == false,
                         isFocused: isActive,
                         focusRequestID: focusRequestID,
+                        retainsResponderDuringFocusHandoff: retainsResponderDuringFocusHandoff,
                         focusChanged: textInputFocusChanged,
+                        typingInlineMarks: typingInlineMarks,
+                        invalidateTypingContext: invalidateInlineTypingContext,
                         accessibilityLabel: block.kind.accessibilityLabel,
                         actions: NativeEditorTextInputActions(
                             handleReturn: handleReturn,
@@ -82,24 +88,6 @@ struct NativeEditorBlockRow: View {
                             selectionChanged()
                         }
                 }
-            } else if block.isEditable && isReadOnly == false {
-                Button(action: focusBlock) {
-                    NativeEditorBlockTextSurface(kind: block.kind) {
-                        NativeEditorRichBlockPreviewView(
-                            block: block,
-                            pageID: pageID,
-                            spaceID: spaceID,
-                            serverURLString: serverURLString,
-                            presenceProjection: presenceProjection,
-                            presenceScope: presenceScope,
-                            presenceBlockIndex: presenceBlockIndex
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(block.kind.accessibilityLabel)
             } else {
                 NativeEditorRichBlockPreviewView(
                     block: block,
@@ -196,8 +184,8 @@ struct NativeEditorBlockRow: View {
         }
     }
 
-    private var showsEditableTextEditor: Bool {
-        NativeEditorBlockRowPolicy.showsEditableTextEditor(block: block, isReadOnly: isReadOnly)
+    private var usesTextInputSurface: Bool {
+        NativeEditorBlockRowPolicy.usesTextInputSurface(block: block)
     }
 
     private var showsControls: Bool {

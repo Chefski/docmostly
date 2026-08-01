@@ -207,19 +207,59 @@ extension NativeRichEditorViewModel {
     }
 
     func toggleInlineMark(_ mark: NativeEditorInlineMark) {
-        performUndoableEdit {
-            guard let index = activeBlockIndex else { return }
+        guard let index = activeBlockIndex else { return }
 
-            if document.blocks[index].selection.hasSelectedRanges(in: document.blocks[index].text) {
-                var selection = document.blocks[index].selection
-                document.blocks[index].text.transformAttributes(in: &selection) { attributes in
-                    mark.toggle(in: &attributes)
-                }
-                document.blocks[index].selection = selection
+        let block = document.blocks[index]
+        guard block.selection.hasSelectedRanges(in: block.text) else {
+            var marks = inlineTypingContext?.blockID == block.id
+                ? inlineTypingContext?.marks ?? []
+                : NativeEditorInlineMark.activeMarks(for: block.selection, in: block.text)
+            if marks.contains(mark) {
+                marks.remove(mark)
             } else {
-                mark.toggle(in: &document.blocks[index].text)
+                if mark == .subscript {
+                    marks.remove(.superscript)
+                } else if mark == .superscript {
+                    marks.remove(.subscript)
+                }
+                marks.insert(mark)
             }
+            inlineTypingContext = NativeEditorInlineTypingContext(blockID: block.id, marks: marks)
+            return
         }
+
+        inlineTypingContext = nil
+        performUndoableEdit {
+            var selection = document.blocks[index].selection
+            document.blocks[index].text.transformAttributes(in: &selection) { attributes in
+                mark.toggle(in: &attributes)
+            }
+            document.blocks[index].selection = selection
+        }
+    }
+
+    func isInlineMarkActive(_ mark: NativeEditorInlineMark) -> Bool {
+        guard let index = activeBlockIndex else { return false }
+        let block = document.blocks[index]
+        if block.selection.hasSelectedRanges(in: block.text) == false,
+           inlineTypingContext?.blockID == block.id {
+            return inlineTypingContext?.marks.contains(mark) == true
+        }
+        return NativeEditorInlineMark.activeMarks(for: block.selection, in: block.text).contains(mark)
+    }
+
+    func typingInlineMarks(for blockID: UUID) -> Set<NativeEditorInlineMark> {
+        guard let block = document.blocks.first(where: { $0.id == blockID }) else { return [] }
+        if block.selection.hasSelectedRanges(in: block.text) == false,
+           inlineTypingContext?.blockID == block.id {
+            return inlineTypingContext?.marks ?? []
+        }
+        return NativeEditorInlineMark.activeMarks(for: block.selection, in: block.text)
+    }
+
+    func invalidateInlineTypingContext(for blockID: UUID) {
+        guard inlineTypingContext?.blockID == blockID else { return }
+        inlineTypingContext = nil
     }
 
     func applyLink(_ urlString: String) {

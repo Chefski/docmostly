@@ -10,17 +10,17 @@ struct NativeEditorBlockRowPolicyTests {
             alignment: .left
         )
 
-        #expect(NativeEditorBlockRowPolicy.showsEditableTextEditor(block: block, isReadOnly: false))
+        #expect(NativeEditorBlockRowPolicy.usesTextInputSurface(block: block))
     }
 
-    @Test func readModeDoesNotShowTextEditorForEditableBlocks() {
+    @Test func readModePreservesTextEditorLayoutForEditableBlocks() {
         let block = NativeEditorBlock(
             kind: .paragraph,
             text: AttributedString("Read-only body"),
             alignment: .left
         )
 
-        #expect(NativeEditorBlockRowPolicy.showsEditableTextEditor(block: block, isReadOnly: true) == false)
+        #expect(NativeEditorBlockRowPolicy.usesTextInputSurface(block: block))
     }
 
     @Test func readModeDisablesTaskListToggles() {

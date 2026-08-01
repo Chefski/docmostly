@@ -32,7 +32,10 @@ nonisolated struct NativeEditorTextDelta: Equatable, Sendable {
         )
     }
 
-    func applying(to source: AttributedString) -> AttributedString {
+    func applying(
+        to source: AttributedString,
+        typingInlineMarks: Set<NativeEditorInlineMark>? = nil
+    ) -> AttributedString {
         let safeDelta = adjustedForAtomicInlineContent(in: source)
         var result = source
         let clampedRange = NativeEditorCharacterRange.clamped(
@@ -42,15 +45,18 @@ nonisolated struct NativeEditorTextDelta: Equatable, Sendable {
         let attributedRange = NativeEditorCharacterRange.attributedRange(for: clampedRange, in: source)
         var replacementText = AttributedString(safeDelta.replacement)
 
-        if replacementText.characters.isEmpty == false,
-           var inheritedAttributes = Self.inheritedAttributes(
-               at: attributedRange.lowerBound,
-               replacedRange: attributedRange,
-               in: source
-           ) {
+        if replacementText.characters.isEmpty == false {
+            var inheritedAttributes = Self.inheritedAttributes(
+                at: attributedRange.lowerBound,
+                replacedRange: attributedRange,
+                in: source
+            ) ?? AttributeContainer()
             inheritedAttributes[NativeEditorMentionAttribute.self] = nil
             inheritedAttributes[NativeEditorStatusAttribute.self] = nil
             inheritedAttributes[NativeEditorMathInlineAttribute.self] = nil
+            if let typingInlineMarks {
+                NativeEditorInlineMark.setActiveMarks(typingInlineMarks, in: &inheritedAttributes)
+            }
             replacementText.mergeAttributes(inheritedAttributes)
         }
 
@@ -259,6 +265,7 @@ nonisolated struct NativeEditorFocusBindingEchoReconciler {
     enum Disposition: Equatable {
         case activate
         case preserveLocalActivation
+        case preserveDuringHandoff
         case deactivate
     }
 
@@ -274,11 +281,17 @@ nonisolated struct NativeEditorFocusBindingEchoReconciler {
 
     mutating func disposition(
         for boundIsFocused: Bool,
-        platformIsFocused: Bool
+        platformIsFocused: Bool,
+        preservesPlatformFocusDuringHandoff: Bool = false
     ) -> Disposition {
         if boundIsFocused {
             isAwaitingLocalActivationEcho = false
             return .activate
+        }
+
+        if preservesPlatformFocusDuringHandoff, platformIsFocused {
+            isAwaitingLocalActivationEcho = false
+            return .preserveDuringHandoff
         }
 
         if isAwaitingLocalActivationEcho, platformIsFocused {

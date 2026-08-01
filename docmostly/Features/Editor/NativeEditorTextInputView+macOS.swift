@@ -5,9 +5,13 @@ import SwiftUI
 struct NativeEditorTextInputView: NSViewRepresentable {
     @Binding var block: NativeEditorBlock
 
+    let isEditable: Bool
     let isFocused: Bool
     let focusRequestID: UUID?
+    let retainsResponderDuringFocusHandoff: Bool
     let focusChanged: (Bool) -> Void
+    let typingInlineMarks: Set<NativeEditorInlineMark>
+    let invalidateTypingContext: () -> Void
     let accessibilityLabel: String
     let actions: NativeEditorTextInputActions
     var remotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
@@ -21,7 +25,7 @@ struct NativeEditorTextInputView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.drawsBackground = false
         textView.isRichText = true
-        textView.isEditable = true
+        textView.isEditable = isEditable
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.isHorizontallyResizable = false
@@ -32,6 +36,7 @@ struct NativeEditorTextInputView: NSViewRepresentable {
         textView.textContainer?.heightTracksTextView = false
         textView.setAccessibilityLabel(accessibilityLabel)
         context.coordinator.applySource(to: textView)
+        context.coordinator.configure(textView)
         context.coordinator.updateFocus(textView)
         textView.updateRemotePresence(remotePresenceSegments)
         return textView
@@ -39,9 +44,9 @@ struct NativeEditorTextInputView: NSViewRepresentable {
 
     func updateNSView(_ textView: NativeEditorNSTextView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.configure(textView)
-
+        textView.isEditable = isEditable
         context.coordinator.updateFromBoundBlock(textView)
+        context.coordinator.configure(textView)
         context.coordinator.updateFocus(textView)
         textView.updateRemotePresence(remotePresenceSegments)
     }
@@ -89,6 +94,7 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
     private var renderedPlainText: String
     private var isApplyingSource = false
     private var pendingTextDelta: NativeEditorTextDelta?
+    private var textDrivenSelection: Range<Int>?
     private var pendingSelectionCorrection: Range<Int>?
     private var handledFocusRequestID: UUID?
     private var bindingEchoReconciler = NativeEditorTextBindingEchoReconciler()
@@ -101,6 +107,8 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
         super.init()
     }
 
+    // AppKit resets typing attributes when the selection changes, so call this
+    // after synchronizing both the text storage and selection.
     func configure(_ textView: NSTextView) {
         let font = platformFont(for: parent.block.kind)
         let paragraphStyle = NSMutableParagraphStyle()
@@ -108,11 +116,13 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
 
         textView.font = font
         textView.alignment = paragraphStyle.alignment
-        textView.typingAttributes = [
-            .font: font,
-            .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraphStyle
-        ]
+        textView.defaultParagraphStyle = paragraphStyle
+        textView.typingAttributes = NativeEditorPlatformTypingAttributes.attributes(
+            baseFont: font,
+            marks: parent.typingInlineMarks,
+            kind: parent.block.kind,
+            paragraphStyle: paragraphStyle
+        )
         textView.setAccessibilityLabel(parent.accessibilityLabel)
     }
 
@@ -197,8 +207,10 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
         }
 
         let safeDelta = delta.adjustedForAtomicInlineContent(in: sourceText)
-        let updatedSource = safeDelta.applying(to: sourceText)
+        let updatedSource = safeDelta.applying(to: sourceText, typingInlineMarks: parent.typingInlineMarks)
         let updatedSourcePlainText = String(updatedSource.characters)
+        let insertionOffset = min(safeDelta.insertionCharacterOffset, updatedSource.characters.count)
+        textDrivenSelection = insertionOffset..<insertionOffset
         bindingEchoReconciler.recordLocalTransition(from: sourceText, to: updatedSource)
         sourceText = updatedSource
 
@@ -206,7 +218,6 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             renderedPlainText = updatedPlainText
             synchronizeSelection(from: textView)
         } else {
-            let insertionOffset = min(safeDelta.insertionCharacterOffset, updatedSource.characters.count)
             let insertionRange = insertionOffset..<insertionOffset
             parent.block = NativeEditorTextBlockMutation.updating(
                 parent.block,
@@ -242,6 +253,8 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             replacedCharacterRange: characterRange,
             replacement: replacementString
         )
+        let insertionOffset = characterRange.lowerBound + replacementString.count
+        textDrivenSelection = insertionOffset..<insertionOffset
         return true
     }
 
@@ -252,6 +265,11 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
             textView.string == renderedPlainText
         else {
             return
+        }
+        let currentSelection = selectedCharacterRange(in: textView)
+        if currentSelection != textDrivenSelection {
+            parent.invalidateTypingContext()
+            textDrivenSelection = nil
         }
         synchronizeSelection(from: textView)
     }
@@ -497,6 +515,13 @@ final class NativeEditorTextInputCoordinator: NSObject, NSTextViewDelegate {
 
 extension NativeEditorTextInputCoordinator {
     func updateFocus(_ textView: NativeEditorNSTextView) {
+        guard parent.isEditable else {
+            textView.requestsFirstResponder = false
+            guard textView.window?.firstResponder === textView else { return }
+            textView.window?.makeFirstResponder(nil)
+            return
+        }
+
         if let focusRequestID = parent.focusRequestID,
            focusRequestID != handledFocusRequestID,
            parent.isFocused {
@@ -507,12 +532,15 @@ extension NativeEditorTextInputCoordinator {
 
         switch focusBindingEchoReconciler.disposition(
             for: parent.isFocused,
-            platformIsFocused: textView.window?.firstResponder === textView
+            platformIsFocused: textView.window?.firstResponder === textView,
+            preservesPlatformFocusDuringHandoff: parent.retainsResponderDuringFocusHandoff
         ) {
         case .activate:
             textView.requestsFirstResponder = true
             textView.requestFirstResponderIfPossible()
         case .preserveLocalActivation:
+            textView.requestsFirstResponder = true
+        case .preserveDuringHandoff:
             textView.requestsFirstResponder = true
         case .deactivate:
             textView.requestsFirstResponder = false
@@ -553,33 +581,4 @@ private extension NativeEditorBlockKind {
     }
 }
 
-@MainActor
-final class NativeEditorNSTextView: NSTextView {
-    var requestsFirstResponder = false
-    var renderedRemotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
-    var remotePresenceHighlightRanges: [NSRange] = []
-    var remotePresenceOverlayViews: [NSView] = []
-    var remotePresenceRenderingIsInvalid = true
-
-    override func layout() {
-        super.layout()
-        layoutRemotePresenceOverlays()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        requestFirstResponderIfPossible()
-    }
-
-    func requestFirstResponderIfPossible() {
-        guard
-            requestsFirstResponder,
-            let window,
-            window.firstResponder !== self
-        else {
-            return
-        }
-        window.makeFirstResponder(self)
-    }
-}
 #endif

@@ -12,6 +12,11 @@ struct NativeEditorQuickFormattingToolbarGroup: View {
         }
         .keyboardShortcut("b", modifiers: .command)
         .nativeEditorToolbarControlFrame()
+        .background(
+            viewModel.isInlineMarkActive(.bold) ? DocmostlyTheme.primaryTint : .clear,
+            in: .rect(cornerRadius: 8)
+        )
+        .accessibilityAddTraits(viewModel.isInlineMarkActive(.bold) ? .isSelected : [])
 
         Button {
             viewModel.toggleInlineMark(.italic)
@@ -20,6 +25,11 @@ struct NativeEditorQuickFormattingToolbarGroup: View {
         }
         .keyboardShortcut("i", modifiers: .command)
         .nativeEditorToolbarControlFrame()
+        .background(
+            viewModel.isInlineMarkActive(.italic) ? DocmostlyTheme.primaryTint : .clear,
+            in: .rect(cornerRadius: 8)
+        )
+        .accessibilityAddTraits(viewModel.isInlineMarkActive(.italic) ? .isSelected : [])
 
         Button {
             viewModel.toggleInlineMark(.code)
@@ -28,6 +38,11 @@ struct NativeEditorQuickFormattingToolbarGroup: View {
         }
         .keyboardShortcut("e", modifiers: .command)
         .nativeEditorToolbarControlFrame()
+        .background(
+            viewModel.isInlineMarkActive(.code) ? DocmostlyTheme.primaryTint : .clear,
+            in: .rect(cornerRadius: 8)
+        )
+        .accessibilityAddTraits(viewModel.isInlineMarkActive(.code) ? .isSelected : [])
 
         Button {
             isShowingLinkPrompt = true
