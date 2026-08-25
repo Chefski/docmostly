@@ -1,8 +1,8 @@
 import Foundation
 
 nonisolated enum NativeEditorBlockRowPolicy {
-    static func showsEditableTextEditor(block: NativeEditorBlock, isReadOnly: Bool) -> Bool {
-        block.isEditable && isReadOnly == false
+    static func usesTextInputSurface(block: NativeEditorBlock) -> Bool {
+        block.isEditable
     }
 
     static func allowsTaskToggle(isReadOnly: Bool) -> Bool {

@@ -5,9 +5,13 @@ import UIKit
 struct NativeEditorTextInputView: UIViewRepresentable {
     @Binding var block: NativeEditorBlock
 
+    let isEditable: Bool
     let isFocused: Bool
     let focusRequestID: UUID?
+    let retainsResponderDuringFocusHandoff: Bool
     let focusChanged: (Bool) -> Void
+    let typingInlineMarks: Set<NativeEditorInlineMark>
+    let invalidateTypingContext: () -> Void
     let accessibilityLabel: String
     let actions: NativeEditorTextInputActions
     var remotePresenceSegments: [NativeEditorRemotePresenceSegment] = []
@@ -20,6 +24,8 @@ struct NativeEditorTextInputView: UIViewRepresentable {
         let textView = NativeEditorUITextView()
         textView.delegate = context.coordinator
         textView.backgroundColor = .clear
+        textView.isEditable = isEditable
+        textView.isSelectable = true
         textView.isScrollEnabled = false
         textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
@@ -33,6 +39,7 @@ struct NativeEditorTextInputView: UIViewRepresentable {
         textView.backspaceAtStartAction = { [weak coordinator = context.coordinator] in
             coordinator?.mergeBlockBackward() ?? false
         }
+        context.coordinator.configure(textView)
         context.coordinator.applySource(to: textView)
         context.coordinator.updateFocus(textView)
         textView.updateRemotePresence(remotePresenceSegments)
@@ -41,6 +48,7 @@ struct NativeEditorTextInputView: UIViewRepresentable {
 
     func updateUIView(_ textView: NativeEditorUITextView, context: Context) {
         context.coordinator.parent = self
+        textView.isEditable = isEditable
         context.coordinator.configure(textView)
 
         context.coordinator.updateFromBoundBlock(textView)
@@ -81,6 +89,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     private var renderedPlainText: String
     private var isApplyingSource = false
     private var pendingTextDelta: NativeEditorTextDelta?
+    private var textDrivenSelection: Range<Int>?
     private var pendingSelectionCorrection: Range<Int>?
     private var handledFocusRequestID: UUID?
     private var bindingEchoReconciler = NativeEditorTextBindingEchoReconciler()
@@ -100,11 +109,12 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
         textView.font = font
         textView.textAlignment = paragraphStyle.alignment
-        textView.typingAttributes = [
-            .font: font,
-            .foregroundColor: UIColor.label,
-            .paragraphStyle: paragraphStyle
-        ]
+        textView.typingAttributes = NativeEditorPlatformTypingAttributes.attributes(
+            baseFont: font,
+            marks: parent.typingInlineMarks,
+            kind: parent.block.kind,
+            paragraphStyle: paragraphStyle
+        )
         textView.accessibilityLabel = parent.accessibilityLabel
     }
 
@@ -173,6 +183,13 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
     }
 
     func updateFocus(_ textView: NativeEditorUITextView) {
+        guard parent.isEditable else {
+            textView.requestsFirstResponder = false
+            guard textView.isFirstResponder else { return }
+            textView.resignFirstResponder()
+            return
+        }
+
         if let focusRequestID = parent.focusRequestID,
            focusRequestID != handledFocusRequestID,
            parent.isFocused {
@@ -183,12 +200,16 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
         switch focusBindingEchoReconciler.disposition(
             for: parent.isFocused,
-            platformIsFocused: textView.isFirstResponder
+            platformIsFocused: textView.isFirstResponder,
+            preservesPlatformFocusDuringHandoff: parent.retainsResponderDuringFocusHandoff
         ) {
         case .activate:
             textView.requestsFirstResponder = true
             textView.requestFirstResponderIfPossible()
         case .preserveLocalActivation:
+            textView.requestsFirstResponder = true
+            return
+        case .preserveDuringHandoff:
             textView.requestsFirstResponder = true
             return
         case .deactivate:
@@ -233,6 +254,9 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
             replacedCharacterRange: characterRange,
             replacement: text
         )
+        textDrivenSelection = pendingTextDelta.map { delta in
+            delta.insertionCharacterOffset..<delta.insertionCharacterOffset
+        }
         return true
     }
 
@@ -245,8 +269,13 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         }
 
         let safeDelta = delta.adjustedForAtomicInlineContent(in: sourceText)
-        let updatedSource = safeDelta.applying(to: sourceText)
+        let updatedSource = safeDelta.applying(
+            to: sourceText,
+            typingInlineMarks: parent.typingInlineMarks
+        )
         let updatedSourcePlainText = String(updatedSource.characters)
+        let insertionOffset = min(safeDelta.insertionCharacterOffset, updatedSource.characters.count)
+        textDrivenSelection = insertionOffset..<insertionOffset
         bindingEchoReconciler.recordLocalTransition(from: sourceText, to: updatedSource)
         sourceText = updatedSource
 
@@ -254,7 +283,6 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
             renderedPlainText = updatedPlainText
             synchronizeSelection(from: textView)
         } else {
-            let insertionOffset = min(safeDelta.insertionCharacterOffset, updatedSource.characters.count)
             let insertionRange = insertionOffset..<insertionOffset
             parent.block = NativeEditorTextBlockMutation.updating(
                 parent.block,
@@ -276,6 +304,11 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
             textView.text == renderedPlainText
         else {
             return
+        }
+        let currentSelection = selectedCharacterRange(in: textView)
+        if currentSelection != textDrivenSelection {
+            parent.invalidateTypingContext()
+            textDrivenSelection = nil
         }
         synchronizeSelection(from: textView)
     }

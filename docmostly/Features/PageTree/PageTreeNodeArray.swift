@@ -7,6 +7,53 @@ nonisolated extension Array where Element == PageTreeNode {
         }
     }
 
+    func hydratingCachedDescendants(from cachedPages: [DocmostPage]) -> [PageTreeNode] {
+        var childPagesByParentID: [String: [DocmostPage]] = [:]
+        for page in cachedPages {
+            guard let parentPageId = page.parentPageId else { continue }
+            childPagesByParentID[parentPageId, default: []].append(page)
+        }
+
+        func hydrate(_ node: PageTreeNode, ancestorIDs: Set<String>) -> PageTreeNode {
+            guard node.hasChildren,
+                  ancestorIDs.contains(node.id) == false,
+                  let childPages = childPagesByParentID[node.id],
+                  childPages.isEmpty == false else {
+                return node
+            }
+
+            let nextAncestorIDs = ancestorIDs.union([node.id])
+            var hydratedNode = node
+            hydratedNode.children = childPages
+                .map(PageTreeNode.init(page:))
+                .sortedByPosition()
+                .filter { nextAncestorIDs.contains($0.id) == false }
+                .map { hydrate($0, ancestorIDs: nextAncestorIDs) }
+            hydratedNode.hasChildren = hydratedNode.children.isEmpty == false
+            return hydratedNode
+        }
+
+        return map { hydrate($0, ancestorIDs: []) }
+    }
+
+    func preservingDescendants(from existingNodes: [PageTreeNode]) -> [PageTreeNode] {
+        var existingNodesByID: [String: PageTreeNode] = [:]
+        for node in existingNodes where existingNodesByID[node.id] == nil {
+            existingNodesByID[node.id] = node
+        }
+
+        return map { node in
+            guard node.hasChildren, let existingNode = existingNodesByID[node.id] else {
+                return node
+            }
+
+            var mergedNode = node
+            mergedNode.children = existingNode.children
+            mergedNode.isChildrenLoaded = false
+            return mergedNode
+        }
+    }
+
     mutating func updateNode(id: String, update: (inout PageTreeNode) -> Void) {
         for index in indices {
             if self[index].id == id {

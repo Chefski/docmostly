@@ -151,6 +151,20 @@ nonisolated final class CacheRepository {
         return try context.fetch(descriptor).map { $0.asPage() }
     }
 
+    func loadEntirePageTree(spaceId: String, scope: CacheScope) throws -> [DocmostPage] {
+        let serverBaseURL = scope.serverBaseURL
+        let userID = scope.userID
+        let descriptor = FetchDescriptor<CachedPageTreeItem>(
+            predicate: #Predicate { item in
+                item.cacheServerBaseURL == serverBaseURL &&
+                    item.cacheUserID == userID &&
+                    item.spaceId == spaceId
+            },
+            sortBy: [SortDescriptor(\.position)]
+        )
+        return try context.fetch(descriptor).map { $0.asPage() }
+    }
+
     func savePage(_ page: DocmostPage, htmlContent: String, scope: CacheScope) throws {
         var hasChanges = false
         if let cachedPage = try loadPage(idOrSlugId: page.id, scope: scope) {
