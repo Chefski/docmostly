@@ -7,6 +7,9 @@ final class PageTreeViewModel {
     private(set) var nodes: [PageTreeNode] = []
     private(set) var visibleNodes: [PageTreeVisibleNode] = []
     private var expandedIDs: Set<String> = []
+    private var activeChildLoadTokens: [String: Int] = [:]
+    private var nextChildLoadToken = 0
+    private var treeRevision = 0
     var isLoading = false
     var isPerformingAction = false
     var isLoadingTrash = false
@@ -24,24 +27,45 @@ final class PageTreeViewModel {
     }
 
     func loadRoot(spaceId: String, appState: AppState) async {
+        invalidatePendingTreeLoads()
+        let loadRevision = treeRevision
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if loadRevision == treeRevision {
+                isLoading = false
+            }
+        }
 
         do {
-            let pages = try await appState.loadSidebarPages(spaceId: spaceId)
-            var refreshedNodes = pages
+            async let cachedPages = appState.loadCachedPageTree(spaceId: spaceId)
+            async let refreshedPages = appState.loadSidebarPages(spaceId: spaceId)
+
+            let localPages = await cachedPages
+            guard loadRevision == treeRevision else { return }
+            nodes = localPages
+                .filter { $0.parentPageId == nil }
                 .map(PageTreeNode.init(page:))
                 .sortedByPosition()
-            for index in refreshedNodes.indices {
-                refreshedNodes[index] = try await reloadExpandedSubtree(
-                    refreshedNodes[index],
-                    appState: appState
-                )
-            }
-            nodes = refreshedNodes
+                .hydratingCachedDescendants(from: localPages)
             rebuildVisibleNodes()
+
+            let pages = try await refreshedPages
+            guard loadRevision == treeRevision else { return }
+            nodes = pages
+                .map(PageTreeNode.init(page:))
+                .sortedByPosition()
+                .hydratingCachedDescendants(from: localPages)
+            rebuildVisibleNodes()
+
+            for node in nodes where expandedIDs.contains(node.id) {
+                let refreshedNode = try await reloadExpandedSubtree(node, appState: appState)
+                guard loadRevision == treeRevision else { return }
+                nodes.updateNode(id: node.id) { $0 = refreshedNode }
+                rebuildVisibleNodes()
+            }
         } catch {
+            guard loadRevision == treeRevision else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -59,9 +83,11 @@ final class PageTreeViewModel {
             return refreshedNode
         }
 
+        let existingChildren = refreshedNode.children
         var children = try await appState.loadSidebarPages(spaceId: node.spaceId, pageId: node.id)
             .map(PageTreeNode.init(page:))
             .sortedByPosition()
+            .preservingDescendants(from: existingChildren)
         for index in children.indices {
             children[index] = try await reloadExpandedSubtree(children[index], appState: appState)
         }
@@ -72,6 +98,7 @@ final class PageTreeViewModel {
     }
 
     func clearPages() {
+        invalidatePendingTreeLoads()
         nodes = []
         expandedIDs = []
         rebuildVisibleNodes()
@@ -137,31 +164,73 @@ final class PageTreeViewModel {
     }
 
     func toggle(node: PageTreeNode, appState: AppState) async {
+        guard toggleExpansion(node: node),
+              let result = await loadChildren(for: node, appState: appState) else {
+            return
+        }
+        applyLoadedChildren(result)
+    }
+
+    @discardableResult
+    func toggleExpansion(node: PageTreeNode) -> Bool {
         if expandedIDs.contains(node.id) {
             expandedIDs.remove(node.id)
             rebuildVisibleNodes()
-            return
+            return false
         }
 
         expandedIDs.insert(node.id)
         rebuildVisibleNodes()
+        return node.hasChildren && node.isChildrenLoaded == false
+    }
 
-        guard node.hasChildren, node.isChildrenLoaded == false else {
-            return
+    func loadChildren(for node: PageTreeNode, appState: AppState) async -> PageTreeChildLoadResult? {
+        guard let currentNode = nodes.node(id: node.id),
+              currentNode.hasChildren,
+              currentNode.isChildrenLoaded == false,
+              activeChildLoadTokens[node.id] == nil else { return nil }
+        let loadRevision = treeRevision
+        nextChildLoadToken &+= 1
+        let loadToken = nextChildLoadToken
+        activeChildLoadTokens[node.id] = loadToken
+        defer {
+            if activeChildLoadTokens[node.id] == loadToken {
+                activeChildLoadTokens.removeValue(forKey: node.id)
+            }
         }
 
         do {
-            let children = try await appState.loadSidebarPages(spaceId: node.spaceId, pageId: node.id)
-            let childNodes = children.map(PageTreeNode.init(page:)).sortedByPosition()
-            nodes.updateNode(id: node.id) { existing in
-                existing.children = childNodes
-                existing.hasChildren = childNodes.isEmpty == false
-                existing.isChildrenLoaded = true
-            }
-            rebuildVisibleNodes()
+            let children = try await appState.loadSidebarPages(
+                spaceId: currentNode.spaceId,
+                pageId: currentNode.id
+            )
+            let existingChildren = nodes.node(id: node.id)?.children ?? []
+            let childNodes = children
+                .map(PageTreeNode.init(page:))
+                .sortedByPosition()
+                .preservingDescendants(from: existingChildren)
+            return PageTreeChildLoadResult(
+                parentID: node.id,
+                treeRevision: loadRevision,
+                childNodes: childNodes
+            )
         } catch {
-            errorMessage = error.localizedDescription
+            if loadRevision == treeRevision, activeChildLoadTokens[node.id] == loadToken {
+                errorMessage = error.localizedDescription
+            }
+            return nil
         }
+    }
+
+    func applyLoadedChildren(_ result: PageTreeChildLoadResult) {
+        guard result.treeRevision == treeRevision else { return }
+
+        nodes.updateNode(id: result.parentID) { existing in
+            existing.children = result.childNodes
+            existing.hasChildren = result.childNodes.isEmpty == false
+            existing.isChildrenLoaded = true
+        }
+        rebuildVisibleNodes()
     }
 
     func createPage(
@@ -203,6 +272,7 @@ final class PageTreeViewModel {
     func movePageToSpace(_ node: PageTreeNode, targetSpaceId: String, appState: AppState) async -> Bool {
         let moved: Bool? = await performAction {
             try await appState.movePageToSpace(pageId: node.id, spaceId: targetSpaceId)
+            invalidatePendingTreeLoads()
             nodes = nodes.removing(id: node.id)
             rebuildVisibleNodes()
             appState.selectSpace(id: targetSpaceId, clearsPage: appState.selectedPageID == node.slugId)
@@ -214,6 +284,7 @@ final class PageTreeViewModel {
     func deletePage(_ node: PageTreeNode, appState: AppState) async {
         await performAction {
             try await appState.deletePage(pageId: node.id)
+            invalidatePendingTreeLoads()
             nodes = nodes.removing(id: node.id)
             rebuildVisibleNodes()
             if appState.selectedPageID == node.slugId {
@@ -225,6 +296,7 @@ final class PageTreeViewModel {
 
     func movePage(sourceID: String, operation: PageTreeDropOperation, appState: AppState) async {
         let previousNodes = nodes
+        invalidatePendingTreeLoads()
 
         do {
             let payload = try nodes.movePayload(sourceID: sourceID, operation: operation)
@@ -284,6 +356,8 @@ final class PageTreeViewModel {
     }
 
     private func insert(_ node: PageTreeNode, parentPageId: String?) {
+        invalidatePendingTreeLoads()
+
         if parentPageId == nil {
             nodes.append(node)
             nodes = nodes.sortedByPosition()
@@ -302,6 +376,12 @@ final class PageTreeViewModel {
 
     private func rebuildVisibleNodes() {
         visibleNodes = nodes.visibleNodes(expandedIDs: expandedIDs)
+    }
+
+    private func invalidatePendingTreeLoads() {
+        treeRevision &+= 1
+        activeChildLoadTokens.removeAll()
+        isLoading = false
     }
 
     private func performAction<Result>(_ action: () async throws -> Result) async -> Result? {

@@ -2,6 +2,7 @@ import SwiftUI
 
 #if os(macOS)
 struct MacWorkspaceSidebarView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.openWindow) private var openWindow
     @Environment(AppState.self) private var appState
     @Environment(MacDesktopCommandController.self) private var commandController
@@ -105,6 +106,7 @@ struct MacWorkspaceSidebarView: View {
                             moveToSpace: beginMoveToSpace,
                             delete: deletePage
                         )
+                        .transition(PageTreeBranchTransition())
                     }
 
                     if let errorMessage = viewModel.errorMessage {
@@ -235,9 +237,12 @@ struct MacWorkspaceSidebarView: View {
     }
 
     private func toggleNode(_ node: PageTreeNode) {
-        Task {
-            await viewModel.toggle(node: node, appState: appState)
-        }
+        PageTreeExpansionMotion.toggle(
+            node: node,
+            viewModel: viewModel,
+            appState: appState,
+            reduceMotion: accessibilityReduceMotion
+        )
     }
 
     private func openInDetailColumn(_ node: PageTreeNode) {

@@ -52,6 +52,24 @@ struct CacheRepositoryPageTreeTests {
         #expect(updatedRows.contains { $0.id == "page-2" } == false)
     }
 
+    @Test func loadingEntirePageTreeIncludesCachedDescendants() throws {
+        let (repository, _) = makeRepository()
+        let root = page(id: "root", title: "Root", position: "a0")
+        let child = page(
+            id: "child",
+            title: "Child",
+            position: "a0",
+            parentPageId: root.id
+        )
+
+        try repository.savePageTree(spaceId: "space-1", parentPageId: nil, pages: [root], scope: scope)
+        try repository.savePageTree(spaceId: "space-1", parentPageId: root.id, pages: [child], scope: scope)
+
+        let cachedPages = try repository.loadEntirePageTree(spaceId: "space-1", scope: scope)
+
+        #expect(Set(cachedPages.map(\.id)) == ["root", "child"])
+    }
+
     private func makeRepository() -> (CacheRepository, ModelContext) {
         let container = DocmostlyModelContainer.make(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
@@ -65,7 +83,12 @@ struct CacheRepositoryPageTreeTests {
         return try context.fetch(descriptor)
     }
 
-    private func page(id: String, title: String, position: String) -> DocmostPage {
+    private func page(
+        id: String,
+        title: String,
+        position: String,
+        parentPageId: String? = nil
+    ) -> DocmostPage {
         DocmostPage(
             id: id,
             slugId: id,
@@ -73,7 +96,7 @@ struct CacheRepositoryPageTreeTests {
             content: nil,
             icon: nil,
             coverPhoto: nil,
-            parentPageId: nil,
+            parentPageId: parentPageId,
             creatorId: nil,
             spaceId: "space-1",
             workspaceId: nil,

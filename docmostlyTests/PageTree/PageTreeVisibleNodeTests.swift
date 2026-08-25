@@ -76,4 +76,5 @@ struct PageTreeVisibleNodeTests {
             isChildrenLoaded: children.isEmpty == false
         )
     }
+
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PageTreeView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(AppState.self) private var appState
     @State private var viewModel = PageTreeViewModel()
     @State private var browserViewModel = PageBrowserViewModel()
@@ -63,6 +64,7 @@ struct PageTreeView: View {
                             moveToSpace: beginMoveToSpace,
                             delete: deletePage
                         )
+                        .transition(PageTreeBranchTransition())
                     }
 
                     if let errorMessage = viewModel.errorMessage {
@@ -218,9 +220,12 @@ struct PageTreeView: View {
     }
 
     private func toggleNode(_ node: PageTreeNode) {
-        Task {
-            await viewModel.toggle(node: node, appState: appState)
-        }
+        PageTreeExpansionMotion.toggle(
+            node: node,
+            viewModel: viewModel,
+            appState: appState,
+            reduceMotion: accessibilityReduceMotion
+        )
     }
 
     private func openInDetailColumn(_ node: PageTreeNode) {
