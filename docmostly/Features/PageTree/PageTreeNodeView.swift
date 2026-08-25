@@ -111,6 +111,8 @@ enum PageTreeSidebarMetrics {
 }
 
 private struct PageTreeDisclosureColumn: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
     let hasChildren: Bool
     let isExpanded: Bool
     let title: String
@@ -118,13 +120,18 @@ private struct PageTreeDisclosureColumn: View {
 
     var body: some View {
         if hasChildren {
-            Button(expandButtonTitle, systemImage: expandButtonImage, action: toggle)
+            Button(expandButtonTitle, systemImage: "chevron.right", action: toggle)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .imageScale(.medium)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .foregroundStyle(.secondary)
                 .frame(width: PageTreeSidebarMetrics.disclosureWidth, height: PageTreeSidebarMetrics.rowHeight)
                 .accessibilityLabel(expandButtonTitle)
+                .animation(
+                    accessibilityReduceMotion ? nil : PageTreeExpansionMotion.animation,
+                    value: isExpanded
+                )
         } else {
             Image(systemName: "circle.fill")
                 .resizable()
@@ -133,10 +140,6 @@ private struct PageTreeDisclosureColumn: View {
                 .frame(width: PageTreeSidebarMetrics.disclosureWidth, height: PageTreeSidebarMetrics.rowHeight)
                 .accessibilityHidden(true)
         }
-    }
-
-    private var expandButtonImage: String {
-        isExpanded ? "chevron.down" : "chevron.right"
     }
 
     private var expandButtonTitle: String {

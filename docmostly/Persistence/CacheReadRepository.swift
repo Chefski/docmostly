@@ -16,6 +16,10 @@ actor CacheReadRepository {
         try repository().loadPageTree(spaceId: spaceId, parentPageId: parentPageId, scope: scope)
     }
 
+    func loadEntirePageTree(spaceId: String, scope: CacheScope) throws -> [DocmostPage] {
+        try repository().loadEntirePageTree(spaceId: spaceId, scope: scope)
+    }
+
     func loadPageSnapshot(idOrSlugId: String, scope: CacheScope) throws -> CachedPageSnapshot? {
         try repository().loadPageSnapshot(idOrSlugId: idOrSlugId, scope: scope)
     }
