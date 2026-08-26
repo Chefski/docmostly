@@ -1,6 +1,6 @@
 import Foundation
 
-enum PageReaderMode: String, CaseIterable, Identifiable {
+nonisolated enum PageReaderMode: String, CaseIterable, Identifiable, Sendable {
     case edit
     case read
 
