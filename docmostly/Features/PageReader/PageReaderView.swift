@@ -70,8 +70,8 @@ struct PageReaderView: View {
             VStack(alignment: .leading, spacing: 18) {
                 if let editorViewModel {
                     if editorViewModel.isLoading {
-                        LoadingStateView(title: "Loading page")
-                            .frame(minHeight: 360)
+                        PageLoadingSkeletonView()
+                            .frame(minHeight: 360, alignment: .topLeading)
                     } else if let errorMessage = editorViewModel.errorMessage {
                         ErrorStateView(title: "Page unavailable", message: errorMessage, retry: retry)
                     } else {
@@ -103,8 +103,8 @@ struct PageReaderView: View {
                         )
                     }
                 } else {
-                    LoadingStateView(title: "Loading page")
-                        .frame(minHeight: 360)
+                    PageLoadingSkeletonView()
+                        .frame(minHeight: 360, alignment: .topLeading)
                 }
             }
             .padding()

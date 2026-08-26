@@ -47,6 +47,19 @@ actor DocmostAPIClient {
         try validate(response: response, data: data)
     }
 
+    func loadImageData(from url: URL) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        request = await authenticatedRequest(request)
+
+        let (data, response) = try await loader.data(for: request)
+        await ingestCookies(from: response, requestURL: request.url)
+        try validateResponseSize(data)
+        try validate(response: response, data: data)
+        return data
+    }
+
     func uploadFile(fileURL: URL, pageId: String, attachmentId: String? = nil) async throws -> DocmostAttachment {
         let mimeType = Self.mimeType(for: fileURL)
         let fileName = fileURL.lastPathComponent.isEmpty ? "file" : fileURL.lastPathComponent
