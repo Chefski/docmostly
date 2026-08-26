@@ -23,14 +23,28 @@ final class DocmostlyUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testPreviewShellOpensPageAndSwitchesMode() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-MainShellPreview"]
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let roadmap = app.buttons["PageOpenLink.roadmap"]
+        XCTAssertTrue(roadmap.waitForExistence(timeout: 5))
+        roadmap.tap()
+
+        let title = app.textFields["Page title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "Roadmap")
+
+        let readMode = app.buttons["Read"]
+        XCTAssertTrue(readMode.waitForExistence(timeout: 3))
+        readMode.tap()
+        XCTAssertFalse(title.isEnabled)
+
+        let editMode = app.buttons["Edit"]
+        XCTAssertTrue(editMode.waitForExistence(timeout: 3))
+        editMode.tap()
+        XCTAssertTrue(title.isEnabled)
     }
 
     @MainActor

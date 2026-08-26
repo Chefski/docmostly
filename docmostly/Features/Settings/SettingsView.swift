@@ -63,6 +63,14 @@ struct SettingsView: View {
             Section("App") {
                 LabeledContent("Version", value: appVersion)
                 LabeledContent("Theme", value: "System")
+
+                if let privacyURL = URL(string: "https://chefski.github.io/docmostly/privacy/") {
+                    Link("Privacy Policy", destination: privacyURL)
+                }
+
+                if let supportURL = URL(string: "https://chefski.github.io/docmostly/support/") {
+                    Link("Support", destination: supportURL)
+                }
             }
 
             Section {
