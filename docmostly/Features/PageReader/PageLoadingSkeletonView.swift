@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PageLoadingSkeletonView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading) {
             Text(verbatim: "Page title")
                 .font(.largeTitle)
                 .bold()
