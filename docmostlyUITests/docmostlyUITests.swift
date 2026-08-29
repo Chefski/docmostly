@@ -47,7 +47,7 @@ final class DocmostlyUITests: XCTestCase {
         let editMode = modePicker.buttons["Edit"]
         XCTAssertTrue(editMode.waitForExistence(timeout: 3))
         editMode.tap()
-        XCTAssertTrue(waitForValue("Selected", element: editMode, timeout: 3))
+        XCTAssertTrue(waitForSelectedState(true, element: editMode, timeout: 3))
     }
 
     @MainActor
@@ -121,12 +121,12 @@ final class DocmostlyUITests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    private func waitForValue(
-        _ value: String,
+    private func waitForSelectedState(
+        _ isSelected: Bool,
         element: XCUIElement,
         timeout: TimeInterval
     ) -> Bool {
-        let predicate = NSPredicate(format: "value == %@", value)
+        let predicate = NSPredicate(format: "selected == %@", NSNumber(value: isSelected))
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
