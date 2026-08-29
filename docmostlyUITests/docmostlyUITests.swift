@@ -39,12 +39,12 @@ final class DocmostlyUITests: XCTestCase {
         let readMode = app.buttons["Read"]
         XCTAssertTrue(readMode.waitForExistence(timeout: 3))
         readMode.tap()
-        XCTAssertFalse(title.isEnabled)
+        XCTAssertTrue(waitForEnabledState(false, element: title, timeout: 3))
 
         let editMode = app.buttons["Edit"]
         XCTAssertTrue(editMode.waitForExistence(timeout: 3))
         editMode.tap()
-        XCTAssertTrue(title.isEnabled)
+        XCTAssertTrue(waitForEnabledState(true, element: title, timeout: 3))
     }
 
     @MainActor
@@ -106,5 +106,15 @@ final class DocmostlyUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
+    private func waitForEnabledState(
+        _ isEnabled: Bool,
+        element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: isEnabled))
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }
