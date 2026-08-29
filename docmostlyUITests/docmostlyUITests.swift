@@ -28,8 +28,9 @@ final class DocmostlyUITests: XCTestCase {
         app.launchArguments = ["-MainShellPreview"]
         app.launch()
 
-        let roadmap = app.buttons["PageOpenLink.roadmap"]
-        XCTAssertTrue(roadmap.waitForExistence(timeout: 5))
+        let roadmapQuery = app.buttons.matching(identifier: "PageOpenLink.roadmap")
+        XCTAssertTrue(roadmapQuery.firstMatch.waitForExistence(timeout: 5))
+        let roadmap = try XCTUnwrap(roadmapQuery.allElementsBoundByIndex.first(where: \.isHittable))
         roadmap.tap()
 
         let title = app.textFields["Page title"]
@@ -63,7 +64,7 @@ final class DocmostlyUITests: XCTestCase {
     }
 
     @MainActor
-    func testSpaceSettingsEntrySupportsNestedNavigation() throws {
+    func testSpaceSettingsEntryShowsSpaceConfiguration() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-MainShellPreview"]
         app.launch()
@@ -76,8 +77,17 @@ final class DocmostlyUITests: XCTestCase {
         XCTAssertTrue(spaceSettings.waitForExistence(timeout: 5))
         spaceSettings.tap()
 
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-        assertSettingsDestinationOpens("account", title: "Account", app: app)
+        XCTAssertTrue(app.navigationBars["Product"].waitForExistence(timeout: 5))
+
+        let settingsTab = app.buttons["Settings"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsTab.value as? String, "Selected")
+
+        let membersTab = app.buttons["Members"]
+        XCTAssertTrue(membersTab.waitForExistence(timeout: 5))
+        membersTab.tap()
+        XCTAssertEqual(membersTab.value as? String, "Selected")
+        XCTAssertTrue(app.textFields["Search members"].waitForExistence(timeout: 5))
     }
 
     @MainActor
