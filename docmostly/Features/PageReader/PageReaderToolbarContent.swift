@@ -30,6 +30,7 @@ extension PageReaderView {
         .pickerStyle(.segmented)
         .controlSize(.small)
         .disabled(editorViewModel.canEdit == false)
+        .accessibilityIdentifier("PageModePicker")
     }
 
     private func pageActionsMenu(editorViewModel: NativeRichEditorViewModel) -> some View {

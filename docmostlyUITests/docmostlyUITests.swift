@@ -36,15 +36,18 @@ final class DocmostlyUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertEqual(title.value as? String, "Roadmap")
 
-        let readMode = app.buttons["Read"]
+        let modePicker = app.segmentedControls["PageModePicker"]
+        XCTAssertTrue(modePicker.waitForExistence(timeout: 3))
+
+        let readMode = modePicker.buttons["Read"]
         XCTAssertTrue(readMode.waitForExistence(timeout: 3))
         readMode.tap()
         XCTAssertTrue(waitForEnabledState(false, element: title, timeout: 3))
 
-        let editMode = app.buttons["Edit"]
+        let editMode = modePicker.buttons["Edit"]
         XCTAssertTrue(editMode.waitForExistence(timeout: 3))
         editMode.tap()
-        XCTAssertTrue(waitForEnabledState(true, element: title, timeout: 3))
+        XCTAssertTrue(waitForValue("Selected", element: editMode, timeout: 3))
     }
 
     @MainActor
@@ -114,6 +117,16 @@ final class DocmostlyUITests: XCTestCase {
         timeout: TimeInterval
     ) -> Bool {
         let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: isEnabled))
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForValue(
+        _ value: String,
+        element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let predicate = NSPredicate(format: "value == %@", value)
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
