@@ -28,9 +28,8 @@ final class DocmostlyUITests: XCTestCase {
         app.launchArguments = ["-MainShellPreview"]
         app.launch()
 
-        let roadmapQuery = app.buttons.matching(identifier: "PageOpenLink.roadmap")
-        XCTAssertTrue(roadmapQuery.firstMatch.waitForExistence(timeout: 5))
-        let roadmap = try XCTUnwrap(roadmapQuery.allElementsBoundByIndex.first(where: \.isHittable))
+        let roadmap = app.buttons["PageTreeNode.roadmap"]
+        XCTAssertTrue(roadmap.waitForExistence(timeout: 5))
         roadmap.tap()
 
         let title = app.textFields["Page title"]
