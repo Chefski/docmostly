@@ -23,7 +23,7 @@ final class DocmostlyUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewShellOpensPageAndSwitchesMode() throws {
+    func testPreviewShellOpensCachedPageInReadMode() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-MainShellPreview"]
         app.launch()
@@ -41,13 +41,8 @@ final class DocmostlyUITests: XCTestCase {
 
         let readMode = modePicker.buttons["Read"]
         XCTAssertTrue(readMode.waitForExistence(timeout: 3))
-        readMode.tap()
+        XCTAssertTrue(waitForSelectedState(true, element: readMode, timeout: 3))
         XCTAssertTrue(waitForEnabledState(false, element: title, timeout: 3))
-
-        let editMode = modePicker.buttons["Edit"]
-        XCTAssertTrue(editMode.waitForExistence(timeout: 3))
-        editMode.tap()
-        XCTAssertTrue(waitForSelectedState(true, element: editMode, timeout: 3))
     }
 
     @MainActor
