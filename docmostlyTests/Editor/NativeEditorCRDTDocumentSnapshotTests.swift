@@ -15,6 +15,8 @@ struct NativeEditorCRDTDocumentSnapshotTests {
         viewModel.document = NativeEditorDocument(blocks: [
             NativeEditorBlock(kind: .paragraph, text: AttributedString("Local"), alignment: .left)
         ])
+        viewModel.lastSavedDocument = viewModel.document
+        viewModel.resetEditingHistory()
         viewModel.markRemoteBaseline(updatedAt: Date(timeIntervalSince1970: 10))
         let snapshot = NativeEditorCRDTDocumentSnapshot(
             title: "Merged",
