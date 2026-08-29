@@ -175,6 +175,12 @@ struct NativeEditorTextMutationTests {
         )
         #expect(
             reconciler.disposition(
+                for: AttributedString("ABC"),
+                authoritativeText: authoritativeText
+            ) == .staleLocalEcho
+        )
+        #expect(
+            reconciler.disposition(
                 for: AttributedString("Server replacement"),
                 authoritativeText: authoritativeText
             ) == .external

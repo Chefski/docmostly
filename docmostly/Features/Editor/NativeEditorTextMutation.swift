@@ -229,8 +229,8 @@ nonisolated struct NativeEditorTextBindingEchoReconciler {
     ) {
         appendIfNeeded(previousText)
         appendIfNeeded(updatedText)
-        if pendingLocalTexts.count > 64 {
-            pendingLocalTexts.removeFirst(pendingLocalTexts.count - 64)
+        if pendingLocalTexts.count > 256 {
+            pendingLocalTexts.removeFirst(pendingLocalTexts.count - 256)
         }
     }
 
@@ -239,11 +239,9 @@ nonisolated struct NativeEditorTextBindingEchoReconciler {
         authoritativeText: AttributedString
     ) -> Disposition {
         if boundText == authoritativeText {
-            pendingLocalTexts.removeAll()
             return .current
         }
-        if let echoIndex = pendingLocalTexts.firstIndex(of: boundText) {
-            pendingLocalTexts.removeFirst(echoIndex + 1)
+        if pendingLocalTexts.contains(boundText) {
             return .staleLocalEcho
         }
 

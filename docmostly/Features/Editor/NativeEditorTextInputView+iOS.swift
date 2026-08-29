@@ -235,6 +235,7 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
 
     func textViewDidEndEditing(_ textView: UITextView) {
         focusBindingEchoReconciler.recordLocalDeactivation()
+        bindingEchoReconciler.reset()
         parent.focusChanged(false)
     }
 
