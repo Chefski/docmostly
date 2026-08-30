@@ -6,6 +6,7 @@ extension NativeRichEditorViewModel {
             clearAuthoringState()
             return
         }
+        pendingTextInputFocusHandoffBlockID = nil
         guard focusedTextInputBlockID != blockID || activeBlockID != blockID || isTitleFocused else { return }
 
         isTitleFocused = false
@@ -20,6 +21,12 @@ extension NativeRichEditorViewModel {
         guard focusedTextInputBlockID == blockID else { return }
 
         focusedTextInputBlockID = nil
+        if let activeBlockID, activeBlockID != blockID {
+            pendingTextInputFocusHandoffBlockID = activeBlockID
+            return
+        }
+
+        pendingTextInputFocusHandoffBlockID = nil
         guard activeBlockID == blockID else { return }
         activeBlockID = nil
         notifyLocalAwarenessChanged()

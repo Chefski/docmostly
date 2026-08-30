@@ -430,6 +430,7 @@ extension NativeRichEditorBlockMechanicsTests {
         )
         let viewModel = configuredViewModel(blocks: [first, empty])
 
+        #expect(viewModel.backwardMergeDestination(for: empty.id) == first.id)
         #expect(viewModel.mergeBlockBackward(empty.id))
 
         let remainingBlock = try #require(viewModel.document.blocks.first)

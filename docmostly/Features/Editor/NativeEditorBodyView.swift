@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NativeEditorBodyView: View {
     @State private var textInputFocusRequest: NativeEditorTextInputFocusRequest?
+    @State private var pendingBlockRemoval: PendingBlockRemoval?
     @Bindable var viewModel: NativeRichEditorViewModel
     let focusedField: FocusState<NativeEditorFocus?>.Binding
     var isAuthoringEnabled = true
@@ -82,8 +83,7 @@ struct NativeEditorBodyView: View {
                         },
                         delete: {
                             guard authoringIsAvailable else { return }
-                            guard let destinationBlockID = viewModel.deleteBlock(block.id) else { return }
-                            requestBlockFocus(destinationBlockID)
+                            deleteBlockPreservingFocus(block.id)
                         },
                         tableActions: authoringIsAvailable ? tableEditingActions : nil,
                         richBlockActions: authoringIsAvailable ? richBlockEditingActions : nil,
@@ -98,6 +98,7 @@ struct NativeEditorBodyView: View {
                             if isFocused {
                                 guard authoringIsAvailable else { return }
                                 viewModel.textInputDidBeginEditing(blockID: block.id)
+                                completePendingBlockRemoval(focusedBlockID: block.id)
                             } else {
                                 viewModel.textInputDidEndEditing(blockID: block.id)
                             }
@@ -127,11 +128,7 @@ struct NativeEditorBodyView: View {
                         },
                         mergeBlockBackward: {
                             guard authoringIsAvailable else { return false }
-                            guard viewModel.mergeBlockBackward(block.id) else { return false }
-                            if let destinationBlockID = viewModel.activeBlockID {
-                                requestBlockFocus(destinationBlockID)
-                            }
-                            return true
+                            return mergeBlockBackwardPreservingFocus(block.id)
                         },
                         blockChanged: {
                             guard authoringIsAvailable else { return }
@@ -177,7 +174,11 @@ struct NativeEditorBodyView: View {
         .onChange(of: viewModel.activeBlockID) { _, blockID in
             guard let blockID else {
                 textInputFocusRequest = nil
+                pendingBlockRemoval = nil
                 return
+            }
+            if pendingBlockRemoval?.destinationBlockID != blockID {
+                pendingBlockRemoval = nil
             }
             guard viewModel.focusedTextInputBlockID != blockID else { return }
             guard textInputFocusRequest?.blockID != blockID else { return }
@@ -267,6 +268,55 @@ struct NativeEditorBodyView: View {
         requestBlockFocus(destinationBlockID)
     }
 
+    private func deleteBlockPreservingFocus(_ blockID: UUID) {
+        guard let destinationBlockID = viewModel.deletionFocusDestination(for: blockID) else { return }
+        guard viewModel.focusedTextInputBlockID == blockID, destinationBlockID != blockID else {
+            guard viewModel.deleteBlock(blockID) != nil else { return }
+            requestBlockFocus(destinationBlockID)
+            return
+        }
+
+        pendingBlockRemoval = .deletion(
+            sourceBlockID: blockID,
+            destinationBlockID: destinationBlockID
+        )
+        requestBlockFocus(destinationBlockID)
+    }
+
+    private func mergeBlockBackwardPreservingFocus(_ blockID: UUID) -> Bool {
+        guard let destinationBlockID = viewModel.backwardMergeDestination(for: blockID) else { return false }
+
+        pendingBlockRemoval = .backwardMerge(
+            sourceBlockID: blockID,
+            destinationBlockID: destinationBlockID
+        )
+        requestBlockFocus(destinationBlockID)
+        return true
+    }
+
+    private func completePendingBlockRemoval(focusedBlockID: UUID) {
+        guard
+            authoringIsAvailable,
+            let pendingBlockRemoval,
+            pendingBlockRemoval.destinationBlockID == focusedBlockID
+        else {
+            return
+        }
+
+        self.pendingBlockRemoval = nil
+        let destinationBlockID: UUID?
+        switch pendingBlockRemoval {
+        case .deletion(let sourceBlockID, _):
+            destinationBlockID = viewModel.deleteBlock(sourceBlockID)
+        case .backwardMerge(let sourceBlockID, let expectedDestinationBlockID):
+            destinationBlockID = viewModel.mergeBlockBackward(sourceBlockID)
+                ? expectedDestinationBlockID
+                : nil
+        }
+        guard let destinationBlockID else { return }
+        requestBlockFocus(destinationBlockID)
+    }
+
     private var tableEditingActions: NativeEditorTableEditingActions {
         NativeEditorTableEditingActions(
             updateCell: { blockID, rowIndex, columnIndex, text in
@@ -305,6 +355,20 @@ struct NativeEditorBodyView: View {
             updateExcalidraw: viewModel.updateExcalidraw,
             updateMathBlock: viewModel.updateMathBlock
         )
+    }
+}
+
+private extension NativeEditorBodyView {
+    enum PendingBlockRemoval: Equatable {
+        case deletion(sourceBlockID: UUID, destinationBlockID: UUID)
+        case backwardMerge(sourceBlockID: UUID, destinationBlockID: UUID)
+
+        var destinationBlockID: UUID {
+            switch self {
+            case .deletion(_, let destinationBlockID), .backwardMerge(_, let destinationBlockID):
+                destinationBlockID
+            }
+        }
     }
 }
 
