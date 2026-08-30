@@ -42,6 +42,7 @@ struct PageReaderView: View {
     @State var focusedCommentID: String?
     @State var scrollPosition = ScrollPosition()
     @State var usesFullWidth = false
+    @State var showsEditorToolbar = true
     @State var realtimePageID: String?
     @FocusState var editorFocusedField: NativeEditorFocus?
 
@@ -70,8 +71,8 @@ struct PageReaderView: View {
             VStack(alignment: .leading, spacing: 18) {
                 if let editorViewModel {
                     if editorViewModel.isLoading {
-                        LoadingStateView(title: "Loading page")
-                            .frame(minHeight: 360)
+                        PageLoadingSkeletonView()
+                            .frame(minHeight: 360, alignment: .topLeading)
                     } else if let errorMessage = editorViewModel.errorMessage {
                         ErrorStateView(title: "Page unavailable", message: errorMessage, retry: retry)
                     } else {
@@ -103,8 +104,8 @@ struct PageReaderView: View {
                         )
                     }
                 } else {
-                    LoadingStateView(title: "Loading page")
-                        .frame(minHeight: 360)
+                    PageLoadingSkeletonView()
+                        .frame(minHeight: 360, alignment: .topLeading)
                 }
             }
             .padding()
@@ -125,7 +126,11 @@ struct PageReaderView: View {
             pageReaderToolbar
         }
         .safeAreaInset(edge: .bottom) {
-            if let editorViewModel, readerMode == .edit, editorViewModel.isEditing, editorViewModel.canEdit {
+            if let editorViewModel,
+               readerMode == .edit,
+               editorViewModel.isEditing,
+               editorViewModel.canEdit,
+               showsEditorToolbar {
                 VStack(spacing: 6) {
                     if isUploadingAttachment {
                         DocmostlyGlassPanel(cornerRadius: 14) {
@@ -326,6 +331,7 @@ struct PageReaderView: View {
         }
         #endif
         .task(id: pageID) {
+            applyPagePreferences()
             await loadNativePage()
             focusRequestedCommentIfAvailable()
         }
@@ -352,6 +358,9 @@ struct PageReaderView: View {
         }
         .onChange(of: appState.selectedCommentID) { _, _ in
             focusRequestedCommentIfAvailable()
+        }
+        .onChange(of: appState.currentUser?.user.settings?.preferences) { _, preferences in
+            applyLayoutPreferences(preferences)
         }
         .onChange(of: editorViewModel?.localEditRevision) { oldRevision, newRevision in
             guard let oldRevision, let newRevision, oldRevision != newRevision else { return }
@@ -390,6 +399,19 @@ struct PageReaderView: View {
 }
 
 extension PageReaderView {
+    func applyPagePreferences() {
+        let preferences = PageReaderPreferences(appState.currentUser?.user.settings?.preferences)
+        readerMode = preferences.defaultMode
+        usesFullWidth = preferences.usesFullWidth
+        showsEditorToolbar = preferences.showsEditorToolbar
+    }
+
+    func applyLayoutPreferences(_ userPreferences: DocmostUserPreferences?) {
+        let preferences = PageReaderPreferences(userPreferences)
+        usesFullWidth = preferences.usesFullWidth
+        showsEditorToolbar = preferences.showsEditorToolbar
+    }
+
     var collaborationParticipation: NativeEditorCollaborationParticipation {
         guard let editorViewModel else { return .receiveOnly }
         guard readerMode == .edit, editorViewModel.canEdit else { return .receiveOnly }

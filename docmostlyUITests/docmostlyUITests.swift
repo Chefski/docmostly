@@ -23,14 +23,26 @@ final class DocmostlyUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testPreviewShellOpensCachedPageInReadMode() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-MainShellPreview"]
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let roadmap = app.buttons["PageTreeNode.roadmap"]
+        XCTAssertTrue(roadmap.waitForExistence(timeout: 5))
+        roadmap.tap()
+
+        let title = app.textFields["Page title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "Roadmap")
+
+        let modePicker = app.segmentedControls["PageModePicker"]
+        XCTAssertTrue(modePicker.waitForExistence(timeout: 3))
+
+        let readMode = modePicker.buttons["Read"]
+        XCTAssertTrue(readMode.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForSelectedState(true, element: readMode, timeout: 3))
+        XCTAssertTrue(waitForEnabledState(false, element: title, timeout: 3))
     }
 
     @MainActor
@@ -49,7 +61,7 @@ final class DocmostlyUITests: XCTestCase {
     }
 
     @MainActor
-    func testSpaceSettingsEntrySupportsNestedNavigation() throws {
+    func testSpaceSettingsEntryShowsSpaceConfiguration() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-MainShellPreview"]
         app.launch()
@@ -62,8 +74,17 @@ final class DocmostlyUITests: XCTestCase {
         XCTAssertTrue(spaceSettings.waitForExistence(timeout: 5))
         spaceSettings.tap()
 
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-        assertSettingsDestinationOpens("account", title: "Account", app: app)
+        XCTAssertTrue(app.navigationBars["Product"].waitForExistence(timeout: 5))
+
+        let settingsTab = app.buttons["Settings"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsTab.value as? String, "Selected")
+
+        let membersTab = app.buttons["Members"]
+        XCTAssertTrue(membersTab.waitForExistence(timeout: 5))
+        membersTab.tap()
+        XCTAssertEqual(membersTab.value as? String, "Selected")
+        XCTAssertTrue(app.textFields["Search members"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -83,5 +104,25 @@ final class DocmostlyUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
+    private func waitForEnabledState(
+        _ isEnabled: Bool,
+        element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: isEnabled))
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForSelectedState(
+        _ isSelected: Bool,
+        element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let predicate = NSPredicate(format: "selected == %@", NSNumber(value: isSelected))
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }

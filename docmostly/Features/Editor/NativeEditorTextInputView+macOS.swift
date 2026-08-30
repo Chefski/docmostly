@@ -556,6 +556,7 @@ extension NativeEditorTextInputCoordinator {
 
     func textDidEndEditing(_ notification: Notification) {
         focusBindingEchoReconciler.recordLocalDeactivation()
+        bindingEchoReconciler.reset()
         parent.focusChanged(false)
     }
 }

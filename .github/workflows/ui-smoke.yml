@@ -1,6 +1,17 @@
 name: UI Smoke
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/ui-smoke.yml'
+      - 'DocmostlyMac/**'
+      - 'DocmostlyMacUITests/**'
+      - 'docmostly/**'
+      - 'docmostly.xcodeproj/**'
+      - 'docmostlyUITests/**'
+  push:
+    branches:
+      - main
   schedule:
     - cron: '0 7 * * 1'
   workflow_dispatch:

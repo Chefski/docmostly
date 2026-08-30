@@ -325,6 +325,7 @@ private struct MacSidebarSpacePickerRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(selectedSpace.name)
+        .accessibilityIdentifier("SpacePicker")
         .accessibilityAddTraits(.isButton)
         .frame(maxWidth: .infinity, minHeight: MacSidebarMetrics.rowHeight, alignment: .leading)
         .contentShape(.rect)

@@ -85,6 +85,7 @@ jobs:
             -project docmostly.xcodeproj \
             -scheme docmostly \
             -destination '${{ steps.ios-simulator.outputs.destination }}' \
+            -parallel-testing-enabled NO \
             -resultBundlePath "$result_bundle" \
             CODE_SIGNING_ALLOWED=NO
           test_status=$?

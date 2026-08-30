@@ -233,11 +233,6 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         parent.focusChanged(true)
     }
 
-    func textViewDidEndEditing(_ textView: UITextView) {
-        focusBindingEchoReconciler.recordLocalDeactivation()
-        parent.focusChanged(false)
-    }
-
     func textView(
         _ textView: UITextView,
         shouldChangeTextIn range: NSRange,
@@ -517,6 +512,14 @@ final class NativeEditorTextInputCoordinator: NSObject, UITextViewDelegate {
         case .justify:
             .justified
         }
+    }
+}
+
+extension NativeEditorTextInputCoordinator {
+    func textViewDidEndEditing(_ textView: UITextView) {
+        focusBindingEchoReconciler.recordLocalDeactivation()
+        bindingEchoReconciler.reset()
+        parent.focusChanged(false)
     }
 }
 

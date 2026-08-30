@@ -122,7 +122,7 @@ struct NativeEditorSaveRaceTests {
         #expect(viewModel.isDirty == false)
     }
 
-    @Test func divergentRemoteCRDTSnapshotDuringSaveCannotReplaceLocalDraftOrBaseline() async {
+    @Test func authoritativeCRDTProjectionDuringSavePreservesItsNewerBaseline() async {
         let engine = SuspendingSaveCRDTDocumentEngine()
         let viewModel = makeViewModel(engine: engine)
 
@@ -148,19 +148,20 @@ struct NativeEditorSaveRaceTests {
         let didSave = await saveTask.value
 
         #expect(didSave)
-        #expect(viewModel.title == "Draft")
-        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Local body"])
-        #expect(viewModel.lastSavedTitle == "Draft")
+        #expect(viewModel.title == "Remote title")
+        #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["Remote merged body"])
+        #expect(viewModel.lastSavedTitle == "Remote title")
         #expect(viewModel.lastSavedDocument.blocks.map { String($0.text.characters) } == ["Original body"])
-        #expect(viewModel.pendingRemoteCRDTSnapshot?.document == remoteDocument)
-        #expect(viewModel.pendingRemoteUpdate?.title == "Remote title")
-        #expect(viewModel.realtimeStatus == .conflict)
+        #expect(viewModel.pendingRemoteCRDTSnapshot == nil)
+        #expect(viewModel.pendingRemoteUpdate == nil)
+        #expect(viewModel.realtimeStatus == .connected)
+        #expect(viewModel.lastRemoteUpdatedAt == Date(timeIntervalSince1970: 50))
         #expect(viewModel.isDirty)
     }
 
     @Test func deferredConflictAutosaveQueuesLocalDraftWithoutFlushingYjsOrLoopingHandoff() async throws {
-        let engine = SuspendingSaveCRDTDocumentEngine()
-        let viewModel = makeViewModel(engine: engine)
+        let engine = SuspendingSaveCRDTDocumentEngine(requiresInitialRemoteSnapshot: true)
+        let viewModel = makeViewModel(engine: engine, isCRDTEngineReadyForLocalChanges: false)
         viewModel.document.blocks[0].text = AttributedString("Local durable draft")
         viewModel.handleDocumentChanged()
         try await viewModel.waitForPendingCRDTLocalChange()
@@ -218,7 +219,8 @@ struct NativeEditorSaveRaceTests {
     }
 
     private func makeViewModel(
-        engine: SuspendingSaveCRDTDocumentEngine
+        engine: SuspendingSaveCRDTDocumentEngine,
+        isCRDTEngineReadyForLocalChanges: Bool = true
     ) -> NativeRichEditorViewModel {
         let initialDocument = document(text: "Original body")
         let viewModel = NativeRichEditorViewModel(
@@ -228,7 +230,7 @@ struct NativeEditorSaveRaceTests {
         )
         viewModel.document = initialDocument
         viewModel.lastSavedDocument = initialDocument
-        viewModel.isCRDTEngineReadyForLocalChanges = true
+        viewModel.isCRDTEngineReadyForLocalChanges = isCRDTEngineReadyForLocalChanges
         viewModel.resetEditingHistory()
         return viewModel
     }
@@ -242,6 +244,8 @@ struct NativeEditorSaveRaceTests {
 
 @MainActor
 private final class SuspendingSaveCRDTDocumentEngine: NativeEditorCRDTDocumentEngine {
+    nonisolated let requiresInitialRemoteSnapshot: Bool
+
     enum Event: Equatable {
         case integrate(String)
         case flush(String)
@@ -255,6 +259,10 @@ private final class SuspendingSaveCRDTDocumentEngine: NativeEditorCRDTDocumentEn
     private(set) var flushRequests: [FlushRequest] = []
     private(set) var events: [Event] = []
     private var flushContinuation: CheckedContinuation<NativeEditorCRDTSaveResult, Never>?
+
+    init(requiresInitialRemoteSnapshot: Bool = false) {
+        self.requiresInitialRemoteSnapshot = requiresInitialRemoteSnapshot
+    }
 
     func encodeStateVector() async throws -> Data {
         Data()

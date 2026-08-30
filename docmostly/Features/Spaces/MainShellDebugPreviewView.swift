@@ -61,7 +61,7 @@ struct MainShellDebugPreviewView: View {
         if CommandLine.arguments.contains("-MainShellPreviewSettings") {
             appState.selectSidebarUtilityDestination(.settings)
         } else {
-            appState.selectDefaultSpaceIfNeeded()
+            appState.selectSpace(id: MainShellDebugPreviewFixtures.productSpaceID)
         }
     }
 }
