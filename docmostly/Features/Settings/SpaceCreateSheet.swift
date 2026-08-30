@@ -11,12 +11,21 @@ struct SpaceCreateSheet: View {
         NavigationStack {
             Form {
                 Section("Space") {
-                    TextField("Name", text: $draft.name)
+                    TextField(
+                        "Name",
+                        text: Binding(
+                            get: { draft.name },
+                            set: { draft.setName($0) }
+                        )
+                    )
                         .docmostlyTextInputAutocapitalization(.words)
-                        .onChange(of: draft.name) { _, newValue in
-                            draft.setName(newValue)
-                        }
-                    TextField("Slug", text: $draft.slug)
+                    TextField(
+                        "Slug",
+                        text: Binding(
+                            get: { draft.slug },
+                            set: { draft.setSlug($0) }
+                        )
+                    )
                         .docmostlyTextInputAutocapitalization(.never)
                     TextField("Description", text: $draft.description, axis: .vertical)
                         .lineLimit(2...)

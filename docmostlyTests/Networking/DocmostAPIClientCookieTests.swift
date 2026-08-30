@@ -69,6 +69,28 @@ struct DocmostAPIClientCookieTests {
         #expect(request.httpShouldHandleCookies == false)
     }
 
+    @Test func imageRequestsUseExplicitCookieHeaders() async throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let imageURL = baseURL.appending(path: "api/attachments/img/space-icon/space.png")
+        let imageData = Data([0x01, 0x02, 0x03])
+        let jar = SessionCookieJar(cookies: [
+            cookie(name: "authToken", value: "secret", domain: "docs.example.com", path: "/")
+        ])
+        let loader = CapturingHTTPDataLoader(responses: [
+            try loaderResponse(url: imageURL, data: imageData)
+        ])
+        let client = DocmostAPIClient(baseURL: baseURL, loader: loader, cookieJar: jar)
+
+        let loadedData = try await client.loadImageData(from: imageURL)
+        let dataRequests = await loader.dataRequests
+        let request = try #require(dataRequests.first)
+
+        #expect(loadedData == imageData)
+        #expect(request.value(forHTTPHeaderField: "Accept") == "image/*")
+        #expect(request.value(forHTTPHeaderField: "Cookie") == "authToken=secret")
+        #expect(request.httpShouldHandleCookies == false)
+    }
+
     @Test func redirectPolicyRejectsCrossOriginRedirects() throws {
         let original = try #require(URL(string: "https://docs.example.com/api/users/me"))
         let redirect = try #require(URL(string: "https://evil.example.net/capture"))

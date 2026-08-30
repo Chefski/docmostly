@@ -258,7 +258,25 @@ private struct MacAboutSettingsPane: View {
                 }
             }
 
-            Section("Project") {
+            Section("Docmostly") {
+                if let websiteURL = URL(string: "https://docmostly.chef.ski/") {
+                    Link("Website", destination: websiteURL)
+                }
+
+                if let privacyURL = URL(string: "https://docmostly.chef.ski/privacy/") {
+                    Link("Privacy Policy", destination: privacyURL)
+                }
+
+                if let supportURL = URL(string: "https://docmostly.chef.ski/support/") {
+                    Link("Support", destination: supportURL)
+                }
+
+                if let sourceURL = URL(string: "https://github.com/Chefski/docmostly") {
+                    Link("Source Code", destination: sourceURL)
+                }
+            }
+
+            Section("Related Project") {
                 if let docmostURL = URL(string: "https://docmost.com") {
                     Link("Docmost", destination: docmostURL)
                 }

@@ -11,6 +11,7 @@ struct PageBrowserScopeSwitch: View {
             .padding(.vertical, PageBrowserMetrics.scopeSwitchVerticalOverflowPadding)
         }
         .padding(.vertical, -PageBrowserMetrics.scopeSwitchVerticalOverflowPadding)
+        .scrollClipDisabled()
         .scrollIndicators(.hidden)
         .accessibilityElement(children: .contain)
     }

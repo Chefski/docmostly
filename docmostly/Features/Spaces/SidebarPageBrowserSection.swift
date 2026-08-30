@@ -5,15 +5,32 @@ struct SidebarPageBrowserSection: View {
 
     var body: some View {
         Group {
-            PageBrowserScopeSwitch(viewModel: viewModel)
-                .contentMargins(
-                    .horizontal,
-                    PageBrowserMetrics.sidebarScopeSwitchSidePadding,
-                    for: .scrollContent
-                )
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+#if os(iOS)
+            Section {
+                PageBrowserScopeSwitch(viewModel: viewModel)
+                    .contentMargins(
+                        .horizontal,
+                        PageBrowserMetrics.sidebarScopeSwitchSidePadding,
+                        for: .scrollContent
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+            .listSectionMargins(.horizontal, 0)
+#else
+            Section {
+                PageBrowserScopeSwitch(viewModel: viewModel)
+                    .contentMargins(
+                        .horizontal,
+                        PageBrowserMetrics.sidebarScopeSwitchSidePadding,
+                        for: .scrollContent
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+#endif
 
             Section {
                 if viewModel.isLoading && viewModel.items.isEmpty {

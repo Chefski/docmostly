@@ -73,15 +73,24 @@ struct SpaceSettingsDetailFormView: View {
                     }
 
                     SpaceSettingsLabeledRow(title: "Name") {
-                        TextField("Name", text: $viewModel.draft.name)
+                        TextField(
+                            "Name",
+                            text: Binding(
+                                get: { viewModel.draft.name },
+                                set: { viewModel.draft.setName($0) }
+                            )
+                        )
                             .docmostlyTextInputAutocapitalization(.words)
-                            .onChange(of: viewModel.draft.name) { _, newValue in
-                                viewModel.draft.setName(newValue)
-                            }
                     }
 
                     SpaceSettingsLabeledRow(title: "Slug") {
-                        TextField("Slug", text: $viewModel.draft.slug)
+                        TextField(
+                            "Slug",
+                            text: Binding(
+                                get: { viewModel.draft.slug },
+                                set: { viewModel.draft.setSlug($0) }
+                            )
+                        )
                             .docmostlyTextInputAutocapitalization(.never)
                     }
 

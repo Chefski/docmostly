@@ -23,28 +23,31 @@ final class DocmostlyMacUITests: XCTestCase {
 
     func testPreviewShellSwitchesSidebarDestinations() throws {
         let app = launchMainShellPreview()
+        let spacePicker = app.buttons["SpacePicker"]
 
-        XCTAssertTrue(app.buttons["Product"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Roadmap"].waitForExistence(timeout: 5))
+        XCTAssertTrue(spacePicker.waitForExistence(timeout: 5))
+        XCTAssertEqual(spacePicker.label, "Product")
+        XCTAssertTrue(app.buttons["PageOpenLink.roadmap"].waitForExistence(timeout: 5))
 
         app.buttons["Search"].click()
         XCTAssertTrue(app.staticTexts["Search"].waitForExistence(timeout: 5))
 
-        app.buttons["Product"].click()
+        spacePicker.click()
         XCTAssertTrue(app.menuItems["Engineering"].waitForExistence(timeout: 5))
         app.menuItems["Engineering"].click()
-        XCTAssertTrue(app.buttons["Architecture"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["PageOpenLink.architecture"].waitForExistence(timeout: 5))
     }
 
     func testPreviewShellSelectsPageIntoDetailColumn() throws {
         let app = launchMainShellPreview()
 
-        XCTAssertTrue(app.buttons["Roadmap"].waitForExistence(timeout: 5))
-        app.buttons["Roadmap"].click()
+        XCTAssertTrue(app.buttons["PageOpenLink.roadmap"].waitForExistence(timeout: 5))
+        app.buttons["PageOpenLink.roadmap"].click()
 
         XCTAssertTrue(app.textFields["Page title"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["Page title"].value as? String, "Roadmap")
-        XCTAssertTrue(app.staticTexts["Roadmap native preview content"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textViews["Paragraph"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textViews["Paragraph"].value as? String, "Roadmap native preview content")
     }
 
     func testPreviewShellCanSwitchSpacesAfterOpeningOverviewPage() throws {
@@ -55,7 +58,7 @@ final class DocmostlyMacUITests: XCTestCase {
         XCTAssertTrue(app.textFields["Page title"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["Page title"].value as? String, "Roadmap")
 
-        app.buttons["Product"].click()
+        app.buttons["SpacePicker"].click()
         XCTAssertTrue(app.menuItems["Engineering"].waitForExistence(timeout: 5))
         app.menuItems["Engineering"].click()
 
@@ -65,7 +68,8 @@ final class DocmostlyMacUITests: XCTestCase {
         app.buttons["PageOpenLink.architecture"].click()
         XCTAssertTrue(app.textFields["Page title"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["Page title"].value as? String, "Architecture")
-        XCTAssertTrue(app.staticTexts["Architecture native preview content"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textViews["Paragraph"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textViews["Paragraph"].value as? String, "Architecture native preview content")
     }
 
     func testLaunchPerformance() throws {

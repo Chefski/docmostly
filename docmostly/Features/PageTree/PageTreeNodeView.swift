@@ -30,10 +30,12 @@ struct PageTreeNodeView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(node.title)
+                .accessibilityIdentifier(pageAccessibilityIdentifier)
                 #else
                 NavigationLink(value: node) {
                     PageTreeNodeLabel(node: node)
                 }
+                .accessibilityIdentifier(pageAccessibilityIdentifier)
                 #endif
             }
             .padding(.leading, CGFloat(depth) * PageTreeSidebarMetrics.depthIndent)
@@ -80,6 +82,10 @@ struct PageTreeNodeView: View {
 
     private func openNodeInDetailColumn() {
         openInDetailColumn(node)
+    }
+
+    private var pageAccessibilityIdentifier: String {
+        "PageTreeNode.\(node.slugId)"
     }
 
     private func handleDrop(pageIDs: [String], location: CGPoint) -> Bool {
