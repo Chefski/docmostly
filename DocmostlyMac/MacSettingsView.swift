@@ -259,15 +259,15 @@ private struct MacAboutSettingsPane: View {
             }
 
             Section("Docmostly") {
-                if let websiteURL = URL(string: "https://chefski.github.io/docmostly/") {
+                if let websiteURL = URL(string: "https://docmostly.chef.ski/") {
                     Link("Website", destination: websiteURL)
                 }
 
-                if let privacyURL = URL(string: "https://chefski.github.io/docmostly/privacy/") {
+                if let privacyURL = URL(string: "https://docmostly.chef.ski/privacy/") {
                     Link("Privacy Policy", destination: privacyURL)
                 }
 
-                if let supportURL = URL(string: "https://chefski.github.io/docmostly/support/") {
+                if let supportURL = URL(string: "https://docmostly.chef.ski/support/") {
                     Link("Support", destination: supportURL)
                 }
 
