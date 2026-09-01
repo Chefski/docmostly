@@ -2,24 +2,11 @@ import SwiftUI
 
 struct MainShellContentView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        Group {
-            #if os(iOS)
-            if pageOpenPresentation == .stack {
-                NavigationStack(path: $navigationPath) {
-                    MainShellContentRootView()
-                }
-            } else {
-                MainShellContentRootView()
-            }
-            #else
-            NavigationStack(path: $navigationPath) {
-                MainShellContentRootView()
-            }
-            #endif
+        NavigationStack(path: $navigationPath) {
+            MainShellContentRootView()
         }
         .onChange(of: appState.selectedSidebarDestination) {
             navigationPath = NavigationPath()
