@@ -129,6 +129,7 @@ struct PageOpenLink<Label: View>: View {
 
 struct PageOpenDestinationView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
 
     let target: PageOpenTarget
 
@@ -138,6 +139,7 @@ struct PageOpenDestinationView: View {
                 appState.openPage(target)
             }
             .onDisappear {
+                guard pageOpenPresentation.shouldClearSelectedPageOnReaderDisappear else { return }
                 appState.clearSelectedPage(ifMatching: target.slugId)
             }
     }

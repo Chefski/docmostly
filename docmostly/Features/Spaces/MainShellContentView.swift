@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainShellContentView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -9,6 +10,10 @@ struct MainShellContentView: View {
             MainShellContentRootView()
         }
         .onChange(of: appState.selectedSidebarDestination) {
+            navigationPath = NavigationPath()
+        }
+        .onChange(of: pageOpenPresentation) { _, newPresentation in
+            guard newPresentation == .detailColumn else { return }
             navigationPath = NavigationPath()
         }
         .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 460)

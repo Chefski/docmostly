@@ -1,8 +1,12 @@
 import SwiftUI
 
-enum PageOpenPresentation {
+enum PageOpenPresentation: Equatable {
     case stack
     case detailColumn
+
+    var shouldClearSelectedPageOnReaderDisappear: Bool {
+        self == .stack
+    }
 }
 
 extension EnvironmentValues {
