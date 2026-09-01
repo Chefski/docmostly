@@ -85,6 +85,7 @@ nonisolated struct PageOpenTarget: Identifiable, Hashable, Sendable {
 
 struct PageOpenLink<Label: View>: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
 
     let target: PageOpenTarget
     let label: () -> Label
@@ -104,10 +105,20 @@ struct PageOpenLink<Label: View>: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier(accessibilityIdentifier)
         #else
-        NavigationLink(value: target) {
-            label()
+        if pageOpenPresentation == .stack {
+            NavigationLink(value: target) {
+                label()
+            }
+            .accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            Button {
+                appState.openPage(target)
+            } label: {
+                label()
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(accessibilityIdentifier)
         }
-        .accessibilityIdentifier(accessibilityIdentifier)
         #endif
     }
 

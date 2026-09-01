@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NotificationListRow: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
 
     let notification: DocmostNotification
     let isUnread: Bool
@@ -24,18 +25,24 @@ struct NotificationListRow: View {
                 .accessibilityIdentifier("PageOpenLink.\(target.slugId)")
                 #else
                 Button {
-                    openPage(target)
+                    if pageOpenPresentation == .stack {
+                        openPage(target)
+                    } else {
+                        appState.openPage(target)
+                    }
                     if isUnread {
                         markRead()
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack {
                         NotificationRowView(notification: notification, isUnread: isUnread)
 
-                        Image(systemName: "chevron.forward")
-                            .imageScale(.small)
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
+                        if pageOpenPresentation == .stack {
+                            Image(systemName: "chevron.forward")
+                                .imageScale(.small)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
