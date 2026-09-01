@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PageTreeNodeView: View {
+    @Environment(\.pageOpenPresentation) private var pageOpenPresentation
+
     let node: PageTreeNode
     let depth: Int
     let isExpanded: Bool
@@ -32,10 +34,19 @@ struct PageTreeNodeView: View {
                 .accessibilityLabel(node.title)
                 .accessibilityIdentifier(pageAccessibilityIdentifier)
                 #else
-                NavigationLink(value: node) {
-                    PageTreeNodeLabel(node: node)
+                if pageOpenPresentation == .stack {
+                    NavigationLink(value: node) {
+                        PageTreeNodeLabel(node: node)
+                    }
+                    .accessibilityIdentifier(pageAccessibilityIdentifier)
+                } else {
+                    Button(action: openNodeInDetailColumn) {
+                        PageTreeNodeLabel(node: node)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(node.title)
+                    .accessibilityIdentifier(pageAccessibilityIdentifier)
                 }
-                .accessibilityIdentifier(pageAccessibilityIdentifier)
                 #endif
             }
             .padding(.leading, CGFloat(depth) * PageTreeSidebarMetrics.depthIndent)
