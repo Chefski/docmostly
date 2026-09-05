@@ -356,6 +356,17 @@ extension NativeRichEditorViewModel {
         return destinationBlockID
     }
 
+    func deletionFocusDestination(for blockID: UUID) -> UUID? {
+        guard let index = document.blocks.firstIndex(where: { $0.id == blockID }) else { return nil }
+        guard document.blocks.count > 1 else { return blockID }
+
+        let precedingIndices = document.blocks.indices.prefix(index).reversed()
+        let followingIndices = document.blocks.indices.dropFirst(index + 1)
+        let destinationIndex = precedingIndices.first(where: { document.blocks[$0].isEditable }) ??
+            followingIndices.first(where: { document.blocks[$0].isEditable })
+        return destinationIndex.map { document.blocks[$0].id }
+    }
+
     private func focusEditableBlockAfterDeletion(at deletedIndex: Int) -> UUID? {
         guard document.blocks.isEmpty == false else {
             activeBlockID = nil

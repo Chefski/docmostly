@@ -318,6 +318,7 @@ struct NativeRichEditorViewModelTests {
         viewModel.document = NativeEditorDocument(blocks: [firstBlock, selectedBlock, lastBlock])
 
         viewModel.selectBlock(selectedBlock.id)
+        #expect(viewModel.deletionFocusDestination(for: selectedBlock.id) == firstBlock.id)
         let destinationBlockID = viewModel.deleteSelectedBlock()
 
         #expect(viewModel.document.blocks.map { String($0.text.characters) } == ["First", "Last"])

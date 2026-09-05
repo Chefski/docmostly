@@ -29,10 +29,14 @@ final class NativeRichEditorViewModel {
         didSet {
             if activeBlockID != oldValue {
                 inlineTypingContext = nil
+                if pendingTextInputFocusHandoffBlockID != activeBlockID {
+                    pendingTextInputFocusHandoffBlockID = nil
+                }
             }
         }
     }
     var focusedTextInputBlockID: UUID?
+    var pendingTextInputFocusHandoffBlockID: UUID?
     var inlineTypingContext: NativeEditorInlineTypingContext?
     var selectedBlockID: UUID?
     var visibleBlockControlsID: UUID?
@@ -130,7 +134,7 @@ final class NativeRichEditorViewModel {
     }
 
     var isEditing: Bool {
-        isTitleFocused || focusedTextInputBlockID != nil
+        isTitleFocused || focusedTextInputBlockID != nil || pendingTextInputFocusHandoffBlockID != nil
     }
 
     var currentPageID: String {

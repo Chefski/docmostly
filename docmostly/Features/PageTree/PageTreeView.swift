@@ -124,12 +124,7 @@ struct PageTreeView: View {
             await refreshBrowser()
         }
         .task(id: searchTaskKey) {
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-                await searchViewModel.search(provider: searchProvider)
-            } catch {
-                return
-            }
+            await searchViewModel.search(provider: searchProvider, debounce: .milliseconds(300))
         }
         .pageOpenDestination()
         .navigationDestination(for: PageTreeNode.self) { node in
@@ -185,7 +180,7 @@ struct PageTreeView: View {
     }
 
     private var searchTaskKey: PageTreeSearchTaskKey {
-        PageTreeSearchTaskKey(spaceID: space.id, searchTaskKey: searchViewModel.searchTaskKey)
+        PageTreeSearchTaskKey(spaceID: space.id, searchTaskKey: searchViewModel.taskKey(provider: searchProvider))
     }
 
     private var searchProvider: PageTreeSearchProvider {

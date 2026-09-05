@@ -44,10 +44,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		4769950B2FE721BC00A9454F /* DocmostlyMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DocmostlyMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4769950B2FE721BC00A9454F /* Syncline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Syncline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		476995192FE721BE00A9454F /* DocmostlyMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DocmostlyMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		476995232FE721BE00A9454F /* DocmostlyMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DocmostlyMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		47D95DD22FE294E500ECEA87 /* docmostly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = docmostly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		47D95DD22FE294E500ECEA87 /* Syncline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Syncline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		47D95DE12FE294E700ECEA87 /* docmostlyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = docmostlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		47D95DEB2FE294E700ECEA87 /* docmostlyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = docmostlyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -164,10 +164,10 @@
 		47D95DD32FE294E500ECEA87 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				47D95DD22FE294E500ECEA87 /* docmostly.app */,
+				47D95DD22FE294E500ECEA87 /* Syncline.app */,
 				47D95DE12FE294E700ECEA87 /* docmostlyTests.xctest */,
 				47D95DEB2FE294E700ECEA87 /* docmostlyUITests.xctest */,
-				4769950B2FE721BC00A9454F /* DocmostlyMac.app */,
+				4769950B2FE721BC00A9454F /* Syncline.app */,
 				476995192FE721BE00A9454F /* DocmostlyMacTests.xctest */,
 				476995232FE721BE00A9454F /* DocmostlyMacUITests.xctest */,
 			);
@@ -197,8 +197,8 @@
 			packageProductDependencies = (
 				9ED94873D837F0482A6F599C /* YouTubePlayerKit */,
 			);
-			productName = DocmostlyMac;
-			productReference = 4769950B2FE721BC00A9454F /* DocmostlyMac.app */;
+			productName = Syncline;
+			productReference = 4769950B2FE721BC00A9454F /* Syncline.app */;
 			productType = "com.apple.product-type.application";
 		};
 		476995182FE721BE00A9454F /* DocmostlyMacTests */ = {
@@ -267,8 +267,8 @@
 			packageProductDependencies = (
 				E03B35CC5DAE0817D7846F6B /* YouTubePlayerKit */,
 			);
-			productName = docmostly;
-			productReference = 47D95DD22FE294E500ECEA87 /* docmostly.app */;
+			productName = Syncline;
+			productReference = 47D95DD22FE294E500ECEA87 /* Syncline.app */;
 			productType = "com.apple.product-type.application";
 		};
 		47D95DE02FE294E700ECEA87 /* docmostlyTests */ = {
@@ -495,7 +495,7 @@
 		4769952C2FE721BE00A9454F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncline;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DocmostlyMac/DocmostlyMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -508,6 +508,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Syncline;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -518,7 +519,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = DocmostlyMac;
+				PRODUCT_NAME = Syncline;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -533,7 +535,7 @@
 		4769952D2FE721BE00A9454F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncline;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DocmostlyMac/DocmostlyMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -546,6 +548,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Syncline;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -556,7 +559,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = DocmostlyMac;
+				PRODUCT_NAME = Syncline;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -587,7 +591,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DocmostlyMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DocmostlyMac";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Syncline.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Syncline";
 			};
 			name = Debug;
 		};
@@ -610,7 +614,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DocmostlyMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DocmostlyMac";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Syncline.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Syncline";
 			};
 			name = Release;
 		};
@@ -782,14 +786,14 @@
 		47D95DF62FE294E700ECEA87 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncline;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H844BPNKMP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Docmostly;
+				INFOPLIST_KEY_CFBundleDisplayName = Syncline;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -802,7 +806,8 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = docmostly;
+				PRODUCT_NAME = Syncline;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -816,14 +821,14 @@
 		47D95DF72FE294E700ECEA87 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Syncline;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H844BPNKMP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Docmostly;
+				INFOPLIST_KEY_CFBundleDisplayName = Syncline;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -836,7 +841,8 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ski.chef.docmostly;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = docmostly;
+				PRODUCT_NAME = Syncline;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -865,7 +871,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/docmostly.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/docmostly";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Syncline.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Syncline";
 			};
 			name = Debug;
 		};
@@ -887,7 +893,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/docmostly.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/docmostly";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Syncline.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Syncline";
 			};
 			name = Release;
 		};

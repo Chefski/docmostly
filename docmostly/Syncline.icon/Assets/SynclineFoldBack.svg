@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <path
+    d="M 136 278 C 300 278, 338 666, 512 666 C 686 666, 724 278, 888 278"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="92"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

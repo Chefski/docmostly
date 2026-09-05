@@ -131,7 +131,7 @@ struct MacWorkspaceSidebarView: View {
             .padding(.horizontal, MacSidebarMetrics.horizontalPadding)
             .padding(.vertical, MacSidebarMetrics.verticalPadding)
         }
-        .navigationTitle("Docmostly")
+        .navigationTitle("Syncline")
         .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
         .task(id: selectedSpace?.id) {
             await loadSelectedSpacePages()

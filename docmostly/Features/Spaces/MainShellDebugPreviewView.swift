@@ -93,7 +93,7 @@ private enum MainShellDebugPreviewFixtures {
         ),
         workspace: DocmostWorkspace(
             id: "workspace-1",
-            name: "Docmostly Preview",
+            name: "Syncline Preview",
             logo: nil,
             hostname: nil,
             description: nil,
