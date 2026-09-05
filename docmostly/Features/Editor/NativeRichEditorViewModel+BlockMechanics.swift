@@ -189,6 +189,21 @@ extension NativeRichEditorViewModel {
         return didMerge
     }
 
+    func backwardMergeDestination(for blockID: UUID) -> UUID? {
+        guard
+            let index = editableBlockIndex(for: blockID),
+            index > document.blocks.startIndex
+        else {
+            return nil
+        }
+
+        let previousIndex = document.blocks.index(before: index)
+        let previousBlock = document.blocks[previousIndex]
+        let currentBlock = document.blocks[index]
+        guard previousBlock.isEditable, Self.canMerge(currentBlock, into: previousBlock) else { return nil }
+        return previousBlock.id
+    }
+
     private func editableBlockIndex(for blockID: UUID) -> Array<NativeEditorBlock>.Index? {
         document.blocks.firstIndex { $0.id == blockID && $0.isEditable }
     }

@@ -43,9 +43,34 @@ struct NativeEditorFocusLifecycleTests {
         #expect(destinationBlockID == firstBlock.id)
         #expect(viewModel.activeBlockID == firstBlock.id)
         #expect(viewModel.focusedTextInputBlockID == nil)
+        #expect(viewModel.pendingTextInputFocusHandoffBlockID == firstBlock.id)
+        #expect(viewModel.isEditing == true)
 
         viewModel.textInputDidBeginEditing(blockID: firstBlock.id)
         #expect(viewModel.isEditing == true)
         #expect(viewModel.focusedTextInputBlockID == firstBlock.id)
+        #expect(viewModel.pendingTextInputFocusHandoffBlockID == nil)
+    }
+
+    @Test func outgoingBlurDoesNotInterruptEditingBeforeContinuationFocuses() {
+        let firstBlock = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("First"), alignment: .left)
+        let secondBlock = NativeEditorBlock(kind: .bulletListItem, text: AttributedString("Second"), alignment: .left)
+        let viewModel = NativeRichEditorViewModel(pageID: "page-1", initialTitle: "Page")
+        viewModel.document = NativeEditorDocument(blocks: [firstBlock, secondBlock])
+
+        viewModel.textInputDidBeginEditing(blockID: firstBlock.id)
+        viewModel.focus(blockID: secondBlock.id)
+        viewModel.textInputDidEndEditing(blockID: firstBlock.id)
+
+        #expect(viewModel.isEditing == true)
+        #expect(viewModel.activeBlockID == secondBlock.id)
+        #expect(viewModel.focusedTextInputBlockID == nil)
+        #expect(viewModel.pendingTextInputFocusHandoffBlockID == secondBlock.id)
+
+        viewModel.textInputDidBeginEditing(blockID: secondBlock.id)
+
+        #expect(viewModel.isEditing == true)
+        #expect(viewModel.focusedTextInputBlockID == secondBlock.id)
+        #expect(viewModel.pendingTextInputFocusHandoffBlockID == nil)
     }
 }

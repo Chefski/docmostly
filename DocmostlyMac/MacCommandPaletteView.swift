@@ -3,7 +3,6 @@ import SwiftUI
 struct MacCommandPaletteView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    @State private var query = ""
     @State private var searchViewModel = SearchViewModel()
 
     let items: [MacCommandPaletteItem]
@@ -11,7 +10,7 @@ struct MacCommandPaletteView: View {
     let openSearchResultInNewWindow: (DocmostSearchResult) -> Void
 
     private var matchingItems: [MacCommandPaletteItem] {
-        items.filter { $0.matches(query) }
+        items.filter { $0.matches(searchViewModel.query) }
     }
 
     var body: some View {
@@ -21,7 +20,7 @@ struct MacCommandPaletteView: View {
                     Image(systemName: "command")
                         .foregroundStyle(.secondary)
 
-                    TextField("Search commands and pages", text: $query)
+                    TextField("Search commands and pages", text: $searchViewModel.query)
                         .textFieldStyle(.plain)
                 }
                 .padding()
@@ -68,7 +67,7 @@ struct MacCommandPaletteView: View {
                     }
 
                     if shouldShowNoResults {
-                        ContentUnavailableView.search(text: query)
+                        ContentUnavailableView.search(text: searchViewModel.query)
                     }
 
                     if let errorMessage = searchViewModel.errorMessage {
@@ -87,38 +86,17 @@ struct MacCommandPaletteView: View {
             }
         }
         .frame(minWidth: 620, minHeight: 520)
-        .task(id: query) {
-            await searchPages(for: query)
+        .task(id: searchViewModel.taskKey(provider: appState)) {
+            await searchViewModel.search(provider: appState, debounce: .milliseconds(250))
         }
     }
 
     private var shouldShowNoResults: Bool {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedQuery.count >= 2
+        searchViewModel.hasCompletedSearch
             && matchingItems.isEmpty
             && searchViewModel.results.isEmpty
             && searchViewModel.isSearching == false
             && searchViewModel.errorMessage == nil
-    }
-
-    private func searchPages(for query: String) async {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedQuery.count >= 2 else {
-            searchViewModel.query = ""
-            searchViewModel.results = []
-            searchViewModel.errorMessage = nil
-            return
-        }
-
-        do {
-            try await Task.sleep(for: .milliseconds(250))
-            try Task.checkCancellation()
-        } catch {
-            return
-        }
-
-        searchViewModel.query = trimmedQuery
-        await searchViewModel.search(provider: appState)
     }
 
     private func perform(_ action: @escaping @MainActor () -> Void) {

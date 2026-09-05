@@ -57,91 +57,127 @@ enum SearchAuthorScope: Hashable {
 final class SearchViewModel {
     static let defaultPageSize = 25
 
-    var query = ""
-    var results: [DocmostSearchResult] = []
-    var isSearching = false
-    var isLoadingMore = false
-    var hasMoreResults = false
-    var errorMessage: String?
-    var spaceScope: SearchSpaceScope = .currentSpace
-    var authorScope: SearchAuthorScope = .anyone
-    private var requestedResultCount = 0
-
-    var searchTaskKey: SearchTaskKey {
-        SearchTaskKey(query: query, spaceScope: spaceScope, authorScope: authorScope)
-    }
-
-    func search(provider: any SearchProviding, reset: Bool = true) async {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else {
-            results = []
-            errorMessage = nil
-            hasMoreResults = false
-            requestedResultCount = 0
-            return
-        }
-
-        let requestedSpaceScope = spaceScope
-        let requestedAuthorScope = authorScope
-        let requestedOffset = reset ? 0 : requestedResultCount
-        let requestedSpaceID = requestedSpaceScope.resolvedSpaceID(currentSpaceID: provider.selectedSpaceID)
-        let requestedCreatorID = requestedAuthorScope.resolvedCreatorID(currentUserID: provider.currentSearchUserID)
-
-        if reset {
-            isSearching = true
-        } else {
-            isLoadingMore = true
-        }
-        errorMessage = nil
-        defer {
-            if reset {
-                isSearching = false
-            } else {
-                isLoadingMore = false
+    var query = "" {
+        didSet {
+            if query.trimmingCharacters(in: .whitespacesAndNewlines) !=
+                oldValue.trimmingCharacters(in: .whitespacesAndNewlines) {
+                invalidateSearch()
             }
         }
+    }
+    private(set) var results: [DocmostSearchResult] = []
+    private(set) var isSearching = false
+    private(set) var isLoadingMore = false
+    private(set) var hasMoreResults = false
+    private(set) var errorMessage: String?
+    var spaceScope: SearchSpaceScope = .currentSpace {
+        didSet { if spaceScope != oldValue { invalidateSearch() } }
+    }
+    var authorScope: SearchAuthorScope = .anyone {
+        didSet { if authorScope != oldValue { invalidateSearch() } }
+    }
+    private(set) var hasCompletedSearch = false
+    @ObservationIgnored private var activeRequestID = UUID()
+    @ObservationIgnored private var completedRequestKey: SearchTaskKey?
+    private var requestedResultCount = 0
+
+    func taskKey(provider: any SearchProviding) -> SearchTaskKey {
+        SearchTaskKey(
+            query: query.trimmingCharacters(in: .whitespacesAndNewlines),
+            spaceScope: spaceScope,
+            authorScope: authorScope,
+            spaceID: spaceScope.resolvedSpaceID(currentSpaceID: provider.selectedSpaceID),
+            creatorID: authorScope.resolvedCreatorID(currentUserID: provider.currentSearchUserID)
+        )
+    }
+
+    func search(
+        provider: any SearchProviding,
+        reset: Bool = true,
+        debounce: Duration = .zero
+    ) async {
+        guard Task.isCancelled == false else { return }
+        let requestKey = taskKey(provider: provider)
+        guard requestKey.query.count >= 2 else {
+            invalidateSearch()
+            return
+        }
+        guard reset || canLoadMore(for: requestKey) else { return }
+
+        let requestedOffset = reset ? 0 : requestedResultCount
+        if reset {
+            invalidateSearch()
+        }
+        let requestID = UUID()
+        activeRequestID = requestID
+        isSearching = reset
+        isLoadingMore = reset == false
+        errorMessage = nil
+        defer { finishRequest(requestID) }
 
         do {
+            if debounce > .zero {
+                try await Task.sleep(for: debounce)
+            }
+            try Task.checkCancellation()
+            guard isCurrentRequest(requestID, key: requestKey, provider: provider) else { return }
             let fetchedResults = try await provider.search(
-                query: trimmed,
-                spaceId: requestedSpaceID,
-                creatorId: requestedCreatorID,
+                query: requestKey.query,
+                spaceId: requestKey.spaceID,
+                creatorId: requestKey.creatorID,
                 limit: Self.defaultPageSize,
                 offset: requestedOffset
             )
-            guard Task.isCancelled == false else { return }
-            guard isCurrentRequest(
-                query: trimmed,
-                spaceScope: requestedSpaceScope,
-                authorScope: requestedAuthorScope
-            ) else { return }
+            guard isCurrentRequest(requestID, key: requestKey, provider: provider) else { return }
 
             if reset {
                 results = fetchedResults
             } else {
                 appendUniqueResults(fetchedResults)
             }
+            completedRequestKey = requestKey
+            hasCompletedSearch = true
             requestedResultCount = requestedOffset + fetchedResults.count
             hasMoreResults = fetchedResults.count == Self.defaultPageSize
         } catch {
-            guard Task.isCancelled == false else { return }
+            guard isCurrentRequest(requestID, key: requestKey, provider: provider),
+                  error is CancellationError == false else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func loadMore(provider: any SearchProviding) async {
-        guard hasMoreResults, isSearching == false, isLoadingMore == false else { return }
         await search(provider: provider, reset: false)
     }
 
+    private func finishRequest(_ id: UUID) {
+        guard activeRequestID == id else { return }
+        isSearching = false
+        isLoadingMore = false
+    }
+
+    private func canLoadMore(for key: SearchTaskKey) -> Bool {
+        hasMoreResults && isSearching == false && isLoadingMore == false && completedRequestKey == key
+    }
+
     private func isCurrentRequest(
-        query requestedQuery: String,
-        spaceScope requestedSpaceScope: SearchSpaceScope,
-        authorScope requestedAuthorScope: SearchAuthorScope
+        _ id: UUID,
+        key: SearchTaskKey,
+        provider: any SearchProviding
     ) -> Bool {
-        requestedQuery == query.trimmingCharacters(in: .whitespacesAndNewlines) &&
-            requestedSpaceScope == spaceScope &&
-            requestedAuthorScope == authorScope
+        Task.isCancelled == false && activeRequestID == id && key == taskKey(provider: provider)
+    }
+
+    private func invalidateSearch() {
+        activeRequestID = UUID()
+        completedRequestKey = nil
+        results = []
+        errorMessage = nil
+        hasMoreResults = false
+        hasCompletedSearch = false
+        requestedResultCount = 0
+        isSearching = false
+        isLoadingMore = false
     }
 
     private func appendUniqueResults(_ fetchedResults: [DocmostSearchResult]) {
@@ -156,4 +192,6 @@ struct SearchTaskKey: Hashable {
     let query: String
     let spaceScope: SearchSpaceScope
     let authorScope: SearchAuthorScope
+    let spaceID: String?
+    let creatorID: String?
 }

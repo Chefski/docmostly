@@ -1,12 +1,12 @@
-# Docmostly
+# Syncline
 
-Docmostly is an open source Apple-platform app for [Docmost](https://docmost.com), built as a native companion for Docmost workspaces across iPhone, iPad, and Mac.
+Syncline is an open source Apple-platform app for [Docmost](https://docmost.com), built as a native companion for Docmost workspaces across iPhone, iPad, and Mac.
 
-[![Download Docmostly on TestFlight](https://askyourself.app/assets/testflight.png)](https://testflight.apple.com/join/pnRP3TSA)
+[![Download Syncline on TestFlight](https://askyourself.app/assets/testflight.png)](https://testflight.apple.com/join/pnRP3TSA)
 
 The goal is to make Docmost feel at home on iPhone, iPad, and macOS: fast browsing, reliable reading, search, recent pages, offline read-only access, settings, comments, attachments, and collaboration features designed with SwiftUI instead of a web wrapper.
 
-Docmostly is an independent open source project and is not affiliated with, sponsored by, or endorsed by Docmost.
+Syncline is an independent open source project and is not affiliated with, sponsored by, or endorsed by Docmost.
 
 ## Project Goals
 
@@ -19,7 +19,7 @@ Docmostly is an independent open source project and is not affiliated with, spon
 
 ## Technology
 
-Docmostly is built with:
+Syncline is built with:
 
 - Swift
 - SwiftUI
@@ -31,11 +31,11 @@ The iPhone and iPad app targets iOS 26.0 and iPadOS 26.0 or later. The Mac app t
 
 ## Status
 
-Docmostly is under active development. The current focus is building a robust native foundation for authentication, workspace navigation, page reading, caching, search, comments, attachments, and collaboration across iPhone, iPad, and Mac.
+Syncline is under active development. The current focus is building a robust native foundation for authentication, workspace navigation, page reading, caching, search, comments, attachments, and collaboration across iPhone, iPad, and Mac.
 
 ## Getting Started
 
-To work on Docmostly locally:
+To work on Syncline locally:
 
 1. Clone the repository.
 2. Open `docmostly.xcodeproj` in Xcode.
@@ -58,6 +58,6 @@ Before opening a pull request:
 
 ## License
 
-Docmostly is available under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Syncline is available under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 Third-party notices for bundled dependencies are available in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

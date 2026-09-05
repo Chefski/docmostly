@@ -9,7 +9,7 @@ struct DocmostlyMacApp: App {
     private let sharedModelContainer = DocmostlyModelContainer.make()
 
     var body: some Scene {
-        WindowGroup("Docmostly", id: "main") {
+        WindowGroup("Syncline", id: "main") {
             MacRootView(modelContainer: sharedModelContainer)
                 .environment(appState)
                 .environment(commandController)

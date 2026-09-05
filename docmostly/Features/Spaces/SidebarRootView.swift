@@ -55,7 +55,7 @@ struct SidebarRootView: View {
         #if os(iOS)
         ""
         #else
-        "Docmostly"
+        "Syncline"
         #endif
     }
 

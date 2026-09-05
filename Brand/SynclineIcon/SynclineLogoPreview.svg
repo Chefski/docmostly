@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10182F"/>
+      <stop offset="0.55" stop-color="#221A4D"/>
+      <stop offset="1" stop-color="#35185B"/>
+    </linearGradient>
+    <linearGradient id="backFold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7E91FF"/>
+      <stop offset="1" stop-color="#9B78F6"/>
+    </linearGradient>
+    <linearGradient id="middleFold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFCA91"/>
+      <stop offset="1" stop-color="#FF8E7B"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="20" flood-color="#080B18" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#background)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)">
+    <path d="M 136 278 C 300 278, 338 666, 512 666 C 686 666, 724 278, 888 278" stroke="url(#backFold)" stroke-width="92"/>
+    <path d="M 136 430 C 300 430, 338 788, 512 788 C 686 788, 724 430, 888 430" stroke="url(#middleFold)" stroke-width="82"/>
+    <path d="M 136 576 C 300 576, 338 888, 512 888 C 686 888, 724 576, 888 576" stroke="#F7F3FF" stroke-width="72"/>
+  </g>
+</svg>

@@ -54,15 +54,19 @@ nonisolated extension Array where Element == PageTreeNode {
         }
     }
 
-    mutating func updateNode(id: String, update: (inout PageTreeNode) -> Void) {
+    @discardableResult
+    mutating func updateNode(id: String, update: (inout PageTreeNode) -> Void) -> Bool {
         for index in indices {
             if self[index].id == id {
                 update(&self[index])
-                return
+                return true
             }
 
-            self[index].children.updateNode(id: id, update: update)
+            if self[index].children.updateNode(id: id, update: update) {
+                return true
+            }
         }
+        return false
     }
 
     func node(id: String) -> PageTreeNode? {

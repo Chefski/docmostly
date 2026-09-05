@@ -58,6 +58,21 @@ struct PageTreeVisibleNodeTests {
         #expect(updated.first?.children.isEmpty == true)
     }
 
+    @Test func updatesNestedNodeAndReportsWhetherItWasFound() {
+        var nodes = [
+            node(id: "root", children: [node(id: "child")]),
+            node(id: "sibling")
+        ]
+
+        let found = nodes.updateNode(id: "child") { $0.title = "Updated" }
+        let missing = nodes.updateNode(id: "missing") { $0.title = "Unexpected" }
+
+        #expect(found)
+        #expect(missing == false)
+        #expect(nodes.node(id: "child")?.title == "Updated")
+        #expect(nodes.node(id: "sibling")?.title == "sibling")
+    }
+
     private func node(
         id: String,
         hasChildren: Bool? = nil,

@@ -12,16 +12,8 @@ struct SearchView: View {
         }
         .navigationTitle("Search")
         .searchable(text: $viewModel.query, prompt: "Search pages")
-        .task(id: viewModel.searchTaskKey) {
-            do {
-                try await Task.sleep(for: .milliseconds(300))
-                try Task.checkCancellation()
-                await viewModel.search(provider: appState)
-            } catch is CancellationError {
-                return
-            } catch {
-                return
-            }
+        .task(id: viewModel.taskKey(provider: appState)) {
+            await viewModel.search(provider: appState, debounce: .milliseconds(300))
         }
         .pageOpenDestination()
     }
@@ -51,14 +43,15 @@ struct SearchResultsContent: View {
                     await loadMore()
                 }
             }
-            .disabled(viewModel.isLoadingMore)
+            .disabled(viewModel.isSearching || viewModel.isLoadingMore)
         }
 
         if viewModel.isLoadingMore {
             ProgressView("Loading more")
         }
 
-        if viewModel.results.isEmpty && viewModel.query.isEmpty == false && viewModel.isSearching == false {
+        if viewModel.hasCompletedSearch && viewModel.results.isEmpty
+            && viewModel.isSearching == false && viewModel.errorMessage == nil {
             ContentUnavailableView.search(text: viewModel.query)
         }
 
