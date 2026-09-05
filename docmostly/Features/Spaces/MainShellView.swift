@@ -3,6 +3,9 @@ import SwiftUI
 struct MainShellView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     #if os(macOS)
     @Environment(MacDesktopCommandController.self) private var commandController
     @State private var isShowingSpaceSettings = false
@@ -44,6 +47,10 @@ struct MainShellView: View {
                 MainShellDetailView()
             }
             .navigationSplitViewStyle(.balanced)
+            .environment(
+                \.pageOpenPresentation,
+                horizontalSizeClass == .compact ? .stack : .detailColumn
+            )
             #endif
         }
         .environment(notificationStore)
