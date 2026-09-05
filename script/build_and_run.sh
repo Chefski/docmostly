@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="DocmostlyMac"
+APP_NAME="Syncline"
 PROJECT_NAME="docmostly.xcodeproj"
 SCHEME_NAME="DocmostlyMac"
 BUNDLE_ID="ski.chef.docmostly"

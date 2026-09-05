@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4769950A2FE721BC00A9454F"
-               BuildableName = "DocmostlyMac.app"
+               BuildableName = "Syncline.app"
                BlueprintName = "DocmostlyMac"
                ReferencedContainer = "container:docmostly.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4769950A2FE721BC00A9454F"
-            BuildableName = "DocmostlyMac.app"
+            BuildableName = "Syncline.app"
             BlueprintName = "DocmostlyMac"
             ReferencedContainer = "container:docmostly.xcodeproj">
          </BuildableReference>
@@ -67,7 +67,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4769950A2FE721BC00A9454F"
-            BuildableName = "DocmostlyMac.app"
+            BuildableName = "Syncline.app"
             BlueprintName = "DocmostlyMac"
             ReferencedContainer = "container:docmostly.xcodeproj">
          </BuildableReference>
@@ -84,7 +84,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4769950A2FE721BC00A9454F"
-            BuildableName = "DocmostlyMac.app"
+            BuildableName = "Syncline.app"
             BlueprintName = "DocmostlyMac"
             ReferencedContainer = "container:docmostly.xcodeproj">
          </BuildableReference>

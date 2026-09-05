@@ -46,7 +46,7 @@ struct LoginView: View {
                         .foregroundStyle(.primary)
                         .accessibilityHidden(true)
 
-                    Text("Sign in to Docmostly")
+                    Text("Sign in to Syncline")
                         .font(.title.bold())
 
                     Text("Use your Docmost workspace account to continue.")
@@ -171,7 +171,7 @@ struct LoginView: View {
                 } header: {
                     Text("Account")
                 } footer: {
-                    Text("Docmostly stores the authenticated session securely on this device.")
+                    Text("Syncline stores the authenticated session securely on this device.")
                 }
 
                 Section {
@@ -283,7 +283,7 @@ private struct MacLoginIntroPanel: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Docmostly")
+                    Text("Syncline")
                         .font(.largeTitle.bold())
 
                     Text("A native workspace for reading, editing, and organizing Docmost pages on your Mac.")
@@ -540,7 +540,7 @@ private struct MacLoginAccountSection: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("Docmostly stores the authenticated session securely on this device.")
+            Text("Syncline stores the authenticated session securely on this device.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

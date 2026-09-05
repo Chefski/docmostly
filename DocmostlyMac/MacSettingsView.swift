@@ -244,7 +244,7 @@ private struct MacAboutSettingsPane: View {
                         .frame(width: 72, height: 72)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Docmostly")
+                        Text("Syncline")
                             .font(.largeTitle.bold())
 
                         Text(MacAppVersion.displayString)
@@ -258,7 +258,7 @@ private struct MacAboutSettingsPane: View {
                 }
             }
 
-            Section("Docmostly") {
+            Section("Syncline") {
                 if let websiteURL = URL(string: "https://docmostly.chef.ski/") {
                     Link("Website", destination: websiteURL)
                 }
