@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import docmostly
 
+@MainActor
 struct NativeEditorMentionSearchTests {
     @Test func buildsPageMentionFromSearchResult() {
         let mention = NativeEditorMention(pageSearchResult: searchResult())

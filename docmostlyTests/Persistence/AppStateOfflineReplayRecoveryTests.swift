@@ -279,7 +279,8 @@ struct AppStateOfflineReplayRecoveryTests {
     }
 }
 
-private actor OfflineReplayCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing {
+@MainActor
+private final class OfflineReplayCRDTSynchronizer: NativeEditorOfflineCRDTSynchronizing {
     func synchronize(
         pageID: String,
         session: DocumentSession,

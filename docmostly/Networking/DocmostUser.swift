@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct DocmostUser: Decodable, Identifiable, Hashable, Sendable {
+nonisolated struct DocmostUser: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let email: String?

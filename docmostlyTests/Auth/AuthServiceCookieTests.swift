@@ -48,6 +48,29 @@ struct AuthServiceCookieTests {
         let session = try #require(restoredSession)
 
         #expect(session.cookies.map(\.name).sorted() == ["authToken", "refreshToken"])
+        #expect(session.currentUser?.user.id == "user-1")
+        #expect(session.currentUser?.workspace.id == "workspace-1")
+    }
+
+    @Test func storedSessionCurrentUserSurvivesJSONRoundTrip() throws {
+        let baseURL = try #require(URL(string: "https://docs.example.com"))
+        let envelope = try DocmostJSONDecoder.make().decode(
+            APIEnvelope<CurrentUserResponse>.self,
+            from: currentUserEnvelopeData()
+        )
+        let session = StoredSession(serverBaseURL: baseURL, cookies: [], currentUser: envelope.data)
+
+        let decoded = try JSONDecoder().decode(StoredSession.self, from: JSONEncoder().encode(session))
+
+        #expect(decoded == session)
+    }
+
+    @Test func storedSessionWithoutCurrentUserStillDecodes() throws {
+        let legacyData = Data(#"{"serverBaseURL":"https://docs.example.com","cookies":[]}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(StoredSession.self, from: legacyData)
+
+        #expect(decoded.currentUser == nil)
     }
 
     @Test func logoutClearsCookieJarAndStoredSession() async throws {

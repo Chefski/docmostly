@@ -97,7 +97,8 @@ final class SessionTestDocumentEngineFactory: NativeEditorCRDTDocumentEngineFact
     }
 }
 
-actor RecordingDocumentUpdateIndexer: DocumentUpdateIndexer {
+@MainActor
+final class RecordingDocumentUpdateIndexer: DocumentUpdateIndexer {
     private(set) var count = 0
 
     func documentUpdateCommitted(_ update: CommittedDocumentUpdate) {

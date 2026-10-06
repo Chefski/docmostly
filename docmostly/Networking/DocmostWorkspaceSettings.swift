@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct DocmostWorkspaceSettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostWorkspaceSettings: Codable, Hashable, Sendable {
     let artificialIntelligence: DocmostWorkspaceAISettings?
     let sharing: DocmostWorkspaceSharingSettings?
     let api: DocmostWorkspaceAPISettings?
@@ -14,21 +14,21 @@ nonisolated struct DocmostWorkspaceSettings: Decodable, Hashable, Sendable {
     }
 }
 
-nonisolated struct DocmostWorkspaceAISettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostWorkspaceAISettings: Codable, Hashable, Sendable {
     let search: Bool?
     let generative: Bool?
     let mcp: Bool?
     let chat: Bool?
 }
 
-nonisolated struct DocmostWorkspaceSharingSettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostWorkspaceSharingSettings: Codable, Hashable, Sendable {
     let disabled: Bool?
 }
 
-nonisolated struct DocmostWorkspaceAPISettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostWorkspaceAPISettings: Codable, Hashable, Sendable {
     let restrictToAdmins: Bool?
 }
 
-nonisolated struct DocmostWorkspaceTemplateSettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostWorkspaceTemplateSettings: Codable, Hashable, Sendable {
     let allowMemberTemplates: Bool?
 }

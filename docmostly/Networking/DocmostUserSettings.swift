@@ -1,17 +1,17 @@
 import Foundation
 
-nonisolated struct DocmostUserSettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostUserSettings: Codable, Hashable, Sendable {
     let preferences: DocmostUserPreferences?
     let notifications: DocmostUserNotificationSettings?
 }
 
-nonisolated struct DocmostUserPreferences: Decodable, Hashable, Sendable {
+nonisolated struct DocmostUserPreferences: Codable, Hashable, Sendable {
     let fullPageWidth: Bool?
     let pageEditMode: String?
     let editorToolbar: Bool?
 }
 
-nonisolated struct DocmostUserNotificationSettings: Decodable, Hashable, Sendable {
+nonisolated struct DocmostUserNotificationSettings: Codable, Hashable, Sendable {
     let pageUpdated: Bool?
     let pageUserMention: Bool?
     let commentUserMention: Bool?

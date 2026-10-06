@@ -62,6 +62,11 @@ final class LoginViewModel {
            appState.serverURLString.isEmpty == false {
             validatedWorkspaceURLString = appState.serverURLString
         }
+
+        if let logoutErrorMessage = appState.logoutErrorMessage {
+            errorMessage = logoutErrorMessage
+            appState.logoutErrorMessage = nil
+        }
     }
 
     func clearWorkspaceErrorAndInvalidateAccountIfNeeded() {
