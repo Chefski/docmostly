@@ -45,7 +45,9 @@ nonisolated enum ServerURLValidator {
         }
 
         components.scheme = scheme
-        components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        // Keep a leading slash for subpath installs; URLComponents rejects a relative path once a host is set.
+        let trimmedPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = trimmedPath.isEmpty ? "" : "/\(trimmedPath)"
         components.query = nil
         components.fragment = nil
 

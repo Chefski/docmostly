@@ -19,11 +19,13 @@ final class AppState {
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
+    /// Set when logout could not remove the persisted session; shown once on the login screen.
+    var logoutErrorMessage: String?
     var pendingOfflineMutationCount = 0
 
     @ObservationIgnored let settingsStore: LocalSettingsStore
-    @ObservationIgnored private let authService: AuthService
-    @ObservationIgnored private let cookieJar: SessionCookieJar
+    @ObservationIgnored let authService: AuthService
+    @ObservationIgnored let cookieJar: SessionCookieJar
     @ObservationIgnored let crdtDocumentEngineFactory: (any NativeEditorCRDTDocumentEngineFactory)?
     @ObservationIgnored let offlineCRDTSynchronizer: any NativeEditorOfflineCRDTSynchronizing
     @ObservationIgnored var documentSessionRegistry: DocumentSessionRegistry?
@@ -33,8 +35,8 @@ final class AppState {
     @ObservationIgnored var offlineQueue: OfflineMutationQueue?
     @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
     @ObservationIgnored var cacheScope: CacheScope?
-    @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
-    @ObservationIgnored private var restoreTask: Task<Void, Never>?
+    @ObservationIgnored var apiClient: DocmostAPIClient?
+    @ObservationIgnored var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
@@ -158,39 +160,6 @@ final class AppState {
         pendingCacheWrites.removeAll(keepingCapacity: true)
     }
 
-    func restore() async {
-        do {
-            guard serverURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-                phase = .needsServer
-                return
-            }
-
-            let serverURL = try ServerURLValidator.normalizedURL(from: serverURLString)
-            apiClient = DocmostAPIClient(baseURL: serverURL, cookieJar: cookieJar)
-            serverURLString = serverURL.absoluteString
-
-            if let session = try await authService.restoreSession() {
-                apiClient = DocmostAPIClient(baseURL: session.serverBaseURL, cookieJar: cookieJar)
-                serverURLString = session.serverBaseURL.absoluteString
-            }
-
-            guard let apiClient else {
-                phase = .needsServer
-                return
-            }
-
-            currentUser = try await apiClient.send(.currentUser)
-            updateCacheScope()
-            phase = .authenticated
-            await loadSpaces()
-        } catch {
-            currentUser = nil
-            cacheScope = nil
-            phase = serverURLString.isEmpty ? .needsServer : .unauthenticated
-            await loadCachedSpaces()
-        }
-    }
-
     func validateAndSaveServerURL(_ value: String) async throws {
         let url = try ServerURLValidator.normalizedURL(from: value)
         let client = DocmostAPIClient(baseURL: url, cookieJar: cookieJar)
@@ -220,6 +189,7 @@ final class AppState {
             credentials: AuthCredentials(email: email, password: password),
             client: apiClient
         )
+        settingsStore.saveSessionInvalidated(false)
         currentUser = response
         updateCacheScope()
         phase = .authenticated
@@ -228,7 +198,17 @@ final class AppState {
     }
 
     func logout() async {
-        try? await authService.logout(client: apiClient)
+        // Mark first so a failed Keychain clear can never be resurrected by the offline restore fallback.
+        settingsStore.saveSessionInvalidated(true)
+        do {
+            try await authService.logout(client: apiClient)
+            settingsStore.saveSessionInvalidated(false)
+        } catch {
+            logoutErrorMessage = "Signed out, but the saved session couldn't be removed. Sign in and log out again."
+        }
+        if let host = apiClient?.baseURL.host() ?? URL(string: serverURLString)?.host() {
+            await CookieBridge.removeWebKitCookies(forHost: host)
+        }
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
         documentSessionRegistry?.removeAll()
@@ -479,7 +459,7 @@ final class AppState {
         return status != 401 && status != 403
     }
 
-    private func loadCachedSpaces() async {
+    func loadCachedSpaces() async {
         guard let cacheScope else { return }
 
         let cached: [DocmostSpace]?
@@ -556,7 +536,7 @@ final class AppState {
         return DocmostMentionSuggestionResponse(pages: pages)
     }
 
-    private func updateCacheScope() {
+    func updateCacheScope() {
         guard let currentUser, let apiClient else {
             cacheScope = nil
             return
@@ -573,24 +553,5 @@ final class AppState {
             throw APIError.connectionFailed(message)
         }
         return cacheScope
-    }
-}
-
-extension AppState {
-    func restoreIfNeeded() async {
-        if let restoreTask {
-            await restoreTask.value
-            return
-        }
-
-        guard phase == .restoring else { return }
-
-        let task = Task { [weak self] in
-            guard let self else { return }
-            await self.restore()
-        }
-        restoreTask = task
-        await task.value
-        restoreTask = nil
     }
 }

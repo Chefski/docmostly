@@ -215,7 +215,7 @@ struct NativeEditorWebEmbedView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let webView = WKWebView(frame: .zero, configuration: .nativeEditorEmbed)
         webView.navigationDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = .clear
@@ -239,7 +239,7 @@ struct NativeEditorWebEmbedView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let webView = WKWebView(frame: .zero, configuration: .nativeEditorEmbed)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         return webView
@@ -288,5 +288,14 @@ final class NativeEditorWebEmbedCoordinator: NSObject, WKNavigationDelegate {
             allowedHosts: allowedHosts
         )
         return isAllowed ? .allow : .cancel
+    }
+}
+
+private extension WKWebViewConfiguration {
+    /// Embeds get session cookies injected, so keep them in memory instead of the shared persistent store.
+    static var nativeEditorEmbed: WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        return configuration
     }
 }

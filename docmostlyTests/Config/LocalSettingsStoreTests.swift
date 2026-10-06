@@ -40,4 +40,22 @@ struct LocalSettingsStoreTests {
 
         userDefaults.removePersistentDomain(forName: suiteName)
     }
+
+    @Test func sessionInvalidatedMarkerRoundTrips() {
+        let suiteName = "Docmostly.LocalSettingsStoreTests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName) ?? .standard
+        userDefaults.removePersistentDomain(forName: suiteName)
+        let store = LocalSettingsStore(userDefaults: userDefaults)
+
+        #expect(store.loadSessionInvalidated() == false)
+
+        store.saveSessionInvalidated(true)
+        #expect(store.loadSessionInvalidated())
+        #expect(LocalSettingsStore(userDefaults: userDefaults).loadSessionInvalidated())
+
+        store.saveSessionInvalidated(false)
+        #expect(store.loadSessionInvalidated() == false)
+
+        userDefaults.removePersistentDomain(forName: suiteName)
+    }
 }

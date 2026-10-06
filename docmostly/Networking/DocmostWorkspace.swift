@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct DocmostWorkspace: Decodable, Identifiable, Hashable, Sendable {
+nonisolated struct DocmostWorkspace: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let logo: String?
