@@ -13,4 +13,13 @@ nonisolated enum CookieBridge {
             }
         }
     }
+
+    /// Clears the shared persistent WebKit store, which older builds used for embeds and seeded with session cookies.
+    @MainActor
+    static func removeAllWebKitData() async {
+        await WKWebsiteDataStore.default().removeData(
+            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
+            modifiedSince: .distantPast
+        )
+    }
 }

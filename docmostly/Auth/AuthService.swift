@@ -22,15 +22,19 @@ actor AuthService {
         return session
     }
 
-    func persistSession(for client: DocmostAPIClient) async throws {
+    func persistSession(for client: DocmostAPIClient, currentUser: CurrentUserResponse?) async throws {
         let cookies = await cookieJar.allCookies()
-        try await sessionStore.save(StoredSession(serverBaseURL: client.baseURL, cookies: cookies))
+        try await sessionStore.save(StoredSession(
+            serverBaseURL: client.baseURL,
+            cookies: cookies,
+            currentUser: currentUser
+        ))
     }
 
     func login(credentials: AuthCredentials, client: DocmostAPIClient) async throws -> CurrentUserResponse {
         try await client.sendVoid(.login(email: credentials.email, password: credentials.password))
         let currentUser: CurrentUserResponse = try await client.send(.currentUser)
-        try await persistSession(for: client)
+        try await persistSession(for: client, currentUser: currentUser)
         return currentUser
     }
 

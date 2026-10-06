@@ -19,6 +19,8 @@ final class AppState {
     var savedServerURLStrings: [String]
     var isOffline = false
     var statusMessage: String?
+    /// Set when logout could not remove the persisted session; shown once on the login screen.
+    var logoutErrorMessage: String?
     var pendingOfflineMutationCount = 0
 
     @ObservationIgnored let settingsStore: LocalSettingsStore
@@ -34,7 +36,7 @@ final class AppState {
     @ObservationIgnored var offlineQueueRepository: OfflineMutationQueueRepository?
     @ObservationIgnored var cacheScope: CacheScope?
     @ObservationIgnored private(set) var apiClient: DocmostAPIClient?
-    @ObservationIgnored private var restoreTask: Task<Void, Never>?
+    @ObservationIgnored var restoreTask: Task<Void, Never>?
     @ObservationIgnored private var spacesLoadTask: Task<Bool, Never>?
     @ObservationIgnored private var pendingCacheWrites: [CacheWriteOperation] = []
     @ObservationIgnored private var cacheWriteTask: Task<Void, Never>?
@@ -159,6 +161,7 @@ final class AppState {
     }
 
     func restore() async {
+        var restoredSession: StoredSession?
         do {
             guard serverURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
                 phase = .needsServer
@@ -169,9 +172,10 @@ final class AppState {
             apiClient = DocmostAPIClient(baseURL: serverURL, cookieJar: cookieJar)
             serverURLString = serverURL.absoluteString
 
-            if let session = try await authService.restoreSession() {
-                apiClient = DocmostAPIClient(baseURL: session.serverBaseURL, cookieJar: cookieJar)
-                serverURLString = session.serverBaseURL.absoluteString
+            restoredSession = try await authService.restoreSession()
+            if let restoredSession {
+                apiClient = DocmostAPIClient(baseURL: restoredSession.serverBaseURL, cookieJar: cookieJar)
+                serverURLString = restoredSession.serverBaseURL.absoluteString
             }
 
             guard let apiClient else {
@@ -179,15 +183,29 @@ final class AppState {
                 return
             }
 
-            currentUser = try await apiClient.send(.currentUser)
+            let user: CurrentUserResponse = try await apiClient.send(.currentUser)
+            currentUser = user
             updateCacheScope()
             phase = .authenticated
+            // Refresh the stored user and any rotated cookies; a failure here must not block sign-in.
+            try? await authService.persistSession(for: apiClient, currentUser: user)
             await loadSpaces()
         } catch {
+            // A stored session that only failed to reach the server stays signed in on the offline cache.
+            if canUseOfflineCache(after: error),
+               let cachedUser = restoredSession?.currentUser,
+               apiClient != nil {
+                currentUser = cachedUser
+                updateCacheScope()
+                phase = .authenticated
+                isOffline = true
+                await loadSpaces()
+                return
+            }
+
             currentUser = nil
             cacheScope = nil
             phase = serverURLString.isEmpty ? .needsServer : .unauthenticated
-            await loadCachedSpaces()
         }
     }
 
@@ -228,7 +246,12 @@ final class AppState {
     }
 
     func logout() async {
-        try? await authService.logout(client: apiClient)
+        do {
+            try await authService.logout(client: apiClient)
+        } catch {
+            logoutErrorMessage = "Signed out, but the saved session couldn't be removed. Sign in and log out again."
+        }
+        await CookieBridge.removeAllWebKitData()
         cancelScheduledCacheWrites()
         cancelOfflineReplay()
         documentSessionRegistry?.removeAll()
@@ -573,24 +596,5 @@ final class AppState {
             throw APIError.connectionFailed(message)
         }
         return cacheScope
-    }
-}
-
-extension AppState {
-    func restoreIfNeeded() async {
-        if let restoreTask {
-            await restoreTask.value
-            return
-        }
-
-        guard phase == .restoring else { return }
-
-        let task = Task { [weak self] in
-            guard let self else { return }
-            await self.restore()
-        }
-        restoreTask = task
-        await task.value
-        restoreTask = nil
     }
 }

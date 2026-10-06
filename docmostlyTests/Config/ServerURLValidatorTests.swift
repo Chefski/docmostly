@@ -9,6 +9,13 @@ struct ServerURLValidatorTests {
         #expect(url.absoluteString == "https://docs.example.com")
     }
 
+    @Test func keepsSubpathAndRemovesTrailingSlash() throws {
+        let url = try ServerURLValidator.normalizedURL(from: "https://example.com/docmost/")
+
+        #expect(url.absoluteString == "https://example.com/docmost")
+        #expect(url.appending(path: "api/users/me").absoluteString == "https://example.com/docmost/api/users/me")
+    }
+
     @Test func addsHTTPSWhenSchemeIsMissing() throws {
         let url = try ServerURLValidator.normalizedURL(from: "docs.example.com")
 
