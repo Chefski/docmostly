@@ -6,6 +6,7 @@ final class LocalSettingsStore {
     private let serverURLKey = "Docmostly.serverURL"
     private let savedServerURLsKey = "Docmostly.savedServerURLs"
     private let lastSelectedSpaceIDsKey = "Docmostly.lastSelectedSpaceIDs"
+    private let sessionInvalidatedKey = "Docmostly.sessionInvalidated"
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -32,6 +33,15 @@ final class LocalSettingsStore {
         var selectedSpaceIDs = lastSelectedSpaceIDs
         selectedSpaceIDs[selectionScopeKey(for: scope)] = spaceID
         userDefaults.set(selectedSpaceIDs, forKey: lastSelectedSpaceIDsKey)
+    }
+
+    /// Whether the stored session was rejected or logged out and must not be restored, even offline.
+    func loadSessionInvalidated() -> Bool {
+        userDefaults.bool(forKey: sessionInvalidatedKey)
+    }
+
+    func saveSessionInvalidated(_ isInvalidated: Bool) {
+        userDefaults.set(isInvalidated, forKey: sessionInvalidatedKey)
     }
 
     private var lastSelectedSpaceIDs: [String: String] {
