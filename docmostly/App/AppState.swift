@@ -459,7 +459,7 @@ final class AppState {
         return status != 401 && status != 403
     }
 
-    private func loadCachedSpaces() async {
+    func loadCachedSpaces() async {
         guard let cacheScope else { return }
 
         let cached: [DocmostSpace]?

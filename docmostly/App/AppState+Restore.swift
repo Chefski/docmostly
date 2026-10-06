@@ -68,13 +68,13 @@ extension AppState {
         } catch {
             // A stored session that only failed to reach the server stays signed in on the offline cache.
             if Self.isConnectivityFailure(error),
-               let cachedUser = restoredSession?.currentUser,
-               apiClient != nil {
+               let cachedUser = restoredSession?.currentUser {
                 currentUser = cachedUser
                 updateCacheScope()
                 phase = .authenticated
                 isOffline = true
-                await loadSpaces()
+                // The server was just unreachable, so read the cache instead of repeating the failed request.
+                await loadCachedSpaces()
                 return
             }
 
